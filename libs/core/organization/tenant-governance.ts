@@ -41,7 +41,7 @@ import {
   externalOperationGrantMatches,
   parseExternalOperationGrant,
 } from '../governance/external-operation-target.js';
-import type { CharterScope } from '../governance/accountability-charter.js';
+import type { CharterScope, CharterScopeKind } from '../governance/accountability-charter.js';
 import { resolveIdentityContext } from '../authority.js';
 import { currentActor } from '../authn/actor-context.js';
 import { pathResolver } from '../path-resolver.js';
@@ -391,7 +391,7 @@ export interface TenantProviderAttestationResult {
   /** Set when the attestation was applied under a human approval. */
   approval?: { request_id: string; approved_by: string };
   /** Set when a standing charter grant authorized the apply instead of a per-instance approval. */
-  delegation?: { charter_id: string; scope_kind: 'person' | 'organization'; grant_hash: string };
+  delegation?: { charter_id: string; scope_kind: CharterScopeKind; grant_hash: string };
 }
 
 export interface AttestationInvoker {
@@ -901,7 +901,7 @@ export function findProviderAttestationGrantAuthority(
     attested_by?: string;
   },
   options: TenantRegistryPathOptions = {}
-): { charter_id: string; scope_kind: 'person' | 'organization'; grant_hash: string } | undefined {
+): { charter_id: string; scope_kind: CharterScopeKind; grant_hash: string } | undefined {
   if (input.training_use !== 'none') return undefined;
   const target = parseExternalOperationGrant(
     buildExternalOperationTarget('tenant:attest_provider', {
@@ -956,7 +956,7 @@ export function attestTenantProvider(
   let approved:
     { approval: ApprovalRequestRecord; humanDecider: string; claimId: string } | undefined;
   let delegated:
-    { charter_id: string; scope_kind: 'person' | 'organization'; grant_hash: string } | undefined;
+    { charter_id: string; scope_kind: CharterScopeKind; grant_hash: string } | undefined;
   if (input.training_use === 'none') {
     if (input.approvalRequestId?.trim()) {
       const checked = assertProviderAttestationApproval(input.approvalRequestId.trim(), {

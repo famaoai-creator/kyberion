@@ -440,6 +440,7 @@ Repository build, test, generator and gate scripts for contributors.
 | `pnpm kyberion media intro-scratch`                 |                                            | Build the scratch-first narrated intro video.                                                     |
 | `pnpm kyberion patch dependency`                    |                                            | Apply a governed dependency patch                                                                 |
 | `pnpm kyberion prepare`                             | `pnpm prepare`                             | Install git hooks                                                                                 |
+| `pnpm kyberion prepare worktree`                    | `pnpm prepare:worktree`                    | Bootstrap a fresh worktree (install, build packages and repo scripts)                             |
 | `pnpm kyberion provider-capabilities report`        |                                            | Report which capabilities each installed provider CLI supports.                                   |
 | `pnpm kyberion release changelog-draft`             |                                            | Draft CHANGELOG entries from Conventional Commits since the last tag.                             |
 | `pnpm kyberion resolve generated`                   |                                            | Regenerate tracked generated files to resolve conflicts                                           |

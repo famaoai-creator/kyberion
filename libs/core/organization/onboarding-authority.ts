@@ -5,7 +5,15 @@ import { withAuthenticatedPersonalApprovals } from '../governance/authenticated-
 import { humanActor } from '../contracts/actor.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { isValidMemberId, readMemberProfile } from './member-registry.js';
-import type { CharterScope, ExternalEffectPolicy } from '../governance/accountability-charter.js';
+import {
+  CHARTER_SCOPE_ORGANIZATION,
+  CHARTER_SCOPE_PERSON,
+  charterScopeTenantSlug,
+  isPersonalCharterScope,
+  type CharterScope,
+  type CharterScopeKind,
+  type ExternalEffectPolicy,
+} from '../governance/accountability-charter.js';
 import { delegableCharterDecisions } from '../governance/charter-decision-vocabulary.js';
 import {
   acceptCharter,
@@ -52,7 +60,7 @@ export interface OnboardingAuthorityPrincipal {
   tenantSlugs: 'all' | string[];
 }
 export interface OnboardingAuthorityInput {
-  scope_kind: 'person' | 'organization';
+  scope_kind: CharterScopeKind;
   tenant_slug?: string;
   grants: ExternalOperationGrant[];
   /** Business decision types delegated by policy (allow/allow_with_review/forbid). */
@@ -112,7 +120,7 @@ function ownerFor(principal: OnboardingAuthorityPrincipal, scope: CharterScope, 
     return deny('authenticated requester and registered accountable human required');
   const member = readMemberProfile(principal.accountableId.slice(5), options);
   if (!member || member.status !== 'active') return deny('accountable member unavailable');
-  if (scope.kind === 'person') {
+  if (isPersonalCharterScope(scope)) {
     if (!principal.personalOwner || member.member_id !== 'owner')
       return deny('local personal owner required');
   } else if (
@@ -130,7 +138,7 @@ function withOnboardingApprovalScope<T>(
   options: Options,
   run: () => T
 ): T {
-  if (scope.kind !== 'person') return run();
+  if (!isPersonalCharterScope(scope)) return run();
   const owner = ownerFor(principal, scope, options);
   const installed = inspectInstalledOnboardingRuntime(scope);
   if (!installed.ready || installed.ownerId !== owner.id)
@@ -148,7 +156,7 @@ function parseDataTier(raw: unknown, scope: CharterScope): OnboardingAuthorityIn
     return deny('unknown data_tier field');
   const allowed = new Set([
     'public',
-    scope.kind === 'person' ? 'personal' : `confidential:${scope.tenant_slug}`,
+    isPersonalCharterScope(scope) ? 'personal' : `confidential:${scope.tenant_slug}`,
   ]);
   const parse = (key: 'read' | 'write'): string[] => {
     const rows = value[key];
@@ -161,23 +169,16 @@ function parseDataTier(raw: unknown, scope: CharterScope): OnboardingAuthorityIn
 export function onboardingAuthorityScope(raw: unknown): CharterScope {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return deny('scope required');
   const value = raw as Record<string, unknown>;
-  if (value.scope_kind === 'person' && value.tenant_slug === undefined) return { kind: 'person' };
+  if (value.scope_kind === CHARTER_SCOPE_PERSON && value.tenant_slug === undefined)
+    return { kind: 'person' };
   if (
-    value.scope_kind === 'organization' &&
+    value.scope_kind === CHARTER_SCOPE_ORGANIZATION &&
     typeof value.tenant_slug === 'string' &&
     isValidTenantSlug(value.tenant_slug)
   )
     return { kind: 'organization', tenant_slug: value.tenant_slug };
   return deny('valid actual scope required; personal scope has no tenant');
 }
-export function sameOnboardingAuthorityScope(left: CharterScope, right: CharterScope): boolean {
-  if (left.kind !== right.kind) return false;
-  return (
-    left.kind === 'person' ||
-    (right.kind === 'organization' && left.tenant_slug === right.tenant_slug)
-  );
-}
-
 function parseInput(raw: unknown, now: Date): OnboardingAuthorityInput {
   const scope = onboardingAuthorityScope(raw);
   const value = raw as Record<string, unknown>;
@@ -211,9 +212,10 @@ function parseInput(raw: unknown, now: Date): OnboardingAuthorityInput {
     return deny('mode must be grant, revoke or activate');
   if (value.renew_existing !== undefined && typeof value.renew_existing !== 'boolean')
     return deny('renew_existing must be boolean');
+  const scopeTenant = charterScopeTenantSlug(scope);
   return {
     scope_kind: scope.kind,
-    ...(scope.kind === 'organization' ? { tenant_slug: scope.tenant_slug } : {}),
+    ...(scopeTenant !== undefined ? { tenant_slug: scopeTenant } : {}),
     grants,
     ...(delegated_decisions !== undefined ? { delegated_decisions } : {}),
     ...(data_tier !== undefined ? { data_tier } : {}),
@@ -228,7 +230,7 @@ function buildPlan(principal: OnboardingAuthorityPrincipal, raw: unknown, option
   const scope = onboardingAuthorityScope(input);
   const accountable = ownerFor(principal, scope, options);
   const installed = inspectInstalledOnboardingRuntime(scope);
-  if (scope.kind === 'person' && (!installed.ready || installed.ownerId !== accountable.id))
+  if (isPersonalCharterScope(scope) && (!installed.ready || installed.ownerId !== accountable.id))
     return deny('complete installed operator and registered agent identity setup first');
   const runtime =
     installed.ready && installed.ownerId === accountable.id
