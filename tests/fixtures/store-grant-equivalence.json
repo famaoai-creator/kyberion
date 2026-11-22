@@ -729,7 +729,9 @@
           "active/shared/coordination/identity/",
           "knowledge/personal/tenants/",
           "knowledge/personal/members/",
-          "knowledge/personal/missions/"
+          "knowledge/personal/missions/",
+          "active/shared/runtime/co-sessions/",
+          "active/shared/observability/co-sessions/"
         ],
         "allow_write": []
       },
