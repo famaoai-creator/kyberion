@@ -381,6 +381,13 @@ export const MODELING_TRANSFORM_OP_HANDLERS: Readonly<Record<string, ModelingTra
       const sourceRoot = path.relative(rootDir, sourceRootPath).replaceAll(path.sep, '/') || '.';
       const languages = resolve(params.languages);
       const exclude = resolve(params.exclude);
+      for (const [name, value] of [
+        ['languages', languages],
+        ['exclude', exclude],
+      ] as const) {
+        if (value !== undefined && value !== '' && !Array.isArray(value))
+          throw new Error(`extract_code_graph: ${name} must be an array of strings`);
+      }
       return {
         ...ctx,
         [params.export_as || 'code_graph']: await extractCodeGraph({

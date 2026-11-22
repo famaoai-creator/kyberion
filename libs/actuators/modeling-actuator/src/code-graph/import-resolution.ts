@@ -21,6 +21,12 @@ export type ImportResolution =
 
 const posix = path.posix;
 
+function pushTo(index: Map<string, string[]>, key: string, value: string): void {
+  const list = index.get(key);
+  if (list) list.push(value);
+  else index.set(key, [value]);
+}
+
 function stripQuotes(value: string): string {
   return value.trim().replace(/^['"`<]|['"`>]$/gu, '');
 }
@@ -72,8 +78,8 @@ function resolveRelativePath(
     ctx.files
   );
   if (found) return { kind: 'internal', files: [found] };
-  // System headers (<stdio.h>) and missing includes are not internal files.
-  return relative ? { kind: 'unresolved' } : { kind: 'external', name: spec };
+  // A path-style include/require that names no file is a gap to report, not a dependency.
+  return { kind: 'unresolved' };
 }
 
 function resolvePythonModule(
@@ -128,9 +134,8 @@ function jvmIndex(ctx: ImportResolutionContext): JvmIndex {
     for (const file of ctx.files) {
       if (!JVM_SOURCE.test(file)) continue;
       const base = posix.basename(file).replace(JVM_SOURCE, '');
-      index.byBase.set(base, [...(index.byBase.get(base) ?? []), file]);
-      const dirBase = posix.basename(posix.dirname(file));
-      index.byDirBase.set(dirBase, [...(index.byDirBase.get(dirBase) ?? []), file]);
+      pushTo(index.byBase, base, file);
+      pushTo(index.byDirBase, posix.basename(posix.dirname(file)), file);
     }
     jvmIndexes.set(ctx, index);
   }
@@ -210,7 +215,7 @@ function goDirIndex(ctx: ImportResolutionContext): Map<string, string[]> {
     for (const file of ctx.files) {
       if (!file.endsWith('.go') || file.endsWith('_test.go')) continue;
       const dir = posix.dirname(file);
-      index.set(dir, [...(index.get(dir) ?? []), file]);
+      pushTo(index, dir, file);
     }
     goDirs.set(ctx, index);
   }

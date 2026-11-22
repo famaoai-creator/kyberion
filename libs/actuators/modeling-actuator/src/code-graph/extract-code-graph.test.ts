@@ -164,6 +164,7 @@ describe('modeling:extract_code_graph', () => {
       purpose: 'maintenance',
       in_scope: ['.'],
       exclusions: [],
+      uncovered_extensions: [{ extension: '.kt', reason: 'no Kotlin grammar in the rules yet' }],
       references: [],
     });
     const write = (registry: CodeGraphRegistry) =>
@@ -219,6 +220,15 @@ describe('modeling:extract_code_graph', () => {
     expect(narrowed.nodes.some((node) => node.path.startsWith('web/'))).toBe(false);
     expect(narrowed.unanalyzed_extensions).toEqual({});
     expect(narrowed.source_fingerprint).toEqual(graph.source_fingerprint);
+  });
+
+  it('reports files of filtered-out rule languages as unanalyzed', async () => {
+    const goOnly = await extractCodeGraph({ sourceRoot: relativeSource, languages: ['go'] });
+    expect(goOnly.generated_by.languages).toEqual(['go']);
+    expect(Object.keys(goOnly.unanalyzed_extensions)).toEqual(
+      expect.arrayContaining(['.ts', '.py', '.java', '.kt'])
+    );
+    expect(goOnly.unanalyzed_extensions).not.toHaveProperty('.go');
   });
 
   it('rejects unknown language filters', async () => {

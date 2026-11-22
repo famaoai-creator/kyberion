@@ -57,7 +57,11 @@ export interface CodeGraphReconciliationRow {
 export interface CodeGraphRegistry {
   kind: 'code-graph-registry';
   schema_version: 1;
-  generated_by: { op: 'modeling:extract_code_graph'; rules_version: string };
+  generated_by: {
+    op: 'modeling:extract_code_graph';
+    rules_version: string;
+    languages: string[];
+  };
   source_root: string;
   source_fingerprint: { algorithm: 'sha256'; value: string; file_count: number };
   excluded_paths: string[];
@@ -136,6 +140,11 @@ function languageFor(
   );
 }
 
+/** Code-unit order: deterministic across machines and ICU locales. */
+function compareText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function markerKey(hit: { subtype: string; line: number }, file: string): string {
   return `${hit.subtype}@${file}:${hit.line}`;
 }
@@ -149,11 +158,22 @@ function nodeId(
   return `${kind === 'entrypoint' ? 'EP' : 'BND'}:${hit!.subtype}:${file}:${hit!.line}`;
 }
 
+const compiledPatterns = new Map<string, RegExp>();
+
+function linePattern(source: string): RegExp {
+  let pattern = compiledPatterns.get(source);
+  if (!pattern) {
+    pattern = new RegExp(source, 'u');
+    compiledPatterns.set(source, pattern);
+  }
+  return pattern;
+}
+
 function scanLinePatterns(text: string, markers: CodeGraphMarkerRule[]): MarkerHit[] {
   const lines = text.split('\n');
   const hits: MarkerHit[] = [];
   for (const marker of markers) {
-    const pattern = new RegExp(marker.line_pattern, 'u');
+    const pattern = linePattern(marker.line_pattern);
     lines.forEach((line, index) => {
       if (pattern.test(line))
         hits.push({ kind: marker.kind, subtype: marker.subtype, line: index + 1 });
@@ -194,6 +214,8 @@ export async function extractCodeGraph(
   const languageRules = options.languages?.length
     ? rules.languages.filter((rule) => options.languages!.includes(rule.id))
     : rules.languages;
+  // Files of rule languages left out by the filter are a coverage gap, reported like any other.
+  const filteredOut = rules.languages.filter((rule) => !languageRules.includes(rule));
   if (options.languages?.length) {
     const unknown = options.languages.filter(
       (id) => !rules.languages.some((rule) => rule.id === id)
@@ -229,7 +251,8 @@ export async function extractCodeGraph(
       continue;
     }
     const ext = path.posix.extname(file).toLowerCase();
-    if (SOURCE_LIKE_EXTENSIONS.has(ext)) unanalyzed[ext] = (unanalyzed[ext] ?? 0) + 1;
+    if (SOURCE_LIKE_EXTENSIONS.has(ext) || languageFor(file, filteredOut))
+      unanalyzed[ext] = (unanalyzed[ext] ?? 0) + 1;
   }
 
   const nodes = new Map<string, CodeGraphNode>();
@@ -374,8 +397,8 @@ export async function extractCodeGraph(
 
   const definitions: Record<CodeGraphNodeKind, { a: string; b: string }> = {
     module: {
-      a: 'tree-sitter: source files that parse without syntax errors',
-      b: 'file listing by rule extensions',
+      a: 'tree-sitter: rule-extension files that parse without syntax errors (a subset of route B; only_in_b lists unparsable files)',
+      b: 'file listing by rule extensions after exclusions',
     },
     entrypoint: {
       a: 'tree-sitter marker queries (kind=entrypoint) from code-graph-enumeration-rules',
@@ -398,12 +421,16 @@ export async function extractCodeGraph(
     };
   });
 
-  const sortedNodes = [...nodes.values()].sort((left, right) => left.id.localeCompare(right.id));
+  const sortedNodes = [...nodes.values()].sort((left, right) => compareText(left.id, right.id));
   for (const node of sortedNodes) node.routes.sort();
   return {
     kind: 'code-graph-registry',
     schema_version: 1,
-    generated_by: { op: 'modeling:extract_code_graph', rules_version: rules.version },
+    generated_by: {
+      op: 'modeling:extract_code_graph',
+      rules_version: rules.version,
+      languages: languageRules.map((rule) => rule.id).sort(),
+    },
     source_root: root.relative,
     source_fingerprint: fingerprint,
     excluded_paths: excluded,
@@ -411,11 +438,13 @@ export async function extractCodeGraph(
     unanalyzed_extensions: unanalyzed,
     nodes: sortedNodes,
     edges: [...edges.values()].sort((left, right) =>
-      `${left.from}->${left.to}`.localeCompare(`${right.from}->${right.to}`)
+      compareText(`${left.from}->${left.to}`, `${right.from}->${right.to}`)
     ),
     external_dependencies: [...external].sort(),
-    unresolved_imports: unresolved.sort((left, right) =>
-      `${left.path}:${left.line}`.localeCompare(`${right.path}:${right.line}`)
+    unresolved_imports: unresolved.sort(
+      (left, right) =>
+        compareText(`${left.path}:${left.line}`, `${right.path}:${right.line}`) ||
+        left.line - right.line
     ),
     reconciliation,
   };
