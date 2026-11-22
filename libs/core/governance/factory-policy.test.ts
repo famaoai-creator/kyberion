@@ -11,6 +11,7 @@ import {
   getTenantFactoryAutonomyConfig,
   isFactoryActionGraduated,
   loadFactoryAutonomyPolicy,
+  mergeTenantFactoryAutonomyOverlays,
   type FactoryAutonomyPolicy,
 } from './factory-policy.js';
 
@@ -29,9 +30,11 @@ describe('factory-policy', () => {
   });
 
   it('ships with zero tenants graduated by default', () => {
+    const productOnly = getFactoryAutonomyPolicy({ tenantOverlays: false });
+    expect(productOnly.tenants).toEqual({});
     const policy = getFactoryAutonomyPolicy();
-    expect(policy.tenants).toEqual({});
     for (const actionId of FACTORY_GRADUATABLE_ACTIONS) {
+      expect(isFactoryActionGraduated(actionId, 'acme', productOnly)).toBe(false);
       expect(isFactoryActionGraduated(actionId, 'acme', policy)).toBe(false);
     }
   });
@@ -122,5 +125,92 @@ describe('factory-policy', () => {
     expect(() =>
       loadFactoryAutonomyPolicy({ policyPath: '/tmp/outside-repo-factory-policy.json' })
     ).toThrow();
+  });
+
+  it('merges confidential tenant governance overlays strictly scoped to each tenant', () => {
+    const base: FactoryAutonomyPolicy = { version: '1.0.0', tenants: {} };
+    const merged = mergeTenantFactoryAutonomyOverlays(base, [
+      {
+        tenant_slug: 'acme',
+        path: 'knowledge/confidential/acme/governance/factory-autonomy-policy.json',
+        value: {
+          version: '1.0.0',
+          tenants: {
+            acme: {
+              enabled: true,
+              graduated_actions: ['ci_autofix_attempt', 'pr_merge_low'],
+            },
+            beta: {
+              enabled: true,
+              graduated_actions: ['pr_merge_medium'],
+            },
+          },
+        },
+      },
+      {
+        tenant_slug: 'broken',
+        path: 'knowledge/confidential/broken/governance/factory-autonomy-policy.json',
+        value: {
+          version: '1.0.0',
+          tenants: {
+            broken: {
+              enabled: true,
+              graduated_actions: ['pr_merge_high'],
+            },
+          },
+        },
+      },
+    ]);
+    expect(isFactoryActionGraduated('ci_autofix_attempt', 'acme', merged)).toBe(true);
+    expect(isFactoryActionGraduated('pr_merge_low', 'acme', merged)).toBe(true);
+    expect(isFactoryActionGraduated('pr_merge_medium', 'beta', merged)).toBe(false);
+    expect(getTenantFactoryAutonomyConfig('broken', merged)).toBeUndefined();
+
+    // End-to-end filesystem load with registered tenant profile + confidential overlay under rootDir.
+    safeMkdir(path.join(scratchDir, 'knowledge/personal/tenants'), { recursive: true });
+    safeWriteFile(
+      path.join(scratchDir, 'knowledge/personal/tenants/acme.json'),
+      JSON.stringify(
+        {
+          tenant_slug: 'acme',
+          display_name: 'Acme',
+          status: 'active',
+          assigned_role: 'owner',
+        },
+        null,
+        2
+      )
+    );
+    safeMkdir(path.join(scratchDir, 'knowledge/confidential/acme/governance'), {
+      recursive: true,
+    });
+    safeWriteFile(
+      path.join(scratchDir, 'knowledge/confidential/acme/governance/factory-autonomy-policy.json'),
+      JSON.stringify(
+        {
+          version: '1.0.0',
+          tenants: {
+            acme: {
+              enabled: true,
+              graduated_actions: ['ci_autofix_attempt', 'pr_merge_low'],
+            },
+            beta: {
+              enabled: true,
+              graduated_actions: ['mission_start_mandate'],
+            },
+          },
+        },
+        null,
+        2
+      )
+    );
+
+    const loaded = loadFactoryAutonomyPolicy({ rootDir: scratchDir });
+    expect(isFactoryActionGraduated('ci_autofix_attempt', 'acme', loaded)).toBe(true);
+    expect(isFactoryActionGraduated('pr_merge_low', 'acme', loaded)).toBe(true);
+    expect(getTenantFactoryAutonomyConfig('beta', loaded)).toBeUndefined();
+    expect(
+      loadFactoryAutonomyPolicy({ rootDir: scratchDir, tenantOverlays: false }).tenants
+    ).toEqual({});
   });
 });

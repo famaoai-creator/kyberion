@@ -45,6 +45,50 @@ let charters: typeof import('@agent/core/dot/dot-charter');
 let results: typeof import('@agent/core/dot/dot-executor-reports');
 let control: typeof import('@agent/core/cloudflare-os-shared');
 
+const MUTABLE_PRODUCT_FILE = 'knowledge/product/governance/front-desk-execution-policy.json';
+const SEEDED_STATIC_TOP_LEVEL = new Set(['package.json', 'pipelines', 'scripts']);
+const SEEDED_STATIC_PRODUCT_DIRS = new Set(['schemas', 'governance', 'orchestration']);
+const SEEDED_STATIC_ROOTS = [
+  'package.json',
+  'pipelines',
+  'scripts',
+  'knowledge/product/schemas',
+  'knowledge/product/governance',
+  'knowledge/product/orchestration',
+];
+let seededStaticDirs: string[] = [];
+let seededStaticBaseline: Array<[string, string]> = [];
+
+function hashFile(file: string): string {
+  return createHash('sha256')
+    .update(safeReadFile(file, { encoding: null }))
+    .digest('hex');
+}
+
+function snapshotStaticTree(): { rows: Array<[string, string]>; dirs: string[] } {
+  return authority.withExecutionContext('ecosystem_architect', () => {
+    const rows: Array<[string, string]> = [];
+    const dirs: string[] = [];
+    const visit = (file: string) => {
+      const stat = safeLstat(file);
+      const relative = path.relative(root, file).split(path.sep).join('/');
+      if (relative === MUTABLE_PRODUCT_FILE) return;
+      if (stat.isDirectory()) {
+        dirs.push(relative);
+        rows.push([relative, 'directory']);
+        for (const name of safeReaddir(file).sort()) visit(path.join(file, name));
+      } else {
+        rows.push([relative, hashFile(file)]);
+      }
+    };
+    for (const entry of SEEDED_STATIC_ROOTS) {
+      const target = path.join(root, entry);
+      if (safeExistsSync(target)) visit(target);
+    }
+    return { rows, dirs };
+  });
+}
+
 function put(file: string, value: unknown): void {
   authority.withExecutionContext('ecosystem_architect', () => {
     const target = path.join(root, file);
@@ -58,22 +102,68 @@ function put(file: string, value: unknown): void {
 function snapshot() {
   return authority.withExecutionContext('ecosystem_architect', () => {
     const rows: Array<[string, string]> = [];
-    const visit = (file: string) => {
-      if (!safeExistsSync(file)) return;
+    const visitMutable = (file: string) => {
       const stat = safeLstat(file);
       const relative = path.relative(root, file).split(path.sep).join('/');
       if (stat.isDirectory()) {
         rows.push([relative, 'directory']);
-        for (const name of safeReaddir(file).sort()) visit(path.join(file, name));
-      } else
-        rows.push([
-          relative,
-          createHash('sha256')
-            .update(safeReadFile(file, { encoding: null }))
-            .digest('hex'),
-        ]);
+        for (const name of safeReaddir(file).sort()) visitMutable(path.join(file, name));
+      } else {
+        rows.push([relative, hashFile(file)]);
+      }
     };
-    visit(root);
+    for (const topName of safeReaddir(root).sort()) {
+      const topPath = path.join(root, topName);
+      if (SEEDED_STATIC_TOP_LEVEL.has(topName)) {
+        const stat = safeLstat(topPath);
+        rows.push([
+          `static-top:${topName}`,
+          `${stat.isDirectory() ? 'dir' : 'file'}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`,
+        ]);
+      } else if (topName === 'knowledge') {
+        const kStat = safeLstat(topPath);
+        if (!kStat.isDirectory()) {
+          rows.push(['knowledge', hashFile(topPath)]);
+          continue;
+        }
+        rows.push(['knowledge', 'directory']);
+        for (const kName of safeReaddir(topPath).sort()) {
+          const kPath = path.join(topPath, kName);
+          if (kName !== 'product') {
+            visitMutable(kPath);
+            continue;
+          }
+          const pStat = safeLstat(kPath);
+          if (!pStat.isDirectory()) {
+            rows.push(['knowledge/product', hashFile(kPath)]);
+            continue;
+          }
+          rows.push(['knowledge/product', 'directory']);
+          for (const pName of safeReaddir(kPath).sort()) {
+            if (!SEEDED_STATIC_PRODUCT_DIRS.has(pName)) {
+              visitMutable(path.join(kPath, pName));
+            }
+          }
+        }
+      } else {
+        visitMutable(topPath);
+      }
+    }
+    const mutableProductPath = path.join(root, MUTABLE_PRODUCT_FILE);
+    if (safeExistsSync(mutableProductPath)) {
+      visitMutable(mutableProductPath);
+    }
+    for (const dirRel of seededStaticDirs) {
+      const dirPath = path.join(root, dirRel);
+      if (!safeExistsSync(dirPath)) {
+        rows.push([`static-dir:${dirRel}`, 'missing']);
+        continue;
+      }
+      const stat = safeLstat(dirPath);
+      const listing = safeReaddir(dirPath).sort().join('\n');
+      const listingHash = createHash('sha256').update(listing).digest('hex');
+      rows.push([`static-dir:${dirRel}`, `${stat.mtimeMs}:${stat.ctimeMs}:${listingHash}`]);
+    }
     return rows;
   });
 }
@@ -188,6 +278,9 @@ beforeAll(async () => {
   charters = await import('@agent/core/dot/dot-charter');
   results = await import('@agent/core/dot/dot-executor-reports');
   control = await import('@agent/core/cloudflare-os-shared');
+  const baseline = snapshotStaticTree();
+  seededStaticBaseline = baseline.rows;
+  seededStaticDirs = baseline.dirs;
 }, 60_000);
 beforeEach(() => {
   for (const key of ['SYSTEM_ROLE', 'MISSION_ID', 'KYBERION_SUDO', 'KYBERION_TENANT'])
@@ -205,11 +298,17 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 afterAll(() => {
-  process.chdir(sourceRoot);
-  vi.useRealTimers();
-  vi.unstubAllEnvs();
-  safeRmSync(root, { recursive: true, force: true });
-});
+  try {
+    if (seededStaticBaseline.length > 0) {
+      expect(snapshotStaticTree().rows).toEqual(seededStaticBaseline);
+    }
+  } finally {
+    process.chdir(sourceRoot);
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    safeRmSync(root, { recursive: true, force: true });
+  }
+}, 60_000);
 describe('request-bound first-job status with real governed stores', { timeout: 60_000 }, () => {
   it('keeps the actual onboarding harness status path read-only and its failures identical', async () => {
     configure();

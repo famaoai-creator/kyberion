@@ -92,7 +92,7 @@ owner は各副作用の前に元の承認 hash・scope・charter・claim・leas
 既定動作（`agent/kyberion-development` 単一ブランチおよび全 `shadow: true` アクション停止）を保ったまま、ミッション単位で完結・検証・収束できる基盤を段階導入する。
 
 - **ミッション単位の並列開発ブランチ**: `libs/core/vcs/development-branch.ts` により、従来の `agent/kyberion-development` に加えて `agent/factory-<slug>`（`^agent/factory-[a-z0-9][a-z0-9-]{1,60}$`）を許可し、複数ミッションを相互干渉なく並列実行できるようにした。
-- **テナント別 opt-in shadow 昇格ポリシー**: `knowledge/product/governance/factory-autonomy-policy.json`（既定 `"tenants": {}`）と `libs/core/governance/factory-policy.ts` により、明示的に有効化されたテナントかつ許可済みアクション（`mission_start_mandate`、`ci_autofix_attempt`、`main_sync_clean`、`conflict_mechanical`、`pr_merge_low`、`pr_merge_medium`、`auto_revert_on_main_failure`）だけ shadow を解除する。`high_risk_paths` / `never_auto` / スコア上限による人間承認エスカレーションは常に維持する。
+- **テナント別 opt-in shadow 昇格ポリシー**: 公開カタログ `knowledge/product/governance/factory-autonomy-policy.json`（常に既定 `"tenants": {}`）を土台に、`knowledge/confidential/<tenant-slug>/governance/factory-autonomy-policy.json` の tenant governance overlay（自テナント専用スコープに厳格限定）を `libs/core/governance/factory-policy.ts` がマージし、明示的に有効化されたテナントかつ許可済みアクション（`mission_start_mandate`、`ci_autofix_attempt`、`main_sync_clean`、`conflict_mechanical`、`pr_merge_low`、`pr_merge_medium`、`auto_revert_on_main_failure`）だけ shadow を解除する。`high_risk_paths` / `never_auto` / スコア上限による人間承認エスカレーションは常に維持する。
 - **不変 Delivery Envelope と差分検証**: `libs/core/governance/factory-delivery-envelope.ts` が Standing Mandate または承認済み Alignment Brief に紐づく SHA-256 署名付き `FactoryDeliveryEnvelope` を生成し、`high_risk_paths`・`scope_out`・`allowed_paths` 逸脱および低リスク自動マージの安全側縮小（`auto_low_risk` → `veto_window`）を強制する。
 - **導入診断 (`evaluateFactoryReadiness`)**: `libs/core/governance/factory-readiness.ts` が halt 状態・テナント opt-in・有効な Standing Mandate 件数・各ゲート判定を統合し、有効化前のブロッカーを一覧化する。
 
