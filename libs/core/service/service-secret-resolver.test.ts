@@ -3,7 +3,8 @@ import { runInExecutionScope } from '../foundation/execution-scope.js';
 import { withTaskCredentialBinding } from '../foundation/credential-binding.js';
 import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 import { secretGuard } from '../secret/secret-guard.js';
-import { resolveServiceSecret } from './service-secret-resolver.js';
+import { loadServiceEndpointsCatalog } from './service-endpoint-registry.js';
+import { buildServiceSecretReference, resolveServiceSecret } from './service-secret-resolver.js';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -50,5 +51,25 @@ describe('strict service credential resolution', () => {
       throw failure;
     });
     expect(() => resolveServiceSecret('slack', ['BOT_TOKEN'])).toThrow(failure);
+  });
+
+  it('finds a hyphenated service secret stored under its env-safe name (google-maps → GOOGLE_MAPS_API_KEY)', () => {
+    // The reference name stays the binding / probe form; only the stored name is env-safe.
+    expect(buildServiceSecretReference('google-maps', 'API_KEY').env).toBe('GOOGLE-MAPS_API_KEY');
+    vi.stubEnv('AUTHORIZED_SCOPE', 'google-maps');
+    vi.stubEnv('GOOGLE_MAPS_API_KEY', 'maps-operator-key');
+    expect(resolveServiceSecret('google-maps', ['API_KEY'])).toBe('maps-operator-key');
+  });
+
+  it('keeps the env-safe stored names unique across the service catalog', () => {
+    // secret-guard falls back from `A-B_X` to the stored `A_B_X`; two ids with
+    // the same env-safe form (a-b and a_b) would share stored secrets.
+    const ids = Object.keys(loadServiceEndpointsCatalog().services);
+    const byStored = new Map<string, string[]>();
+    for (const id of ids) {
+      const stored = id.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+      byStored.set(stored, [...(byStored.get(stored) ?? []), id]);
+    }
+    expect([...byStored.values()].filter((group) => group.length > 1)).toEqual([]);
   });
 });

@@ -17,6 +17,7 @@
     "accounts.google.com",
     "oauth2.googleapis.com",
     "www.googleapis.com",
+    "places.googleapis.com",
     "login.microsoftonline.com"
   ],
   "blocked_domains": [],

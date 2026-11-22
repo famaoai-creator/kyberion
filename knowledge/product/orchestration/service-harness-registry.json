@@ -1081,13 +1081,15 @@
     },
     {
       "service_id": "google-maps",
-      "display_name": "Google Maps MCP Server",
-      "description": "MCP-based Google Maps interactions",
+      "display_name": "Google Maps Platform API",
+      "description": "Direct Google Maps Platform calls: Geocoding API and Places API (New) text search. API key from secret-guard (`pnpm kyberion secret introduce google-maps API_KEY`), sent as the `key` query parameter.",
+      "auth_strategy": "api_key_query",
       "operation_count": 2,
       "detail_ref": "knowledge/product/orchestration/service-presets/google-maps.json",
       "operations": [
         {
           "action": "maps_search",
+          "description": "Search places by free text (Places API New, places:searchText). Read-only: the request is a query.",
           "kind": "capture",
           "risk": "read",
           "approval_required": false,
@@ -1096,6 +1098,7 @@
         },
         {
           "action": "maps_geocode",
+          "description": "Geocode an address to coordinates (Geocoding API).",
           "kind": "capture",
           "risk": "read",
           "approval_required": false,

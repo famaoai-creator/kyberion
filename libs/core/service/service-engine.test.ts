@@ -1201,6 +1201,72 @@ describe('executeServicePreset', () => {
     );
   });
 
+  it('calls the Google Maps Platform APIs directly with the secret-guard key (real preset)', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.resolveServiceBinding.mockReturnValue({
+      serviceId: 'google-maps',
+      accessToken: 'maps-key-123',
+    });
+    mocks.loadServiceEndpointsCatalog.mockReturnValue({
+      default_pattern: 'https://api.{service_id}.com/v1',
+      services: {
+        'google-maps': {
+          preset_path: 'knowledge/product/orchestration/service-presets/google-maps.json',
+          base_url: 'https://maps.googleapis.com/maps/api',
+          credential_suffixes: { accessToken: ['API_KEY'] },
+          auth_strategy: 'api_key_query',
+        },
+      },
+    });
+    const actualIo = (await vi.importActual('../secure-io.js')) as typeof import('../secure-io.js');
+    const realPreset = String(
+      actualIo.safeReadFile(
+        path.join(
+          pathResolver.rootDir(),
+          'knowledge/product/orchestration/service-presets/google-maps.json'
+        ),
+        { encoding: 'utf8' }
+      )
+    );
+    mocks.safeReadFile.mockImplementation((filePath: string) =>
+      filePath.includes('google-maps.json') ? realPreset : ''
+    );
+    mocks.secureFetch.mockResolvedValue({ results: [] });
+
+    await executeServicePreset(
+      'google-maps',
+      'maps_geocode',
+      // A caller `key` never replaces the stored key.
+      { address: '東京駅', key: 'caller-key' },
+      'secret-guard'
+    );
+    expect(mocks.secureFetch).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        method: 'GET',
+        url: 'https://maps.googleapis.com/maps/api/geocode/json',
+        params: { address: '東京駅', key: 'maps-key-123' },
+      })
+    );
+
+    await executeServicePreset(
+      'google-maps',
+      'maps_search',
+      { query: 'ramen near Shibuya' },
+      'secret-guard'
+    );
+    expect(mocks.secureFetch).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        method: 'POST',
+        url: 'https://places.googleapis.com/v1/places:searchText',
+        params: { key: 'maps-key-123' },
+        data: { textQuery: 'ramen near Shibuya' },
+        headers: expect.objectContaining({
+          'X-Goog-FieldMask': expect.stringContaining('places.displayName'),
+        }),
+      })
+    );
+  });
+
   it('supports GitHub Actions workflow inspection and dispatch operations', async () => {
     const { executeServicePreset } = await import('./service-engine.js');
     mocks.resolveServiceBinding.mockReturnValue({

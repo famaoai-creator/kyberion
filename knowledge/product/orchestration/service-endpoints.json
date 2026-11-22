@@ -91,8 +91,12 @@
       "auth_strategy": "bearer"
     },
     "google-maps": {
+      "base_url": "https://maps.googleapis.com/maps/api",
       "preset_path": "knowledge/product/orchestration/service-presets/google-maps.json",
-      "auth_strategy": "none"
+      "credential_suffixes": {
+        "accessToken": ["API_KEY"]
+      },
+      "auth_strategy": "api_key_query"
     },
     "google-workspace": {
       "preset_path": "knowledge/product/orchestration/service-presets/google-workspace.json",
