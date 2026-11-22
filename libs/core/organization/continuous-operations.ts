@@ -14,14 +14,20 @@ import {
   dotDelegationCapacity,
   type DotDispatchResult,
 } from '../dot/dot-dispatch.js';
+import { assertContinuousObservationPaths } from './continuous-operations-sources.js';
+import { dotStatePath } from '../dot/dot-state-paths.js';
 import { readDotActionLedgerStrict } from '../dot/dot-action-ledger.js';
-import { assertScopedCadenceExecution } from './organization-cadence.js';
+import {
+  assertScopedCadenceExecution,
+  organizationCadenceLifecycle,
+} from './organization-cadence.js';
 import {
   parseContinuousOperationsConfig,
   parseContinuousObservations,
   evaluateContinuousOperations,
   type ContinuousOperationsConfig,
   type ContinuousOperationsCandidate,
+  type ContinuousObservation,
   type ContinuousSourceSnapshot,
 } from './continuous-operations-policy.js';
 
@@ -32,6 +38,7 @@ interface RuleState {
   value: number;
   operation_key?: string;
   admitted_at?: string;
+  admission_observation?: ContinuousObservation;
   status?: string;
   action_ref?: string;
   work_item_id?: string;
@@ -45,6 +52,7 @@ interface LoopState {
   identity: string;
   rules: Record<string, RuleState>;
 }
+const ADMISSION_PRIORITY = { urgent: 0, high: 1, normal: 2, low: 3 } as const;
 export interface ContinuousOperationsInventoryRow {
   rule_id: string;
   disposition:
@@ -60,6 +68,7 @@ export interface ContinuousOperationsInventoryRow {
   work_item_id?: string;
   error?: string;
   reason?: string;
+  admission_observation?: ContinuousObservation;
 }
 export interface ContinuousOperationsReport {
   loop_id: string;
@@ -146,6 +155,7 @@ function parseState(value: unknown, identity: string): LoopState {
             'value',
             'operation_key',
             'admitted_at',
+            'admission_observation',
             'status',
             'action_ref',
             'work_item_id',
@@ -177,6 +187,11 @@ function parseState(value: unknown, identity: string): LoopState {
       throw new Error('Invalid continuous operations admission time');
     if (row.operation_key && !row.admitted_at)
       throw new Error('Incomplete continuous operations admission state');
+    if (row.admission_observation !== undefined) {
+      const [baseline] = parseContinuousObservations([row.admission_observation]);
+      if (!row.operation_key || Date.parse(baseline.observed_at) > Date.parse(row.admitted_at!))
+        throw new Error('Invalid continuous operations admission observation');
+    }
   }
   return state;
 }
@@ -189,39 +204,59 @@ export function runContinuousOperations(
     now?: Date;
     rootDir?: string;
     snapshots?: ContinuousSourceSnapshot[];
+    observationOwnerNhi?: string;
+    withheldSources?: Set<string>;
+    assertExecutionCurrent?: () => void;
   } = {},
   deps: ContinuousOperationsDeps = {}
 ): ContinuousOperationsReport {
   const config = parseContinuousOperationsConfig(input);
   const now = options.now ?? new Date();
   const root = options.rootDir ?? pathResolver.rootDir();
-  const identity = hash({ loop: config.loop_id, dot: config.dot_id, scope: config.scope });
-  const statePath = path.join(
-    root,
-    'active/shared/runtime',
-    ...storagePartitionSegments({
-      kind: 'tier',
-      tier: config.scope.tier,
-      tenant: config.scope.tenant_slug,
-    }),
-    'continuous-operations',
-    identity,
-    'state.json'
-  );
-  const charter = (deps.charters ?? ((dir) => listDotCharters(dir).map((row) => row.charter)))(
-    root
-  ).find(
-    (row) =>
-      row.dot_id === config.dot_id &&
-      row.status === 'active' &&
-      row.scope.tier === config.scope.tier &&
-      row.scope.tenant_slug === config.scope.tenant_slug &&
-      row.scope.organization_id === config.scope.organization_id &&
-      row.scope.project_id === config.scope.project_id
-  );
+  const currentCharter = () =>
+    (deps.charters ?? ((dir: string) => listDotCharters(dir).map((row) => row.charter)))(root).find(
+      (row) =>
+        row.dot_id === config.dot_id &&
+        row.status === 'active' &&
+        row.scope.tier === config.scope.tier &&
+        row.scope.tenant_slug === config.scope.tenant_slug &&
+        row.scope.organization_id === config.scope.organization_id &&
+        row.scope.project_id === config.scope.project_id
+    );
+  const charter = currentCharter();
   if (!charter)
     throw new Error('Continuous operations requires an active dot charter with exact scope');
   (deps.authorize ?? authorize)(config, charter);
+  const ownerNhi = charter.scope.tier === 'personal' ? charter.scope.owner_nhi : undefined;
+  if (
+    charter.scope.tier === 'personal' &&
+    (!ownerNhi?.trim() || (options.snapshots && options.observationOwnerNhi !== ownerNhi))
+  )
+    throw new Error('Continuous operations observations require the current personal owner');
+  const assertOwnerCurrent = () => {
+    if (ownerNhi && currentCharter()?.scope.owner_nhi !== ownerNhi)
+      throw new Error('Continuous operations personal owner changed');
+  };
+  const identity = hash({
+    loop: config.loop_id,
+    dot: config.dot_id,
+    scope: config.scope,
+    ...(ownerNhi ? { owner_nhi: ownerNhi } : {}),
+  });
+  const statePath = ownerNhi
+    ? path.join(root, dotStatePath(charter, 'continuous-operations', identity, 'state.json'))
+    : path.join(
+        root,
+        'active/shared/runtime',
+        ...storagePartitionSegments({
+          kind: 'tier',
+          tier: config.scope.tier,
+          tenant: config.scope.tenant_slug,
+        }),
+        'continuous-operations',
+        identity,
+        'state.json'
+      );
   if (!config.enabled)
     return {
       loop_id: config.loop_id,
@@ -255,6 +290,8 @@ export function runContinuousOperations(
   };
   const apply = options.apply === true && config.enabled;
   return (deps.lock ?? withLockSync)(`continuous-operations-${identity}`, () => {
+    assertOwnerCurrent();
+    assertContinuousObservationPaths(config, charter);
     // Validate every source before changing any checkpoint or admitting any work.
     const snapshots =
       options.snapshots ??
@@ -271,11 +308,33 @@ export function runContinuousOperations(
           observations: parseContinuousObservations(read(sourcePath)),
         };
       });
-    const validatedSnapshots = snapshots.map((snapshot) => ({
-      source_id: snapshot.source_id,
-      observations: parseContinuousObservations(snapshot.observations),
-    }));
-    const candidates = evaluateContinuousOperations(config, validatedSnapshots, now);
+    const withheldSources = options.withheldSources ?? new Set<string>();
+    const pipelineSources = new Map(
+      config.sources.flatMap((source) =>
+        source.kind === 'pipeline' ? [[source.source_id, source.pipeline_ref] as const] : []
+      )
+    );
+    const sourceWithheld = (sourceId: string, allowed?: readonly string[]): boolean => {
+      if (withheldSources.has(sourceId)) return true;
+      const ref = pipelineSources.get(sourceId);
+      if (!ref || allowed?.includes(ref)) return false;
+      withheldSources.add(sourceId);
+      return true;
+    };
+    const validatedSnapshots = snapshots
+      .filter(
+        (snapshot) => !sourceWithheld(snapshot.source_id, charter.authority.allowed_pipelines)
+      )
+      .map((snapshot) => ({
+        source_id: snapshot.source_id,
+        observations: parseContinuousObservations(snapshot.observations),
+      }));
+    const candidates = evaluateContinuousOperations(
+      config,
+      validatedSnapshots,
+      now,
+      withheldSources
+    );
     if (!deps.read) assertStatePath();
     const state = (deps.exists ?? safeExistsSync)(statePath)
       ? parseState(
@@ -292,7 +351,17 @@ export function runContinuousOperations(
         'Continuous operations rule history limit reached; archive this loop before adding rules'
       );
     let admitted = 0;
-    for (const rule of config.rules) {
+    const rules = [...config.rules].sort(
+      (a, b) =>
+        ADMISSION_PRIORITY[a.priority ?? 'normal'] - ADMISSION_PRIORITY[b.priority ?? 'normal']
+    );
+    for (const rule of rules) {
+      if (withheldSources.has(rule.source_id)) continue;
+      if (
+        pipelineSources.has(rule.source_id) &&
+        sourceWithheld(rule.source_id, currentCharter()?.authority.allowed_pipelines)
+      )
+        continue;
       const observation = validatedSnapshots
         .find((source) => source.source_id === rule.source_id)!
         .observations.find((row) => row.metric === rule.metric);
@@ -359,6 +428,7 @@ export function runContinuousOperations(
         next.status = 'healthy';
         delete next.error;
         delete next.operation_key;
+        delete next.admission_observation;
         delete next.action_ref;
         delete next.work_item_id;
       }
@@ -407,12 +477,27 @@ export function runContinuousOperations(
       admitted += 1;
       row.disposition = recovery ? 'recovered' : 'proposed';
       if (!apply) continue;
+      assertOwnerCurrent();
+      options.assertExecutionCurrent?.();
+      if (
+        !deps.authorize &&
+        organizationCadenceLifecycle(
+          {
+            organizationId: config.scope.organization_id,
+            tenantSlug: config.scope.tenant_slug,
+            tier: config.scope.tier,
+          },
+          root
+        ) !== 'active'
+      )
+        throw new Error('Continuous admission requires an active organization');
       if (!recovery) {
         if (next.generation >= Number.MAX_SAFE_INTEGER)
           throw new Error('Continuous operations episode counter exhausted');
         next.generation += 1;
         next.operation_key = `continuous:${identity}:${semantic}:${next.generation}`;
         next.admitted_at = now.toISOString();
+        next.admission_observation = observation;
         delete next.action_ref;
         delete next.work_item_id;
       }
@@ -421,6 +506,19 @@ export function runContinuousOperations(
       delete next.error;
       state.rules[rule.rule_id] = next;
       write(statePath, state); // Persist immutable operation identity before the external admission.
+      assertOwnerCurrent();
+      options.assertExecutionCurrent?.();
+      if (
+        pipelineSources.has(rule.source_id) &&
+        sourceWithheld(rule.source_id, currentCharter()?.authority.allowed_pipelines)
+      ) {
+        if (old) state.rules[rule.rule_id] = old;
+        else delete state.rules[rule.rule_id];
+        write(statePath, state);
+        inventory.pop();
+        admitted -= 1;
+        continue;
+      }
       try {
         const result = deps.dispatch
           ? deps.dispatch(charter, candidate, next.operation_key!)
@@ -461,6 +559,7 @@ export function runContinuousOperations(
       }
       write(statePath, state);
     }
+    assertOwnerCurrent();
     if (apply) {
       write(statePath, state);
     }
@@ -469,7 +568,14 @@ export function runContinuousOperations(
       scope: config.scope,
       applied: apply,
       state_path: statePath,
-      inventory,
+      inventory: inventory.map((row) => {
+        const episode = state.rules[row.rule_id];
+        return row.action_ref &&
+          episode?.action_ref === row.action_ref &&
+          episode.admission_observation
+          ? { ...row, admission_observation: episode.admission_observation }
+          : row;
+      }),
     };
   });
 }

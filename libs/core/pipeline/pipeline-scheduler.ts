@@ -429,6 +429,16 @@ export function isScheduledPipelineDue(
   if (!schedule.enabled && !(schedule.optIn && scheduleExplicitlyOptedIn(schedule.id)))
     return false;
   if (!scheduleAllowedByOperator(schedule.id)) return false;
+  return isScheduleTimingDue(schedule, timezone, now, options);
+}
+
+/** Registry timing only. Host allowlists are applied by isScheduledPipelineDue. */
+export function isScheduleTimingDue(
+  schedule: ScheduledPipeline,
+  timezone?: string,
+  now = new Date(),
+  options: PipelineSchedulerOptions = {}
+): boolean {
   if (runLockActive(schedule.runLock, now, runLockTtlMs(options))) return false;
 
   if (schedule.trigger.type === 'interval') {

@@ -9430,6 +9430,16 @@
         "ja": "音声機能の準備状況を確認・設定",
         "qps-ploc": "⟦Ƈħėƈķ ȧñḓ şėŧ ůṗ ṽőïƈė řėȧḓïñėşş ŀőřėɱ ïṗşů⟧"
       },
+      "cli_cmd_organization_continuous_status": {
+        "en": "Check the selected scope's continuous operations cadence",
+        "ja": "選択中のスコープで継続運営の周期状態を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė şėŀėƈŧėḓ şƈőṗė'ş ƈőñŧïñůőůş őṗėřȧŧïőñş ƈȧḓėñƈė ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "cli_cmd_organization_continuous_reconcile_collector": {
+        "en": "Release an unconfirmed collector attempt with human approval",
+        "ja": "人間の承認を得て結果未確認の collector 試行を解除",
+        "qps-ploc": "⟦Řėŀėȧşė ȧñ ůñƈőñƒïřɱėḓ ƈőŀŀėƈŧőř ȧŧŧėɱṗŧ ẇïŧħ ħůɱȧñ ȧṗṗřőṽȧŀ⟧"
+      },
       "cli_cmd_organization_role_migrate_publication_store": {
         "en": "Review and install publication role catalog updates",
         "ja": "公開操作に必要なロール定義の更新を確認・適用",

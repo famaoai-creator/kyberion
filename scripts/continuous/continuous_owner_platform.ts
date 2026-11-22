@@ -1,6 +1,38 @@
 /** Platform seam for spawning and terminating the continuous owner controller. */
+import { hostname } from 'node:os';
 import { posixContinuousOwnerPlatform } from './continuous_owner_platform_posix.js';
 import { windowsContinuousOwnerPlatform } from './continuous_owner_platform_windows.js';
+
+export interface ContinuousProcessContainment {
+  host: string;
+  pid: number;
+  kind: 'posix_group' | 'windows_job';
+}
+
+export function continuousProcessContainment(
+  pid: number,
+  detached: boolean
+): ContinuousProcessContainment {
+  return { host: hostname(), pid, kind: detached ? 'posix_group' : 'windows_job' };
+}
+
+export function isRegisteredContinuousWorker(containment: ContinuousProcessContainment): boolean {
+  return (
+    containment.host === hostname() &&
+    containment.pid === (containment.kind === 'posix_group' ? process.pid : process.ppid)
+  );
+}
+
+/** Require a negative, same-host process probe; inaccessible containers stay held. */
+export function isContinuousProcessStopped(containment: ContinuousProcessContainment): boolean {
+  if (containment.host !== hostname()) return false;
+  try {
+    process.kill(containment.kind === 'posix_group' ? -containment.pid : containment.pid, 0);
+    return false;
+  } catch (error) {
+    return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'ESRCH');
+  }
+}
 
 export interface ContinuousOwnerChildProcess {
   pid?: number;

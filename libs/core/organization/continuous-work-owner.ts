@@ -6,6 +6,8 @@ import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { pathResolver } from '../path-resolver.js';
 import { withLock } from '../foundation/lock-utils.js';
 import { isOperationsHalted } from '../governance/operations-halt.js';
+import { organizationCadenceLifecycle } from './organization-cadence.js';
+class OrganizationCadenceHeld extends Error {}
 import { dotBudgetHardThrottled } from '../dot/dot-budget.js';
 import { dotDailyTokenCapReached } from '../dot/dot-runtime.js';
 import { findDotCharter, resolveDotDelegationLimit, type DotCharter } from '../dot/dot-charter.js';
@@ -95,6 +97,18 @@ export async function runContinuousWorkOwner(
     ...(charter.scope.tenant_slug ? { tenant_slug: charter.scope.tenant_slug } : {}),
     organization_id: charter.scope.organization_id,
   };
+  const organizationActive =
+    deps.organizationActive ??
+    (() =>
+      organizationCadenceLifecycle(
+        {
+          organizationId: scope.organization_id,
+          tenantSlug: scope.tenant_slug,
+          tier: scope.tier,
+        },
+        rootDir
+      ) === 'active');
+  if (!organizationActive()) return [];
   const actor = `dot:${charter.dot_id}`;
   const deadline = Date.now() + (charter.goal?.budget?.wall_clock_ms_per_wake ?? 60_000);
   const read =
@@ -142,7 +156,7 @@ export async function runContinuousWorkOwner(
   const considered = new Set<string>();
   const rows: ContinuousWorkOwnerRow[] = [];
   for (let index = 0; index < Math.min(cap, candidates.length); index += 1) {
-    if (halted() || Date.now() >= deadline) break;
+    if (halted() || !organizationActive() || Date.now() >= deadline) break;
     // Advance only for the next attempted candidate, including approval and preflight waits.
     // Admission and effect ownership are checked separately under the per-item lock.
     const selected = cursorPath
@@ -307,6 +321,8 @@ export async function runContinuousWorkOwner(
                   throw new Error('Managed owner charter changed or became inactive');
                 (deps.authorize ?? authorize)(current);
                 if (halted()) throw new Error('Operations halted before managed effect');
+                if (!organizationActive())
+                  throw new OrganizationCadenceHeld('Organization inactive before managed effect');
                 if (abort.signal.aborted || Date.now() >= deadline)
                   throw new Error('Continuous owner wall-clock budget exhausted before effect');
                 const latest = (deps.get ?? ((id) => getWorkItem(id, { rootDir })))(item.item_id);
@@ -461,6 +477,8 @@ export async function runContinuousWorkOwner(
           };
         } catch (error) {
           const reason = error instanceof Error ? error.message : String(error);
+          if (error instanceof OrganizationCadenceHeld && !state?.intent)
+            return { ...base, status: 'skipped', reason };
           const preEffect = error instanceof ContinuousOwnerPreEffectError;
           const noManagedEffects = preEffect && state?.step === 0;
           if (state && statePath) {

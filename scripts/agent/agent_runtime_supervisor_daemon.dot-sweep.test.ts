@@ -141,6 +141,17 @@ afterEach(() => {
 });
 
 describe('runDotSweepOnce', () => {
+  it('keeps the default organization cadence outside the model wake path', async () => {
+    const { managedOrganizationCadenceId } =
+      await import('../organization/organization_cadence_reconcile.js');
+    const scope = { tier: 'confidential' as const, tenant_slug: 'acme', organization_id: 'ops' };
+    const dotId = managedOrganizationCadenceId(scope);
+    const managed = { ...A, charter: { ...charter(dotId), scope } };
+    mocks.due.set(dotId, [{ trigger: { kind: 'cron', cron: '* * * * *' }, key: 'cron:managed' }]);
+    const wake = vi.fn();
+    expect(await runDotSweepOnce(NOW, { listCharters: () => [managed], wake })).toBe(0);
+    expect(wake).not.toHaveBeenCalled();
+  });
   it.each([
     { tier: 'public' as const },
     { tier: 'confidential' as const, tenant_slug: 'tenant-a' },

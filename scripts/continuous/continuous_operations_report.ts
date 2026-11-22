@@ -103,9 +103,15 @@ export async function runContinuousOperationsReport(
   const charter = activeCharter();
   if (!charter) throw new Error('Report requires its configured active charter');
   (deps.authorize ?? assertContinuousOperationsCollectionAuthority)(config, charter);
-  if (!config.enabled || config.sources.some((source) => source.kind !== 'organization_metrics'))
+  if (
+    !config.enabled ||
+    config.sources.some(
+      (source) =>
+        source.kind !== 'organization_metrics' && source.kind !== 'pipeline_schedule_health'
+    )
+  )
     throw new Error(
-      'Scoped report requires an enabled configuration containing only organization_metrics sources'
+      'Scoped report requires an enabled configuration with organization_metrics or pipeline_schedule_health sources'
     );
   if (
     !(charter.authority.allowed_execution_shapes ?? []).includes('pipeline') ||

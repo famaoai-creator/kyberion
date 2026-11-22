@@ -85,6 +85,8 @@ export interface PipelineRunStartedPayload {
     policy_env: Record<string, string>;
     unsupported_policy_env: string[];
   };
+  /** Collector runs are owned by the Continuous Operations recovery flow. */
+  collector_execution?: { dot_id: string; attempt_id: string };
   library_execution?: {
     resume_owner?: 'task';
     source_sha256: string;
@@ -316,6 +318,9 @@ const pipelineStartedFieldsSchema = z.object({
       policy_env: z.record(z.string(), z.string()),
       unsupported_policy_env: z.array(z.string()),
     })
+    .optional(),
+  collector_execution: z
+    .object({ dot_id: z.string().min(1), attempt_id: z.string().uuid() })
     .optional(),
   library_execution: z
     .object({

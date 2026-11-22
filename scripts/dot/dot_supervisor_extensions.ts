@@ -27,6 +27,7 @@ import { FRONT_DESK_EXECUTION_SUPERVISOR_STEP } from '../front_desk_execution_st
 import { DOT_EXECUTOR_SUPERVISOR_STEP } from './dot_executor_step.js';
 import { DOT_CONTINUOUS_OPERATIONS_SUPERVISOR_STEP } from './dot_continuous_operations_step.js';
 import { DOT_ORG_CADENCE_SUPERVISOR_STEP } from './dot_org_cadence_step.js';
+import { sweepOrganizationCadenceEnrollment } from '../organization/organization_cadence_reconcile.js';
 
 const logger = createLogger('dot-supervisor');
 
@@ -178,6 +179,12 @@ DOT_SUPERVISOR_STEPS.push({
 // Per-tenant organization cadences (operation tick, standup, retro) for charters
 // that opt in with operations_cadence — scoped to the charter's own organization
 // and run as its authority role, so no sovereign chronos daemon is required
+DOT_SUPERVISOR_STEPS.push({
+  id: 'organization-cadence-enrollment',
+  async run(now) {
+    sweepOrganizationCadenceEnrollment(now);
+  },
+});
 DOT_SUPERVISOR_STEPS.push(DOT_ORG_CADENCE_SUPERVISOR_STEP);
 
 /**

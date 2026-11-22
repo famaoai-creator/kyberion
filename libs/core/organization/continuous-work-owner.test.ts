@@ -78,6 +78,7 @@ function fixture(kind = 'mission', boundCharter = charter) {
   const deps: ContinuousWorkOwnerDeps = {
     currentCharter: () => boundCharter,
     authorize: () => undefined,
+    organizationActive: () => true,
     authorizeItem: () => undefined,
     halted: () => false,
     throttled: () => false,

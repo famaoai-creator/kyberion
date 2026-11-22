@@ -12,6 +12,7 @@ import { isReservedScopeName, isValidTenantSlug } from '../entity-scope.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReaddir, safeStat } from '../secure-io.js';
 import { listOrganizationOperationalStates } from './organization-operating-model-management.js';
+import { loadOrganizationOperationalState } from './organization-operating-model-persistence.js';
 import type { OrganizationTier } from './organization-operating-model.js';
 import {
   tickDueOrganizationOperations,
@@ -104,6 +105,19 @@ export interface OrganizationCadenceScope {
   /** Absent for an untenanted organization (the `shared` partition). */
   tenantSlug?: string;
   organizationId: string;
+}
+
+/** Observe-only callers can inspect a held organization; effects require active state. */
+export function readOrganizationCadenceState(scope: OrganizationCadenceScope, rootDir?: string) {
+  return loadOrganizationOperationalState(scope.organizationId, {
+    tier: scope.tier,
+    tenantSlug: scope.tenantSlug,
+    rootDir,
+  });
+}
+
+export function organizationCadenceLifecycle(scope: OrganizationCadenceScope, rootDir?: string) {
+  return readOrganizationCadenceState(scope, rootDir)?.status ?? 'missing';
 }
 
 /**

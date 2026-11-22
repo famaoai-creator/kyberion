@@ -1040,6 +1040,27 @@
       "group": "operate"
     },
     {
+      "id": "organization-model.continuous-status",
+      "command": "organization continuous status",
+      "noun": "organization",
+      "verb": "continuous status",
+      "entry": "organization-model",
+      "audience": "operator",
+      "description": "cli_cmd_organization_continuous_status",
+      "group": "operate"
+    },
+    {
+      "id": "organization-model.continuous-reconcile-collector",
+      "command": "organization continuous reconcile-collector",
+      "noun": "organization",
+      "verb": "continuous reconcile-collector",
+      "entry": "organization-model",
+      "audience": "operator",
+      "description": "cli_cmd_organization_continuous_reconcile_collector",
+      "group": "operate",
+      "effect": "state_change"
+    },
+    {
       "id": "organization-model.role-migrate-publication-store",
       "command": "organization role migrate-publication-store",
       "noun": "organization",
@@ -1196,6 +1217,8 @@
       "module": "scripts/organization.ts",
       "commands": [
         "organization",
+        "organization continuous status",
+        "organization continuous reconcile-collector",
         "organization role migrate-publication-store",
         "organization member",
         "organization participant",

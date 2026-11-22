@@ -21,7 +21,19 @@
  */
 
 import * as path from 'node:path';
-import type { DotCharter, DotCadenceCron, LoadedDotCharter } from '@agent/core/dot/dot-charter';
+import {
+  listDotCharters,
+  type DotCharterLoadError,
+  type DotCharter,
+  type DotCadenceCron,
+  type LoadedDotCharter,
+} from '@agent/core/dot/dot-charter';
+import { loadOrganizationOperationalState } from '@agent/core/organization/organization-operating-model-persistence';
+import {
+  isManagedOrganizationCadence,
+  organizationCadenceMatchesDefault,
+  findManualOrganizationCadence,
+} from '../organization/organization_cadence_reconcile.js';
 import { runAsDotCharter } from '@agent/core/dot/dot-key-results';
 import { dotBudgetHardThrottled } from '@agent/core/dot/dot-budget';
 import { dotStatePath } from '@agent/core/dot/dot-state-paths';
@@ -71,6 +83,7 @@ export interface DotOrgCadenceState {
 export type CronScanMemo = Map<string, { scannedUntilMs: number; latestMs?: number }>;
 
 export interface DotOrgCadenceDeps {
+  ownership?: (errors: DotCharterLoadError[]) => DotCharter[];
   rootDir?: string;
   runAs?: <T>(c: DotCharter, fn: () => Promise<T>) => Promise<T>;
   budgetHard?: (c: DotCharter) => boolean;
@@ -212,6 +225,15 @@ export async function runDotOrgCadenceForCharter(
   const memo = deps.memo ?? processMemo;
   const runAs = deps.runAs ?? runAsDotCharter;
   return runAs(c, async () => {
+    if (
+      isManagedOrganizationCadence(c) &&
+      (!organizationCadenceMatchesDefault(c) ||
+        loadOrganizationOperationalState(scope.organizationId, {
+          ...scope,
+          rootDir: deps.rootDir,
+        })?.status !== 'active')
+    )
+      return [];
     const ran: string[] = [];
     const state = readState(c, deps.rootDir);
     const nowIso = now.toISOString();
@@ -287,12 +309,33 @@ export async function runDotOrgCadenceStep(
   active: LoadedDotCharter[],
   deps: DotOrgCadenceDeps = {}
 ): Promise<void> {
+  let ownership: DotCharter[] | undefined;
+  const ownershipErrors: DotCharterLoadError[] = [];
   for (const loaded of active) {
     if (!loaded.charter.operations_cadence) continue;
     const dotId = loaded.charter.dot_id;
     if (!orgCadenceCircuit.admits(dotId)) continue;
     try {
-      await runDotOrgCadenceForCharter(loaded.charter, now, active, deps);
+      let current = loaded.charter;
+      if (isManagedOrganizationCadence(loaded.charter)) {
+        ownership ??=
+          deps.ownership?.(ownershipErrors) ??
+          listDotCharters(deps.rootDir, { errors: ownershipErrors }).map(({ charter }) => charter);
+        const saved = ownership.find((charter) => charter.dot_id === dotId);
+        if (!saved || saved.status !== 'active') continue;
+        if (findManualOrganizationCadence(saved, ownership)) continue;
+        const tenant = loaded.charter.scope.tenant_slug;
+        const root = deps.rootDir ?? pathResolver.rootDir();
+        const tenantDots = path.resolve(root, 'knowledge', 'confidential', tenant ?? '', 'dots');
+        if (
+          ownershipErrors.some(({ path: file }) =>
+            pathResolver.isPathInside(tenantDots, path.resolve(root, file))
+          )
+        )
+          throw new Error('Cannot establish cadence ownership in this tenant');
+        current = saved;
+      }
+      await runDotOrgCadenceForCharter(current, now, active, deps);
       orgCadenceCircuit.reportSuccess(dotId);
     } catch (error) {
       reportDotStepFailure(orgCadenceCircuit, dotId, loaded.charter, error, {

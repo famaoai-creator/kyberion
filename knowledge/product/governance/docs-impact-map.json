@@ -70,6 +70,52 @@
       "note": "top-level governance doc and the operating guide must not diverge"
     },
     {
+      "change": "scripts/organization/organization_cadence_reconcile.ts",
+      "docs": [
+        "knowledge/product/governance/organization-operations-runbook.md",
+        "knowledge/product/architecture/continuous-operations-loop.md"
+      ],
+      "note": "default cadence provisioning is part of the organization lifecycle"
+    },
+    {
+      "change": "scripts/organization/organization_operating_model.ts",
+      "docs": ["knowledge/product/governance/organization-operations-runbook.md"],
+      "note": "organization lifecycle commands and their scoped effects"
+    },
+    {
+      "change": "scripts/dot/dot_org_cadence_step.ts",
+      "docs": ["knowledge/product/governance/organization-operations-runbook.md"],
+      "note": "resident execution follows the organization lifecycle and budget"
+    },
+    {
+      "change": "scripts/dot/dot_supervisor_extensions.ts",
+      "docs": ["knowledge/product/architecture/continuous-operations-loop.md"],
+      "note": "registered supervisor steps control routine reconciliation and execution"
+    },
+    {
+      "change": "scripts/agent/agent_runtime_supervisor_daemon.ts",
+      "docs": ["knowledge/product/architecture/continuous-operations-loop.md"],
+      "note": "the supervisor separates deterministic organization cadence from model wakes"
+    },
+    {
+      "change": "scripts/continuous/continuous_operations_*.ts",
+      "docs": [
+        "knowledge/product/architecture/continuous-operations-loop.md",
+        "knowledge/product/orchestration/continuous-operations-playbook.md"
+      ],
+      "note": "observation cadence and outcome projections define the operator's diagnostics and evidence"
+    },
+    {
+      "change": "scripts/dot/dot_continuous_operations_step.ts",
+      "docs": ["knowledge/product/orchestration/continuous-operations-playbook.md"],
+      "note": "the resident step controls scheduled attempts and isolation from managed work failures"
+    },
+    {
+      "change": "scripts/organization/organization_continuous_operations.ts",
+      "docs": ["knowledge/product/orchestration/continuous-operations-playbook.md"],
+      "note": "the organization facade exposes scoped continuous operation controls and diagnostics"
+    },
+    {
       "change": "scripts/*.ts",
       "docs": ["docs/CLI_REFERENCE.md"],
       "note": "script entrypoints that are CLI-registered land in the CLI reference"

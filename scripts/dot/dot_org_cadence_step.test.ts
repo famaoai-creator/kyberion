@@ -162,6 +162,48 @@ describe('runDotOrgCadenceForCharter', () => {
 });
 
 describe('runDotOrgCadenceStep', () => {
+  it('does not let an unreadable foreign tenant charter block local ownership checks', async () => {
+    const { managedOrganizationCadenceId } =
+      await import('../organization/organization_cadence_reconcile.js');
+    const managed = {
+      ...CHARTER,
+      dot_id: managedOrganizationCadenceId({
+        tier: CHARTER.scope.tier,
+        tenant_slug: CHARTER.scope.tenant_slug,
+        organization_id: CHARTER.scope.organization_id!,
+      }),
+    };
+    const runAs = vi.fn(async () => []);
+    const read = vi.fn((errors) => {
+      errors.push({ path: 'knowledge/confidential/other/dots/broken.json', error: 'invalid' });
+      return [managed];
+    });
+    await runDotOrgCadenceStep(jst(5, 8, 45), [{ ...ACTIVE[0], charter: managed }], {
+      ownership: read,
+      budgetHard: () => false,
+      runAs: runAs as unknown as NonNullable<Parameters<typeof runDotOrgCadenceStep>[2]>['runAs'],
+    });
+    expect(read).toHaveBeenCalledOnce();
+    expect(runAs).toHaveBeenCalledOnce();
+  });
+  it('does not fall back to a managed cadence while the manual owner is paused', async () => {
+    const { managedOrganizationCadenceId } =
+      await import('../organization/organization_cadence_reconcile.js');
+    const managed = {
+      ...CHARTER,
+      dot_id: managedOrganizationCadenceId({
+        tier: CHARTER.scope.tier,
+        tenant_slug: CHARTER.scope.tenant_slug,
+        organization_id: CHARTER.scope.organization_id!,
+      }),
+    };
+    const runAs = vi.fn(async () => []);
+    await runDotOrgCadenceStep(jst(5, 8, 45), [{ ...ACTIVE[0], charter: managed }], {
+      ownership: () => [managed, { ...CHARTER, status: 'paused' }],
+      runAs: runAs as unknown as NonNullable<Parameters<typeof runDotOrgCadenceStep>[2]>['runAs'],
+    });
+    expect(runAs).not.toHaveBeenCalled();
+  });
   it('never throws and keeps the marker when a cadence fails', async () => {
     const { deps, state } = harness({
       tick: vi.fn(async () => {

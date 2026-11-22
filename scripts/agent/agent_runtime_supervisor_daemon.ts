@@ -33,6 +33,8 @@ import { sendOpsAlert } from '@agent/core/ops-alert';
 import { computeSupervisorCodeStamp } from '@agent/core/agent/agent-runtime-supervisor-client';
 import { getRegisteredEnvText, parseSafeJsonInput, setRegisteredEnv } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/authority';
+import { isManagedOrganizationCadence } from '../organization/organization_cadence_reconcile.js';
+import { continuousOperationsInFlight } from '../dot/dot_continuous_operations_step.js';
 import { createTriggerRunner, resolveCurrentTriggerAuthority } from '@agent/core/trigger-runner';
 import {
   listDotCharters,
@@ -372,7 +374,7 @@ export function maybeSelfRecycleOnStaleCode(
   return runStaleCodeSelfRecycleCheck(
     {
       loadedStamp: DAEMON_CODE_STAMP,
-      dotSweepInFlight: () => dotSweepInFlight,
+      dotSweepInFlight: () => dotSweepInFlight || continuousOperationsInFlight(),
       inflightAsks: () => daemonMutatingRequestsInflight,
       pendingDelegatedWorkerStarts: () => delegatedWorkerStarts.size,
       stopDelegatedWorkers: () => {
@@ -497,6 +499,13 @@ async function runDotSweepWithStableOutputs(now: Date, deps: DotSweepDeps): Prom
     // housekeeping and before wakes; each step is isolated.
     await runDotSupervisorExtensions(now, active);
     for (const loaded of active) {
+      if (isManagedOrganizationCadence(loaded.charter)) {
+        recordDaemonHeartbeat(loaded.charter.runtime.heartbeat_id, {
+          status: 'running',
+          details: { dot_id: loaded.charter.dot_id, trigger: 'organization-cadence' },
+        });
+        continue;
+      }
       // A build that started since the last check owns the outputs: leave the
       // remaining dots (and their triggers) for the next sweep.
       if (!(await compilerOutputsIdle())) {
