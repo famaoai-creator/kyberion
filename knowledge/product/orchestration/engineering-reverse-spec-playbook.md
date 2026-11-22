@@ -59,6 +59,19 @@ checker exits 0, never when an agent says so.
    reason, or the gate fails. The gate recomputes the counts and differences from the nodes' routes,
    so the reconciliation cannot be edited apart from the graph. The file also records `source_fingerprint`. Freezing the
    graph is a held decision; changing the denominator afterwards needs a new decision.
+   **Tooling.** Instantiate the
+   [`reverse-spec-code-graph`](../pipeline-templates/reverse-spec-code-graph.json) pipeline
+   template (op `modeling:extract_code_graph`), passing `mission_evidence_dir`, `source_root`
+   and the scope exclusions as `exclude`. Route A parses each file with web-tree-sitter and runs
+   the marker queries; route B scans the same files with each marker's line pattern. Rules live
+   in [`code-graph-enumeration-rules.json`](../governance/code-graph-enumeration-rules.json):
+   TypeScript/TSX, JavaScript, Python, Java, Scala, C#, PHP, Rust, Go, Ruby, C and C++ (official
+   tree-sitter grammars with prebuilt WASM). Source extensions without a rule are listed in
+   `unanalyzed_extensions` — a coverage gap to record in the scope, not an error. A file the
+   grammar cannot parse stays in the denominator through route B and appears in the module
+   difference; for example, tree-sitter-typescript 0.23 rejects `typeof import('x')` as a type
+   argument. Route B also matches markers inside strings and comments that route A ignores.
+   Resolve each such difference in `resolution` rather than editing the lists.
 3. **Analysis.** Read every node down to its implementation from the ARCH, REQ, API, DATA,
    BEHAVIOR and NFR viewpoints, and give each analysis item an id `ANA-<CAT>-<n>`. A node leaves
    the denominator only through a `dispositions` entry with a reason and a `decision_ref` file

@@ -44,3 +44,4 @@ status: active
 ## 依存関係の変更記録
 
 - [Lockfile 変更レビュー — @presence/mission-deck](./LOCKFILE_CHANGE_MISSION_DECK_2026-11-20.md) — completed
+- [Lockfile 変更レビュー — web-tree-sitter と grammar パッケージ（code graph 抽出）](./LOCKFILE_CHANGE_CODE_GRAPH_2026-11-23.md) — completed

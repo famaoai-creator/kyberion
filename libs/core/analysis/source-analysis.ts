@@ -969,3 +969,7 @@ export function writeEngineeringArtifactBundle(
     ])
   );
 }
+
+// Source-tree fingerprinting is part of the source-analysis surface (code-graph extraction, reverse_spec gates).
+export * from './source-fingerprint.js';
+export * from './code-graph-rules.js';

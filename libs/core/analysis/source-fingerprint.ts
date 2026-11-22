@@ -41,6 +41,12 @@ export const DEFAULT_SOURCE_TREE_MAX_FILES = 200_000;
 /** Workspace trees a source root must not contain (runtime state, knowledge tiers, secrets). */
 export const SOURCE_ROOT_RESERVED_DIRECTORIES: readonly string[] = ['active', 'knowledge', 'vault'];
 
+/** Floors inside active/ where an analyzed copy may live (inbound files and scratch). */
+export const SOURCE_ROOT_ALLOWED_FLOORS: readonly string[] = [
+  'active/shared/staging',
+  'active/shared/tmp',
+];
+
 export interface SourceFingerprint {
   algorithm: 'sha256';
   value: string;
@@ -63,12 +69,20 @@ export function resolveWorkspaceSourceRoot(sourceRoot: string): ResolvedSourceRo
     throw new Error(`[SOURCE_ROOT] source_root must stay within the workspace: ${sourceRoot}`);
   }
   // A root that contains Kyberion's own runtime or knowledge trees would fingerprint mission
-  // evidence written during the analysis (never stable) and walk higher-tier knowledge.
+  // evidence written during the analysis (never stable) and walk higher-tier knowledge; a root
+  // inside them is just as unsafe, except the inbound/scratch floors legacy code is copied into.
   for (const reserved of SOURCE_ROOT_RESERVED_DIRECTORIES) {
     const reservedAbs = path.join(workspace, reserved);
-    if (reservedAbs === absolute || reservedAbs.startsWith(absolute + path.sep)) {
+    const containsReserved =
+      reservedAbs === absolute || reservedAbs.startsWith(absolute + path.sep);
+    const insideReserved = absolute.startsWith(reservedAbs + path.sep);
+    const allowedFloor = SOURCE_ROOT_ALLOWED_FLOORS.some((floor) => {
+      const floorAbs = path.join(workspace, floor);
+      return absolute.startsWith(floorAbs + path.sep);
+    });
+    if (containsReserved || (insideReserved && !allowedFloor)) {
       throw new Error(
-        `[SOURCE_ROOT] source_root ${sourceRoot || '.'} contains the workspace ${reserved}/ tree — copy the target under active/shared/staging/<job>/ and point source_root there`
+        `[SOURCE_ROOT] source_root ${sourceRoot || '.'} overlaps the workspace ${reserved}/ tree — copy the target under active/shared/staging/<job>/ and point source_root there`
       );
     }
   }

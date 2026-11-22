@@ -32552,6 +32552,44 @@
           ]
         },
         {
+          "op": "extract_code_graph",
+          "kind": "transform",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "export_as": {
+                "type": "string"
+              },
+              "exclude": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "languages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "max_files": {
+                "type": "number"
+              },
+              "source_root": {
+                "type": "string"
+              }
+            },
+            "required": ["source_root"],
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "source_root": "active/shared/staging/legacy-app",
+              "export_as": "code_graph"
+            }
+          ]
+        },
+        {
           "op": "build_agentic_source_review_participants",
           "kind": "transform",
           "input_schema": {

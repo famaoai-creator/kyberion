@@ -11845,7 +11845,8 @@
             {
               "task_id_suffix": "code-graph",
               "team_role": "implementer",
-              "description": "モジュール・入口・外部境界のノードと依存エッジを機械的な全走査で列挙し、2 経路の突合(要素差分つき)と source fingerprint を含めて evidence/code-graph.json に出力する。狙い撃ちの grep で分母を作らない。凍結後の分母変更は人の判断を要する",
+              "pipeline_ref": "knowledge/product/pipeline-templates/reverse-spec-code-graph.json",
+              "description": "modeling:extract_code_graph(reverse-spec-code-graph パイプライン)でモジュール・入口・外部境界のノードと依存エッジを機械的な全走査で列挙し、2 経路の突合(要素差分つき)と source fingerprint を含めて evidence/code-graph.json に出力する。狙い撃ちの grep で分母を作らない。凍結後の分母変更は人の判断を要する",
               "deliverable": "evidence/code-graph.json",
               "acceptance_criteria": [
                 "全ノードが path:line を持ち解析対象内に解決する",

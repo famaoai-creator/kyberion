@@ -107,7 +107,9 @@
           "legacy modernization",
           "migrate the legacy",
           "modernize the legacy",
-          "rebuild the legacy"
+          "rebuild the legacy",
+          "レガシーを新しい",
+          "レガシーシステムを新しい"
         ]
       },
       "mission_class": "code_change"

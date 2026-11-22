@@ -71,9 +71,10 @@ describe('reverse_spec evidence gates', () => {
     );
   });
 
-  it('requires unanalyzed source extensions to be declared in the scope', () => {
-    const { mission, docs, flush } = fixture();
-    docs.code_graph.unanalyzed_extensions = { '.kt': 4 };
+  it('derives uncovered extensions from the source tree, not from the graph', () => {
+    const { mission, source, docs, flush } = fixture();
+    write(path.join(source, 'src/Main.kt'), 'fun main() {}\n');
+    docs.code_graph.source_fingerprint = computeSourceFingerprint(source);
     flush();
     expect(() => validateReverseSpecEvidenceAt(mission, 'code_graph')).toThrow(
       /uncovered_extensions: \.kt/u
@@ -81,6 +82,33 @@ describe('reverse_spec evidence gates', () => {
     docs.scope.uncovered_extensions = [{ extension: '.kt', reason: 'Kotlin build scripts only' }];
     flush();
     expect(validateReverseSpecEvidenceAt(mission, 'code_graph').ok).toBe(true);
+  });
+
+  it('catches a module dropped from the graph even when the counts are edited to match', () => {
+    const { mission, docs, flush } = fixture();
+    (docs.code_graph.nodes as Record<string, unknown>[]).pop();
+    (docs.code_graph.edges as unknown[]).length = 0;
+    const row = (docs.code_graph.reconciliation as Record<string, unknown>[])[0];
+    row.route_a = { definition: 'tree-sitter program roots', count: 1 };
+    row.route_b = { definition: 'file listing by extension', count: 1 };
+    flush();
+    expect(() => validateReverseSpecEvidenceAt(mission, 'code_graph')).toThrow(
+      /shrunk by omission: src\/billing\.py/u
+    );
+  });
+
+  it('rejects a source root inside the workspace runtime or knowledge trees', () => {
+    const { mission, docs, flush } = fixture();
+    docs.scope.source_root = 'active/missions';
+    flush();
+    expect(() => validateReverseSpecEvidenceAt(mission, 'scope')).toThrow(
+      /overlaps the workspace active/u
+    );
+    docs.scope.source_root = 'knowledge/product';
+    flush();
+    expect(() => validateReverseSpecEvidenceAt(mission, 'scope')).toThrow(
+      /overlaps the workspace knowledge/u
+    );
   });
 
   it('keeps spec files inside the mission directory', () => {

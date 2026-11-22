@@ -63,6 +63,18 @@ const MODELING_CONTRACTS: Record<string, InputSchema> = {
     required: ['from'],
     additionalProperties: false,
   },
+  extract_code_graph: {
+    type: 'object',
+    properties: {
+      export_as: { type: 'string' },
+      exclude: { type: 'array', items: { type: 'string' } },
+      languages: { type: 'array', items: { type: 'string' } },
+      max_files: { type: 'number' },
+      source_root: { type: 'string' },
+    },
+    required: ['source_root'],
+    additionalProperties: false,
+  },
   analyze_source_tree: {
     type: 'object',
     properties: {
@@ -400,6 +412,9 @@ const MODELING_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
   json_query: [{ from: 'payload', path: '.items' }],
   mermaid_gen: [{ from: 'architecture' }],
   analyze_source_tree: [{ source_root: 'libs' }],
+  extract_code_graph: [
+    { source_root: 'active/shared/staging/legacy-app', export_as: 'code_graph' },
+  ],
   ui_flow_to_test_inventory: [{ from: 'ui_flow' }],
   web_profile_to_ui_flow_adf: [{ from: 'web_profile' }],
   test_inventory_to_browser_pipeline: [{ from: 'test_inventory' }],
@@ -456,6 +471,7 @@ export const MODELING_ACTUATOR_TRANSFORM_OPS = [
   'asset_inventory_to_ledger',
   'security_ledger_check_plan',
   'analyze_source_tree',
+  'extract_code_graph',
   'build_agentic_source_review_participants',
   'compile_agentic_source_review_plan',
   'compile_agentic_source_review_verification',

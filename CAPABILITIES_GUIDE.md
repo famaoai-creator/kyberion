@@ -1,7 +1,7 @@
 # Kyberion Capabilities Guide
 
 Total Actuators: 37
-Last updated: 2026-11-16
+Last updated: 2026-11-22
 
 This guide is generated from `libs/actuators/*/manifest.json` (actuator table) and `knowledge/product/orchestration/actuator-op-discovery.json` (op tables, sourced from each actuator describeOps). Human-readable counterpart to `global_actuator_index.json`.
 
@@ -263,6 +263,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `export_adf`                                 | browser                                     |
 | `export_failure_bundle`                      | browser                                     |
 | `export_playwright`                          | browser                                     |
+| `extract_code_graph`                         | modeling                                    |
 | `filter`                                     | data                                        |
 | `find_slides_by_owner`                       | media                                       |
 | `find_ui_nodes`                              | android                                     |
@@ -628,16 +629,6 @@ Several use cases map to more than one actuator by name alone. This table is the
 | Cron-style schedule declarations (register/list/cancel/fire)        | `scheduler-actuator`                                                                                                                                           | Declaration store only, no daemon. `process-actuator` supervises running processes; it does not own time-based triggers.                                                                                  |
 
 ## Governed Core Workloads
-
-The network actuator's `capture/fetch` step admits GET and HEAD as external
-reads. Other methods use the external mutation path, where an eligible Charter
-or exact approval can authorize the effect. Both paths remain subject to the
-active tenant and egress policy.
-
-In service resource-introduction enforcement mode, the service actuator binds
-direct API actions to the dispatch URL and GitHub repository presets to the
-repository resolved from execution arguments. The operation descriptor
-determines the required read or write permission.
 
 `@agent/core` also exposes the additive marketing workload contract for G0 intake, G1 data classification, G2 claims, G3 video/text/image validation, G4 independent review, G5 shared human approval binding, G6 publication verification, risk-policy resolution, and evidence-aware Mission completion.
 

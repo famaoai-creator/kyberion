@@ -1,0 +1,473 @@
+{
+  "$schema": "../schemas/code-graph-enumeration-rules.schema.json",
+  "version": "1.0.0",
+  "languages": [
+    {
+      "id": "typescript",
+      "grammar": {
+        "package": "tree-sitter-typescript",
+        "wasm": "tree-sitter-typescript.wasm"
+      },
+      "extensions": [".ts", ".mts", ".cts"],
+      "exclude_suffixes": [".d.ts"],
+      "imports": {
+        "resolver": "relative_path",
+        "query": "((import_statement source: (string (string_fragment) @source))) ((export_statement source: (string (string_fragment) @source))) ((call_expression function: (identifier) @_f arguments: (arguments . (string (string_fragment) @source))) (#eq? @_f \"require\"))",
+        "candidates": [
+          "",
+          ".ts",
+          ".tsx",
+          ".mts",
+          ".cts",
+          ".js",
+          ".jsx",
+          ".mjs",
+          ".cjs",
+          "/index.ts",
+          "/index.tsx",
+          "/index.js",
+          "/index.jsx"
+        ]
+      },
+      "markers": [
+        {
+          "kind": "entrypoint",
+          "subtype": "http_route",
+          "query": "((call_expression function: (member_expression object: (identifier) @_o property: (property_identifier) @_m) arguments: (arguments . (string))) @marker (#match? @_o \"^(app|router|server|fastify|api)$\") (#match? @_m \"^(get|post|put|patch|delete|all|use|route)$\"))",
+          "line_pattern": "\\b(app|router|server|fastify|api)\\.(get|post|put|patch|delete|all|use|route)\\s*\\(\\s*['\"`]"
+        },
+        {
+          "kind": "entrypoint",
+          "subtype": "decorator_route",
+          "query": "((decorator (call_expression function: (identifier) @_d)) @marker (#match? @_d \"^(Controller|Get|Post|Put|Patch|Delete|All|Command|Cron|EventPattern|MessagePattern)$\"))",
+          "line_pattern": "@(Controller|Get|Post|Put|Patch|Delete|All|Command|Cron|EventPattern|MessagePattern)\\s*\\("
+        },
+        {
+          "kind": "entrypoint",
+          "subtype": "serverless_handler",
+          "query": "((export_statement declaration: (function_declaration name: (identifier) @_n)) @marker (#eq? @_n \"handler\"))",
+          "line_pattern": "^\\s*export\\s+(async\\s+)?function\\s+handler\\b"
+        },
+        {
+          "kind": "boundary",
+          "subtype": "http_client",
+          "query": "((call_expression function: (identifier) @_f) @marker (#eq? @_f \"fetch\")) ((call_expression function: (member_expression object: (identifier) @_o)) @marker (#match? @_o \"^(axios|got|superagent)$\"))",
+          "line_pattern": "(\\bfetch\\s*\\(|\\b(axios|got|superagent)\\.[A-Za-z_]+\\s*\\()"
+        }
+      ]
+    },
+    {
+      "id": "tsx",
+      "grammar": {
+        "package": "tree-sitter-typescript",
+        "wasm": "tree-sitter-tsx.wasm"
+      },
+      "extensions": [".tsx"],
+      "exclude_suffixes": [],
+      "imports": {
+        "resolver": "relative_path",
+        "query": "((import_statement source: (string (string_fragment) @source))) ((export_statement source: (string (string_fragment) @source))) ((call_expression function: (identifier) @_f arguments: (arguments . (string (string_fragment) @source))) (#eq? @_f \"require\"))",
+        "candidates": [
+          "",
+          ".ts",
+          ".tsx",
+          ".mts",
+          ".cts",
+          ".js",
+          ".jsx",
+          ".mjs",
+          ".cjs",
+          "/index.ts",
+          "/index.tsx",
+          "/index.js",
+          "/index.jsx"
+        ]
+      },
+      "markers": [
+        {
+          "kind": "entrypoint",
+          "subtype": "http_route",
+          "query": "((call_expression function: (member_expression object: (identifier) @_o property: (property_identifier) @_m) arguments: (arguments . (string))) @marker (#match? @_o \"^(app|router|server|fastify|api)$\") (#match? @_m \"^(get|post|put|patch|delete|all|use|route)$\"))",
+          "line_pattern": "\\b(app|router|server|fastify|api)\\.(get|post|put|patch|delete|all|use|route)\\s*\\(\\s*['\"`]"
+        },
+        {
+          "kind": "entrypoint",
+          "subtype": "decorator_route",
+          "query": "((decorator (call_expression function: (identifier) @_d)) @marker (#match? @_d \"^(Controller|Get|Post|Put|Patch|Delete|All|Command|Cron|EventPattern|MessagePattern)$\"))",
+          "line_pattern": "@(Controller|Get|Post|Put|Patch|Delete|All|Command|Cron|EventPattern|MessagePattern)\\s*\\("
+        },
+        {
+          "kind": "entrypoint",
+          "subtype": "serverless_handler",
+          "query": "((export_statement declaration: (function_declaration name: (identifier) @_n)) @marker (#eq? @_n \"handler\"))",
+          "line_pattern": "^\\s*export\\s+(async\\s+)?function\\s+handler\\b"
+        },
+        {
+          "kind": "boundary",
+          "subtype": "http_client",
+          "query": "((call_expression function: (identifier) @_f) @marker (#eq? @_f \"fetch\")) ((call_expression function: (member_expression object: (identifier) @_o)) @marker (#match? @_o \"^(axios|got|superagent)$\"))",
+          "line_pattern": "(\\bfetch\\s*\\(|\\b(axios|got|superagent)\\.[A-Za-z_]+\\s*\\()"
+        }
+      ]
+    },
+    {
+      "id": "javascript",
+      "grammar": {
+        "package": "tree-sitter-javascript",
+        "wasm": "tree-sitter-javascript.wasm"
+      },
+      "extensions": [".js", ".jsx", ".mjs", ".cjs"],
+      "exclude_suffixes": [".min.js"],
+      "imports": {
+        "resolver": "relative_path",
+        "query": "((import_statement source: (string (string_fragment) @source))) ((export_statement source: (string (string_fragment) @source))) ((call_expression function: (identifier) @_f arguments: (arguments . (string (string_fragment) @source))) (#eq? @_f \"require\"))",
+        "candidates": [
+          "",
+          ".ts",
+          ".tsx",
+          ".mts",
+          ".cts",
+          ".js",
+          ".jsx",
+          ".mjs",
+          ".cjs",
+          "/index.ts",
+          "/index.tsx",
+          "/index.js",
+          "/index.jsx"
+        ]
+      },
+      "markers": [
+        {
+          "kind": "entrypoint",
+          "subtype": "http_route",
+          "query": "((call_expression function: (member_expression object: (identifier) @_o property: (property_identifier) @_m) arguments: (arguments . (string))) @marker (#match? @_o \"^(app|router|server|fastify|api)$\") (#match? @_m \"^(get|post|put|patch|delete|all|use|route)$\"))",
+          "line_pattern": "\\b(app|router|server|fastify|api)\\.(get|post|put|patch|delete|all|use|route)\\s*\\(\\s*['\"`]"
+        },
+        {
+          "kind": "entrypoint",
+          "subtype": "serverless_handler",
+          "query": "((export_statement declaration: (function_declaration name: (identifier) @_n)) @marker (#eq? @_n \"handler\"))",
+          "line_pattern": "^\\s*export\\s+(async\\s+)?function\\s+handler\\b"
+        },
+        {
+          "kind": "boundary",
+          "subtype": "http_client",
+          "query": "((call_expression function: (identifier) @_f) @marker (#eq? @_f \"fetch\")) ((call_expression function: (member_expression object: (identifier) @_o)) @marker (#match? @_o \"^(axios|got|superagent)$\"))",
+          "line_pattern": "(\\bfetch\\s*\\(|\\b(axios|got|superagent)\\.[A-Za-z_]+\\s*\\()"
+        }
+      ]
+    },
+    {
+      "id": "python",
+      "grammar": {
+        "package": "tree-sitter-python",
+        "wasm": "tree-sitter-python.wasm"
+      },
+      "extensions": [".py"],
+      "imports": {
+        "resolver": "python_module",
+        "query": "((import_statement name: (dotted_name) @source)) ((import_statement name: (aliased_import name: (dotted_name) @source))) ((import_from_statement module_name: (dotted_name) @source)) ((import_from_statement module_name: (relative_import) @source))"
+      },
+      "markers": [
+        {
+          "kind": "entrypoint",
+          "subtype": "http_route",
+          "query": "((decorator (call function: (attribute object: (identifier) @_o attribute: (identifier) @_m))) @marker (#match? @_o \"^(app|router|bp|blueprint|api)$\") (#match? @_m \"^(route|get|post|put|patch|delete|websocket)$\"))",
+          "line_pattern": "^\\s*@(app|router|bp|blueprint|api)\\.(route|get|post|put|patch|delete|websocket)\\s*\\("
+        },
+        {
+          "kind": "entrypoint",
+          "subtype": "cli_or_task",
+          "query": "((decorator (call function: (attribute object: (identifier) @_o attribute: (identifier) @_m))) @marker (#match? @_o \"^(click|celery|app)$\") (#match? @_m \"^(command|group|task)$\")) ((decorator (identifier) @_d) @marker (#eq? @_d \"shared_task\"))",
+          "line_pattern": "^\\s*@((click|celery|app)\\.(command|group|task)\\s*\\(|shared_task\\b)"
+        },
+        {
+          "kind": "entrypoint",
+          "subtype": "main_guard",
+          "query": "((if_statement condition: (comparison_operator (identifier) @_n)) @marker (#eq? @_n \"__name__\"))",
+          "line_pattern": "^\\s*if\\s+__name__\\s*==\\s*['\"]__main__['\"]"
+        },
+        {
+          "kind": "boundary",
+          "subtype": "io_call",
+          "query": "((call function: (attribute object: (identifier) @_o attribute: (identifier) @_m)) @marker (#match? @_o \"^(requests|httpx|cursor|session|conn|connection|db)$\") (#match? @_m \"^(get|post|put|patch|delete|request|execute|executemany|query|commit)$\"))",
+          "line_pattern": "\\b(requests|httpx|cursor|session|conn|connection|db)\\.(get|post|put|patch|delete|request|execute|executemany|query|commit)\\s*\\("
+        }
+      ]
+    },
+    {
+      "id": "java",
+      "grammar": {
+        "package": "tree-sitter-java",
+        "wasm": "tree-sitter-java.wasm"
+      },
+      "extensions": [".java"],
+      "imports": {
+        "resolver": "qualified_name",
+        "query": "((import_declaration (scoped_identifier) @source))"
+      },
+      "markers": [
+        {
+          "kind": "entrypoint",
+          "subtype": "annotated_handler",
+          "query": "((annotation name: (identifier) @_a) @marker (#match? @_a \"^(GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping|RequestMapping|Path|GET|POST|PUT|DELETE|Scheduled|KafkaListener|JmsListener|RabbitListener|WebServlet|EventListener)$\")) ((marker_annotation name: (identifier) @_a) @marker (#match? @_a \"^(GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping|RequestMapping|Path|GET|POST|PUT|DELETE|Scheduled|KafkaListener|JmsListener|RabbitListener|WebServlet|EventListener)$\"))",
+          "line_pattern": "@(GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping|RequestMapping|Path|GET|POST|PUT|DELETE|Scheduled|KafkaListener|JmsListener|RabbitListener|WebServlet|EventListener)\\b"
+        },
+        {
+          "kind": "entrypoint",
+          "subtype": "main_method",
+          "query": "((method_declaration name: (identifier) @_n) @marker (#eq? @_n \"main\"))",
+          "line_pattern": "\\bstatic\\s+void\\s+main\\s*\\("
+        },
+        {
+          "kind": "boundary",
+          "subtype": "persistence_or_client",
+          "query": "((annotation name: (identifier) @_a) @marker (#match? @_a \"^(Entity|Table|Repository|FeignClient)$\")) ((marker_annotation name: (identifier) @_a) @marker (#match? @_a \"^(Entity|Table|Repository|FeignClient)$\"))",
+          "line_pattern": "@(Entity|Table|Repository|FeignClient)\\b"
+        }
+      ]
+    },
+    {
+      "id": "scala",
+      "grammar": {
+        "package": "tree-sitter-scala",
+        "wasm": "tree-sitter-scala.wasm"
+      },
+      "extensions": [".scala"],
+      "imports": {
+        "resolver": "qualified_name",
+        "query": "((import_declaration) @source)"
+      },
+      "markers": [
+        {
+          "kind": "entrypoint",
+          "subtype": "main_method",
+          "query": "((function_definition name: (identifier) @_n) @marker (#eq? @_n \"main\"))",
+          "line_pattern": "\\bdef\\s+main\\s*\\("
+        },
+        {
+          "kind": "entrypoint",
+          "subtype": "app_object",
+          "query": "((object_definition extend: (extends_clause type: (type_identifier) @_t)) @marker (#eq? @_t \"App\"))",
+          "line_pattern": "\\bobject\\s+\\w+\\s+extends\\s+App\\b"
+        }
+      ]
+    },
+    {
+      "id": "c_sharp",
+      "grammar": {
+        "package": "tree-sitter-c-sharp",
+        "wasm": "tree-sitter-c_sharp.wasm"
+      },
+      "extensions": [".cs"],
+      "imports": {
+        "resolver": "namespace",
+        "query": "((using_directive (qualified_name) @source)) ((using_directive (identifier) @source))",
+        "declarations": "((namespace_declaration name: (_) @namespace)) ((file_scoped_namespace_declaration name: (_) @namespace))"
+      },
+      "markers": [
+        {
+          "kind": "entrypoint",
+          "subtype": "attribute_route",
+          "query": "((attribute name: (identifier) @_a) @marker (#match? @_a \"^(HttpGet|HttpPost|HttpPut|HttpDelete|HttpPatch|Route|ApiController)$\"))",
+          "line_pattern": "\\[\\s*(HttpGet|HttpPost|HttpPut|HttpDelete|HttpPatch|Route|ApiController)\\b|,\\s*(HttpGet|HttpPost|HttpPut|HttpDelete|HttpPatch|Route|ApiController)\\b"
+        },
+        {
+          "kind": "entrypoint",
+          "subtype": "minimal_api",
+          "query": "((invocation_expression function: (member_access_expression name: (identifier) @_m)) @marker (#match? @_m \"^Map(Get|Post|Put|Delete|Patch)$\"))",
+          "line_pattern": "\\.Map(Get|Post|Put|Delete|Patch)\\s*\\("
+        },
+        {
+          "kind": "entrypoint",
+          "subtype": "main_method",
+          "query": "((method_declaration name: (identifier) @_n) @marker (#eq? @_n \"Main\"))",
+          "line_pattern": "\\bstatic\\s+(async\\s+)?[\\w<>]+\\s+Main\\s*\\("
+        },
+        {
+          "kind": "boundary",
+          "subtype": "io_client",
+          "query": "((object_creation_expression type: (identifier) @_t) @marker (#match? @_t \"^(SqlConnection|SqlCommand|NpgsqlConnection|HttpClient|FileStream|StreamReader|StreamWriter)$\"))",
+          "line_pattern": "\\bnew\\s+(SqlConnection|SqlCommand|NpgsqlConnection|HttpClient|FileStream|StreamReader|StreamWriter)\\s*\\("
+        }
+      ]
+    },
+    {
+      "id": "php",
+      "grammar": {
+        "package": "tree-sitter-php",
+        "wasm": "tree-sitter-php.wasm"
+      },
+      "extensions": [".php"],
+      "imports": {
+        "resolver": "relative_path",
+        "query": "((require_expression (string (string_content) @source))) ((require_once_expression (string (string_content) @source))) ((include_expression (string (string_content) @source))) ((include_once_expression (string (string_content) @source)))",
+        "bare_specifier": "path",
+        "candidates": [""]
+      },
+      "markers": [
+        {
+          "kind": "entrypoint",
+          "subtype": "framework_route",
+          "query": "((scoped_call_expression scope: (name) @_s name: (name) @_m) @marker (#eq? @_s \"Route\") (#match? @_m \"^(get|post|put|patch|delete|any|match|resource|apiResource)$\")) ((attribute (name) @_a) @marker (#eq? @_a \"Route\"))",
+          "line_pattern": "\\bRoute::(get|post|put|patch|delete|any|match|resource|apiResource)\\s*\\(|#\\[\\s*Route\\b"
+        },
+        {
+          "kind": "boundary",
+          "subtype": "io_call",
+          "query": "((function_call_expression function: (name) @_f) @marker (#match? @_f \"^(mysqli_query|mysql_query|pg_query|curl_exec|file_get_contents|fopen)$\")) ((object_creation_expression (name) @_t) @marker (#match? @_t \"^(PDO|mysqli)$\"))",
+          "line_pattern": "\\b(mysqli_query|mysql_query|pg_query|curl_exec|file_get_contents|fopen)\\s*\\(|\\bnew\\s+(PDO|mysqli)\\s*\\("
+        }
+      ]
+    },
+    {
+      "id": "rust",
+      "grammar": {
+        "package": "tree-sitter-rust",
+        "wasm": "tree-sitter-rust.wasm"
+      },
+      "extensions": [".rs"],
+      "imports": {
+        "resolver": "rust_module",
+        "query": "((mod_item !body name: (identifier) @source)) ((use_declaration argument: (scoped_identifier) @source)) ((use_declaration argument: (scoped_use_list path: (_) @source)))"
+      },
+      "markers": [
+        {
+          "kind": "entrypoint",
+          "subtype": "main_fn",
+          "query": "((function_item name: (identifier) @_n) @marker (#eq? @_n \"main\"))",
+          "line_pattern": "\\bfn\\s+main\\s*\\("
+        },
+        {
+          "kind": "entrypoint",
+          "subtype": "route_attribute",
+          "query": "((attribute_item (attribute (identifier) @_a)) @marker (#match? @_a \"^(get|post|put|patch|delete|route)$\"))",
+          "line_pattern": "#\\[\\s*(get|post|put|patch|delete|route)\\s*\\("
+        },
+        {
+          "kind": "boundary",
+          "subtype": "io_call",
+          "query": "((call_expression function: (scoped_identifier path: (identifier) @_p)) @marker (#match? @_p \"^(reqwest|File|fs|sqlx|TcpStream)$\"))",
+          "line_pattern": "\\b(reqwest|File|fs|sqlx|TcpStream)::\\w+\\s*[(<]"
+        }
+      ]
+    },
+    {
+      "id": "go",
+      "grammar": {
+        "package": "tree-sitter-go",
+        "wasm": "tree-sitter-go.wasm"
+      },
+      "extensions": [".go"],
+      "imports": {
+        "resolver": "go_package",
+        "query": "((import_spec path: (interpreted_string_literal (interpreted_string_literal_content) @source)))"
+      },
+      "markers": [
+        {
+          "kind": "entrypoint",
+          "subtype": "main_fn",
+          "query": "((function_declaration name: (identifier) @_n) @marker (#eq? @_n \"main\"))",
+          "line_pattern": "^func\\s+main\\s*\\("
+        },
+        {
+          "kind": "entrypoint",
+          "subtype": "http_route",
+          "query": "((call_expression function: (selector_expression operand: (identifier) @_o field: (field_identifier) @_f)) @marker (#match? @_o \"^(http|mux|r|router|e|g|app)$\") (#match? @_f \"^(HandleFunc|Handle|GET|POST|PUT|PATCH|DELETE|Get|Post|Put|Patch|Delete)$\"))",
+          "line_pattern": "\\b(http|mux|r|router|e|g|app)\\.(HandleFunc|Handle|GET|POST|PUT|PATCH|DELETE|Get|Post|Put|Patch|Delete)\\s*\\("
+        },
+        {
+          "kind": "boundary",
+          "subtype": "io_call",
+          "query": "((call_expression function: (selector_expression operand: (identifier) @_o field: (field_identifier) @_f)) @marker (#match? @_o \"^(sql|db|tx|os)$\") (#match? @_f \"^(Open|Query|QueryRow|Exec|ReadFile|WriteFile|Create)$\"))",
+          "line_pattern": "\\b(sql|db|tx|os)\\.(Open|Query|QueryRow|Exec|ReadFile|WriteFile|Create)\\s*\\("
+        }
+      ]
+    },
+    {
+      "id": "ruby",
+      "grammar": {
+        "package": "tree-sitter-ruby",
+        "wasm": "tree-sitter-ruby.wasm"
+      },
+      "extensions": [".rb"],
+      "imports": {
+        "resolver": "relative_path",
+        "query": "((call method: (identifier) @_m arguments: (argument_list . (string (string_content) @source))) (#eq? @_m \"require_relative\"))",
+        "bare_specifier": "path",
+        "candidates": [".rb", ""]
+      },
+      "markers": [
+        {
+          "kind": "entrypoint",
+          "subtype": "route_dsl",
+          "query": "((call !receiver method: (identifier) @_m arguments: (argument_list)) @marker (#match? @_m \"^(get|post|put|patch|delete|resources|resource|root|match)$\"))",
+          "line_pattern": "^\\s*(get|post|put|patch|delete|resources|resource|root|match)\\s+[:'\"]"
+        },
+        {
+          "kind": "boundary",
+          "subtype": "io_call",
+          "query": "((call receiver: (constant) @_r) @marker (#match? @_r \"^(File|IO|Faraday|HTTParty|RestClient|PG|Mysql2|Redis)$\"))",
+          "line_pattern": "\\b(File|IO|Faraday|HTTParty|RestClient|PG|Mysql2|Redis)\\.\\w+"
+        }
+      ]
+    },
+    {
+      "id": "c",
+      "grammar": {
+        "package": "tree-sitter-c",
+        "wasm": "tree-sitter-c.wasm"
+      },
+      "extensions": [".c", ".h"],
+      "imports": {
+        "resolver": "relative_path",
+        "query": "((preproc_include path: (string_literal (string_content) @source)))",
+        "bare_specifier": "path",
+        "candidates": [""]
+      },
+      "markers": [
+        {
+          "kind": "entrypoint",
+          "subtype": "main_fn",
+          "query": "((function_declarator declarator: (identifier) @_n) @marker (#eq? @_n \"main\"))",
+          "line_pattern": "^\\s*(int|void)?\\s*\\bmain\\s*\\("
+        },
+        {
+          "kind": "boundary",
+          "subtype": "io_call",
+          "query": "((call_expression function: (identifier) @_f) @marker (#match? @_f \"^(fopen|open|socket|connect|curl_easy_perform|sqlite3_exec|mysql_query|PQexec)$\"))",
+          "line_pattern": "\\b(fopen|open|socket|connect|curl_easy_perform|sqlite3_exec|mysql_query|PQexec)\\s*\\("
+        }
+      ]
+    },
+    {
+      "id": "cpp",
+      "grammar": {
+        "package": "tree-sitter-cpp",
+        "wasm": "tree-sitter-cpp.wasm"
+      },
+      "extensions": [".cc", ".cpp", ".cxx", ".hpp", ".hh", ".hxx"],
+      "imports": {
+        "resolver": "relative_path",
+        "query": "((preproc_include path: (string_literal (string_content) @source)))",
+        "bare_specifier": "path",
+        "candidates": [""]
+      },
+      "markers": [
+        {
+          "kind": "entrypoint",
+          "subtype": "main_fn",
+          "query": "((function_declarator declarator: (identifier) @_n) @marker (#eq? @_n \"main\"))",
+          "line_pattern": "^\\s*(int|void)?\\s*\\bmain\\s*\\("
+        },
+        {
+          "kind": "boundary",
+          "subtype": "io_call",
+          "query": "((call_expression function: (identifier) @_f) @marker (#match? @_f \"^(fopen|open|socket|connect|curl_easy_perform|sqlite3_exec|mysql_query|PQexec)$\"))",
+          "line_pattern": "\\b(fopen|open|socket|connect|curl_easy_perform|sqlite3_exec|mysql_query|PQexec)\\s*\\("
+        }
+      ]
+    }
+  ]
+}
