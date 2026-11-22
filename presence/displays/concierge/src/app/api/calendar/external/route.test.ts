@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   owner: true,
   connected: true,
   raw: null as unknown,
+  loggedIn: undefined as boolean | undefined,
   agendaError: null as Error | null,
   agendaCalls: 0,
 }));
@@ -20,6 +21,7 @@ vi.mock('@agent/core/meeting/calendar-workflow', () => ({
   readCalendarProviderAuthStatus: async () => ({
     ok: mocks.connected,
     available: true,
+    ...(mocks.loggedIn === undefined ? {} : { logged_in: mocks.loggedIn }),
     raw: mocks.raw,
   }),
   listCalendarAgenda: async () => {
@@ -61,6 +63,7 @@ describe('GET /api/calendar/external', () => {
     mocks.owner = true;
     mocks.connected = true;
     mocks.raw = null;
+    mocks.loggedIn = undefined;
     mocks.agendaError = null;
     resetExternalCalendarStatusCache();
     mocks.agendaCalls = 0;
@@ -132,7 +135,7 @@ describe('GET /api/calendar/external', () => {
 
   it('checks the login again after a failed read instead of trusting the cache', async () => {
     mocks.raw = { encrypted_credentials_exists: true, token_valid: true };
-    mocks.agendaError = new Error('invalid_grant');
+    mocks.agendaError = new Error('error sending request: connection reset');
     expect(await (await get('from=2026-11-16&to=2026-11-29')).json()).toMatchObject({
       degraded: true,
     });
@@ -177,6 +180,37 @@ describe('GET /api/calendar/external', () => {
     expect(await (await get('from=2026-11-16&to=2026-11-29')).json()).toMatchObject({
       connected: true,
     });
+  });
+
+  it.each([
+    'Command failed: gws calendar events list\nerror[auth]: Failed to get token: invalid_grant: Bad Request',
+    'Command failed: m365 request\nAADSTS700082: The refresh token has expired due to inactivity.',
+    'Command failed: m365 request\ninteraction_required',
+  ])('turns a refused read into login_expired without the text: %s', async (message) => {
+    mocks.raw = { encrypted_credentials_exists: true, token_valid: true };
+    mocks.agendaError = new Error(message);
+    const body = await (await get('from=2026-11-16&to=2026-11-29')).json();
+    expect(body).toMatchObject({ ok: true, connected: false, login_expired: true, events: [] });
+    expect(JSON.stringify(body)).not.toMatch(/invalid_grant|AADSTS|interaction/);
+  });
+
+  it.each([
+    'Command failed: m365 request\nAADSTS700016: unauthorized_client: app not found in the tenant',
+    'Command failed: gws calendar events list --params {"maxResults":401}',
+    'error sending request: connection reset',
+  ])('keeps a failure that is not a sign-in refusal as degraded: %s', async (message) => {
+    mocks.raw = { encrypted_credentials_exists: true, token_valid: true };
+    mocks.agendaError = new Error(message);
+    const body = await (await get('from=2026-11-16&to=2026-11-29')).json();
+    expect(body).toMatchObject({ connected: true, degraded: true });
+  });
+
+  it('treats a status that reports no account as not connected (no provider call)', async () => {
+    mocks.loggedIn = false;
+    const body = await (await get('from=2026-11-16&to=2026-11-29')).json();
+    expect(body).toMatchObject({ connected: false });
+    expect(body.login_expired).toBeUndefined();
+    expect(mocks.agendaCalls).toBe(0);
   });
 
   it('reports a provider failure as degraded with a fixed message', async () => {

@@ -197,4 +197,44 @@ describe('service harness contract', () => {
     const persisted = persistServiceExecutionReceipt(receipt);
     expect(persisted.receipt_path).toContain('/runtime/service-receipts');
   });
+  it('does not infer a read for an undeclared CLI operation (no method says nothing about its effect)', () => {
+    const ops = describeServiceHarness('google-workspace', { detail: false }).operations;
+    const byAction = (action: string) => ops.find((op) => op.action === action)!;
+    for (const action of ['gmail_send', 'calendar_events_insert', 'calendar_events_delete']) {
+      expect(byAction(action)).toMatchObject({
+        risk: 'write',
+        kind: 'apply',
+        approval_required: true,
+      });
+    }
+    expect(() => assertServiceCaptureOperation('google-workspace', 'gmail_send')).toThrow(
+      /Capture-only surface rejected/
+    );
+    // An undeclared MCP route is not a read either.
+    const brave = describeServiceHarness('brave-search', { detail: false }).operations;
+    expect(brave.find((op) => op.action === 'brave_web_search')).toMatchObject({ risk: 'write' });
+  });
+
+  it('keeps the declared calendar reads as reads (operator decision 2026-11-22)', () => {
+    for (const [service, actions] of [
+      [
+        'google-workspace',
+        [
+          'calendar_agenda',
+          'calendar_calendarList_list',
+          'calendar_events_list',
+          'calendar_freebusy_query',
+        ],
+      ],
+      ['m365', ['calendar_list', 'calendar_view_primary', 'calendar_freebusy_query']],
+    ] as const) {
+      const ops = describeServiceHarness(service, { detail: false }).operations;
+      for (const action of actions) {
+        expect(ops.find((op) => op.action === action)).toMatchObject({
+          risk: 'read',
+          approval_required: false,
+        });
+      }
+    }
+  });
 });

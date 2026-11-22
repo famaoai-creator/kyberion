@@ -101,6 +101,11 @@ export interface CalendarProviderDeleteEventParams {
 export interface CalendarProviderAuthStatus {
   ok: boolean;
   available: boolean;
+  /**
+   * Whether the CLI reports a signed-in account, when its status says so
+   * (`m365 status` without `connectedAs` is logged out). Absent: unknown.
+   */
+  logged_in?: boolean;
   raw: unknown;
   error?: string;
 }
@@ -243,7 +248,13 @@ function normalizeM365CalendarList(value: unknown): CalendarListEntry[] {
 async function readM365AuthStatus(): Promise<CalendarProviderAuthStatus> {
   try {
     const raw = await executeServicePreset('m365', 'auth_status', { params: {} });
-    return { ok: true, available: true, raw };
+    // Logged out, `m365 status` answers without an account (e.g. "Logged out").
+    const loggedIn =
+      Boolean(raw) &&
+      typeof raw === 'object' &&
+      typeof (raw as Record<string, unknown>).connectedAs === 'string' &&
+      ((raw as Record<string, unknown>).connectedAs as string).length > 0;
+    return { ok: true, available: true, logged_in: loggedIn, raw };
   } catch (error: unknown) {
     return {
       ok: false,
@@ -378,9 +389,21 @@ function registerBuiltinCalendarProviders(): void {
         return `me/calendars/${trimmed}`;
       },
       async listEvents(params) {
+        const calendarPath = this.resolveCalendarPath(params.calendarId);
+        // The primary calendar has a fixed-path read operation (approval-free
+        // for agents); another calendar goes through the gated templated one.
+        if (calendarPath === 'me') {
+          return executeServicePreset('m365', 'calendar_view_primary', {
+            params: {
+              timeMin: params.encodedTimeMin,
+              timeMax: params.encodedTimeMax,
+              maxResults: params.maxResults,
+            },
+          });
+        }
         return executeServicePreset('m365', 'calendar_events_list', {
           params: {
-            calendarPath: this.resolveCalendarPath(params.calendarId),
+            calendarPath,
             timeMin: params.encodedTimeMin,
             timeMax: params.encodedTimeMax,
             maxResults: params.maxResults,

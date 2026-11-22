@@ -9,6 +9,7 @@ import { resolveConciergeInstallationAccess } from '../../../../lib/installation
 import { resolveConciergeViewer } from '../../../../lib/viewer-context';
 import {
   forgetProviderLoginState,
+  isProviderTokenRefusal,
   providerLoginState,
 } from '../../../../lib/external-calendar-status';
 
@@ -128,6 +129,18 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     // The login may have expired since it was checked: check it again next time.
     forgetProviderLoginState(provider);
+    // A provider whose status cannot see an expired login (m365) shows it
+    // here: the read was refused. The owner gets the re-login hint, not the text.
+    if (isProviderTokenRefusal(error)) {
+      logger.warn(
+        `external calendar login refused — the provider rejected the stored sign-in | ` +
+          `next: the owner signs in again (the page shows the command) | evidence: provider=${provider}`
+      );
+      return NextResponse.json(
+        { ok: true, provider, connected: false, login_expired: true, events: [] },
+        { headers: NO_STORE }
+      );
+    }
     // The reply stays fixed (wire boundary); the operator log carries the cause.
     logger.warn(
       `external calendar read failed — ${error instanceof Error ? error.message : String(error)} | ` +

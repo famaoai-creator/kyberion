@@ -65,6 +65,18 @@ Check [`service-endpoints/README.md`](service-endpoints/README.md), existing
    (`read` / `write` / `destructive`), `approval_required`, and `idempotency`
    explicitly wherever applicable. Reads must have no external effects. Writes
    and destructive operations must retain the approval gate.
+   An undeclared `risk` is inferred from the HTTP method only for `api` routes.
+   A CLI or MCP route with no method says nothing about its effect, so the
+   harness treats it as `write` (approval required, never capture). Declare
+   `risk: read` on a CLI read when agents should be able to run it without an
+   approval decision: that is a governance decision. Only declare it when the
+   parameters cannot change what is read: an operation whose URL path is a
+   template parameter (m365 `calendar_events_list` takes `{{calendarPath}}`,
+   so `me/messages?x=` would read mail) stays gated, and a fixed-path variant
+   carries the read (`calendar_view_primary`). The Google Workspace and
+   Microsoft 365 calendar reads are declared this way (operator decision,
+   2026-11-22). A declared read also lets a failed call report its own error
+   instead of "service effect outcome is unknown".
    For a service whose operations always use tenant-owned connections, set
    top-level `tenant_binding_required: true` in the preset. For a mixed service,
    set it on each tenant-bound operation. At execution, Kyberion requires a

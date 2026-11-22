@@ -13,6 +13,7 @@
     },
     "calendar_list": {
       "type": "cli",
+      "risk": "read",
       "command": "m365",
       "args": ["request", "--url", "@graph/me/calendars", "--output", "json"],
       "description": "List the signed-in user's calendars."
@@ -27,10 +28,24 @@
         "--output",
         "json"
       ],
-      "description": "List calendar events for the requested window."
+      "description": "List calendar events for the requested window. The Graph path is a parameter, so this stays approval-gated; the primary calendar uses calendar_view_primary."
+    },
+    "calendar_view_primary": {
+      "type": "cli",
+      "risk": "read",
+      "command": "m365",
+      "args": [
+        "request",
+        "--url",
+        "@graph/me/calendarView?startDateTime={{timeMin}}&endDateTime={{timeMax}}",
+        "--output",
+        "json"
+      ],
+      "description": "List the signed-in user's primary calendar events for the requested window (fixed Graph path; parameters only fill the query)."
     },
     "calendar_freebusy_query": {
       "type": "cli",
+      "risk": "read",
       "command": "m365",
       "args": [
         "request",

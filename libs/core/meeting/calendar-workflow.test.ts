@@ -15,8 +15,45 @@ import {
   listCalendarAgenda,
   listCalendars,
   queryCalendarFreeBusy,
+  readCalendarProviderAuthStatus,
   updateCalendarEvent,
 } from './calendar-workflow.js';
+
+describe('m365 calendar path', () => {
+  it('sends another calendar through the gated templated operation', async () => {
+    mocks.executeServicePreset.mockResolvedValue({ value: [] });
+    await listCalendarAgenda({
+      provider: 'm365',
+      calendar_id: 'AAMkAGI2',
+      time_min: '2026-06-23T00:00:00Z',
+      time_max: '2026-06-24T00:00:00Z',
+    });
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith(
+      'm365',
+      'calendar_events_list',
+      expect.objectContaining({
+        params: expect.objectContaining({ calendarPath: 'me/calendars/AAMkAGI2' }),
+      })
+    );
+  });
+});
+
+describe('m365 auth status', () => {
+  it('is signed in only with an account (connectedAs)', async () => {
+    mocks.executeServicePreset.mockResolvedValueOnce({ connectedAs: 'owner@example.com' });
+    expect(await readCalendarProviderAuthStatus('m365')).toMatchObject({
+      ok: true,
+      logged_in: true,
+    });
+    mocks.executeServicePreset.mockResolvedValueOnce('Logged out');
+    expect(await readCalendarProviderAuthStatus('m365')).toMatchObject({
+      ok: true,
+      logged_in: false,
+    });
+    mocks.executeServicePreset.mockResolvedValueOnce({ connectedAs: '' });
+    expect(await readCalendarProviderAuthStatus('m365')).toMatchObject({ logged_in: false });
+  });
+});
 
 describe('calendar-workflow helpers', () => {
   it('lists agenda items from the primary calendar by default', async () => {
@@ -226,9 +263,9 @@ describe('calendar-workflow helpers', () => {
       time_max: '2026-06-24T00:00:00+09:00',
     });
 
-    expect(mocks.executeServicePreset).toHaveBeenCalledWith('m365', 'calendar_events_list', {
+    // The primary calendar uses the fixed-path read; no Graph path is a parameter.
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith('m365', 'calendar_view_primary', {
       params: {
-        calendarPath: 'me',
         timeMin: '2026-06-23T00%3A00%3A00%2B09%3A00',
         timeMax: '2026-06-24T00%3A00%3A00%2B09%3A00',
         maxResults: 20,
