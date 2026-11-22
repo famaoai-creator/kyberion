@@ -7,6 +7,11 @@ export {
 } from '../foundation/credential-binding.js';
 import * as secureIo from '../secure-io.js';
 import { assertAccountCredentialMaterialRead } from '../foundation/credential-material-capability.js';
+import {
+  isAccountOwnerKind,
+  isPersonAccountOwner,
+  type AccountOwnerKind,
+} from '../service/service-binding-owner.js';
 import { operatorProbeSecretAccess } from '../service/operator-service-connection-admission.js';
 import { ledger } from '../governance/ledger.js';
 import * as pathResolver from '../path-resolver.js';
@@ -528,7 +533,7 @@ export const storeConnectionDocument = (
 export interface LocalAccountMaterialIdentity {
   serviceId: string;
   bindingId: string;
-  ownerKind: 'person' | 'organization';
+  ownerKind: AccountOwnerKind;
   ownerRef: string;
   tenantSlug?: string;
 }
@@ -545,8 +550,8 @@ function localAccountMaterialIdentity(identity: LocalAccountMaterialIdentity): s
     typeof identity.ownerRef !== 'string' ||
     !slug.test(identity.serviceId) ||
     !slug.test(identity.bindingId) ||
-    (identity.ownerKind !== 'person' && identity.ownerKind !== 'organization') ||
-    (identity.ownerKind === 'person'
+    !isAccountOwnerKind(identity.ownerKind) ||
+    (isPersonAccountOwner(identity.ownerKind)
       ? !/^user:[A-Za-z0-9._-]{1,128}$/.test(identity.ownerRef) || identity.tenantSlug !== undefined
       : typeof identity.tenantSlug !== 'string' ||
         !slug.test(identity.tenantSlug) ||
@@ -747,7 +752,7 @@ function assertAllocatedAccountRead(
   const tenant = credentialExecutionIdentity().tenantSlug;
   if (
     !tenant ||
-    identity.ownerKind !== 'person' ||
+    !isPersonAccountOwner(identity.ownerKind) ||
     identity.tenantSlug ||
     getPluginExecutionContext()
   )
@@ -786,7 +791,7 @@ function assertPersonalRuntimeAccountRead(
   if (
     execution.tenantSlug ||
     !execution.personalClaim ||
-    identity.ownerKind !== 'person' ||
+    !isPersonAccountOwner(identity.ownerKind) ||
     identity.tenantSlug ||
     identity.ownerRef !== execution.personalClaim.ownerId ||
     getPluginExecutionContext()
