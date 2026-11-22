@@ -1790,8 +1790,11 @@ async function handleMfaChallenge(lease, recording, session) {
 //
 // Native Messaging stays the only transport: the extension polls the native
 // host (`poll_requests`) and answers with `respond_request`. The poller runs
-// every minute via chrome.alarms, and every 5 s only while a Side Panel holds
-// a `sidepanel` port. Nothing here answers a request on its own: observe_tab
+// every minute via chrome.alarms, every 5 s while a Side Panel holds a
+// `sidepanel` port, and every 5 s for a bounded window after control_step
+// activity (the native call each tick performs keeps the MV3 service worker
+// warm — no side panel needed for an interactive control loop). Nothing here
+// answers a request on its own: observe_tab
 // needs an explicit click in the Side Panel, local_infer runs in the Side Panel
 // (Built-in AI document APIs are unavailable in a service worker), and
 // approval_pending notifications are display-only.
@@ -1839,6 +1842,16 @@ function withInboxLock(fn) {
 
 const sidePanelPorts = new Set();
 let fastPollTimer = null;
+// Interactive control needs the mailbox hot. After any control_step sighting
+// the fast poll stays alive for a bounded window — each tick performs a
+// native call, which is enough MV3 service-worker activity on its own.
+const CONTROL_FAST_POLL_WINDOW_MS = 5 * 60_000;
+let controlFastPollUntil = 0;
+
+function noteControlActivity() {
+  controlFastPollUntil = Date.now() + CONTROL_FAST_POLL_WINDOW_MS;
+  startFastPoll();
+}
 
 function scrubber() {
   const scrub = globalThis.__kyberionPiiScrub;
@@ -2075,7 +2088,7 @@ function schedulePoll() {
 function startFastPoll() {
   if (fastPollTimer) return;
   fastPollTimer = setInterval(() => {
-    if (sidePanelPorts.size === 0) {
+    if (sidePanelPorts.size === 0 && Date.now() >= controlFastPollUntil) {
       stopFastPoll();
       return;
     }
@@ -2672,6 +2685,7 @@ async function executeControlStep(item) {
 // the CLI side, so the inbox is informational (a live view of what ran).
 async function drainControlSteps(requests) {
   const control = requests.filter((item) => item.request_kind === 'control_step');
+  if (control.length > 0) noteControlActivity();
   for (const item of control) {
     try {
       const wire = await executeControlStep(item);
