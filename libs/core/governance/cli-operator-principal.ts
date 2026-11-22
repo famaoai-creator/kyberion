@@ -81,9 +81,9 @@ export function resolveCliOperatorIdentity(
       { source: 'loopback' },
       options.rootDir ? { rootDir: options.rootDir } : {}
     );
-    const tenantRole = owner?.memberships.find(
-      (entry) => entry.tenant_slug === options.tenantSlug
-    )?.role;
+    const tenantRole = options.tenantSlug
+      ? owner?.memberships.find((entry) => entry.tenant_slug === options.tenantSlug)?.role
+      : undefined;
     return {
       principalId: owner ? `user:${owner.member_id}` : null,
       displayName,

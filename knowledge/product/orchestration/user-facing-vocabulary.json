@@ -5103,6 +5103,26 @@
         "ja": "最重要",
         "qps-ploc": "⟦Ƈřïŧïƈȧŀ ŀőř⟧"
       },
+      "chronos_changes_tasks": {
+        "en": "Changes and tasks",
+        "ja": "変更とタスク",
+        "qps-ploc": "⟦Ƈħȧñɠėş ȧñḓ ŧȧşķş ŀőřėɱ⟧"
+      },
+      "chronos_this_turn": {
+        "en": "Artifacts from this turn",
+        "ja": "今回の成果物",
+        "qps-ploc": "⟦Ȧřŧïƒȧƈŧş ƒřőɱ ŧħïş ŧůřñ ŀőřėɱ ï⟧"
+      },
+      "chronos_uncommitted": {
+        "en": "Uncommitted changes",
+        "ja": "未コミットの変更",
+        "qps-ploc": "⟦Ůñƈőɱɱïŧŧėḓ ƈħȧñɠėş ŀőřėɱ ⟧"
+      },
+      "chronos_child_work": {
+        "en": "Child work items",
+        "ja": "子作業項目",
+        "qps-ploc": "⟦Ƈħïŀḓ ẇőřķ ïŧėɱş ŀőřėɱ⟧"
+      },
       "chronos_change_create": {
         "en": "Create",
         "ja": "作成",
