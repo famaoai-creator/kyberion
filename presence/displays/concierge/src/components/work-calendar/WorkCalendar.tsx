@@ -6,7 +6,12 @@ import { Button } from '@agent/shared-ui';
 import { localeToBcp47 } from '@agent/core/foundation/locale-normalize';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
 import { useWorkspaceResource } from '../../lib/use-workspace-resource';
-import { entityHref, listQueryFromSearch, workspaceApiPath } from '../../lib/workspace-view';
+import {
+  entityHref,
+  isWorkspaceKind,
+  listQueryFromSearch,
+  workspaceApiPath,
+} from '../../lib/workspace-view';
 import { LoadErrorState, LoadingState, type Translate } from '../../app/w/workspace-parts';
 import {
   CALENDAR_SOURCE_GROUPS,
@@ -168,9 +173,9 @@ export function WorkCalendar({ t }: { t: Translate }) {
     () =>
       [
         ...fromCalendarEntries(data?.entries ?? [], (link, tenantSlug) =>
-          // `session` links have no workspace route — the entry stays
-          // text-only until a session detail page exists.
-          link.kind === 'session' ? undefined : entityHref(link.kind, link.id, tenantSlug)
+          // Kinds outside GraphEntityKind (e.g. `session`) have no workspace
+          // route — the canonical kind guard decides, not a per-kind check.
+          isWorkspaceKind(link.kind) ? entityHref(link.kind, link.id, tenantSlug) : undefined
         ),
         ...(external.state === 'ready' ? fromExternalEvents(external.events) : []),
       ].filter((item) => shownGroups.has(sourceGroup(item.source))),
