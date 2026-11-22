@@ -171,7 +171,7 @@ export const DEFAULT_PRESENCE_STALE_MS = 5 * 60 * 1000;
 export const CO_SESSION_PRESENCE_COMPACT_MIN_BYTES = 1024 * 1024;
 /**
  * observability events.jsonl is an append-only event log: rotated (live file
- * renamed to `events-<stamp>.jsonl` beside it) once it passes this size.
+ * renamed to `events.<stamp>Z-<pid>.jsonl` beside it) once it passes this size.
  * Window readers scan the live file and its rotated segments.
  */
 export const CO_SESSION_EVENTS_ROTATE_MIN_BYTES = 8 * 1024 * 1024;
