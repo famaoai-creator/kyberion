@@ -7,6 +7,8 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { readTenantProfile, tenantProfilePath } from '@agent/core/organization/tenant-registry';
 import {
+  isOrganizationManagementResource,
+  isProjectManagementResource,
   readSurfaceManagementExact,
   readSurfaceManagementResource,
   verifySurfaceManagementAuthorization,
@@ -151,7 +153,8 @@ export async function managementSnapshot(
         continue;
       throw error;
     }
-    if (entry.resource.kind !== 'organization') throw new Error('Invalid organization projection');
+    if (!isOrganizationManagementResource(entry.resource))
+      throw new Error('Invalid organization projection');
     const { state, purpose } = entry.resource;
     organizations.push({ id, name: state.name, status: state.status });
     if (id !== organizationId) continue;
@@ -176,7 +179,8 @@ export async function managementSnapshot(
           continue;
         throw error;
       }
-      if (item.resource.kind !== 'project') throw new Error('Invalid project projection');
+      if (!isProjectManagementResource(item.resource))
+        throw new Error('Invalid project projection');
       const record = item.resource.record;
       projects.push({ id: child, name: record.name, organization_id: id, status: record.status });
       if (child === projectId)

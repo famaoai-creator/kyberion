@@ -58,6 +58,21 @@ export const GRAPH_ENTITY_KINDS = [
 ] as const;
 export type GraphEntityKind = (typeof GRAPH_ENTITY_KINDS)[number];
 
+/** Per-kind guards for `kind` discriminant reads — the canonical projections. */
+export const isTenantGraphNode = (node: Pick<GraphRef, 'kind'>): boolean => node.kind === 'tenant';
+export const isOrganizationGraphNode = (node: Pick<GraphRef, 'kind'>): boolean =>
+  node.kind === 'organization';
+export const isProjectGraphNode = (node: Pick<GraphRef, 'kind'>): boolean =>
+  node.kind === 'project';
+export const isMissionGraphNode = (node: Pick<GraphRef, 'kind'>): boolean =>
+  node.kind === 'mission';
+export const isTaskGraphNode = (node: Pick<GraphRef, 'kind'>): boolean => node.kind === 'task';
+export const isWorkItemGraphNode = (node: Pick<GraphRef, 'kind'>): boolean =>
+  node.kind === 'work_item';
+export const isApprovalGraphNode = (node: Pick<GraphRef, 'kind'>): boolean =>
+  node.kind === 'approval';
+export const isActorGraphNode = (node: Pick<GraphRef, 'kind'>): boolean => node.kind === 'actor';
+
 export interface GraphRef {
   kind: GraphEntityKind;
   id: string;

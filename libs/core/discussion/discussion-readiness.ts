@@ -8,7 +8,11 @@ import {
   assertReasoningEgressAllowed,
   withReasoningPayloadScope,
 } from '../reasoning/reasoning-egress-scope.js';
-import type { DiscussionProvider, DiscussionScope } from './discussion-types.js';
+import {
+  isClaudeDiscussionProvider,
+  type DiscussionProvider,
+  type DiscussionScope,
+} from './discussion-types.js';
 
 export interface DiscussionReadinessCheck {
   id:
@@ -37,7 +41,8 @@ function inspectExecutable(provider: DiscussionProvider): DiscussionReadinessChe
   const id = 'executable';
   // Claude's isolated SDK selects its platform-native package inside query().
   // PATH claude is not that executable; discovering it by query would launch it.
-  if (provider === 'claude') return { id, status: 'unverified', code: 'executable_unverified' };
+  if (isClaudeDiscussionProvider(provider))
+    return { id, status: 'unverified', code: 'executable_unverified' };
   let binary: string;
   try {
     // Only the existing bounded which/where locator, never Codex itself.

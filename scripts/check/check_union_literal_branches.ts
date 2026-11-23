@@ -42,6 +42,13 @@ const LITERAL_SOURCES: LiteralSource[] = [
     name: 'WORKSPACE_KINDS',
   },
   {
+    // Canonical declaration mirrored by WORKSPACE_KINDS above — the runtime
+    // module that owns the union branches on it freely.
+    file: 'libs/core/surface/workspace-graph.ts',
+    kind: 'array',
+    name: 'GRAPH_ENTITY_KINDS',
+  },
+  {
     file: 'libs/core/workforce/co-session.ts',
     kind: 'array',
     name: 'CO_SESSION_PROVIDERS',

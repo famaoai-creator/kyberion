@@ -16,7 +16,7 @@ import {
   withCharterDecisionLock,
   type CharterPathOptions,
 } from './accountability-charter-registry.js';
-import type { CharterScope } from './accountability-charter.js';
+import { isOrganizationCharterScope, type CharterScope } from './accountability-charter.js';
 
 export interface CharterPaymentIntent {
   /** Durable business identity, stable across task/process retries and charter amendments. */
@@ -81,7 +81,7 @@ function paymentKey(scope: CharterScope, paymentId: string): string {
     .update(
       JSON.stringify([
         scope.kind,
-        scope.kind === 'organization' ? scope.tenant_slug : null,
+        isOrganizationCharterScope(scope) ? scope.tenant_slug : null,
         paymentId,
       ])
     )

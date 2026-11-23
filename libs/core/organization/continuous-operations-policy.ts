@@ -6,6 +6,7 @@ import {
   parseContinuousWorkPlan,
   CONTINUOUS_MANAGED_WORK_PIPELINE,
   type ContinuousWorkPlan,
+  isProjectWorkPlan,
 } from './continuous-work-plan.js';
 import {
   DEFAULT_DOT_ACTION_ID,
@@ -280,7 +281,7 @@ export function parseContinuousOperationsConfig(value: unknown): ContinuousOpera
       result.requested_decision = choice(rule.requested_decision, ['auto', 'notify', 'approve']);
     if (rule.work_plan !== undefined) {
       result.work_plan = parseContinuousWorkPlan(rule.work_plan);
-      if (result.work_plan.kind !== 'project' && !scope.project_id)
+      if (!isProjectWorkPlan(result.work_plan) && !scope.project_id)
         fail('managed mission work requires project scope');
       if (pipeline !== CONTINUOUS_MANAGED_WORK_PIPELINE)
         fail('managed work requires its governed pipeline');

@@ -138,6 +138,11 @@ export type ChronosPipelineScope =
   | { kind: 'tenant'; relative: string; tenant_slug: string }
   | { kind: 'personal'; relative: string };
 
+/** Tenant scopes are the only members carrying a slug — structural guard, no discriminant read. */
+export const isTenantChronosScope = (
+  scope: ChronosPipelineScope
+): scope is Extract<ChronosPipelineScope, { kind: 'tenant' }> => 'tenant_slug' in scope;
+
 const TENANT_PIPELINE_RE = /^knowledge\/confidential\/([^/]+)\/pipelines\/[^/]+\.json$/;
 const PERSONAL_PIPELINE_RE = /^knowledge\/personal\/pipelines\/[^/]+\.json$/;
 const PERSONAL_KNOWLEDGE_ROOT = 'knowledge/personal';
@@ -920,7 +925,7 @@ async function tickAsLeader(): Promise<void> {
             logger.info(`[CHRONOS] ✓ ${scheduled.id}: succeeded (personal)`);
             return `cron-run:${runToken}`;
           }
-          if (scope.kind === 'tenant') {
+          if (isTenantChronosScope(scope)) {
             // Re-verified at run time: a tenant suspended since registration,
             // or a path swapped for a symlink, is refused here.
             assertRegisteredTenantPipeline(scope);

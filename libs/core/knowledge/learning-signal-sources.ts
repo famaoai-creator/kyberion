@@ -9,6 +9,7 @@ import {
   listApprovalChannelsAt,
   listApprovalPartitions,
   tenantApprovalEventLogicalPath,
+  isTenantApprovalPartition,
   type PrivateApprovalPartition,
 } from '../governance/approval-store-location.js';
 import { readWorkerEventStreamJsonl } from '../workforce/worker-event-stream.js';
@@ -180,7 +181,9 @@ function approvalRejectionObservations(
         ? loadApprovalRequest(
             channel,
             requestId,
-            partition?.kind === 'tenant' ? { scope: { tenant_slug: partition.tenant_slug } } : {}
+            partition !== undefined && isTenantApprovalPartition(partition)
+              ? { scope: { tenant_slug: partition.tenant_slug } }
+              : {}
           )
         : null;
     } catch {
@@ -195,7 +198,9 @@ function approvalRejectionObservations(
     const kind = closedToken(String(record?.kind || 'unknown'));
     const tenantSlug =
       record?.scope?.tenant_slug?.trim() ||
-      (partition?.kind === 'tenant' ? partition.tenant_slug : undefined);
+      (partition !== undefined && isTenantApprovalPartition(partition)
+        ? partition.tenant_slug
+        : undefined);
     observations.push({
       key: `${kind}:${reason}`,
       title: `${kind} approval rejected (${reason})`,

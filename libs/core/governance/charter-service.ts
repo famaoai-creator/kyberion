@@ -34,6 +34,7 @@ import {
   type InformationCategory,
   type RecipientClass,
   type ReputationalClass,
+  isOrganizationCharterScope,
 } from './accountability-charter.js';
 import {
   delegableCharterDecisions,
@@ -620,7 +621,7 @@ export function viewCharter(
     charter_id: charter.charter_id,
     scope_kind: charter.scope.kind,
     external_operations: structuredClone(charter.envelope.external_operations ?? []),
-    tenant_slug: charter.scope.kind === 'organization' ? charter.scope.tenant_slug : '',
+    tenant_slug: isOrganizationCharterScope(charter.scope) ? charter.scope.tenant_slug : '',
     responsible: charter.accountable.actor,
     deputies: charter.accountable.deputies,
     accepted_at: charter.accountable.accepted_at,

@@ -493,13 +493,19 @@ function notepadMinutesContent(key: string, scope: MinutesScope): MinutesContent
   };
 }
 
+const MINUTES_READERS: Record<
+  Exclude<MinutesSource, never>,
+  (key: string, scope: MinutesScope) => MinutesContent | null
+> = {
+  mission: missionMinutesContent,
+  pad: padMinutesContent,
+  notepad: notepadMinutesContent,
+};
+
 export function readMeetingMinutesContent(
   source: MinutesSource,
   key: string,
   scope: MinutesScope
 ): MinutesContent | null {
-  if (source === 'mission') return missionMinutesContent(key, scope);
-  if (source === 'pad') return padMinutesContent(key, scope);
-  if (source === 'notepad') return notepadMinutesContent(key, scope);
-  return null;
+  return MINUTES_READERS[source]?.(key, scope) ?? null;
 }

@@ -49,6 +49,8 @@ import {
 } from '../temporal/business-calendar.js';
 import type { SurfaceAuthorizationContext } from './surface-authorization.js';
 import {
+  isMissionGraphNode,
+  isOrganizationGraphNode,
   WORKSPACE_GRAPH_READER_ROLE,
   type GraphNode,
   type WorkspaceGraph,
@@ -458,7 +460,7 @@ export function buildWorkspaceCalendar(
       // Operations belong to an organization, not to a project or mission.
       if (!filter.projectId && !filter.missionId && !projectCeiling) {
         for (const org of nodes) {
-          if (org.kind !== 'organization') continue;
+          if (!isOrganizationGraphNode(org)) continue;
           try {
             const data = sources.operations({
               organizationId: org.id,
@@ -472,7 +474,7 @@ export function buildWorkspaceCalendar(
         }
       }
       for (const mission of nodes) {
-        if (mission.kind !== 'mission' || mission.status === 'archived') continue;
+        if (!isMissionGraphNode(mission) || mission.status === 'archived') continue;
         if (projectCeiling && !(mission.projectId && projectCeiling.has(mission.projectId)))
           continue;
         try {

@@ -162,6 +162,12 @@ const custodyWriteGrants = createSynchronousResourceGrantIssuer<
   Readonly<{ owner: string | null; file: string }>
 >('CREDENTIAL_CUSTODY_STORE_CAPABILITY');
 
+/** Custody declared on a credential connection record — tenant or person, always owned. */
+export type CredentialStoreCustody = Readonly<{ kind: 'tenant' | 'person'; owner: string }>;
+
+export const isTenantCredentialCustody = (custody: CredentialStoreCustody): boolean =>
+  custody.kind === 'tenant';
+
 /**
  * Exact write ceiling of one credential custody file (design §2.1):
  * - tenant custody (`owner` = tenant): the connection or its `.record.json` under
@@ -171,11 +177,11 @@ const custodyWriteGrants = createSynchronousResourceGrantIssuer<
  * Nothing else under the tenant / personal root.
  */
 export function withCredentialCustodyWriteCapability<T>(
-  custody: Readonly<{ kind: 'tenant' | 'person'; owner: string }>,
+  custody: CredentialStoreCustody,
   file: string,
   run: () => T
 ): T {
-  const owner = custody.kind === 'tenant' ? custody.owner : null;
+  const owner = isTenantCredentialCustody(custody) ? custody.owner : null;
   const match = owner ? TENANT_CONNECTION.exec(file) : PERSONAL_RECORD.exec(file);
   if (!match || (owner && match[1] !== owner))
     throw new Error('[CREDENTIAL_CAPABILITY_INVALID] Exact custody store path required');

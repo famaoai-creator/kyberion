@@ -134,6 +134,8 @@ export function listOrganizationProfiles(
     source: 'tenant' | 'public';
   }> = [];
 
+  const TENANT_PROFILE_SOURCE = 'tenant' as const;
+
   const publicProfile = loadOrganizationProfile(undefined, null);
   const publicProfileLabel = publicProfile
     ? `${publicProfile.name} (${publicProfile.organization_id})`
@@ -190,7 +192,7 @@ export function listOrganizationProfiles(
     total_count: filteredRows.length,
     ready_count: filteredRows.filter((row) => row.ready).length,
     missing_count: filteredRows.filter((row) => !row.ready).length,
-    tenant_count: filteredRows.filter((row) => row.source === 'tenant').length,
+    tenant_count: filteredRows.filter((row) => row.source === TENANT_PROFILE_SOURCE).length,
     public_count: filteredRows.filter((row) => row.source === 'public').length,
     active_count: filteredRows.filter((row) => row.active).length,
   };

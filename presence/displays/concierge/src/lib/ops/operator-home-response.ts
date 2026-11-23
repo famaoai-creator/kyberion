@@ -217,6 +217,8 @@ function isNhiLedgerSummary(value: unknown): boolean {
   );
 }
 
+const ACTION_QUEUE_ITEM_KINDS = new Set(['mission', 'approval', 'deliverable']);
+
 function isActionQueue(value: unknown): boolean {
   if (!Array.isArray(value)) return false;
   return value.every(
@@ -224,7 +226,8 @@ function isActionQueue(value: unknown): boolean {
       isRecord(item) &&
       hasSafeTree(item) &&
       isString(item.actionId) &&
-      (item.kind === 'mission' || item.kind === 'approval' || item.kind === 'deliverable') &&
+      typeof item.kind === 'string' &&
+      ACTION_QUEUE_ITEM_KINDS.has(item.kind) &&
       isString(item.title) &&
       isOptionalString(item.missionId) &&
       isString(item.status) &&

@@ -5,6 +5,7 @@ import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import { loadOrganizationOperationalState } from '../organization/organization-operating-model.js';
 import { hearingNamespace } from './hearing-runtime.js';
+import { isInventoryHearing, isMissionHearing, type HearingKind } from './hearing.js';
 import { narrowSurfaceViewerScope } from './surface-mutation-guard.js';
 import type { SurfaceViewerScope } from './surface-viewer-scope-contract.js';
 
@@ -59,11 +60,11 @@ export class HearingScopeError extends Error {
  */
 export function resolveHearingHandoffScope(
   viewer: SurfaceViewerScope,
-  kind: 'mission' | 'inventory',
+  kind: HearingKind,
   options: HearingOwnerInput
 ): { tenantSlug?: string; organizationId?: string; projectId?: string } {
   const allowed = viewer;
-  if (kind === 'inventory' && allowed.projectIds !== 'all')
+  if (isInventoryHearing(kind) && allowed.projectIds !== 'all')
     throw new HearingScopeError('hearing_inventory_project_unsupported');
   const single = (values: string[] | 'all'): string | undefined => {
     if (values === 'all') return undefined;
@@ -76,7 +77,7 @@ export function resolveHearingHandoffScope(
     throw new HearingScopeError('hearing_scope_unavailable');
   const namespace = hearingNamespace(viewer.tenantSlugs);
   if (namespace === 'all' || namespace === 'unscoped') {
-    if (kind === 'mission' || organizationId || projectId || options.owner !== true)
+    if (isMissionHearing(kind) || organizationId || projectId || options.owner !== true)
       throw new HearingScopeError('hearing_scope_unavailable');
     return {};
   }

@@ -25,6 +25,7 @@ import type {
   SurfaceSummary,
   WorkLoopPreview,
 } from './MissionIntelligenceTypes';
+import { isMissionControlAction } from './MissionIntelligenceTypes';
 
 /**
  * The focused mission lives in the URL (`?mission=<id>`), not in browser
@@ -291,7 +292,9 @@ export function getLatestMissionControlAction(
   actions: ControlActionSummary[],
   missionId: string
 ): ControlActionSummary | null {
-  return actions.find((action) => action.kind === 'mission' && action.target === missionId) || null;
+  return (
+    actions.find((action) => isMissionControlAction(action) && action.target === missionId) || null
+  );
 }
 
 export function getLatestSurfaceControlAction(

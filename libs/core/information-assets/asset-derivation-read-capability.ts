@@ -2,7 +2,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { registerStoreGrant } from '../foundation/store-grant-registry.js';
 import type { ResourceAccessOperation } from '../foundation/resource-access-scope.js';
 import { PARTITIONED_RUNTIME_LEDGER_ROOTS } from '../foundation/runtime-state-roots.js';
-import type { AssetDerivationRecord, DerivationCustody } from './asset-derivation.js';
+import type { AssetDerivationRecord } from './asset-derivation.js';
+import { isTenantDerivationCustody, type DerivationCustody } from './asset-derivation-custody.js';
 
 const RECEIPT_FILE = `${PARTITIONED_RUNTIME_LEDGER_ROOTS.asset_derivations}/system/derivations.jsonl`;
 const grants = new AsyncLocalStorage<object>();
@@ -62,7 +63,10 @@ export function withAssetDerivationReceiptSnapshot<T>(
     root,
     entries: [
       ...receipts
-        .filter((record) => custody.kind !== 'tenant' || record.taint.tenants.includes(custody.ref))
+        .filter(
+          (record) =>
+            !isTenantDerivationCustody(custody) || record.taint.tenants.includes(custody.ref)
+        )
         .map((record) => ({ record, partition: { kind: 'system' as const } })),
       ...own.map((record) => ({ record, partition: custody })),
     ],

@@ -15,6 +15,26 @@ export type ResourceAccessCustody =
   | { readonly kind: 'tenant' }
   | { readonly kind: 'person'; readonly ref?: string };
 
+export const RESOURCE_ACCESS_CUSTODY_KINDS = ['system', 'tenant', 'person'] as const;
+
+export function isTenantAccessCustody(
+  custody: ResourceAccessCustody
+): custody is Extract<ResourceAccessCustody, { kind: 'tenant' }> {
+  return custody.kind === 'tenant';
+}
+
+export function isPersonAccessCustody(
+  custody: ResourceAccessCustody
+): custody is Extract<ResourceAccessCustody, { kind: 'person' }> {
+  return custody.kind === 'person';
+}
+
+export function isSystemAccessCustody(
+  custody: ResourceAccessCustody
+): custody is Extract<ResourceAccessCustody, { kind: 'system' }> {
+  return custody.kind === 'system';
+}
+
 /** A server-created, deny-only ceiling. Never populate paths from client input. */
 export interface ResourceAccessScope {
   /**
@@ -155,9 +175,9 @@ export function matchesNamePrefix(scope: ResourceAccessScope, target: string): b
 function freezeCustody(scope: ResourceAccessScope): ResourceAccessCustody {
   const custody = scope.custody;
   if (custody !== undefined && custody !== null) {
-    if (typeof custody !== 'object' || !['system', 'tenant', 'person'].includes(custody.kind))
+    if (typeof custody !== 'object' || !RESOURCE_ACCESS_CUSTODY_KINDS.includes(custody.kind))
       throw new Error('[RESOURCE_SCOPE_INVALID] Unknown custody kind');
-    if (custody.kind !== 'tenant') {
+    if (!isTenantAccessCustody(custody)) {
       if (
         scope.tenantSlug !== undefined ||
         scope.organizationId !== undefined ||
@@ -166,7 +186,7 @@ function freezeCustody(scope: ResourceAccessScope): ResourceAccessCustody {
         throw new Error(
           '[RESOURCE_SCOPE_INVALID] Non-tenant custody cannot bind a tenant, organization or project'
         );
-      if (custody.kind === 'person') {
+      if (isPersonAccessCustody(custody)) {
         if (
           custody.ref !== undefined &&
           (typeof custody.ref !== 'string' || !isValidMemberId(custody.ref))
@@ -191,8 +211,8 @@ function sameCustody(left: ResourceAccessScope, right: ResourceAccessScope): boo
   const lc = left.custody ?? { kind: 'tenant' as const };
   const rc = right.custody ?? { kind: 'tenant' as const };
   if (lc.kind !== rc.kind) return false;
-  if (lc.kind === 'tenant') return left.tenantSlug === right.tenantSlug;
-  if (lc.kind === 'person' && rc.kind === 'person') return lc.ref === rc.ref;
+  if (isTenantAccessCustody(lc)) return left.tenantSlug === right.tenantSlug;
+  if (isPersonAccessCustody(lc) && isPersonAccessCustody(rc)) return lc.ref === rc.ref;
   return true;
 }
 

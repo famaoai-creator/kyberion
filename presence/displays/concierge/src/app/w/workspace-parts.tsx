@@ -26,6 +26,11 @@ import {
   type GraphRef,
   type WorkspaceLoadError,
 } from '../../lib/workspace-view';
+import {
+  isApprovalWorkspaceKind,
+  isMissionWorkspaceKind,
+  isTaskWorkspaceKind,
+} from '../../lib/workspace-view';
 
 /**
  * Building blocks shared by the workspace pages. Every element uses the
@@ -79,7 +84,7 @@ export function factValue(t: Translate, key: string, value: string | number | bo
 
 export function EntityStatus({ kind, status }: { kind: GraphEntityKind; status?: string }) {
   if (!status) return null;
-  const domain: KbStatusDomain | undefined = kind === 'mission' ? 'mission' : undefined;
+  const domain: KbStatusDomain | undefined = isMissionWorkspaceKind(kind) ? 'mission' : undefined;
   return <StatusPill status={status as KbStatus} domain={domain} />;
 }
 
@@ -189,7 +194,7 @@ export function useApprovalBriefs(): ReadonlyMap<string, DecisionBrief> {
 /** The best brief for an approval node: the viewer-scoped one, else the graph's own. */
 export function useNodeBrief(node: GraphNode): DecisionBrief | undefined {
   const briefs = React.useContext(ApprovalBriefs);
-  if (node.kind !== 'approval') return undefined;
+  if (!isApprovalWorkspaceKind(node.kind)) return undefined;
   return briefs.get(node.id) ?? parseDecisionBrief(node.brief);
 }
 
@@ -197,7 +202,7 @@ export function useNodeBrief(node: GraphNode): DecisionBrief | undefined {
 export function nodeTitle(
   node: GraphNode,
   locale: 'en' | 'ja',
-  brief: DecisionBrief | undefined = node.kind === 'approval'
+  brief: DecisionBrief | undefined = isApprovalWorkspaceKind(node.kind)
     ? parseDecisionBrief(node.brief)
     : undefined
 ): string {
@@ -222,7 +227,7 @@ export function EntityRow({
   sameCount?: number;
 }) {
   const { locale } = useConciergeI18n();
-  const linkable = node.kind !== 'task';
+  const linkable = !isTaskWorkspaceKind(node.kind);
   const brief = useNodeBrief(node);
   const title = nodeTitle(node, locale, brief);
   // Approvals say why they need a person; other rows show their summary with
@@ -284,10 +289,9 @@ export function EntityList({
     ? groupByDecision(
         items.map((node) => ({
           node,
-          brief:
-            node.kind === 'approval'
-              ? (briefs.get(node.id) ?? parseDecisionBrief(node.brief))
-              : undefined,
+          brief: isApprovalWorkspaceKind(node.kind)
+            ? (briefs.get(node.id) ?? parseDecisionBrief(node.brief))
+            : undefined,
         }))
       ).map((group) => ({ node: group.lead.node, sameCount: group.others.length + 1 }))
     : items.map((node) => ({ node, sameCount: 1 }));

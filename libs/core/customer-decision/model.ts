@@ -15,6 +15,9 @@
  * Nothing in this file touches disk.
  */
 export type AgendaEntryKind = 'choice' | 'approval' | 'ranking' | 'hearing';
+
+export const isApprovalAgendaEntry = (entry: Pick<AgendaEntry, 'kind'>): boolean =>
+  entry.kind === 'approval';
 export const AGENDA_ENTRY_KINDS: readonly AgendaEntryKind[] = [
   'choice',
   'approval',

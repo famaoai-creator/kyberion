@@ -519,6 +519,9 @@ interface ControlActionSummary {
   error?: string;
 }
 
+export const isMissionControlAction = (action: ControlActionSummary): boolean =>
+  action.kind === 'mission';
+
 interface ControlActionDetail {
   ts: string;
   decision: string;

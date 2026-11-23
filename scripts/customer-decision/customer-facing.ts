@@ -26,6 +26,7 @@ import {
   writeRespondJournal,
   type CustomerDecisionInvite,
   type DecisionAgenda,
+  isApprovalAgendaEntry,
 } from '@agent/core/customer-decision';
 import { isActiveCustomerTenant } from '@agent/core/customer-channel-binding';
 import { sweepDecisionConsumers } from '@agent/core/mission/mission-decision-lock';
@@ -196,7 +197,7 @@ function runView(
             ...(option.impact ? { impact: option.impact } : {}),
           })),
           // The draft an `approval` entry asks the customer to approve (submit refuses one without).
-          ...(entry.kind === 'approval' && entry.our_decision?.value !== undefined
+          ...(isApprovalAgendaEntry(entry) && entry.our_decision?.value !== undefined
             ? { draft: entry.our_decision.value }
             : {}),
           // CD-10: images (fetched one by one through `attachment`) and external links.

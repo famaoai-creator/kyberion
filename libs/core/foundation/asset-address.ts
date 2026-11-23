@@ -1,3 +1,8 @@
+import {
+  isPersonAssetCustody,
+  isSystemAssetCustody,
+  isTenantAssetCustody,
+} from '../contracts/asset-scope.js';
 import type {
   AssetAddressResolution,
   AssetCustody,
@@ -65,16 +70,16 @@ export function resolveAssetAddress(
     return unresolved('invalid_partition', ids);
 
   let custody: AssetCustody;
-  if (store.custody.kind === 'tenant') {
+  if (isTenantAssetCustody(store.custody)) {
     if (tenant === 'shared' && store.custody.shared_segment === 'system')
       custody = { kind: 'system', ref: 'installation' };
     else if (tenant && isValidTenantSlug(tenant) && store.custody.ref === '<tenant>')
       custody = { kind: 'tenant', ref: tenant };
     else return unresolved('custody_unresolved', ids);
-  } else if (store.custody.kind === 'person' || store.custody.kind === 'system') {
+  } else if (isPersonAssetCustody(store.custody) || isSystemAssetCustody(store.custody)) {
     const ref = store.custody.ref;
     if (ref && /^<[a-z]+>$/u.test(ref)) return unresolved('custody_unresolved', ids);
-    if (store.custody.kind === 'person' && !ref) return unresolved('custody_unresolved', ids);
+    if (isPersonAssetCustody(store.custody) && !ref) return unresolved('custody_unresolved', ids);
     custody = { kind: store.custody.kind, ref: ref ?? 'installation' };
   } else return unresolved('custody_unresolved', ids);
 

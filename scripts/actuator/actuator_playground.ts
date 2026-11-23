@@ -915,6 +915,8 @@ async function defaultEvaluateTrustDelegation(
 ): Promise<{ delegatedScope: string; charterId: string } | null> {
   try {
     const { evaluateProjectTrustDelegation } = await import('@agent/core/project/project-trust');
+    const { isOrganizationCharterScope } =
+      await import('@agent/core/governance/accountability-charter');
     const { listActiveCharters } =
       await import('@agent/core/governance/accountability-charter-registry');
     for (const charter of listActiveCharters(new Date())) {
@@ -926,7 +928,9 @@ async function defaultEvaluateTrustDelegation(
       });
       if (result.delegated === true) {
         return {
-          delegatedScope: scope.kind === 'organization' ? `tenant:${scope.tenant_slug}` : 'person',
+          delegatedScope: isOrganizationCharterScope(scope)
+            ? `tenant:${scope.tenant_slug}`
+            : 'person',
           charterId: result.charterId,
         };
       }

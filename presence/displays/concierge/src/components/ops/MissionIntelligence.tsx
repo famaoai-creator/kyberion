@@ -33,6 +33,7 @@ import type {
   MissionSummary,
   ReferenceDetail,
 } from './MissionIntelligenceTypes';
+import { isMissionControlAction } from './MissionIntelligenceTypes';
 
 export { buildDangerousActionPrompt } from './MissionIntelligenceViewHelpers';
 export {
@@ -184,10 +185,9 @@ export function MissionIntelligence({
   }, [selectedMissionId]);
 
   const jumpToTarget = (action: ControlActionSummary) => {
-    const id =
-      action.kind === 'mission'
-        ? toDomId('mission', action.target)
-        : toDomId('surface', action.target);
+    const id = isMissionControlAction(action)
+      ? toDomId('mission', action.target)
+      : toDomId('surface', action.target);
     const element = document.getElementById(id);
     if (!element) return;
     element.scrollIntoView({ behavior: 'smooth', block: 'center' });

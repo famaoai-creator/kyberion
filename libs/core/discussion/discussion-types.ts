@@ -88,6 +88,12 @@ export interface DiscussionCommand {
 
 export type DiscussionProvider = 'claude' | 'codex';
 
+export const DISCUSSION_PROVIDERS: readonly DiscussionProvider[] = ['claude', 'codex'];
+export const isDiscussionProvider = (provider: unknown): provider is DiscussionProvider =>
+  typeof provider === 'string' && (DISCUSSION_PROVIDERS as readonly string[]).includes(provider);
+export const isClaudeDiscussionProvider = (provider: DiscussionProvider): boolean =>
+  provider === 'claude';
+
 export interface DiscussionProviderAttempt {
   id: string;
   operation: string;

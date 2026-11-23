@@ -29,6 +29,10 @@ import { safeReadFileRange } from '@agent/core/secure-io';
 import { isRecord, readJsonLines } from '@agent/core/foundation';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import * as intelligenceData from './intelligence-observation-data';
+import {
+  isMissionControlAction,
+  isSurfaceControlAction,
+} from '../../../../lib/ops/intelligence-observations';
 import { computeApprovalPresentedDigest } from '@agent/core/governance/approval-store';
 import {
   parseDashboardJsonRecord,
@@ -447,9 +451,9 @@ export function collectControlActions(
   return Array.from(lifecycle.values())
     .filter(
       (action) =>
-        (action.kind === 'mission' &&
+        (isMissionControlAction(action) &&
           intelligenceData.missionVisibleToScope(action.target, tenantSlugs, tierAccess)) ||
-        (action.kind === 'surface' && tenantSlugs === 'all')
+        (isSurfaceControlAction(action) && tenantSlugs === 'all')
     )
     .sort((a, b) => b.ts.localeCompare(a.ts))
     .slice(0, 10);
@@ -465,7 +469,7 @@ export function applyPendingActionSummaries(
 } {
   const pendingMissionTargets = new Map(
     controlActions
-      .filter((action) => action.kind === 'mission' && action.status === 'queued')
+      .filter((action) => isMissionControlAction(action) && action.status === 'queued')
       .map((action) => [
         action.target,
         { operation: action.operation, requestedBy: action.requested_by },

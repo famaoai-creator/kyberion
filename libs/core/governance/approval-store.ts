@@ -21,6 +21,9 @@ import {
   readApprovalJsonAt,
   SYSTEM_APPROVAL_PARTITION,
   writeLocatedApprovalRequest,
+  isPersonalApprovalPartition,
+  isSystemApprovalPartition,
+  isTenantApprovalPartition,
   type ApprovalPartition,
   type LocatedApprovalRequest,
 } from './approval-store-location.js';
@@ -454,7 +457,7 @@ export function resolveSessionCacheSeed(
     return { status: 'unusable', reason: 'the seed belongs to a tenant this process may not bind' };
   }
   try {
-    if (entry.seedPartition && entry.seedPartition.kind !== 'system') {
+    if (entry.seedPartition && !isSystemApprovalPartition(entry.seedPartition)) {
       const record = readApprovalJsonAt<ApprovalRequestRecord>(
         entry.seedPartition,
         approvalRequestLogicalPathAt(
@@ -478,9 +481,9 @@ export function resolveSessionCacheSeed(
         ? { status: 'unusable', reason: 'the tenant seed request cannot be found' }
         : { status: 'missing' };
     }
-    if (located.partition.kind === 'personal')
+    if (isPersonalApprovalPartition(located.partition))
       return { status: 'unusable', reason: 'the seed moved to a personal owner partition' };
-    if (located.partition.kind === 'tenant' || located.record.scope?.tenant_slug) {
+    if (isTenantApprovalPartition(located.partition) || located.record.scope?.tenant_slug) {
       // Stored as untenanted but now found tenant-scoped: never trust it silently.
       if (!entry.tenantSlug)
         return { status: 'unusable', reason: 'the seed moved to a tenant partition' };
@@ -1218,7 +1221,7 @@ function decideApprovalRequestUnlocked(
       ...(updated.scope?.tier === 'personal' && !updated.scope.tenant_slug
         ? { personalOwnerHash: personalApprovalOwnerHash(updated.scope.nhi_id) }
         : {}),
-      ...(located.partition.kind === 'tenant'
+      ...(isTenantApprovalPartition(located.partition)
         ? { tenantSlug: located.partition.tenant_slug }
         : updated.scope?.tenant_slug
           ? { tenantSlug: updated.scope.tenant_slug }

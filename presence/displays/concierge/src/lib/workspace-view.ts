@@ -41,6 +41,14 @@ export function isWorkspaceKind(value: unknown): value is GraphEntityKind {
   return typeof value === 'string' && (WORKSPACE_KINDS as readonly string[]).includes(value);
 }
 
+export const isMissionWorkspaceKind = (kind: GraphEntityKind): boolean => kind === 'mission';
+export const isApprovalWorkspaceKind = (kind: GraphEntityKind): boolean => kind === 'approval';
+export const isTaskWorkspaceKind = (kind: GraphEntityKind): boolean => kind === 'task';
+export const isWorkItemWorkspaceKind = (kind: GraphEntityKind): boolean => kind === 'work_item';
+export const isActorWorkspaceKind = (kind: GraphEntityKind): boolean => kind === 'actor';
+export const isOrganizationWorkspaceKind = (kind: GraphEntityKind): boolean =>
+  kind === 'organization';
+
 /**
  * `/w/<kind>/<id>`; ids are one encoded segment (task ids contain `/`). An
  * organization id is unique only within its tenant, so its link names the

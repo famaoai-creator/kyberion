@@ -35,6 +35,11 @@ export interface ControlActionSummary {
   error?: string;
 }
 
+export const isMissionControlAction = (action: ControlActionSummary): boolean =>
+  action.kind === 'mission';
+export const isSurfaceControlAction = (action: ControlActionSummary): boolean =>
+  action.kind === 'surface';
+
 export interface ControlActionDetail {
   ts: string;
   decision: string;

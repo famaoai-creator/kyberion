@@ -25,6 +25,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import {
   charterScopeTenantSlug,
+  isOrganizationCharterScope,
   isPersonalCharterScope,
   type CharterScope,
 } from './charter-scope.js';
@@ -107,8 +108,9 @@ export function withPrPublicationBinding<T>(
   if (typeof invocationId !== 'string' || !/^[a-f0-9]{64}$/.test(invocationId))
     throw new Error('[PR_PUBLICATION_SCOPE] Stable invocation hash required');
   if (
-    scope?.kind !== 'person' &&
-    (scope?.kind !== 'organization' || !isValidTenantSlug(scope.tenant_slug))
+    scope === undefined ||
+    (!isPersonalCharterScope(scope) &&
+      (!isOrganizationCharterScope(scope) || !isValidTenantSlug(scope.tenant_slug)))
   )
     throw new Error('[PR_PUBLICATION_SCOPE] Valid publication scope required');
   if (!OPERATIONS.includes(operationId))

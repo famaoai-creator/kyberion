@@ -25,6 +25,7 @@ import {
 import {
   CONTINUOUS_MANAGED_WORK_PIPELINE,
   parseContinuousWorkPlan,
+  isProjectWorkPlan,
 } from './continuous-work-plan.js';
 import {
   authorize,
@@ -205,7 +206,7 @@ export async function runContinuousWorkOwner(
                   version: 1,
                   identity,
                   project_id: ids.project_id,
-                  project_created: plan.kind !== 'project',
+                  project_created: !isProjectWorkPlan(plan),
                   missions: Object.fromEntries(
                     plan.missions.map((m) => [
                       m.key,

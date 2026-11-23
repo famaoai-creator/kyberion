@@ -23,7 +23,7 @@ import type {
   DiscussionRoomSummary,
   DiscussionScope,
 } from './discussion-types.js';
-import { DEFAULT_DISCUSSION_CONFIG } from './discussion-types.js';
+import { DEFAULT_DISCUSSION_CONFIG, isDiscussionProvider } from './discussion-types.js';
 import { reduceDiscussionRoom, summarizeDiscussionRoom } from './discussion-reducer.js';
 
 /**
@@ -217,7 +217,7 @@ export function normalizeDiscussionConfig(input: Partial<DiscussionConfig> = {})
     throw new DiscussionUserError('Invalid discussion speaker');
   if (!['panel', 'dialogue'].includes(config.mode))
     throw new DiscussionUserError('Invalid discussion mode');
-  if (config.provider !== undefined && config.provider !== 'claude' && config.provider !== 'codex')
+  if (config.provider !== undefined && !isDiscussionProvider(config.provider))
     throw new DiscussionUserError('Invalid discussion provider');
   if (config.single_pass !== undefined && typeof config.single_pass !== 'boolean')
     throw new DiscussionUserError('Invalid discussion single_pass');

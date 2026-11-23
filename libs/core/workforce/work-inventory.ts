@@ -69,6 +69,9 @@ export type WorkFrequencyPer = 'day' | 'week' | 'month' | 'quarter' | 'year';
 
 export type WorkPromotionKind = 'mission' | 'pipeline';
 
+export const isMissionPromotionKind = (kind: WorkPromotionKind): boolean => kind === 'mission';
+export const isPipelinePromotionKind = (kind: WorkPromotionKind): boolean => kind === 'pipeline';
+
 export interface WorkInventoryStepMethod {
   assigned: WorkMethod;
   source: WorkMethodSource;

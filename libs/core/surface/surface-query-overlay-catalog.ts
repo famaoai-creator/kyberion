@@ -13,6 +13,13 @@ export interface SurfaceQueryOverlayCatalogEntry {
   status?: string;
 }
 
+export const isRoleOverlayEntry = (entry: SurfaceQueryOverlayCatalogEntry): boolean =>
+  entry.kind === 'role';
+export const isPhaseOverlayEntry = (entry: SurfaceQueryOverlayCatalogEntry): boolean =>
+  entry.kind === 'phase';
+export const isTenantOverlayEntry = (entry: SurfaceQueryOverlayCatalogEntry): boolean =>
+  entry.kind === 'tenant';
+
 export interface SurfaceQueryOverlayCatalog {
   version: string;
   base_config_path: string;

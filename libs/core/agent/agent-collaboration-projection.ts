@@ -18,6 +18,8 @@ import {
   type AgentCollaborationEvent,
   type CollaborationKind,
   type CollaborationSource,
+  isApprovalCollaborationKind,
+  isWaitingCollaborationKind,
 } from './agent-collaboration-events.js';
 import { listSupervisorEventFiles } from './agent-runtime-events.js';
 import {
@@ -991,14 +993,15 @@ export function composeAgentCollaborationProjection(
     )
       active += 1;
     if (event.kind === 'blocked') blocked += 1;
-    if (event.kind === 'approval' || event.kind === 'waiting') waitingHuman += 1;
+    if (isApprovalCollaborationKind(event.kind) || isWaitingCollaborationKind(event.kind))
+      waitingHuman += 1;
     if (event.kind === 'review') reviewPending += 1;
     if (event.kind === 'failure') failures += 1;
     if (event.native === true) nativeSubagents += 1;
     if (event.native_unavailable === true) unavailableSubagents += 1;
     const attentionItem = attentionForEvent(event);
     if (attentionItem) {
-      if (event.kind === 'approval') {
+      if (isApprovalCollaborationKind(event.kind)) {
         // An answered request is no longer attention: the response closes the
         // request it correlates with (same rule as agent-collaboration-tree).
         const key = event.request_id || event.correlation_id || event.source_event_id;

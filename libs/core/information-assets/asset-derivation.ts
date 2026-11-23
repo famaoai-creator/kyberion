@@ -60,8 +60,18 @@ import type { MemoryProvenanceRecord } from '../knowledge/memory-provenance.js';
 // Derivation references
 // ---------------------------------------------------------------------------
 
-export type DerivationCustody =
-  { kind: 'system' } | { kind: 'tenant'; ref: string } | { kind: 'person'; ref?: string };
+export type { DerivationCustody } from './asset-derivation-custody.js';
+export {
+  isPersonDerivationCustody,
+  isSystemDerivationCustody,
+  isTenantDerivationCustody,
+} from './asset-derivation-custody.js';
+import type { DerivationCustody } from './asset-derivation-custody.js';
+import {
+  isPersonDerivationCustody,
+  isSystemDerivationCustody,
+  isTenantDerivationCustody,
+} from './asset-derivation-custody.js';
 
 const ASSET_REF_PATTERN = /^asset:([a-z][a-z0-9-]{1,30}):([A-Za-z0-9._-]+)@v(\d+)$/;
 const PATH_REF_PATTERN = /^path:([A-Za-z0-9][A-Za-z0-9._\/-]*)$/;
@@ -292,11 +302,13 @@ export function derivedLandingAllowed(
   rootDir: string = pathResolver.rootDir()
 ): boolean {
   const custody = custodyFromRepoPath(derivedPath, rootDir);
-  if (custody.kind === 'system') return true;
+  if (isSystemDerivationCustody(custody)) return true;
   return sourceCustodies.some((source) => {
-    if (custody.kind === 'tenant') return source.kind === 'tenant' && source.ref === custody.ref;
+    if (isTenantDerivationCustody(custody))
+      return isTenantDerivationCustody(source) && source.ref === custody.ref;
     return (
-      source.kind === 'person' && personPartitionRef(source.ref) === personPartitionRef(custody.ref)
+      isPersonDerivationCustody(source) &&
+      personPartitionRef(source.ref) === personPartitionRef(custody.ref)
     );
   });
 }
@@ -320,8 +332,8 @@ export function custodiesOfRecordSources(record: AssetDerivationRecord): Derivat
 /** Custody equality — person refs compare at partition granularity. */
 export function custodyEquals(a: DerivationCustody, b: DerivationCustody): boolean {
   if (a.kind !== b.kind) return false;
-  if (a.kind === 'tenant') return a.ref === (b as { ref: string }).ref;
-  if (a.kind === 'person')
+  if (isTenantDerivationCustody(a)) return a.ref === (b as { ref: string }).ref;
+  if (isPersonDerivationCustody(a))
     return personPartitionRef(a.ref) === personPartitionRef((b as { ref?: string }).ref);
   return true;
 }
@@ -434,7 +446,7 @@ function inheritedRecordSources(
       currentHash !== undefined &&
       entries.some(
         (entry) =>
-          entry.partition.kind === 'system' &&
+          isSystemDerivationCustody(entry.partition) &&
           entry.record.derived.path === sourcePath &&
           entry.record.proof?.derivedSha256 === currentHash
       );
@@ -521,7 +533,8 @@ function landingHonored(
   if (
     !record.proof ||
     !entries.some(
-      (entry) => entry.partition.kind === 'system' && JSON.stringify(entry.record) === receipt
+      (entry) =>
+        isSystemDerivationCustody(entry.partition) && JSON.stringify(entry.record) === receipt
     )
   ) {
     if (options.strictLineage)
@@ -542,14 +555,14 @@ function landingHonored(
   // A protected system row is also the producer's issuance receipt. It can
   // attest any source custodian; an untrusted custodian copy cannot do so.
   if (
-    partition.kind !== 'system' &&
+    !isSystemDerivationCustody(partition) &&
     !verified.some((source) => custodyEquals(source.custody, partition))
   )
     return false;
   const landing = custodyFromRepoPath(rel, rootOf(options));
   if (
-    landing.kind !== 'system' &&
-    !(partition.kind === 'system'
+    !isSystemDerivationCustody(landing) &&
+    !(isSystemDerivationCustody(partition)
       ? verified.some((source) => custodyEquals(source.custody, landing))
       : custodyEquals(landing, partition))
   )
@@ -563,7 +576,7 @@ function landingHonored(
   )
     return false;
   const floor = combineAssetTaint([record.taint, ...verified.map((source) => source.taint)]);
-  if (landing.kind === 'tenant' && floor.tenants.some((tenant) => tenant !== landing.ref))
+  if (isTenantDerivationCustody(landing) && floor.tenants.some((tenant) => tenant !== landing.ref))
     return false;
   if (
     KNOWLEDGE_TIER_RANK[tierFromRepoPath(rel, path.join(rootOf(options), rel))] <
@@ -574,12 +587,12 @@ function landingHonored(
 }
 
 function custodyPartition(custody: DerivationCustody): string {
-  if (custody.kind === 'tenant') {
+  if (isTenantDerivationCustody(custody)) {
     if (!isValidTenantSlug(custody.ref) && custody.ref !== COMMON_TENANT_SLUG)
       throw new Error(`[DERIVATION_CUSTODY_INVALID] bad tenant ref '${custody.ref}'`);
     return `${DERIVATION_LEDGER_ROOT}/confidential/${custody.ref}`;
   }
-  if (custody.kind === 'person') {
+  if (isPersonDerivationCustody(custody)) {
     const ref = personPartitionRef(custody.ref);
     if (!isValidMemberId(ref))
       throw new Error(`[DERIVATION_CUSTODY_INVALID] bad person ref '${ref}'`);
@@ -964,7 +977,7 @@ export function recordDerivation(input: {
   const taint = combineAssetTaint(resolved.map((source) => source.taint));
   const landingCustody = custodyFromRepoPath(input.derived.path, rootOf(options));
   if (
-    landingCustody.kind === 'tenant' &&
+    isTenantDerivationCustody(landingCustody) &&
     taint.tenants.some((tenant) => tenant !== landingCustody.ref)
   )
     throw new Error(
@@ -1041,7 +1054,7 @@ export function recordDerivation(input: {
     const file = ledgerPath(custody, options);
     withLockSync(`asset-derivation:${custodyPartition(custody)}`, () => {
       safeMkdir(path.dirname(file), { recursive: true });
-      if (custody.kind !== 'system') appendJsonLine(file, record);
+      if (!isSystemDerivationCustody(custody)) appendJsonLine(file, record);
     });
     records.push(record);
   }
@@ -1137,7 +1150,7 @@ function alternateSourceRefs(ref: DerivationRef, options: DerivationPathOptions)
   // Query the asset refs actually used by lineage, rather than assuming the
   // physical landing partition identifies the ingest ledger's custodian.
   for (const entry of recordsAllCustodians(options)) {
-    if (entry.partition.kind !== 'system' || !entry.record.proof) continue;
+    if (!isSystemDerivationCustody(entry.partition) || !entry.record.proof) continue;
     for (const source of entry.record.sources) {
       try {
         const candidate = parseDerivationRef(source);
@@ -1228,16 +1241,15 @@ export function listHonoredDerivedPathsForCustodian(
   const producer = ['mission_controller', 'knowledge_steward', 'chronos_gateway'].includes(
     resolveRole() ?? ''
   );
-  if ((!canonical || custody.kind !== 'tenant') && !producer)
+  if ((!canonical || !isTenantDerivationCustody(custody)) && !producer)
     throw new Error(
       '[DERIVATION_READ_SCOPE] noncanonical, personal and system lineage queries require producer authority'
     );
-  const bound =
-    custody.kind === 'system'
-      ? { kind: 'system' as const }
-      : custody.kind === 'tenant'
-        ? { kind: 'tenant' as const, ref: custody.ref }
-        : { kind: 'person' as const, ...(custody.ref ? { ref: custody.ref } : {}) };
+  const bound = isSystemDerivationCustody(custody)
+    ? { kind: 'system' as const }
+    : isTenantDerivationCustody(custody)
+      ? { kind: 'tenant' as const, ref: custody.ref }
+      : { kind: 'person' as const, ...(custody.ref ? { ref: custody.ref } : {}) };
   const strict = { rootDir: root, strictLineage: true };
   const permission = validateReadPermission(ledgerPath(bound, strict));
   if (!permission.allowed)
@@ -1273,8 +1285,8 @@ function listHonoredDerivedPathsInSnapshot(
     if (
       !custodyEquals(entry.partition, custody) &&
       !(
-        entry.partition.kind === 'system' &&
-        (custody.kind === 'tenant'
+        isSystemDerivationCustody(entry.partition) &&
+        (isTenantDerivationCustody(custody)
           ? entry.record.taint.tenants.includes(custody.ref)
           : inheritedRecordSources(entry.record, strict, entries, new Set()).some((source) =>
               custodyEquals(source.custody, custody)
@@ -1516,8 +1528,8 @@ function assertAssetSourceCustody(
   options: DerivationPathOptions
 ): void {
   const custody = custodyFromRepoPath(relativePath, rootOf(options));
-  if (custody.kind === 'tenant' && custody.ref === ref.tenant) return;
-  if (custody.kind === 'person')
+  if (isTenantDerivationCustody(custody) && custody.ref === ref.tenant) return;
+  if (isPersonDerivationCustody(custody))
     throw new Error(
       '[DERIVATION_INVALID] tenant ingest cannot confer custody of personal material'
     );

@@ -195,20 +195,33 @@ export function strictViewerScopeTenantSlugs(
   }
 }
 
+type StrictViewerScopeKind = 'organization' | 'project';
+
+/** Allowed-scope list field and request field per strict viewer scope kind. */
+const STRICT_VIEWER_SCOPE_FIELDS: Record<
+  StrictViewerScopeKind,
+  { allowed: 'organizationIds' | 'projectIds'; request: 'organizationId' | 'projectId' }
+> = {
+  organization: { allowed: 'organizationIds', request: 'organizationId' },
+  project: { allowed: 'projectIds', request: 'projectId' },
+};
+
 function strictViewerScopeIds(
-  kind: 'organization' | 'project',
+  kind: StrictViewerScopeKind,
   allowed: string[] | 'all',
   requested?: string
 ): string[] | 'all' {
+  const fields = STRICT_VIEWER_SCOPE_FIELDS[kind];
   try {
     return narrowSurfaceViewerScope(
       {
         tenantSlugs: 'all',
-        organizationIds: kind === 'organization' ? allowed : 'all',
-        projectIds: kind === 'project' ? allowed : 'all',
+        organizationIds: 'all',
+        projectIds: 'all',
+        [fields.allowed]: allowed,
       },
-      kind === 'organization' ? { organizationId: requested } : { projectId: requested }
-    )[kind === 'organization' ? 'organizationIds' : 'projectIds'];
+      { [fields.request]: requested }
+    )[fields.allowed];
   } catch (error) {
     throw new ConciergeViewerError(
       403,

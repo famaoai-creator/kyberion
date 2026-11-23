@@ -1,4 +1,5 @@
 import type { ResourceAccessScope } from './resource-access-scope.js';
+import { isTenantAccessCustody } from './resource-access-scope.js';
 import { isValidTenantSlug } from './scope.js';
 
 /**
@@ -38,7 +39,7 @@ export function archivedMissionStateCapability(
 export function isArchivedMissionStateCapability(scope: ResourceAccessScope | undefined): boolean {
   if (
     !scope ||
-    (scope.custody !== undefined && scope.custody.kind !== 'tenant') ||
+    (scope.custody !== undefined && !isTenantAccessCustody(scope.custody)) ||
     scope.organizationId ||
     scope.projectId ||
     (scope.namePrefixExact?.length ?? 0) > 0 ||
