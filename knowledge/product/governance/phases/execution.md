@@ -314,7 +314,11 @@ pnpm mission gate-pass <ID> <GATE_ID> --approval-request-id <request-id>
 
 Until the hold passes, `record-evidence` records evidence for later-phase tasks without
 completing them, the worker does not dispatch them, later gates refuse with
-`HUMAN_HOLD_PENDING`, and `finish` is blocked.
+`HUMAN_HOLD_PENDING`, and `finish` is blocked. `plan-tasks` also records the mission's
+required holds in the audit chain (`mission.human_holds_anchored`); `finish` and `gate-pass`
+check that record too, so editing the mission state or deleting gate definitions does not
+drop a hold. If `finish` reports a hold's gate definition missing, re-run `plan-tasks` to
+restore it, then approve the hold.
 
 **Ordering rule**: never delete the worktree before the mission reaches a terminal
 status. The mission ledger is a gitignored micro-repo under `active/missions/<tier>/` of

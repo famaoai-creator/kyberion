@@ -20,7 +20,9 @@
  * Anything else fails closed. Proof readers never throw.
  *
  * Which holds are required is resolved from several anchors at once
- * ({@link resolveMissionHumanHoldPlan}), so editing one file cannot drop a hold.
+ * ({@link resolveMissionHumanHoldPlan}), so editing one file cannot drop a hold;
+ * the terminal checks also read the audit-chain anchor recorded at planning
+ * (mission-gate-hold-anchor.ts).
  */
 import * as nodePath from 'node:path';
 import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
@@ -33,6 +35,7 @@ import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '../secure
 import type { MissionGateCheck, MissionGateDefinition } from './mission-gate-engine.js';
 import { verifyHumanOverrideSignature } from './mission-gate-engine.js';
 import { fingerprintMissionGateInputs } from './mission-gate-input-fingerprint.js';
+import { loadAnchoredHumanHolds } from './mission-gate-hold-anchor.js';
 import {
   MISSION_GATE_HOLD_APPROVAL_CHANNEL,
   missionGateHoldApprovalPayload,
@@ -181,6 +184,15 @@ function storedGateIds(missionPath: string, missionId: string): Set<string> {
   return ids;
 }
 
+export interface HumanHoldPlanOptions {
+  /**
+   * Also unite the hold set recorded in the audit chain when the process
+   * template was planned. It scans the chain, so only the terminal checks
+   * (finish, gate-pass) ask for it. A chain that cannot be read throws.
+   */
+  auditAnchor?: boolean;
+}
+
 export interface MissionHumanHoldPlan {
   /** Each hold with the phase order it is placed in (its catalog template's when declared there). */
   holds: CatalogHold[];
@@ -193,14 +205,16 @@ export interface MissionHumanHoldPlan {
  *   - the holds of the template named by `process_template.workflow_id`;
  *   - the holds of the templates whose `task_types` match `mission_type`;
  *   - every catalog hold whose gate id has a stored definition file;
- *   - stored definitions that carry `require_signature` themselves.
- * Residual: an agent that rewrites both state fields and deletes the gate
- * definition files removes the anchors; the mission's own git history still
- * shows it.
+ *   - stored definitions that carry `require_signature` themselves;
+ *   - with `auditAnchor`, the holds recorded in the audit chain at planning.
+ * Without `auditAnchor`, an agent that rewrites both state fields and deletes
+ * the gate definition files removes the local anchors; the audit anchor still
+ * holds the mission at finish and gate-pass.
  */
 export function resolveMissionHumanHoldPlan(
   missionId: string,
-  missionPath?: string
+  missionPath?: string,
+  options: HumanHoldPlanOptions = {}
 ): MissionHumanHoldPlan {
   const upper = missionId.trim().toUpperCase();
   const dir = missionPath ?? findMissionPath(upper);
@@ -231,18 +245,28 @@ export function resolveMissionHumanHoldPlan(
         phaseOrder: stateOrder,
       });
   }
+  if (options.auditAnchor) {
+    // The catalog places a catalog hold; any other anchored hold keeps the
+    // placement recorded at planning over the (agent-writable) local copy.
+    for (const anchored of loadAnchoredHumanHolds(upper)) {
+      holds.set(anchored.gateId, catalog.byGate.get(anchored.gateId) ?? anchored);
+    }
+  }
   return { holds: [...holds.values()] };
 }
 
 /** Required holds of the mission (see {@link resolveMissionHumanHoldPlan}). */
 export function resolveRequiredHumanHolds(
   missionId: string,
-  missionPath?: string
+  missionPath?: string,
+  options: HumanHoldPlanOptions = {}
 ): RequiredHumanHold[] {
-  return resolveMissionHumanHoldPlan(missionId, missionPath).holds.map(({ gateId, phase }) => ({
-    gateId,
-    phase,
-  }));
+  return resolveMissionHumanHoldPlan(missionId, missionPath, options).holds.map(
+    ({ gateId, phase }) => ({
+      gateId,
+      phase,
+    })
+  );
 }
 
 /** Fingerprint of the stored gate's declared inputs (what the human approves). */
@@ -321,6 +345,10 @@ export function missionGateHoldProof(
     const upper = missionId.trim().toUpperCase();
     const missionPath = knownMissionPath ?? findMissionPath(upper);
     if (!missionPath) return { verified: false, reason: 'mission_not_found' };
+    // Without its definition the hold can neither be approved nor checked;
+    // report that first so the next step (plan-tasks) is the right one.
+    const current = missionGateHoldInputDigest(missionPath, upper, gateId);
+    if (!current) return { verified: false, reason: 'gate_definition_missing' };
     const recordPath = missionGateHoldRecordPath(missionPath, gateId);
     if (!safeExistsSync(recordPath)) return { verified: false, reason: 'not_approved' };
     const raw = readJson<Record<string, unknown>>(recordPath);
@@ -340,8 +368,6 @@ export function missionGateHoldProof(
     if (!verifyHumanOverrideSignature(gateId, raw)) {
       return { verified: false, reason: 'signature_invalid' };
     }
-    const current = missionGateHoldInputDigest(missionPath, upper, gateId);
-    if (!current) return { verified: false, reason: 'gate_definition_missing' };
     if (current.definition.phase !== record.phase) {
       return { verified: false, reason: 'record_other_phase' };
     }
@@ -387,11 +413,15 @@ function pendingFromPlan(
 }
 
 /** Required holds of the mission whose proof does not verify. */
-export function pendingHumanHolds(missionId: string, missionPath?: string): PendingHumanHold[] {
+export function pendingHumanHolds(
+  missionId: string,
+  missionPath?: string,
+  options: HumanHoldPlanOptions = {}
+): PendingHumanHold[] {
   return pendingFromPlan(
     missionId,
     missionPath,
-    resolveMissionHumanHoldPlan(missionId, missionPath)
+    resolveMissionHumanHoldPlan(missionId, missionPath, options)
   );
 }
 
@@ -412,11 +442,49 @@ function isBehindHold(taskPhase: string, hold: PendingHumanHold): boolean {
 export function pendingHumanHoldBeforePhase(
   missionId: string,
   phase: string,
-  missionPath?: string
+  missionPath?: string,
+  options: HumanHoldPlanOptions = {}
 ): PendingHumanHold | undefined {
-  const plan = resolveMissionHumanHoldPlan(missionId, missionPath);
+  const plan = resolveMissionHumanHoldPlan(missionId, missionPath, options);
   if (plan.holds.length === 0) return undefined;
   return pendingFromPlan(missionId, missionPath, plan).find((hold) => isBehindHold(phase, hold));
+}
+
+export type HumanHoldGatePassRefusal =
+  { code: 'HUMAN_HOLD_PENDING'; hold: PendingHumanHold } | { code: 'HUMAN_HOLD_APPROVAL_REQUIRED' };
+
+/**
+ * Why `gate-pass` must not pass `gateId` now, resolving the hold set once with
+ * the audit anchor: an earlier pending hold blocks it (a gate whose phase is
+ * unknown is blocked by any other pending hold; an exit gate in the phase of
+ * a pending exit hold would advance past it, so it is blocked too), and a
+ * required hold itself needs its approval (`approvalApplied`). Throws when
+ * the chain is unreadable.
+ */
+export function humanHoldGatePassRefusal(
+  missionId: string,
+  gateId: string,
+  gatePhase: string | undefined,
+  options: {
+    approvalApplied?: boolean;
+    missionPath?: string;
+    gatePosition?: 'entry' | 'exit';
+  } = {}
+): HumanHoldGatePassRefusal | undefined {
+  const plan = resolveMissionHumanHoldPlan(missionId, options.missionPath, { auditAnchor: true });
+  if (plan.holds.length === 0) return undefined;
+  const blocking = pendingFromPlan(missionId, options.missionPath, plan).find(
+    (hold) =>
+      hold.gateId !== gateId &&
+      (!gatePhase ||
+        isBehindHold(gatePhase, hold) ||
+        (hold.position === 'exit' && hold.phase === gatePhase && options.gatePosition !== 'entry'))
+  );
+  if (blocking) return { code: 'HUMAN_HOLD_PENDING', hold: blocking };
+  if (!options.approvalApplied && plan.holds.some((hold) => hold.gateId === gateId)) {
+    return { code: 'HUMAN_HOLD_APPROVAL_REQUIRED' };
+  }
+  return undefined;
 }
 
 /**

@@ -41,9 +41,15 @@ import { loadMissionPhaseGateDefinitionAtPath } from './mission-phase-gate-defin
 import { normalizeMissionGateCheckPaths } from './mission-gate-input-fingerprint.js';
 import {
   applyMissionGateHoldProof,
+  isRequiredHumanHoldCheck,
   pendingHumanHoldBeforePhase,
+  resolveMissionHumanHoldPlan,
   type MissionGateHoldRecord,
 } from './mission-gate-hold-proof.js';
+import {
+  assertMissionHumanHoldAnchorRecordable,
+  recordMissionHumanHoldAnchor,
+} from './mission-gate-hold-anchor.js';
 export { fingerprintMissionGateInputs } from './mission-gate-input-fingerprint.js';
 export {
   loadMissionGateRecordAtPath,
@@ -135,6 +141,15 @@ export function applyProcessTemplatePlan(input: {
     }
   }
 
+  // A template with required human holds anchors them in the audit chain
+  // below; check the chain accepts the record before writing anything.
+  const gateDefinitions = processTemplateGateDefinitions(missionId, design);
+  const anchorSource = `process_template:${design.workflow_id}`;
+  const plansHumanHolds = gateDefinitions.some((definition) =>
+    definition.gate.checks.some((check) => isRequiredHumanHoldCheck(check))
+  );
+  if (plansHumanHolds) assertMissionHumanHoldAnchorRecordable(missionId, anchorSource);
+
   // Re-planning must not lose progress: carry over the status of tasks whose
   // task_id survives the re-expansion (e.g. --refresh-catalog after a
   // catalog fix on a partially completed mission). The statuses are read
@@ -158,7 +173,7 @@ export function applyProcessTemplatePlan(input: {
 
   const gateDefsDir = safeMissionArtifactPath(safeMissionDir, 'gates/definitions');
   const gatePaths: string[] = [];
-  for (const definition of processTemplateGateDefinitions(missionId, design)) {
+  for (const definition of gateDefinitions) {
     safeMkdir(gateDefsDir, { recursive: true });
     const gatePath = safeMissionArtifactPath(
       safeMissionDir,
@@ -177,6 +192,16 @@ export function applyProcessTemplatePlan(input: {
       }),
     });
     gatePaths.push(gatePath);
+  }
+  // Anchor the required human holds in the audit chain (append-only), so
+  // finish and gate-pass still hold the mission if the local anchors — the
+  // state type fields and these definition files — are rewritten later.
+  if (plansHumanHolds) {
+    recordMissionHumanHoldAnchor(
+      missionId,
+      resolveMissionHumanHoldPlan(missionId, safeMissionDir).holds,
+      anchorSource
+    );
   }
 
   const taskBoardUpdated = renderPhaseChecklist(missionId, safeMissionDir, design, tasks);

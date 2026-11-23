@@ -1,0 +1,26 @@
+{
+  "record_id": "mem-MSN-HOLD-AUDIT-ANCHOR-20261124-2026_11_23",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Anchor tamper-sensitive requirements by an id the agent cannot rewrite",
+  "summary": "When a guard's requirement set is anchored in the audit chain, key the lookup by the resolved mission id (not a state field), check every pass path including machine-only, record durably after an up-front recordability check, and read the chain only at terminal checks.",
+  "candidate_id": "mem-MSN-HOLD-AUDIT-ANCHOR-20261124-2026_11_23",
+  "evidence_refs": [
+    "active/missions/public/MSN-HOLD-AUDIT-ANCHOR-20261124/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-HOLD-AUDIT-ANCHOR-20261124/evidence/implementation-report.md",
+    "active/missions/public/MSN-HOLD-AUDIT-ANCHOR-20261124/evidence/test-report.md"
+  ],
+  "created_at": "2026-11-23T21:54:51.502Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "## Situation\nRequired human holds were resolved only from files the agent can write (mission state type fields, gate definition files). The fix recorded the hold set in the append-only audit chain at planning and had finish and gate-pass read it.\n\n## Lessons\n- A tamper-evident anchor only helps if its lookup key is not agent-writable. The first version keyed the audit lookup by `mission-state.json` `mission_id`, so rewriting that one field made the anchor invisible. Key by the resolved mission id (caller's id or mission directory), never by a state field.\n- Enumerate every pass path of the guarded transition, not the main one. `gate-pass --machine-only` returned before the hold block; a reviewer found it. List the entry points of the transition (id path, machine-only, dispatch, phase advance) and check each.\n- Record anchors durably and check recordability before the first write (`auditChain.assertRecordable`, then `recordDurable`): a silently lost anchor leaves only the weak anchors, and a refusal after partial writes leaves a half-planned mission.\n- A whole-chain read (`auditChain.loadAll`) belongs only at terminal, infrequent checks (finish, gate-pass). Hot paths keep cheap local anchors; the terminal check is the backstop. Also skip the anchor work entirely for templates without holds — adding it unconditionally to planning pushed unrelated tests past their timeouts.\n- Fail closed on an unreadable chain, but name the cause (chain damage vs. access scope) in the diagnostic.\n\n## Limits\nMissions planned before the anchor and audit files archived by retention have no anchor; they keep the file-based holds only."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-HOLD-AUDIT-ANCHOR-20261124/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-HOLD-AUDIT-ANCHOR-20261124/evidence/implementation-report.md",
+    "active/missions/public/MSN-HOLD-AUDIT-ANCHOR-20261124/evidence/test-report.md"
+  ],
+  "source_branch": "feat/hold-audit-anchor-20261124",
+  "source_commit": "bb7ec217817c7d1715e00a35a46ef8a654464d4d"
+}
