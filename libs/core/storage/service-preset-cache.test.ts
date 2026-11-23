@@ -38,8 +38,10 @@ import {
   fetchWithServicePresetCache,
   getServicePresetCacheEntry,
   invalidateServicePresetCacheEntry,
+  loadServicePresetCacheEntryAtPath,
   servicePresetCachePartitionRoot,
   servicePresetCacheProjectRoot,
+  servicePresetCacheProjectSegment,
 } from './service-preset-cache.js';
 import { registerFoundationIo } from '../foundation/io.js';
 
@@ -202,7 +204,7 @@ describe('service-preset cache (cache floor)', () => {
     expect(getServicePresetCacheEntry('gdrive', 'read:f', TENANT_A)).toBeNull();
   });
 
-  it('rejects a non-slug tenant, a path-like project id and an unknown tier', async () => {
+  it('rejects a non-slug tenant and an unknown tier', async () => {
     const loader = vi.fn(() => ({}));
     await expect(
       fetchWithServicePresetCache('web', 'k', loader, {
@@ -210,18 +212,42 @@ describe('service-preset cache (cache floor)', () => {
       })
     ).rejects.toThrow(/STORAGE_LAYOUT_TENANT_INVALID/);
     await expect(
-      fetchWithServicePresetCache('web', 'k', loader, {
-        scope: { tier: 'confidential', projectId: '..' },
-      })
-    ).rejects.toThrow(/STORAGE_LAYOUT_SEGMENT_INVALID/);
-    await expect(
-      fetchWithServicePresetCache('web', 'k', loader, {
-        scope: { tier: 'confidential', projectId: 'proj-a/nested' },
-      })
-    ).rejects.toThrow(/SERVICE_PRESET_CACHE_PROJECT_INVALID/);
-    await expect(
       fetchWithServicePresetCache('web', 'k', loader, { scope: { tier: 'secret' as never } })
     ).rejects.toThrow(/SERVICE_PRESET_CACHE_TIER_INVALID/);
     expect(loader).not.toHaveBeenCalled();
+  });
+
+  it('maps a non-segment project id (acme:p1, a/b, ..) to one deterministic encoded segment', async () => {
+    expect(servicePresetCacheProjectSegment('proj-a')).toBe('proj-a');
+    const encoded = servicePresetCacheProjectSegment('acme:p1');
+    expect(encoded).toMatch(/^id-[0-9a-f]{32}$/);
+    expect(servicePresetCacheProjectSegment('acme:p1')).toBe(encoded);
+    // An id that looks like an encoding is itself encoded, so it cannot alias another id.
+    expect(servicePresetCacheProjectSegment(encoded)).not.toBe(encoded);
+    for (const odd of ['a/b', '..']) {
+      expect(servicePresetCacheProjectSegment(odd)).toMatch(/^id-[0-9a-f]{32}$/);
+    }
+
+    const scope = { tier: 'confidential' as const, tenant: 'acme', projectId: 'acme:p1' };
+    await fetchWithServicePresetCache('web', 'k', () => ({ v: 1 }), { scope, ttlMs: 60_000 });
+    const root = servicePresetCacheProjectRoot('confidential', 'acme', 'acme:p1');
+    expect(root).toBe(`active/shared/cache/confidential/acme/service-preset/project/${encoded}`);
+    const [file] = filesUnder(root);
+    expect(file).toBeDefined();
+    expect(getServicePresetCacheEntry('web', 'k', scope)?.projectId).toBe('acme:p1');
+    expect(loadServicePresetCacheEntryAtPath(path.join(rootBase, file!))?.projectId).toBe(
+      'acme:p1'
+    );
+  });
+
+  it('loads an entry at its path only while it resolves back to that path', async () => {
+    await fetchWithServicePresetCache('web', 'k', () => ({ v: 1 }), { scope: TENANT_A, ttlMs: 1 });
+    const [file] = filesUnder(servicePresetCacheProjectRoot('confidential', 'tenant-a', 'proj-a'));
+    const source = path.join(rootBase, file!);
+    expect(loadServicePresetCacheEntryAtPath(source)?.expiresAt).toBeDefined();
+    const moved = source.replace('/tenant-a/', '/tenant-b/');
+    fs.mkdirSync(path.dirname(moved), { recursive: true });
+    fs.copyFileSync(source, moved);
+    expect(loadServicePresetCacheEntryAtPath(moved)).toBeNull();
   });
 });

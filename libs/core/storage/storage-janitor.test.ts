@@ -215,6 +215,7 @@ import {
   sweepSupervisorEventFiles,
   sweepStatusRules,
   scanLegacyDataVault,
+  scanServicePresetCache,
   sweepDelegationChildren,
   sweepWorkspaces,
   sweepEmptyMissionDirs,
@@ -241,6 +242,7 @@ import {
   type DelegationChildRecord,
 } from './storage-janitor.js';
 import { SUPERVISOR_EVENTS_LEGACY_FILE } from '../agent/agent-runtime-events.js';
+import { fetchWithServicePresetCache } from './service-preset-cache.js';
 import type { WorkspaceRecord } from '../workforce/workspace-ledger.js';
 import {
   RETENTION_CATALOG_REPO_PATH,
@@ -1231,6 +1233,61 @@ describe('storage-janitor', () => {
     });
   });
 
+  describe('scanServicePresetCache', () => {
+    const SCOPE = { tier: 'confidential' as const, tenant: 'tenant-a', projectId: 'proj-a' };
+
+    async function cachedEntry(key: string, expiresAt?: string): Promise<string> {
+      await fetchWithServicePresetCache('notion', key, () => ({ key }), {
+        scope: SCOPE,
+        ttlMs: 60_000,
+      });
+      const dir = path.join(
+        testRootDir(),
+        'active/shared/cache/confidential/tenant-a/service-preset/project/proj-a'
+      );
+      const file = fs
+        .readdirSync(dir)
+        .map((name) => path.join(dir, name))
+        .find((candidate) => fs.readFileSync(candidate, 'utf8').includes(`"key": "${key}"`))!;
+      if (expiresAt) {
+        const persisted = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+        persisted.expiresAt = expiresAt;
+        fs.writeFileSync(file, JSON.stringify(persisted));
+      }
+      return file;
+    }
+
+    it('deletes entries whose own expiresAt passed, audited, and keeps live and malformed ones', async () => {
+      const expiresAt = new Date(Date.now() - 1_000).toISOString();
+      const expiredFile = await cachedEntry('expired', expiresAt);
+      const liveFile = await cachedEntry('live');
+      const malformed = path.join(path.dirname(liveFile), 'malformed.json');
+      writeFile(malformed, '{not-json');
+
+      expect(scanServicePresetCache({ dryRun: true }).expired).toEqual([expiredFile]);
+      expect(readRetentionAudit()).toHaveLength(0);
+
+      const result = scanServicePresetCache({ dryRun: false });
+      expect(result.deleted).toEqual([expiredFile]);
+      expect(fs.existsSync(expiredFile)).toBe(false);
+      expect(fs.existsSync(liveFile)).toBe(true);
+      expect(fs.existsSync(malformed)).toBe(true);
+      const repoRel = path.relative(testRootDir(), expiredFile).split(path.sep).join('/');
+      expect(readRetentionAudit().filter((r) => r.path === repoRel)).toEqual([
+        expect.objectContaining({
+          event: 'RETENTION_DELETE',
+          policy_path: 'active/shared/cache/confidential',
+          expires_at: expiresAt,
+        }),
+      ]);
+      // runJanitor counts it with the storage floors.
+      await cachedEntry('expired-2', expiresAt);
+      const report = runJanitor({ dryRun: false });
+      expect(report.deletedStorageFloors).toBeGreaterThanOrEqual(1);
+      expect(report.errors).toEqual([]);
+    });
+  });
+
   describe('scanLegacyDataVault', () => {
     const LEGACY_TTL_MS = 30 * RETENTION_DAY_MS;
 
@@ -1275,6 +1332,29 @@ describe('storage-janitor', () => {
         recursive: true,
       });
     }
+
+    it('keeps an expired service-preset cache entry when its audit record cannot be written', async () => {
+      await fetchWithServicePresetCache('notion', 'blocked', () => ({ v: 1 }), {
+        scope: { tier: 'confidential', tenant: 'tenant-a' },
+        ttlMs: 60_000,
+      });
+      const dir = path.join(
+        testRootDir(),
+        'active/shared/cache/confidential/tenant-a/service-preset/global'
+      );
+      const file = path.join(dir, fs.readdirSync(dir)[0]!);
+      const persisted = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+      persisted.expiresAt = new Date(Date.now() - 1_000).toISOString();
+      fs.writeFileSync(file, JSON.stringify(persisted));
+      blockRetentionAudit();
+
+      const result = scanServicePresetCache({ dryRun: false });
+      expect(result.expired).toEqual([file]);
+      expect(result.deleted).toEqual([]);
+      expect(fs.existsSync(file)).toBe(true);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors![0]).toContain('audit record could not be written');
+    });
 
     it('keeps an expired legacy vault file and reports the error when its audit record cannot be written', () => {
       const oldFile = path.join(dataVaultDir, 'blocked-entry.json');

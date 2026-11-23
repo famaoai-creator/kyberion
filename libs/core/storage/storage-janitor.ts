@@ -8,7 +8,15 @@ import {
   rotatedSegmentStem,
 } from './append-only-store.js';
 import { withLockSync } from '../foundation/lock-utils.js';
-import { LIVE_STORAGE_MAINTENANCE_LOCK } from '../storage-layout.js';
+import {
+  LIVE_STORAGE_MAINTENANCE_LOCK,
+  STORAGE_DATA_TIERS,
+  STORAGE_FLOOR_ROOTS,
+} from '../storage-layout.js';
+import {
+  SERVICE_PRESET_CACHE_DOMAIN,
+  loadServicePresetCacheEntryAtPath,
+} from './service-preset-cache.js';
 import {
   ledgerSegmentLastHash,
   listLedgerSegments,
@@ -511,6 +519,60 @@ export function rotateLogs(opts: RotateLogsOptions): RotateLogsResult {
     softDeleted: outcome.softDeleted,
     archived: outcome.archived,
     ...withErrors('logs', errors),
+  };
+}
+
+/**
+ * Expire service-preset cache entries (`active/shared/cache/<tier>/<partition>/
+ * service-preset/**`) whose own `expiresAt` has passed. Disposal goes through
+ * the catalog entry that governs the file (the cache tier partition), and each
+ * expiry is audited first — the trigger is the entry's self-declared expiry,
+ * not a catalog TTL, so the audit record is the only trace of why it went.
+ * The partition's 30-day mtime rule (scanStorageFloors) stays as a backstop.
+ */
+export function scanServicePresetCache(opts: {
+  dryRun: boolean;
+  catalog?: LoadedRetentionCatalog;
+}): ScanRuntimeResult {
+  const catalog = opts.catalog ?? loadRetentionCatalog();
+  const now = Date.now();
+  const expired: string[] = [];
+  const errors: string[] = [];
+  const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
+  for (const tier of STORAGE_DATA_TIERS) {
+    const tierDir = nodePath.join(rootDir(), STORAGE_FLOOR_ROOTS.cache, tier);
+    let partitions: string[];
+    try {
+      partitions = safeExistsSync(tierDir) ? safeReaddir(tierDir) : [];
+    } catch (err) {
+      errors.push(expiryFailure(tierDir, err));
+      continue;
+    }
+    for (const partition of partitions) {
+      for (const filePath of collectFiles(
+        nodePath.join(tierDir, partition, SERVICE_PRESET_CACHE_DOMAIN)
+      )) {
+        if (!filePath.endsWith('.json')) continue;
+        const entry = loadServicePresetCacheEntryAtPath(filePath);
+        if (!entry?.expiresAt || Date.parse(entry.expiresAt) > now) continue;
+        const policy = retentionEntryForPath(catalog, repoRelativePosix(filePath));
+        if (!policy || policy.action === 'review_required') continue;
+        expired.push(filePath);
+        if (opts.dryRun) continue;
+        // Audit-first: a failed expiry keeps the entry and is retried next sweep.
+        expireOrRecord(filePath, policy, outcome, errors, {
+          expires_at: entry.expiresAt,
+          reason: 'service-preset cache entry expiresAt elapsed (storage janitor)',
+        });
+      }
+    }
+  }
+  return {
+    expired,
+    deleted: outcome.deleted,
+    softDeleted: outcome.softDeleted,
+    archived: outcome.archived,
+    ...withErrors('service-preset-cache', errors),
   };
 }
 
@@ -1565,6 +1627,20 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
       errors.push(`storage-floors: ${failure}`);
   } catch (err: any) {
     errors.push(`storage-floors: ${err?.message ?? String(err)}`);
+  }
+  // Service-preset cache entries past their own expiresAt count as floor expiries.
+  try {
+    const presetResult = scanServicePresetCache({ dryRun: opts.dryRun, catalog });
+    for (const failure of presetResult.errors ?? [])
+      errors.push(`service-preset-cache: ${failure}`);
+    storageFloorResult = {
+      expired: [...storageFloorResult.expired, ...presetResult.expired],
+      deleted: [...storageFloorResult.deleted, ...presetResult.deleted],
+      softDeleted: [...storageFloorResult.softDeleted, ...presetResult.softDeleted],
+      archived: [...storageFloorResult.archived, ...presetResult.archived],
+    };
+  } catch (err: any) {
+    errors.push(`service-preset-cache: ${err?.message ?? String(err)}`);
   }
 
   let supervisorEventsResult: ScanRuntimeResult = {

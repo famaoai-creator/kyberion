@@ -64,10 +64,6 @@ function normalizedScope(scope: ServicePresetCacheScope): ServicePresetCacheScop
   }
   const tenant = scope.tenant?.trim().toLowerCase() || undefined;
   const projectId = scope.projectId?.trim() || undefined;
-  // One path segment: a separator would nest one project's subtree in another's.
-  if (projectId && /[\\/]/u.test(projectId)) {
-    throw new Error(`[SERVICE_PRESET_CACHE_PROJECT_INVALID] '${projectId}'`);
-  }
   return {
     tier: scope.tier,
     ...(tenant ? { tenant } : {}),
@@ -87,6 +83,27 @@ export function servicePresetCachePartitionRoot(tier: StorageDataTier, tenant?: 
   );
 }
 
+const PROJECT_SEGMENT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
+const ENCODED_PROJECT_SEGMENT_PATTERN = /^id-[0-9a-f]{32}$/u;
+
+/**
+ * The floor path segment of a project id. An id that is already a valid
+ * segment stays readable; any other id (admitted ids may contain `:`, see
+ * grant-record.schema.json) — and an id that looks like an encoding — maps to
+ * `id-<sha256 prefix>`. Writer and offboarding both resolve through here.
+ */
+export function servicePresetCacheProjectSegment(projectId: string): string {
+  const id = projectId.trim();
+  if (
+    PROJECT_SEGMENT_PATTERN.test(id) &&
+    !/^\.+$/u.test(id) &&
+    !ENCODED_PROJECT_SEGMENT_PATTERN.test(id)
+  ) {
+    return id;
+  }
+  return `id-${crypto.createHash('sha256').update(id).digest('hex').slice(0, 32)}`;
+}
+
 /** Repo-relative subtree of one project's entries inside a partition. */
 export function servicePresetCacheProjectRoot(
   tier: StorageDataTier,
@@ -98,7 +115,7 @@ export function servicePresetCacheProjectRoot(
     { kind: 'tier', tier, tenant },
     SERVICE_PRESET_CACHE_DOMAIN,
     SERVICE_PRESET_CACHE_PROJECT_SEGMENT,
-    projectId
+    servicePresetCacheProjectSegment(projectId)
   );
 }
 
@@ -110,7 +127,7 @@ function entryFileName(serviceId: string, key: string): string {
 
 function entryFilePath(serviceId: string, key: string, scope: ServicePresetCacheScope): string {
   const subtree = scope.projectId
-    ? [SERVICE_PRESET_CACHE_PROJECT_SEGMENT, scope.projectId]
+    ? [SERVICE_PRESET_CACHE_PROJECT_SEGMENT, servicePresetCacheProjectSegment(scope.projectId)]
     : [SERVICE_PRESET_CACHE_GLOBAL_SEGMENT];
   return resolveStorageFloor(
     'cache',
@@ -231,6 +248,38 @@ function readEntry<T>(
       filePath,
       scope
     ) as ServicePresetCacheEntry<T>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read and validate the entry stored at `filePath` for governed sweeps (the
+ * janitor's expiry pass). The entry is accepted only when its own tier,
+ * tenant, project and (serviceId, key) resolve back to exactly this path;
+ * anything else (malformed, moved, tampered) is null.
+ */
+export function loadServicePresetCacheEntryAtPath(
+  filePath: string
+): ServicePresetCacheEntry | null {
+  let raw: Record<string, unknown>;
+  try {
+    raw = parseSafeJsonObjectValue(entryCatalogAtPath(filePath).load(), filePath);
+  } catch {
+    return null;
+  }
+  try {
+    const scope = normalizedScope({
+      tier: raw.tier as StorageDataTier,
+      ...(typeof raw.tenant === 'string' ? { tenant: raw.tenant } : {}),
+      ...(typeof raw.projectId === 'string' ? { projectId: raw.projectId } : {}),
+    });
+    if (typeof raw.serviceId !== 'string' || typeof raw.key !== 'string') return null;
+    if (
+      nodePath.resolve(entryFilePath(raw.serviceId, raw.key, scope)) !== nodePath.resolve(filePath)
+    )
+      return null;
+    return parseEntry(raw, filePath, scope);
   } catch {
     return null;
   }

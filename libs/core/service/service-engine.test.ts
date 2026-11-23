@@ -831,6 +831,58 @@ describe('executeServicePreset', () => {
     );
   });
 
+  it('caches an admitted call in the admission write tier and refuses any other tier', async () => {
+    const { executeServicePresetCached } = await import('./service-engine.js');
+    mocks.identity.mockReturnValue({ tenantSlug: 'acme' });
+    mocks.safeReadFile.mockImplementation((filePath: string) =>
+      filePath.includes('mock/path.json')
+        ? JSON.stringify({
+            operations: { read: { type: 'api', risk: 'read', method: 'GET', path: 'items' } },
+          })
+        : ''
+    );
+    mocks.secureFetch.mockResolvedValue({ ok: true });
+    const admission = issueTenantServiceEngineAdmission({
+      bindingId: 'binding-a',
+      approvalGranted: false,
+      securityScope: {
+        tenant_slug: 'acme',
+        mission_id: 'mission-a',
+        read_tiers: ['personal', 'confidential'],
+        write_tier: 'personal',
+        purpose: 'test',
+      },
+    });
+    await executeServicePresetCached(
+      'test-service',
+      'read',
+      {},
+      'none',
+      { cache_ttl_ms: 1000 },
+      admission
+    );
+    expect(mocks.fetchWithServicePresetCache).toHaveBeenLastCalledWith(
+      'test-service',
+      expect.any(String),
+      expect.any(Function),
+      { ttlMs: 1000, scope: { tier: 'personal', tenant: 'acme' } }
+    );
+    mocks.fetchWithServicePresetCache.mockClear();
+    for (const tier of ['confidential', 'public'] as const) {
+      await expect(
+        executeServicePresetCached(
+          'test-service',
+          'read',
+          {},
+          'none',
+          { cache_ttl_ms: 1000, tier },
+          admission
+        )
+      ).rejects.toThrow(/Service cache tier does not match admitted write tier/);
+    }
+    expect(mocks.fetchWithServicePresetCache).not.toHaveBeenCalled();
+  });
+
   it('does not serve cached output after the service preset disappears', async () => {
     const { executeServicePresetCached } = await import('./service-engine.js');
     mocks.safeReadFile.mockReturnValue('');

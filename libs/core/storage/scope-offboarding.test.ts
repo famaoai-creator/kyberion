@@ -882,6 +882,8 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, service-
   const TENANT = 'tenant-alpha';
   const KNOWLEDGE_ROOT = `knowledge/confidential/${TENANT}`;
   const ALPHA_CACHE = `active/shared/cache/confidential/${TENANT}/service-preset`;
+  const LEGACY_ALPHA = 'active/shared/data-vault/alpha-entry.json';
+  const LEGACY_BETA = 'active/shared/data-vault/beta-entry.json';
   const ALPHA_HASH = 'a'.repeat(64);
   const ALPHA_HASH_2 = 'c'.repeat(64);
   const BETA_HASH = 'b'.repeat(64);
@@ -946,6 +948,17 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, service-
     );
     writeJson(abs('active/shared/cache/confidential/shared/service-preset/global/entry.json'), {
       keep: true,
+    });
+    // LEGACY flat vault: an entry admitted for this tenant, and one for another.
+    writeJson(abs(LEGACY_ALPHA), {
+      key: `${TENANT}:proj-a:binding-1:get_page:0123`,
+      projectId: 'proj-a',
+      data: { secret: 1 },
+    });
+    writeJson(abs(LEGACY_BETA), {
+      key: 'tenant-beta:proj-b:binding-1:get_page:0123',
+      projectId: 'proj-b',
+      data: { keep: true },
     });
     // Classic active/ residue so the pre-DA-08 flow is exercised together.
     writeJson(abs(`active/projects/public/${TENANT}/workspace/plan.json`), { a: 1 });
@@ -1758,6 +1771,8 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, service-
     expect(fs.existsSync(abs(`active/shared/runtime/ingest-cursors/${TENANT}`))).toBe(false);
     expect(fs.existsSync(abs(`active/shared/runtime/ingest/quota/${TENANT}`))).toBe(false);
     expect(fs.existsSync(abs(ALPHA_CACHE))).toBe(false);
+    expect(fs.existsSync(abs(LEGACY_ALPHA))).toBe(false);
+    expect(fs.existsSync(abs(LEGACY_BETA))).toBe(true);
 
     // The dedup registry kept exactly the other tenant's line + the corrupt line.
     const kept = registryLines();
@@ -1797,6 +1812,7 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, service-
         `active/shared/runtime/ingest-cursors/${TENANT}`,
         `active/shared/runtime/ingest/quota/${TENANT}`,
         ALPHA_CACHE,
+        LEGACY_ALPHA,
       ])
     );
     expect(events.find((e) => e.event === 'SCOPE_OFFBOARD_DEDUP_REGISTRY_PRUNE')).toMatchObject({
@@ -2122,13 +2138,80 @@ describe('project offboarding — service-preset cache by partition path (C-OFF-
     ]);
   });
 
-  it('an unfiltered project offboarding claims only the untenanted subtree', async () => {
-    await cache({ tier: 'confidential', tenant: 'tenant-a', projectId: 'proj-shared' }, 'k1');
-    await cache({ tier: 'confidential', projectId: 'proj-shared' }, 'k2');
+  function seedWorkspace(tenant: string, organization: string): void {
+    writeJson(abs(`active/projects/confidential/${tenant}/proj-shared/state/project-state.json`), {
+      tenant_slug: tenant,
+      organization_id: organization,
+    });
+  }
+
+  it('an unfiltered project offboarding with no tenant partitions claims the untenanted subtree', async () => {
+    await cache({ tier: 'confidential', projectId: 'proj-shared' }, 'k1');
 
     expect(cacheTargets('project', 'proj-shared')).toEqual([
       cacheRoot('confidential', 'shared', 'proj-shared'),
     ]);
+  });
+
+  it('an unfiltered project offboarding claims the single resolved lineage tenant’s subtree', async () => {
+    seedWorkspace('tenant-a', 'org-a');
+    await cache({ tier: 'confidential', tenant: 'tenant-a', projectId: 'proj-shared' }, 'k1');
+    await cache({ tier: 'confidential', projectId: 'proj-shared' }, 'k2');
+    // Another tenant's same-id project is not this project's lineage: left alone.
+    await cache({ tier: 'confidential', tenant: 'tenant-z', projectId: 'proj-shared' }, 'k3');
+
+    expect(cacheTargets('project', 'proj-shared')).toEqual([
+      cacheRoot('confidential', 'tenant-a', 'proj-shared'),
+      cacheRoot('confidential', 'shared', 'proj-shared'),
+    ]);
+  });
+
+  it('an unfiltered project offboarding fails closed on a tenant partition without one known lineage tenant', async () => {
+    await cache({ tier: 'confidential', tenant: 'tenant-a', projectId: 'proj-shared' }, 'k1');
+    // No lineage at all.
+    expect(() => collectScopeTargets('project', 'proj-shared')).toThrow(
+      'PROJECT_SERVICE_PRESET_CACHE_AMBIGUOUS'
+    );
+    // Two lineage tenants: still ambiguous.
+    seedWorkspace('tenant-b', 'org-b');
+    writeJson(abs('active/shared/runtime/projects/proj-shared.json'), {
+      tenant_slug: 'tenant-c',
+      organization_id: 'org-c',
+    });
+    expect(() => collectScopeTargets('project', 'proj-shared')).toThrow(
+      /PROJECT_SERVICE_PRESET_CACHE_AMBIGUOUS.*several tenants/
+    );
+    // A tenant filter always resolves it.
+    expect(
+      cacheTargets('project', 'proj-shared', { tenantSlug: 'tenant-a', organizationId: 'org-a' })
+    ).toEqual([cacheRoot('confidential', 'tenant-a', 'proj-shared')]);
+  });
+
+  it('LEGACY: tenant offboarding claims flat data-vault entries keyed for the tenant only', () => {
+    const vault = 'active/shared/data-vault';
+    const legacy = (name: string, record: Record<string, unknown>) =>
+      writeJson(abs(`${vault}/${name}.json`), {
+        sourceType: 'confluence',
+        tier: 'confidential',
+        data: {},
+        ...record,
+      });
+    legacy('a-admitted', { key: 'tenant-a:proj-a:binding-1:get_page:0123', projectId: 'proj-a' });
+    legacy('b-admitted', { key: 'tenant-b:proj-b:binding-1:get_page:0123', projectId: 'proj-b' });
+    // Unadmitted entries are shared by definition: projectId == tenant slug is not a claim.
+    legacy('unadmitted', { key: 'get_page:0123', projectId: 'tenant-a' });
+
+    const targets = collectScopeTargets('tenant', 'tenant-a').filter(
+      (target) => target.kind === 'legacy_data_vault_entry'
+    );
+    expect(targets).toEqual([
+      { path: `${vault}/a-admitted.json`, kind: 'legacy_data_vault_entry' },
+    ]);
+    expect(
+      collectScopeTargets('project', 'proj-a').filter(
+        (target) => target.kind === 'legacy_data_vault_entry'
+      )
+    ).toEqual([]);
   });
 
   it('tenant offboarding claims the tenant’s whole service-preset partition of every tier', async () => {

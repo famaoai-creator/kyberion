@@ -107,17 +107,29 @@ active/shared/cache/<tier>/<tenant|shared>/service-preset/global/<hash>.json
   admission uses the tier's `shared` partition. The project is the admitted
   project, or the caller's `project_id` when there is no admission; without
   one the entry goes to `global/`.
+- The tier of an admitted call is the admission's `write_tier` (a miss writes
+  the partition); a `tier` option that differs is refused. Unadmitted calls
+  default to `confidential`.
+- A project id that is not a valid floor segment (admitted ids may contain
+  `:`) is stored under `id-<sha256 prefix>`; valid ids stay readable.
+  `servicePresetCacheProjectSegment` is the one mapping the writer and
+  offboarding share.
 - Ownership follows from the path. tier-guard and `tenant_scope` protect the
-  `personal` / `confidential` partitions like every floor, and no code reads
-  an owner out of the entry.
+  `personal` / `confidential` partitions like every floor, so a process bound
+  to one tenant cannot write another tenant's entries, and no code reads an
+  owner out of an entry.
 - Each entry records its tier, tenant and project and is served only from the
   partition those name: an entry copied into another partition is a miss.
   Its own `expiresAt` is checked on read (an expired entry is a miss and is
-  rewritten). The cache floor rule (30 days) removes old files.
+  rewritten). The janitor also deletes entries whose `expiresAt` passed
+  (`scanServicePresetCache`, audited, counted with the storage floors); the
+  cache floor rule (30 days by mtime) stays as the backstop.
 - It replaces the flat `active/shared/data-vault/` store. That directory is a
   legacy retention-catalog entry now: nothing writes there, and the janitor
   deletes leftovers 30 days after their last write (audited) until the entry
-  is removed.
+  is removed. The `active/shared/data-vault/` write grants of `run_pipeline`
+  and `run_super_pipeline` remain only so the janitor can delete those
+  leftovers; remove them with the legacy entry.
 
 ### Process start-up caches
 
@@ -580,9 +592,18 @@ ingest commit.
   (`scope-offboarding-cache.ts`): a tenant offboarding exports and soft-deletes
   `active/shared/cache/<tier>/<tenant>/service-preset/` of every tier; a project
   offboarding removes `…/service-preset/project/<id>/` from its filter tenant's
-  partition only, or from the untenanted `<tier>/shared/` partition when the run names
-  no tenant. It never touches another tenant's partition. The rest of a tenant's cache
-  floor partition is not offboarded and expires under the cache floor rule.
+  partition only. Without a filter it removes the untenanted `<tier>/shared/` subtree
+  plus the subtree of the single tenant the project's lineage resolves to (workspaces,
+  active and archived missions, the project registry record); when a tenant partition
+  holds the project but the lineage names no tenant or several, it refuses with
+  `PROJECT_SERVICE_PRESET_CACHE_AMBIGUOUS` (rerun with a tenant filter). Another
+  tenant's partition is never claimed. The rest of a tenant's cache floor partition is
+  not offboarded and expires under the cache floor rule.
+- LEGACY, removed with the `active/shared/data-vault` retention entry: a tenant
+  offboarding also exports and soft-deletes flat data-vault entries that a
+  tenant-admitted call wrote for that tenant (key `<tenant>:<projectId>:<binding>:…`
+  with the entry's projectId). Unadmitted entries are shared by definition and are
+  never claimed; the earlier "projectId equals the tenant slug" match is dropped.
 - A restore refuses (`[BACKUP_RESTORE_APPEND_ONLY_CONFLICT]`) to lay an
   append-only partition or customer decision case over a target that already
   holds files. A chain has no head anchor, so the restore relies on this guard. The target is checked again

@@ -407,6 +407,12 @@ export async function executeServicePresetCached(
     throw new Error('[POLICY_VIOLATION] Service cache admission carries no tenant');
   }
   const projectId = admission ? admittedProjectId : cacheOpts.project_id;
+  // A miss writes the partition, so an admitted call caches in its write tier.
+  const admittedTier = admission?.securityScope.write_tier;
+  if (admittedTier && cacheOpts.tier && cacheOpts.tier !== admittedTier) {
+    throw new Error('[POLICY_VIOLATION] Service cache tier does not match admitted write tier');
+  }
+
   const { data: result, fromCache } = await fetchWithServicePresetCache(
     serviceId,
     admission ? `${admission.bindingId}:${cacheKey}` : cacheKey,
@@ -414,7 +420,7 @@ export async function executeServicePresetCached(
     {
       ttlMs: cacheOpts.cache_ttl_ms,
       scope: {
-        tier: cacheOpts.tier ?? 'confidential',
+        tier: admittedTier ?? cacheOpts.tier ?? 'confidential',
         ...(tenant ? { tenant } : {}),
         ...(projectId ? { projectId } : {}),
       },

@@ -53,7 +53,10 @@ import {
   listMissionDirs,
   missionScopeOf,
 } from './scope-offboarding-lineage.js';
-import { collectServicePresetCacheTargets } from './scope-offboarding-cache.js';
+import {
+  collectLegacyDataVaultTargets,
+  collectServicePresetCacheTargets,
+} from './scope-offboarding-cache.js';
 import { nowIso } from '../foundation/time.js';
 import { logger } from '../core.js';
 import {
@@ -289,6 +292,11 @@ export type OffboardTargetKind =
    * `cache/<tier>/<tenant>/service-preset/`, a project's `…/service-preset/project/<id>/`.
    */
   | 'service_preset_cache_tree'
+  /**
+   * LEGACY: a flat `active/shared/data-vault/` entry a tenant-admitted call
+   * wrote (key prefix); removed with the legacy retention entry.
+   */
+  | 'legacy_data_vault_entry'
   /** Tenant-scoped feedback, intent, audit, and collaboration runtime state. */
   | 'tenant_learning_tree'
   /** The tenant's partition of the resource-usage ledger (one per tier). */
@@ -1081,6 +1089,8 @@ export function collectScopeTargets(
   // path: a project offboarding touches only its filter tenant's (or the
   // untenanted) partition, never another tenant's.
   targets.push(...collectServicePresetCacheTargets(scopeType, id, filter));
+  // LEGACY: flat data-vault entries admitted for the tenant (key prefix).
+  if (scopeType === 'tenant') targets.push(...collectLegacyDataVaultTargets(id));
 
   // P3 (R-09): artifacts derived from the tenant's assets that live OUTSIDE
   // every collected tree (shared caches, cross-partition results) are reached

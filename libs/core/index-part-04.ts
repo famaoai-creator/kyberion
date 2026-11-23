@@ -114,6 +114,7 @@ export {
   scanTmp,
   rotateLogs,
   scanLegacyDataVault,
+  scanServicePresetCache,
   scanRuntime,
   sweepDelegationChildren,
   runJanitor,
@@ -257,8 +258,10 @@ export {
   fetchWithServicePresetCache,
   getServicePresetCacheEntry,
   invalidateServicePresetCacheEntry,
+  loadServicePresetCacheEntryAtPath,
   servicePresetCachePartitionRoot,
   servicePresetCacheProjectRoot,
+  servicePresetCacheProjectSegment,
 } from './storage/service-preset-cache.js';
 
 export type {

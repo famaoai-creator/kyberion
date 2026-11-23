@@ -5,5 +5,5 @@
   "action": "delete",
   "audit": true,
   "backup": "exclude",
-  "note": "LEGACY — retired flat data vault. The service-preset TTL cache moved to the cache floor (active/shared/cache/<tier>/<tenant|shared>/service-preset/, storage/service-preset-cache.ts); nothing writes here any more. Leftover entries on existing deployments are deleted 30 days after their last write (the cache partitions' TTL), audited, by the janitor's scanLegacyDataVault sweep. Remove this entry and that sweep once deployments no longer hold the directory."
+  "note": "LEGACY — retired flat data vault. The service-preset TTL cache moved to the cache floor (active/shared/cache/<tier>/<tenant|shared>/service-preset/, storage/service-preset-cache.ts); nothing writes here any more. Leftover entries on existing deployments are deleted 30 days after their last write (the cache partitions' TTL), audited, by the janitor's scanLegacyDataVault sweep; until then tenant offboarding still claims a tenant's admitted entries (collectLegacyDataVaultTargets). Remove this entry together with that sweep, that offboarding claim and the run_pipeline / run_super_pipeline active/shared/data-vault/ grants once deployments no longer hold the directory."
 }

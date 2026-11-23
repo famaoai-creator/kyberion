@@ -1,15 +1,32 @@
 /**
  * Service-preset cache subtrees of an offboarding scope (C-OFF-014). The
  * cache sits on the tier/tenant-partitioned cache floor, so ownership follows
- * from the path — no entry is opened or attributed by its content.
+ * from the path — no cache-floor entry is opened or attributed by its content.
+ * The one content-based claim left is the LEGACY flat data vault (below).
  * Split out of scope-offboarding.ts (size gate).
  */
 
+import * as path from 'node:path';
 import * as pathResolver from '../path-resolver.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
 import { safeExistsSync } from '../secure-io.js';
-import { safeOptionalRepositoryPath } from './scope-offboarding-files.js';
-import { STORAGE_DATA_TIERS, SYSTEM_PARTITION_SEGMENT } from '../storage-layout.js';
+import {
+  STORAGE_DATA_TIERS,
+  STORAGE_FLOOR_ROOTS,
+  SYSTEM_PARTITION_SEGMENT,
+} from '../storage-layout.js';
+import { repoRelativePosix } from './storage-janitor.js';
+import {
+  listDirEntries,
+  readJsonRecord,
+  safeOptionalRepositoryPath,
+} from './scope-offboarding-files.js';
+import {
+  collectProjectWorkspaceTargets,
+  listMissionDirs,
+  missionScopeOf,
+  projectRecordLineage,
+} from './scope-offboarding-lineage.js';
 import {
   servicePresetCachePartitionRoot,
   servicePresetCacheProjectRoot,
@@ -38,31 +55,111 @@ function present(subtree: string): boolean {
 }
 
 /**
+ * Tenants under which a project id is known: project workspaces, active and
+ * archived missions, and the project registry record (untenanted lineages
+ * contribute nothing).
+ */
+function knownProjectTenants(projectId: string): Set<string> {
+  const tenants = new Set<string>();
+  const add = (tenant: string | undefined) => {
+    if (tenant && isPartitionTenant(tenant)) tenants.add(tenant);
+  };
+  for (const { lineage } of collectProjectWorkspaceTargets(projectId, {})) add(lineage.tenantSlug);
+  for (const archived of [false, true]) {
+    for (const { missionDir, tenantPartition } of listMissionDirs({ archived })) {
+      const scope = missionScopeOf(missionDir, tenantPartition);
+      if (scope.projectId === projectId) add(scope.tenantSlug);
+    }
+  }
+  add(projectRecordLineage(projectId)?.tenantSlug);
+  return tenants;
+}
+
+/** Tenant partitions (any tier) that hold a service-preset subtree of the project. */
+function tenantPartitionsHoldingProject(projectId: string): string[] {
+  const tenants = new Set<string>();
+  for (const tier of STORAGE_DATA_TIERS) {
+    const tierDir = pathResolver.rootResolve(`${STORAGE_FLOOR_ROOTS.cache}/${tier}`);
+    for (const name of listDirEntries(tierDir)) {
+      if (!isPartitionTenant(name)) continue;
+      if (present(servicePresetCacheProjectRoot(tier, name, projectId))) tenants.add(name);
+    }
+  }
+  return [...tenants];
+}
+
+/**
+ * Tenant whose partition an UNFILTERED project offboarding claims: the single
+ * tenant the project's lineage resolves to. When a tenant partition holds the
+ * project but the lineage is not exactly one tenant, refuse rather than leave
+ * (or guess) another tenant's cache.
+ */
+function unfilteredProjectTenant(projectId: string): string | undefined {
+  const holding = tenantPartitionsHoldingProject(projectId);
+  if (holding.length === 0) return undefined;
+  const known = [...knownProjectTenants(projectId)];
+  if (known.length === 1) return known[0];
+  const lineage = known.length === 0 ? 'no tenant' : `several tenants (${known.join(', ')})`;
+  throw new Error(
+    `[PROJECT_SERVICE_PRESET_CACHE_AMBIGUOUS] project '${projectId}' has service-preset cache in tenant partition(s) ${holding.join(', ')} but its lineage resolves to ${lineage} | next: rerun the project offboarding with tenantSlug and organizationId | evidence: ${STORAGE_FLOOR_ROOTS.cache}/<tier>/<tenant>/service-preset/project/`
+  );
+}
+
+/**
  * - Tenant: `active/shared/cache/<tier>/<tenant>/service-preset/` of every tier.
  * - Project with a tenant filter: `…/<tier>/<tenant>/service-preset/project/<id>/`
  *   — only that tenant's partition, never another tenant's.
- * - Project without a filter: the untenanted `…/<tier>/shared/service-preset/project/<id>/`.
+ * - Project without a filter: the untenanted `…/<tier>/shared/…/project/<id>/`,
+ *   plus the single lineage tenant's subtree (see {@link unfilteredProjectTenant}).
  */
 export function collectServicePresetCacheTargets(
   scopeType: OffboardScopeType,
   scopeId: string,
   filter: PhysicalNamespaceFilter
 ): OffboardTarget[] {
-  const tenant = scopeType === 'tenant' ? scopeId : filter.tenantSlug;
-  if (tenant !== undefined && !isPartitionTenant(tenant)) return [];
+  let subtrees: string[];
+  if (scopeType === 'tenant') {
+    if (!isPartitionTenant(scopeId)) return [];
+    subtrees = STORAGE_DATA_TIERS.map((tier) => servicePresetCachePartitionRoot(tier, scopeId));
+  } else if (filter.tenantSlug) {
+    if (!isPartitionTenant(filter.tenantSlug)) return [];
+    const tenant = filter.tenantSlug;
+    subtrees = STORAGE_DATA_TIERS.map((tier) =>
+      servicePresetCacheProjectRoot(tier, tenant, scopeId)
+    );
+  } else {
+    const tenant = unfilteredProjectTenant(scopeId);
+    subtrees = [...(tenant ? [tenant] : []), undefined].flatMap((partition) =>
+      STORAGE_DATA_TIERS.map((tier) => servicePresetCacheProjectRoot(tier, partition, scopeId))
+    );
+  }
+  return subtrees
+    .filter(present)
+    .map((subtree) => ({ path: subtree, kind: 'service_preset_cache_tree' as const }));
+}
+
+/**
+ * LEGACY — remove with the `active/shared/data-vault` retention entry and the
+ * janitor's `scanLegacyDataVault`. Until the flat vault's leftovers expire, a
+ * tenant offboarding still claims the entries a tenant-admitted service call
+ * wrote there: their key is `<tenant>:<projectId>:<bindingId>:<cacheKey>`
+ * with `<projectId>` equal to the entry's projectId. Unadmitted entries are
+ * shared by definition and never claimed (the earlier projectId == tenant
+ * heuristic is dropped deliberately).
+ */
+export function collectLegacyDataVaultTargets(tenant: string): OffboardTarget[] {
+  if (!isPartitionTenant(tenant)) return [];
+  const vaultDir = pathResolver.rootResolve('active/shared/data-vault');
   const targets: OffboardTarget[] = [];
-  for (const tier of STORAGE_DATA_TIERS) {
-    let subtree: string;
-    try {
-      subtree =
-        scopeType === 'tenant'
-          ? servicePresetCachePartitionRoot(tier, tenant)
-          : servicePresetCacheProjectRoot(tier, tenant, scopeId);
-    } catch {
-      // Not a valid floor segment, so the cache can never have written it.
-      continue;
-    }
-    if (present(subtree)) targets.push({ path: subtree, kind: 'service_preset_cache_tree' });
+  for (const name of listDirEntries(vaultDir)) {
+    if (!name.endsWith('.json')) continue;
+    const filePath = safeOptionalRepositoryPath(path.join(vaultDir, name));
+    if (!filePath) continue;
+    const record = readJsonRecord(filePath);
+    if (typeof record?.key !== 'string' || typeof record.projectId !== 'string') continue;
+    const segments = record.key.split(':');
+    if (segments.length < 4 || segments[0] !== tenant || segments[1] !== record.projectId) continue;
+    targets.push({ path: repoRelativePosix(filePath), kind: 'legacy_data_vault_entry' });
   }
   return targets;
 }
