@@ -228,7 +228,11 @@ import {
   DELEGATION_LEGACY_NOTIFICATIONS_REPO_PATH,
   verifyScopeOffboarded,
 } from './scope-offboarding.js';
-import { TENANT_RUNTIME_PARTITION_ROOTS } from '../storage-layout.js';
+import {
+  LIVE_STORAGE_MAINTENANCE_LOCK,
+  TENANT_RUNTIME_PARTITION_ROOTS,
+} from '../storage-layout.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { restoreFromTrash, TRASH_REPO_SUBPATH } from './storage-janitor.js';
 import { STORAGE_RETENTION_AUDIT_FILENAME } from './storage-retention-catalog.js';
 import { withExecutionContext } from '../authority.js';
@@ -418,6 +422,19 @@ describe('AL-04 mission runtime residue GC', () => {
 });
 
 describe('AL-04 tenant/project offboarding', () => {
+  it('refuses execute while live storage maintenance holds the lock', () => {
+    expect(
+      withLockSync(LIVE_STORAGE_MAINTENANCE_LOCK, () =>
+        offboardScope({ scopeType: 'tenant', scopeId: 'tenant-alpha', mode: 'execute' })
+      )
+    ).toMatchObject({
+      status: 'error',
+      targets: [],
+      soft_deleted: [],
+      reason: expect.stringContaining('[LOCK_TIMEOUT]'),
+    });
+  });
+
   function seedTenant(): void {
     writeJson(abs('active/projects/public/tenant-alpha/workspace/plan.json'), { a: 1 });
     writeJson(

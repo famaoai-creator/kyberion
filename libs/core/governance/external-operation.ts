@@ -20,7 +20,13 @@ import {
   findActiveCharter,
   loadCharterUsage,
 } from './accountability-charter-registry.js';
-import { reserveExternalOperation } from './external-operation-store.js';
+import { externalOperationProviderReference } from './external-operation-occurrence.js';
+import {
+  persistExternalOperationOutcome,
+  reserveExternalOperation,
+  type ExternalOperationOutcome,
+  type ExternalOperationReservation,
+} from './external-operation-store.js';
 import type { Charter } from './accountability-charter.js';
 import type { ApprovalRequesterContext } from './approval-store.js';
 import {
@@ -200,6 +206,7 @@ const admittedOperations = new WeakMap<
     tenantSlug?: string;
     effectHash: string;
     protectionHash: string;
+    reservation?: ExternalOperationReservation;
     proof?: ExternalOperationCommitProof;
     committed?: boolean;
   }
@@ -754,13 +761,14 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
   // Admit once, then reserve durably before any caller may perform the effect.
   // Pending approvals never reserve. A started reservation is never released:
   // failures/timeouts require verification, not replay with the same identity.
+  const reservation = {
+    tenantSlug: trustedTenant,
+    operationId: input.operationId,
+    invocationId: authority?.invocationId?.trim() || correlationId,
+    effectHash,
+  };
   try {
-    reserveExternalOperation({
-      tenantSlug: authority?.tenantSlug,
-      operationId: input.operationId,
-      invocationId: authority?.invocationId?.trim() || correlationId,
-      effectHash,
-    });
+    reserveExternalOperation(reservation);
   } catch (error) {
     const conflict =
       error instanceof Error && error.message.includes('EXTERNAL_EXECUTION_ALREADY_RESERVED');
@@ -827,6 +835,7 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
     effectHash,
     protectionHash: protection.hash,
     proof,
+    reservation,
   });
   if (approval.acceptedCharter && charter) {
     admissions.set(input, {
@@ -841,17 +850,39 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
   return approval;
 }
 
+function classifyExternalResult<T>(
+  result: T,
+  classify: (result: T) => ExternalOperationOutcome['outcome'] | ExternalOperationOutcome
+): ExternalOperationOutcome {
+  try {
+    const value = classify(result);
+    const outcome = typeof value === 'string' ? value : value.outcome;
+    if (outcome === 'succeeded' || outcome === 'failed' || outcome === 'unknown') {
+      return {
+        outcome,
+        providerReceiptId: typeof value === 'string' ? undefined : value.providerReceiptId,
+      };
+    }
+  } catch {
+    // The effect has already been attempted; a classifier failure is unknown.
+  }
+  return { outcome: 'unknown' };
+}
+
 /** A failed/unknown external result is evidence, never an instruction to retry. */
 export async function runExternalOperation<T>(
   input: ExternalOperation,
-  execute: () => Promise<T>,
-  classify: (result: T) => 'succeeded' | 'failed' | 'unknown'
+  execute: (providerCorrelationId?: string) => Promise<T>,
+  classify: (result: T) => ExternalOperationOutcome['outcome'] | ExternalOperationOutcome
 ): Promise<T> {
   admitExternalOperation(input);
   assertExternalOperationCommit(input);
   let result: T;
   try {
-    result = await execute();
+    const reservation = admittedOperations.get(input)?.reservation;
+    result = await execute(
+      reservation ? externalOperationProviderReference(reservation) : undefined
+    );
   } catch (error) {
     if (isObservationOnly(input)) {
       recordExternalOperationOutcome(input, 'failed');
@@ -866,16 +897,11 @@ export async function runExternalOperation<T>(
     }
     throw error;
   }
-  let outcome: 'succeeded' | 'failed' | 'unknown' = 'unknown';
-  try {
-    outcome = classify(result);
-  } catch {
-    /* Result already exists; do not retry. */
-  }
-  recordExternalOperationOutcome(input, outcome);
+  const outcome = classifyExternalResult(result, classify);
+  recordExternalOperationOutcome(input, outcome.outcome, outcome.providerReceiptId);
   // The SDK may turn a failed/partial receipt into an ordinary result envelope.
   // Preserve the verification stop at the trusted outer dispatch boundary.
-  if (input.requiresApproval && outcome !== 'succeeded' && !isObservationOnly(input))
+  if (input.requiresApproval && outcome.outcome !== 'succeeded' && !isObservationOnly(input))
     signalExternalOutcomeStop(input);
   return result;
 }
@@ -885,7 +911,7 @@ export async function runExternalOperation<T>(
 export function runExternalOperationSync<T>(
   input: ExternalOperation,
   execute: () => T,
-  classify: (result: T) => 'succeeded' | 'failed' | 'unknown'
+  classify: (result: T) => ExternalOperationOutcome['outcome'] | ExternalOperationOutcome
 ): T {
   admitExternalOperation(input);
   assertExternalOperationCommit(input);
@@ -900,25 +926,30 @@ export function runExternalOperationSync<T>(
     }
     throw error;
   }
-  let outcome: 'succeeded' | 'failed' | 'unknown' = 'unknown';
-  try {
-    outcome = classify(result);
-  } catch {
-    /* Attempted effect needs verification. */
-  }
-  recordExternalOperationOutcome(input, outcome);
-  if (input.requiresApproval && outcome !== 'succeeded') signalExternalOutcomeStop(input);
+  const outcome = classifyExternalResult(result, classify);
+  recordExternalOperationOutcome(input, outcome.outcome, outcome.providerReceiptId);
+  if (input.requiresApproval && outcome.outcome !== 'succeeded') signalExternalOutcomeStop(input);
   return result;
 }
 
 /** Never throw after the effect: failed telemetry must not cause duplicate sends. */
 export function recordExternalOperationOutcome(
   input: ExternalOperation,
-  outcome: 'succeeded' | 'failed' | 'unknown'
+  outcome: ExternalOperationOutcome['outcome'],
+  providerReceiptId?: string
 ): void {
   const admitted = admittedOperations.get(input);
   admittedOperations.delete(input);
   if (!admitted) return;
+  if (admitted.committed && admitted.reservation) {
+    try {
+      persistExternalOperationOutcome(admitted.reservation, { outcome, providerReceiptId });
+    } catch {
+      logger.warn(
+        '[EXTERNAL_RECEIPT_UNRECORDED] Durable outcome unavailable | next: verify the reservation and provider before retrying'
+      );
+    }
+  }
   const admission = admissions.get(input);
   admissions.delete(input);
   if (admission) {
@@ -950,8 +981,8 @@ export function recordExternalOperationOutcome(
       reason: `External operation ${outcome}; admission is not proof of execution`,
       metadata: {
         outcome,
-        tenant_slug: admitted.authority?.tenantSlug,
-        invocation_id: admitted.authority?.invocationId,
+        tenant_slug: admitted.tenantSlug,
+        invocation_id: admitted.reservation?.invocationId ?? admitted.authority?.invocationId,
         effect_hash: admitted.effectHash,
       },
     });

@@ -68,6 +68,9 @@ export type StoragePartition =
 
 export const SYSTEM_PARTITION: StoragePartition = { kind: 'system' };
 
+/** Live restore and scope offboarding must never mutate the checkout concurrently. */
+export const LIVE_STORAGE_MAINTENANCE_LOCK = 'live-storage-maintenance';
+
 const SEGMENT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 
 function assertSegment(value: string, label: string): string {
@@ -113,6 +116,15 @@ export function storageFloorRelativePath(
     ...storagePartitionSegments(partition),
     assertSegment(domain, 'domain'),
     ...rest
+  );
+}
+
+/** Durable source work lists follow the tenant's confidential artifact floor. */
+export function ingestSyncBatchRelativeRoot(tenant: string): string {
+  return storageFloorRelativePath(
+    'artifact',
+    { kind: 'tier', tier: 'confidential', tenant },
+    'ingest-sync'
   );
 }
 

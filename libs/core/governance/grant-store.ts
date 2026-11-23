@@ -36,17 +36,24 @@ export type { ServiceCredentialAllocationScope } from './service-credential-gran
  * mission scope-approve). Other standing capabilities are granted directly by
  * the terminal's operator principal (`grantStandingDirect`).
  */
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import { auditChain } from './audit-chain.js';
 import { parseActorRef } from '../contracts/actor.js';
 import { compileSchema } from '../foundation/ajv.js';
 import { readJsonIfPresent, writeJson } from '../foundation/json.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeReaddir } from '../secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReaddir,
+  safeUnlinkSync,
+} from '../secure-io.js';
 import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
   storagePartitionSegments,
@@ -220,6 +227,7 @@ export const GRANT_EXTENSION_CONSUMER = 'grant_extension';
  */
 export const GRANT_EXTENSION_GRACE_DAYS = 7;
 const GRANT_ID_PATTERN = /^GRT-\d{8}-[a-f0-9]{12}$/;
+const GRANT_MUTATION_LOCK = 'standing-grant-mutation';
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Tenant grants are operator governance data of that tenant: confidential tier. */
 const GRANT_TIER: StorageDataTier = 'confidential';
@@ -534,7 +542,7 @@ export function grantRecordPath(tenantSlug: string | undefined, grantId: string)
   });
 }
 
-function writeGrant(record: GrantRecord): void {
+function writeGrant(record: GrantRecord, createOnly = false): void {
   const check = validateGrantRecord(record);
   if (!check.valid) {
     throw new GrantError(
@@ -544,7 +552,7 @@ function writeGrant(record: GrantRecord): void {
   }
   const filePath = grantRecordPath(record.scope.tenant_slug, record.grant_id);
   safeMkdir(path.dirname(filePath), { recursive: true });
-  writeJson(filePath, record);
+  writeJson(filePath, record, { createOnly });
 }
 
 /** Load one grant; null when missing, unreadable, invalid or misplaced (fail closed). */
@@ -758,7 +766,7 @@ function writeNewGrant(
     id: grantedBy.actor_id,
   });
   const record: GrantRecord = { ...pending, audit_event_id: auditEventId };
-  writeGrant(record);
+  writeGrant(record, true);
   return record;
 }
 
@@ -1004,6 +1012,14 @@ export function assertCredentialLendingEligible(
 export function assertGrantApproval(
   draft: NormalizedGrantDraft,
   approvalRequestId: string
+): ReturnType<typeof checkGrantApproval> {
+  return checkGrantApproval(draft, approvalRequestId);
+}
+
+function checkGrantApproval(
+  draft: NormalizedGrantDraft,
+  approvalRequestId: string,
+  allowConsumed = false
 ): {
   approval: ApprovalRequestRecord;
   humanDecider: string;
@@ -1012,6 +1028,7 @@ export function assertGrantApproval(
 } {
   const checked = assertHumanGrantDecision(approvalRequestId, {
     consumer: GRANT_APPROVAL_CONSUMER,
+    allowConsumed,
     effectBinding: grantApprovalEffectBinding(draft),
     payloadHash: computeApprovalPayloadHash(grantApprovalPayload(draft)),
     payloadMismatch:
@@ -1029,7 +1046,7 @@ export function assertGrantApproval(
   return checked;
 }
 
-/** Approved by an authenticated human, unexpired, unused, usable and hash-bound to the effect. */
+/** Validate the human decision and binding, allowing a consumed receipt only for recovery. */
 function assertHumanGrantDecision(
   approvalRequestId: string,
   binding: {
@@ -1037,6 +1054,7 @@ function assertHumanGrantDecision(
     effectBinding: string;
     payloadHash: string;
     payloadMismatch: string;
+    allowConsumed?: boolean;
   }
 ): {
   approval: ApprovalRequestRecord;
@@ -1051,10 +1069,16 @@ function assertHumanGrantDecision(
       `grant approval ${approvalRequestId} is ${approval?.status ?? 'missing'}, not approved`
     );
   }
-  if (isApprovalRequestExpired(approval)) {
+  const now = Date.now();
+  const consumedAt = approval.consumption ? Date.parse(approval.consumption.consumedAt) : now;
+  if (isApprovalRequestExpired(approval, binding.allowConsumed ? consumedAt : now)) {
     throw new GrantError('approval_invalid', `grant approval has expired: ${approval.id}`);
   }
-  if (approval.consumption || approval.applyClaim || approval.applyResult) {
+  if (
+    (approval.consumption && !binding.allowConsumed) ||
+    approval.applyClaim ||
+    approval.applyResult
+  ) {
     throw new GrantError('approval_invalid', `grant approval ${approval.id} was already used`);
   }
   if (binding.consumer === GRANT_EXTENSION_CONSUMER)
@@ -1093,12 +1117,66 @@ function assertHumanGrantDecision(
   if (!humanDecider) {
     throw new GrantError('approval_invalid', 'grant approval does not name its human decider');
   }
+  if (
+    approval.consumption &&
+    (approval.consumption.consumer !== binding.consumer ||
+      approval.consumption.consumedBy !== humanDecider ||
+      !Number.isFinite(consumedAt) ||
+      consumedAt > now)
+  ) {
+    throw new GrantError('approval_invalid', 'grant approval has an invalid consumption receipt');
+  }
   return {
     approval,
     humanDecider,
     assurance: assuranceOfAuthMethod(humanApproval.authMethod) ?? 'A0',
     role: humanApproval.role === 'sovereign' ? 'sovereign' : 'operator',
   };
+}
+
+/** Local recovery intent, kept with the grant partition and quarantined on restore. */
+function pendingGrantEffectPath(tenant: string, approvalId: string): string {
+  const key = createHash('sha256').update(approvalId).digest('hex');
+  return assertSafeRepositoryPath(path.join(grantPartitionDir(tenant), `.pending-${key}.json`), {
+    allowMissingLeaf: true,
+  });
+}
+
+function consumeGrantEffect(
+  checked: ReturnType<typeof assertHumanGrantDecision>,
+  tenant: string,
+  consumer: typeof GRANT_APPROVAL_CONSUMER | typeof GRANT_EXTENSION_CONSUMER,
+  effectRef: string
+): { consumedAt: string; pendingPath: string } {
+  const pendingPath = pendingGrantEffectPath(tenant, checked.approval.id);
+  const pending = readJsonIfPresent<{ effect_ref: string }>(pendingPath);
+  const receipt = checked.approval.consumption;
+  if (
+    (pending && pending.effect_ref !== effectRef) ||
+    (receipt && (!pending || receipt.effectRef !== effectRef))
+  ) {
+    throw new GrantError(
+      'approval_invalid',
+      'grant approval was already used for a different or unavailable effect'
+    );
+  }
+  if (!pending) {
+    safeMkdir(path.dirname(pendingPath), { recursive: true });
+    writeJson(pendingPath, { effect_ref: effectRef }, { createOnly: true });
+  }
+  const consumed =
+    receipt ??
+    markApprovalConsumed('mission_controller', {
+      channel: GRANT_APPROVAL_CHANNEL,
+      requestId: checked.approval.id,
+      consumer,
+      consumedBy: checked.humanDecider,
+      effectRef,
+    }).consumption;
+  if (!consumed || isApprovalRequestExpired(checked.approval, Date.parse(consumed.consumedAt))) {
+    throw new GrantError('approval_invalid', 'grant approval was not consumed before expiry');
+  }
+  return { consumedAt: consumed.consumedAt, pendingPath };
 }
 
 /**
@@ -1184,6 +1262,13 @@ export function grantStanding(
   draft: GrantDraft,
   options: { approvalRequestId: string; now?: Date }
 ): GrantRecord {
+  return withLockSync(GRANT_MUTATION_LOCK, () => issueStandingGrant(draft, options), 0);
+}
+
+function issueStandingGrant(
+  draft: GrantDraft,
+  options: { approvalRequestId: string; now?: Date }
+): GrantRecord {
   const normalized = normalizeGrantDraft(draft);
   const policy = requireStandingGrantPolicy(normalized.capability);
   const approvalRequestId = String(options.approvalRequestId ?? '').trim();
@@ -1199,33 +1284,41 @@ export function grantStanding(
       `${normalized.capability} is not external_io; grant it directly without an approval`
     );
   }
-  const checked = assertGrantApproval(normalized, approvalRequestId);
+  const checked = checkGrantApproval(normalized, approvalRequestId, true);
   // The consumption names the grant it creates and its time becomes the
   // grant's granted_at, so the stored record is bound to this approval:
   // a copy under another id or a shifted validity window no longer matches
   // (verifyGrantBasis).
-  const grantId = generateGrantId(options.now ?? new Date());
-  const consumed = markApprovalConsumed('mission_controller', {
-    channel: GRANT_APPROVAL_CHANNEL,
-    requestId: checked.approval.id,
-    consumer: GRANT_APPROVAL_CONSUMER,
-    consumedBy: checked.humanDecider,
-    effectRef: grantId,
-  });
-  const consumedAt = consumed.consumption?.consumedAt;
-  if (!consumedAt) {
+  const pending = readJsonIfPresent<{ effect_ref: string }>(
+    pendingGrantEffectPath(normalized.tenant_slug, checked.approval.id)
+  );
+  const receipt = checked.approval.consumption;
+  const grantId =
+    receipt?.effectRef ?? pending?.effect_ref ?? generateGrantId(options.now ?? new Date());
+  if (safeExistsSync(grantRecordPath(normalized.tenant_slug, grantId))) {
     throw new GrantError(
       'approval_invalid',
-      `grant approval ${checked.approval.id} was not consumed`
+      `grant approval ${checked.approval.id} was already used`
     );
   }
-  return writeNewGrant(
+  const { consumedAt, pendingPath } = consumeGrantEffect(
+    checked,
+    normalized.tenant_slug,
+    GRANT_APPROVAL_CONSUMER,
+    grantId
+  );
+  if (Date.parse(consumedAt) + normalized.ttl_days * DAY_MS <= Date.now()) {
+    throw new GrantError('approval_invalid', 'the approved grant validity window has elapsed');
+  }
+  const record = writeNewGrant(
     normalized,
     { actor_id: checked.humanDecider, role: checked.role, assurance: checked.assurance },
     { approval_request_id: checked.approval.id, approval_channel: GRANT_APPROVAL_CHANNEL },
     options.now ?? new Date(),
     { grantId, grantedAt: consumedAt }
   );
+  safeUnlinkSync(pendingPath);
+  return record;
 }
 
 /**
@@ -1456,32 +1549,44 @@ export function extendStandingGrant(
   draft: GrantExtensionDraft,
   options: { approvalRequestId: string; now?: Date }
 ): GrantRecord {
-  const now = options.now ?? new Date();
+  return withLockSync(GRANT_MUTATION_LOCK, () => applyStandingGrantExtension(draft, options), 0);
+}
+
+function applyStandingGrantExtension(
+  draft: GrantExtensionDraft,
+  options: { approvalRequestId: string; now?: Date }
+): GrantRecord {
   const record = requireExtendableGrant(draft);
-  const { extendDays } = assertGrantExtendable(record, now, draft.extend_days);
   const previous = record.expires_at;
   const approvalRequestId = String(options.approvalRequestId ?? '').trim();
   if (!approvalRequestId)
     throw new GrantError('approval_required', 'an extension needs an approval request id');
+  if (record.extensions?.some((step) => step.approval_request_id === approvalRequestId)) {
+    throw new GrantError(
+      'approval_invalid',
+      `extension approval ${approvalRequestId} was already used`
+    );
+  }
+  const receipt = loadApprovalRequest(GRANT_APPROVAL_CHANNEL, approvalRequestId)?.consumption;
+  const now = receipt ? new Date(receipt.consumedAt) : (options.now ?? new Date());
+  const { extendDays } = assertGrantExtendable(record, now, draft.extend_days);
   const checked = assertHumanGrantDecision(approvalRequestId, {
     consumer: GRANT_EXTENSION_CONSUMER,
+    allowConsumed: true,
     effectBinding: grantExtensionEffectBinding(record.grant_id, previous),
     payloadHash: computeApprovalPayloadHash(grantExtensionPayload(record, previous, extendDays)),
     payloadMismatch: 'extension approval is bound to a different grant, expiry or length',
   });
-  const consumed = markApprovalConsumed('mission_controller', {
-    channel: GRANT_APPROVAL_CHANNEL,
-    requestId: checked.approval.id,
-    consumer: GRANT_EXTENSION_CONSUMER,
-    consumedBy: checked.humanDecider,
-    effectRef: grantExtensionEffectRef(record.grant_id, previous),
-  });
-  const extendedAt = consumed.consumption?.consumedAt;
-  if (!extendedAt)
-    throw new GrantError(
-      'approval_invalid',
-      `extension approval ${checked.approval.id} was not consumed`
-    );
+  const { consumedAt: extendedAt, pendingPath } = consumeGrantEffect(
+    checked,
+    draft.tenant_slug.trim(),
+    GRANT_EXTENSION_CONSUMER,
+    grantExtensionEffectRef(record.grant_id, previous)
+  );
+  assertGrantExtendable(record, new Date(extendedAt), extendDays);
+  if (Date.parse(extendedAt) + extendDays * DAY_MS <= Date.now()) {
+    throw new GrantError('approval_invalid', 'the approved extension validity window has elapsed');
+  }
   const step: Omit<GrantExtension, 'audit_event_id'> = {
     approval_request_id: checked.approval.id,
     approval_channel: GRANT_APPROVAL_CHANNEL,
@@ -1517,6 +1622,7 @@ export function extendStandingGrant(
     extensions: [...(record.extensions ?? []), { ...step, audit_event_id: auditEventId }],
   };
   writeGrant(extended);
+  safeUnlinkSync(pendingPath);
   return extended;
 }
 
@@ -1578,6 +1684,13 @@ export function findGrantById(grantId: string, tenantSlug?: string): GrantRecord
 
 /** Revoke a grant: the record stays (with `revoked`), and grants nothing from now on. */
 export function revokeGrant(
+  grantId: string,
+  options: { by: GrantActor; reason: string; tenant_slug?: string; now?: Date }
+): GrantRecord {
+  return withLockSync(GRANT_MUTATION_LOCK, () => revokeStandingGrant(grantId, options), 0);
+}
+
+function revokeStandingGrant(
   grantId: string,
   options: { by: GrantActor; reason: string; tenant_slug?: string; now?: Date }
 ): GrantRecord {

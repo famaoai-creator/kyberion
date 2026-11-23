@@ -204,6 +204,7 @@ vi.mock('../governance/ledger.js', () => ({
 
 import { holdsAuditChainLock } from '../governance/audit-chain.js';
 import { withLockSync } from '../foundation/lock-utils.js';
+import { LIVE_STORAGE_MAINTENANCE_LOCK } from '../storage-layout.js';
 import { appendOnlyStoreLockId } from './append-only-store.js';
 import {
   scanTmp,
@@ -313,6 +314,12 @@ function writeCatalogFile(content: unknown): void {
 }
 
 describe('storage-janitor', () => {
+  it('refuses destructive maintenance while a live restore holds the lock', () => {
+    expect(() =>
+      withLockSync(LIVE_STORAGE_MAINTENANCE_LOCK, () => runJanitor({ dryRun: false }))
+    ).toThrow('[LOCK_TIMEOUT]');
+  });
+
   beforeEach(() => {
     const base = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-janitor-test-'));
     tmpDir = path.join(base, 'active', 'shared', 'tmp');

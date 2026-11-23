@@ -1,4 +1,7 @@
 import * as path from 'node:path';
+import { withEntityLifecycleLock } from './entity-lifecycle-lock.js';
+import { listProjectRecords } from '../project/project-registry.js';
+export { withEntityLifecycleLock } from './entity-lifecycle-lock.js';
 import { executionAgentId } from '../governance/execution-agent-id.js';
 import type { ValidateFunction } from 'ajv';
 import {
@@ -641,6 +644,12 @@ export function transitionOrganizationLifecycle(input: {
   verb: OrganizationLifecycleVerb;
   reason?: string;
 }): OrganizationOperationalState {
+  return withEntityLifecycleLock(() => transitionOrganizationUnderLock(input));
+}
+
+function transitionOrganizationUnderLock(
+  input: Parameters<typeof transitionOrganizationLifecycle>[0]
+): OrganizationOperationalState {
   const current = loadOrganizationOperationalState(input.organizationId, input);
   if (!current) throw new Error(`Organization not found: ${input.organizationId}`);
   const expected = input.verb === 'pause' ? 'active' : input.verb === 'resume' ? 'paused' : null;
@@ -649,10 +658,26 @@ export function transitionOrganizationLifecycle(input: {
       `Organization '${input.organizationId}' is ${current.status}; expected ${expected}.`
     );
   }
-  if (input.verb === 'archive' && (current.active_project_ids || []).length > 0) {
-    throw new Error(
-      `Cannot archive organization with active projects: ${current.active_project_ids!.join(', ')}`
+  if (input.verb === 'archive') {
+    const owned = listProjectRecords(input.rootDir).filter(
+      (project) =>
+        project.organization_id === current.organization_id &&
+        project.tier === current.tier &&
+        (project.tenant_slug ?? 'shared') === recordTenant(current)
     );
+    const archived = new Set(
+      owned.filter((project) => project.status === 'archived').map((project) => project.project_id)
+    );
+    const blocking = new Set([
+      ...(current.active_project_ids ?? []).filter((id) => !archived.has(id)),
+      ...owned
+        .filter((project) => project.status !== 'archived')
+        .map((project) => project.project_id),
+    ]);
+    if (blocking.size > 0)
+      throw new Error(
+        `Cannot archive organization with active projects: ${[...blocking].sort().join(', ')}`
+      );
   }
   const now = nowIso();
   const next: OrganizationOperationalState = {
@@ -720,6 +745,12 @@ export function setOrganizationParent(input: {
   rootDir?: string;
   parentOrganizationId: string | null;
 }): OrganizationOperationalState {
+  return withEntityLifecycleLock(() => setOrganizationParentUnderLock(input));
+}
+
+function setOrganizationParentUnderLock(
+  input: Parameters<typeof setOrganizationParent>[0]
+): OrganizationOperationalState {
   const current = loadOrganizationOperationalState(input.organizationId, input);
   if (!current) throw new Error(`Organization not found: ${input.organizationId}`);
   if (input.parentOrganizationId) {
@@ -777,67 +808,155 @@ export function loadOrganizationOperationalState(
   return null;
 }
 
+export interface OrganizationEntitySaveOptions {
+  rootDir?: string;
+  /** Only the retirement facade sets this after its reverse-reference check. */
+  retire?: true;
+}
+
 export function saveOrganizationDomain(
   record: OrganizationDomainRecord,
-  options: { rootDir?: string } = {}
+  options: OrganizationEntitySaveOptions = {}
 ): string {
-  assertRecordIdentity(record, options.rootDir);
-  return saveValidated(
-    record,
-    DOMAIN_SCHEMA_PATH,
-    recordPath(
-      'domains',
-      record.domain_id,
-      DOMAIN_FILE_NAME,
-      record.organization_id,
-      record.tier,
-      recordTenant(record),
-      options.rootDir
-    ),
-    'organization domain'
-  );
+  return withEntityLifecycleLock(() => {
+    assertRecordIdentity(record, options.rootDir);
+    const query = organizationEntityWriteScope(record, options.rootDir);
+    assertOrganizationEntityWrite(record, loadOrganizationDomain(record.domain_id, query), options);
+    if (record.status !== 'retired') {
+      for (const id of record.capability_ids)
+        assertReferenceAvailable('capability', id, loadOrganizationCapability(id, query));
+      for (const id of record.service_ids)
+        assertReferenceAvailable('service', id, loadOrganizationService(id, query));
+    }
+    return saveValidated(
+      record,
+      DOMAIN_SCHEMA_PATH,
+      recordPath(
+        'domains',
+        record.domain_id,
+        DOMAIN_FILE_NAME,
+        record.organization_id,
+        record.tier,
+        recordTenant(record),
+        options.rootDir
+      ),
+      'organization domain'
+    );
+  });
 }
 
 export function saveOrganizationCapability(
   record: OrganizationCapabilityRecord,
-  options: { rootDir?: string } = {}
+  options: OrganizationEntitySaveOptions = {}
 ): string {
-  assertRecordIdentity(record, options.rootDir);
-  return saveValidated(
-    record,
-    CAPABILITY_SCHEMA_PATH,
-    recordPath(
-      'capabilities',
-      record.capability_id,
-      CAPABILITY_FILE_NAME,
-      record.organization_id,
-      record.tier,
-      recordTenant(record),
-      options.rootDir
-    ),
-    'organization capability'
-  );
+  return withEntityLifecycleLock(() => {
+    assertRecordIdentity(record, options.rootDir);
+    const query = organizationEntityWriteScope(record, options.rootDir);
+    assertOrganizationEntityWrite(
+      record,
+      loadOrganizationCapability(record.capability_id, query),
+      options
+    );
+    if (record.status !== 'retired') {
+      assertReferenceAvailable(
+        'domain',
+        record.domain_id,
+        loadOrganizationDomain(record.domain_id, query)
+      );
+      for (const id of record.service_ids)
+        assertReferenceAvailable('service', id, loadOrganizationService(id, query));
+    }
+    return saveValidated(
+      record,
+      CAPABILITY_SCHEMA_PATH,
+      recordPath(
+        'capabilities',
+        record.capability_id,
+        CAPABILITY_FILE_NAME,
+        record.organization_id,
+        record.tier,
+        recordTenant(record),
+        options.rootDir
+      ),
+      'organization capability'
+    );
+  });
 }
 
 export function saveOrganizationService(
   record: OrganizationServiceRecord,
-  options: { rootDir?: string } = {}
+  options: OrganizationEntitySaveOptions = {}
 ): string {
-  assertRecordIdentity(record, options.rootDir);
-  return saveValidated(
-    record,
-    SERVICE_SCHEMA_PATH,
-    recordPath(
-      'services',
-      record.service_id,
-      SERVICE_FILE_NAME,
-      record.organization_id,
-      record.tier,
-      recordTenant(record),
-      options.rootDir
-    ),
-    'organization service'
-  );
+  return withEntityLifecycleLock(() => {
+    assertRecordIdentity(record, options.rootDir);
+    const query = organizationEntityWriteScope(record, options.rootDir);
+    assertOrganizationEntityWrite(
+      record,
+      loadOrganizationService(record.service_id, query),
+      options
+    );
+    if (record.status !== 'retired') {
+      assertReferenceAvailable(
+        'domain',
+        record.domain_id,
+        loadOrganizationDomain(record.domain_id, query)
+      );
+    }
+    return saveValidated(
+      record,
+      SERVICE_SCHEMA_PATH,
+      recordPath(
+        'services',
+        record.service_id,
+        SERVICE_FILE_NAME,
+        record.organization_id,
+        record.tier,
+        recordTenant(record),
+        options.rootDir
+      ),
+      'organization service'
+    );
+  });
+}
+
+export function organizationEntityWriteScope(
+  record: {
+    organization_id: string;
+    tier: OrganizationTier;
+    tenant_slug?: string;
+  },
+  rootDir?: string
+) {
+  return {
+    organizationId: record.organization_id,
+    tier: record.tier,
+    tenantSlug: record.tenant_slug,
+    rootDir,
+  };
+}
+
+export function assertOrganizationEntityWrite(
+  record: { status: string },
+  current: { status: string } | null,
+  options: OrganizationEntitySaveOptions
+): void {
+  if (current?.status === 'retired' && record.status !== 'retired') {
+    throw new Error(
+      '[ORGANIZATION_ENTITY_RETIRED] a retired entity cannot be reactivated by a record update'
+    );
+  }
+  if (current && current.status !== 'retired' && record.status === 'retired' && !options.retire) {
+    throw new Error('[ORGANIZATION_RETIRE_REQUIRED] use the governed retire operation');
+  }
+}
+
+export function assertReferenceAvailable(
+  kind: string,
+  id: string,
+  reference: { status: string } | null
+): void {
+  if (reference?.status === 'retired')
+    throw new Error(`[ORGANIZATION_REFERENCE_RETIRED] ${kind} '${id}' is retired`);
 }
 
 export function saveOrganizationServiceState(

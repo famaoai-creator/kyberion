@@ -10,6 +10,19 @@
     "tenant_slug": { "type": "string", "minLength": 1 },
     "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
     "units": { "type": "number", "minimum": 0 },
+    "reservations": {
+      "type": "object",
+      "propertyNames": { "format": "uuid" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "units"],
+        "properties": {
+          "action": { "type": "string" },
+          "units": { "type": "number", "exclusiveMinimum": 0 }
+        }
+      }
+    },
     "updated_at": { "type": "string", "format": "date-time" }
   }
 }

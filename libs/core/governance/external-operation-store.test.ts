@@ -3,6 +3,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   reserveExternalOperation,
   externalOperationReservationRelativePath,
+  externalOperationProviderReference,
+  persistExternalOperationOutcome,
+  readExternalOperationStatus,
+  reconcileExternalOperation,
 } from './external-operation-store.js';
 
 describe('durable external execution reservation', () => {
@@ -86,5 +90,37 @@ describe('durable external execution reservation', () => {
     expect(() =>
       reloaded.reserveExternalOperation({ ...input, invocationId: randomUUID() })
     ).not.toThrow();
+  });
+
+  it('reconciles an unknown outcome using the original reference without reopening execution', async () => {
+    const input = {
+      tenantSlug: 'acme',
+      operationId: 'service:send',
+      invocationId: randomUUID(),
+      effectHash: 'abc',
+    };
+    const lookup = vi.fn(async () => ({ outcome: 'succeeded' as const }));
+    expect(await reconcileExternalOperation(input, lookup)).toBeNull();
+    expect(lookup).not.toHaveBeenCalled();
+    reserveExternalOperation(input);
+    expect(readExternalOperationStatus(input)).toEqual({ state: 'started' });
+    expect(await reconcileExternalOperation(input, lookup)).toEqual({ outcome: 'succeeded' });
+    expect(lookup).toHaveBeenLastCalledWith({
+      correlationId: externalOperationProviderReference(input),
+    });
+    persistExternalOperationOutcome(input, { outcome: 'unknown', providerReceiptId: 'trigger-17' });
+    expect(readExternalOperationStatus(input)).toEqual({
+      state: 'unknown',
+      providerReceiptId: 'trigger-17',
+    });
+    expect(await reconcileExternalOperation(input, lookup)).toEqual({ outcome: 'succeeded' });
+    expect(lookup).toHaveBeenLastCalledWith({
+      correlationId: externalOperationProviderReference(input),
+      providerReceiptId: 'trigger-17',
+    });
+    expect(() => reserveExternalOperation(input)).toThrow('EXTERNAL_EXECUTION_ALREADY_RESERVED');
+    expect(() => readExternalOperationStatus({ ...input, effectHash: 'changed' })).toThrow(
+      'EXTERNAL_EVIDENCE_MISMATCH'
+    );
   });
 });

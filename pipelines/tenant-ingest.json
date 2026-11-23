@@ -3,7 +3,7 @@
   "pipeline_id": "tenant-ingest",
   "version": "1.0.0",
   "name": "Tenant Incremental Ingest Sync",
-  "description": "DA-03: reads the jobs registry in knowledge/product/governance/knowledge-sync-rules.json and runs ingest:sync_source for every enabled tenant × source job. Declarative wiring only (LE rule): the watermark read/advance, pagination, and retry classification live inside the typed op; transport retry/backoff lives in the service-engine recovery_policy layer. The op lists changed items and advances the per-tenant watermark (active/shared/runtime/ingest-cursors/) only on full success — body fetch, parse, normalize, and the explicit ingest:commit ceremony are wired separately and stay operator-initiated (DA-05: no automatic knowledge/ landing).",
+  "description": "DA-03: reads the jobs registry in knowledge/product/governance/knowledge-sync-rules.json and runs ingest:sync_source for every enabled tenant × source job. The typed op saves the changed-item list in the tenant's confidential artifact partition before advancing the watermark. Pagination and cursor changes live in the typed op, and transport retries live in the service-engine recovery_policy layer. Body fetch, parse, normalize, and the explicit ingest:commit ceremony remain operator-initiated.",
   "schedule": {
     "id": "tenant-ingest",
     "cron": "30 2 * * *",

@@ -2,6 +2,8 @@ import { revokeStandingEffectApproval } from './approval-revocation.js';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
+import { getFoundationIo } from '../foundation/io.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -450,10 +452,62 @@ describe('grant approval flow', () => {
     approvalIds.push(next.id);
     expect(next.id).not.toBe(request.id);
   });
+
+  it('resumes an interrupted issuance with the original consumed identity and validity window', () => {
+    const request = requestGrantApproval(draft, { requester: { requestedBy: 'agent:requester' } });
+    approvalIds.push(request.id);
+    approve(request);
+    const io = getFoundationIo();
+    const create = io.createExclusiveFile!.bind(io);
+    const spy = vi.spyOn(io, 'createExclusiveFile').mockImplementation((file, contents) => {
+      if (file.startsWith(GRANTS_ROOT) && /\/GRT-[^/]+\.json$/u.test(file)) {
+        throw new Error('simulated issuance interruption');
+      }
+      create(file, contents);
+    });
+    try {
+      expect(() => grantStanding(draft, { approvalRequestId: request.id })).toThrow(
+        'simulated issuance interruption'
+      );
+    } finally {
+      spy.mockRestore();
+    }
+    const receipt = loadApprovalRequest(GRANT_APPROVAL_CHANNEL, request.id)?.consumption;
+    expect(receipt?.consumer).toBe('grant_standing');
+    expect(listGrants({ tenant_slug: 'acme' })).toEqual([]);
+    expect(() =>
+      grantStanding({ ...draft, purpose: 'different purpose' }, { approvalRequestId: request.id })
+    ).toThrow(/different capability\/tenant/);
+    const repaired = grantStanding(draft, { approvalRequestId: request.id });
+    expect(repaired.grant_id).toBe(receipt?.effectRef);
+    expect(repaired.granted_at).toBe(receipt?.consumedAt);
+    expect(verifyGrantBasis(repaired)).toBe(true);
+    expect(() => grantStanding(draft, { approvalRequestId: request.id })).toThrow(/already used/);
+  });
 });
 
 describe('grant extension (owner-approved, same grant)', () => {
   const DAY = 86_400_000;
+  it('refuses extend and revoke contenders before consuming approval or changing the record', () => {
+    const record = approvedGrant({ ...draft, ttl_days: 10 });
+    const extension = { grant_id: record.grant_id, tenant_slug: 'acme', extend_days: 20 };
+    const request = requestGrantExtension(extension, {
+      requester: { requestedBy: 'agent:requester' },
+    });
+    approvalIds.push(request.id);
+    approve(request);
+    withLockSync('standing-grant-mutation', () => {
+      expect(() => extendStandingGrant(extension, { approvalRequestId: request.id })).toThrow(
+        /LOCK_TIMEOUT/
+      );
+      expect(() => revokeGrant(record.grant_id, { by: HUMAN_ACTOR, reason: 'contender' })).toThrow(
+        /LOCK_TIMEOUT/
+      );
+    });
+    expect(loadApprovalRequest(GRANT_APPROVAL_CHANNEL, request.id)?.consumption).toBeUndefined();
+    expect(loadGrant('acme', record.grant_id)).toEqual(record);
+  });
+
   function extend(record: GrantRecord, days: number, now: Date): GrantRecord {
     const request = requestGrantExtension(
       { grant_id: record.grant_id, tenant_slug: 'acme', extend_days: days },
@@ -541,6 +595,51 @@ describe('grant extension (owner-approved, same grant)', () => {
       )
     ).toThrow(/revoked/);
   });
+
+  it.each([false, true])(
+    'handles extension recovery after an interrupted write (revoked=%s)',
+    (revoked) => {
+      const record = approvedGrant({ ...draft, ttl_days: 10 });
+      const extension = { grant_id: record.grant_id, tenant_slug: 'acme', extend_days: 20 };
+      const request = requestGrantExtension(extension, {
+        requester: { requestedBy: 'agent:requester' },
+      });
+      approvalIds.push(request.id);
+      approve(request);
+      const io = getFoundationIo();
+      const write = io.writeFile.bind(io);
+      const spy = vi.spyOn(io, 'writeFile').mockImplementation((file, content, options) => {
+        if (file === grantRecordPath('acme', record.grant_id))
+          throw new Error('simulated extension interruption');
+        write(file, content, options);
+      });
+      try {
+        expect(() => extendStandingGrant(extension, { approvalRequestId: request.id })).toThrow(
+          'simulated extension interruption'
+        );
+      } finally {
+        spy.mockRestore();
+      }
+      const receipt = loadApprovalRequest(GRANT_APPROVAL_CHANNEL, request.id)?.consumption;
+      expect(receipt?.consumer).toBe('grant_extension');
+      expect(loadGrant('acme', record.grant_id)).toEqual(record);
+      if (revoked) {
+        const result = revokeGrant(record.grant_id, {
+          by: HUMAN_ACTOR,
+          reason: 'cancel after interruption',
+        });
+        expect(() => extendStandingGrant(extension, { approvalRequestId: request.id })).toThrow(
+          /revoked/
+        );
+        expect(loadGrant('acme', record.grant_id)).toEqual(result);
+        return;
+      }
+      const repaired = extendStandingGrant(extension, { approvalRequestId: request.id });
+      expect(repaired.extensions).toHaveLength(1);
+      expect(repaired.extensions?.[0]?.extended_at).toBe(receipt?.consumedAt);
+      expect(verifyGrantBasis(repaired)).toBe(true);
+    }
+  );
 
   it('extends an expired grant only inside the grace window', () => {
     const realNow = Date.now();

@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { withEntityLifecycleLock } from './entity-lifecycle-lock.js';
 import { loadOrganizationProfile } from './organization-profile.js';
 import { listProjectRecords, loadProjectRecord } from '../project/project-registry.js';
 import { loadProjectOperationalState } from '../project/project-operational-state-registry.js';
@@ -433,6 +434,11 @@ export function buildOrganizationProjectLink(
       `Organization state not found for '${input.organizationId}'. Run 'init' first.`
     );
   }
+  if (!input.detach && state.status !== 'active') {
+    throw new Error(
+      `Organization '${input.organizationId}' is ${state.status}; project attachment is denied.`
+    );
+  }
   const project = input.detach
     ? null
     : loadProjectRecord(input.projectId, { rootDir: input.rootDir });
@@ -475,6 +481,19 @@ export function buildOrganizationProjectLink(
     );
   }
   return record;
+}
+
+export function applyOrganizationProjectLink(input: BuildOrganizationProjectLinkInput): {
+  record: OrganizationOperationalState;
+  savedPath: string;
+} {
+  return withEntityLifecycleLock(() => {
+    const record = buildOrganizationProjectLink(input);
+    return {
+      record,
+      savedPath: saveOrganizationOperationalState(record, { rootDir: input.rootDir }),
+    };
+  });
 }
 
 export function listOrganizationIncidents(
@@ -897,6 +916,14 @@ export function reconcileOrganizationState(query: {
   rootDir?: string;
   apply?: boolean;
 }): OrganizationReconciliationResult {
+  return query.apply
+    ? withEntityLifecycleLock(() => reconcileOrganizationStateUnderLock(query))
+    : reconcileOrganizationStateUnderLock(query);
+}
+
+function reconcileOrganizationStateUnderLock(
+  query: Parameters<typeof reconcileOrganizationState>[0]
+): OrganizationReconciliationResult {
   assertOrganizationId(query.organizationId);
   const reconciliation = reconcileOrganizationCatalog(query);
   const state = loadOrganizationOperationalState(query.organizationId, {

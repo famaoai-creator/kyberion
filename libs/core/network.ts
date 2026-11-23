@@ -120,12 +120,14 @@ export class SecureFetchError extends Error {
   }
 }
 
-export async function secureFetch<T = unknown>(options: SecureFetchOptions): Promise<T> {
-  const { kyberion_allow_local_network, kyberion_egress_context, ...axiosOptions } =
-    options as SecureFetchOptions & {
-      authenticateRequest?: boolean;
-    };
-  const url = options.url || '';
+/** Check a single outgoing request, including requests made by streaming clients. */
+export function assertNetworkEgress(
+  url: string,
+  {
+    kyberion_allow_local_network,
+    kyberion_egress_context,
+  }: Pick<SecureFetchOptions, 'kyberion_allow_local_network' | 'kyberion_egress_context'> = {}
+) {
   validateUrl(url, { allowLocalNetwork: kyberion_allow_local_network === true });
   const hostname = new URL(url).hostname;
 
@@ -187,6 +189,15 @@ export async function secureFetch<T = unknown>(options: SecureFetchOptions): Pro
       },
     });
   }
+  return { hostname, egressDecision };
+}
+
+export async function secureFetch<T = unknown>(options: SecureFetchOptions): Promise<T> {
+  const { kyberion_allow_local_network, kyberion_egress_context, ...axiosOptions } = options;
+  const { hostname, egressDecision } = assertNetworkEgress(options.url || '', {
+    kyberion_allow_local_network,
+    kyberion_egress_context,
+  });
 
   // 2. Automatically scrub outbound payload UNLESS explicitly authenticated
   const isAuth = options.authenticateRequest === true;

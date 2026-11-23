@@ -224,7 +224,16 @@ describe('revoking an approved approval (further uses refused)', () => {
         consumer: 'organization_decision',
         consumedBy: 'organization-cli',
       });
-    expect(consume().consumption).toMatchObject({ consumer: 'organization_decision' });
+    const consumed = consume();
+    expect(consumed.consumption).toMatchObject({ consumer: 'organization_decision' });
+    expect(() =>
+      claimApprovalApply(role, {
+        channel,
+        requestId: approved.id,
+        appliedBy: 'operator',
+        expectedRecordHash: computeApprovalPayloadHash({ record: consumed }),
+      })
+    ).toThrow(/already consumed/);
     expect(() => consume()).toThrow(/was already used by organization_decision/);
     expect(() => revoke(approved, 'user:alice')).toThrow(
       /already consumed by organization_decision .* one-shot effect has happened/

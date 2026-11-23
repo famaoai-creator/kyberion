@@ -5,12 +5,12 @@ import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord, readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { isReservedScopeName, isValidTenantSlug } from '../entity-scope.js';
+import { withEntityLifecycleLock } from './entity-lifecycle-lock.js';
 import {
   safeExistsSync,
   safeMkdir,
   safeLstat,
   safeReaddir,
-  safeUnlinkSync,
   safeWriteFile,
   assertSafeRepositoryPath,
 } from '../secure-io.js';
@@ -386,6 +386,10 @@ export interface RecordProviderAttestationInput {
 export function recordTenantProviderAttestation(
   input: RecordProviderAttestationInput
 ): TenantProfile {
+  return withEntityLifecycleLock(() => updateTenantProviderAttestation(input));
+}
+
+function updateTenantProviderAttestation(input: RecordProviderAttestationInput): TenantProfile {
   const options = input.rootDir ? { rootDir: input.rootDir } : {};
   const profile = readTenantProfile(input.slug, options);
   if (!profile) {
@@ -456,25 +460,11 @@ export function writeTenantProfile(
     normalized.knowledge_root!
   );
   const file = tenantProfilePath(normalized.tenant_slug, options);
-  const isNewProfile = !safeExistsSync(file);
   safeMkdir(path.dirname(file), { recursive: true });
+  // Publish the profile once its knowledge root is usable. A crash before
+  // the profile write leaves a directory that a retry can reuse.
+  if (!safeExistsSync(knowledgeRootPath)) safeMkdir(knowledgeRootPath, { recursive: true });
   safeWriteFile(file, JSON.stringify(normalized, null, 2) + '\n', { encoding: 'utf8' });
-  try {
-    if (!safeExistsSync(knowledgeRootPath)) safeMkdir(knowledgeRootPath, { recursive: true });
-  } catch (error) {
-    // Roll back a profile written by this call: a registered tenant without
-    // its knowledge root is a half-created state that `create` can neither
-    // use nor retry (it refuses existing slugs). Pre-existing profiles are
-    // left alone — the write above may have been a legitimate update.
-    if (isNewProfile) {
-      try {
-        safeUnlinkSync(file);
-      } catch {
-        // best-effort rollback; surface the original failure
-      }
-    }
-    throw error;
-  }
   return normalized;
 }
 

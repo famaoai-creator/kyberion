@@ -21,16 +21,21 @@
  */
 
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import * as pathResolver from '@agent/core/path-resolver';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { isRecord, readTextFile } from '@agent/core/foundation/text';
 import { nowIso } from '@agent/core/foundation/time';
+import { withLockSync } from '@agent/core/foundation/lock-utils';
+import { ingestSyncBatchRelativeRoot } from '@agent/core/storage-layout';
+import type { SyncSourceItem } from './sources/source-walker.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeLstat,
+  safeReaddir,
   safeUnlink,
   safeWriteFile,
 } from '@agent/core/secure-io';
@@ -56,6 +61,7 @@ export interface SyncCursorState {
   last_success_at: string;
   /** Failures since the last success; reset to 0 by advanceSyncCursor. */
   consecutive_failures: number;
+  batch_id?: string;
   note?: string;
 }
 
@@ -99,6 +105,95 @@ export function syncCursorPath(
     path.join(cursorsBaseDir(options), tenantSlug, `${sourceSystem}.json`),
     { allowMissingLeaf: true }
   );
+}
+
+interface SyncBatch {
+  tenant_slug: string;
+  source_system: string;
+  from_cursor: string;
+  to_cursor: string;
+  items: SyncSourceItem[];
+}
+
+const BATCH_ID = /^[a-f0-9]{64}$/u;
+const batchDigest = (text: string) => createHash('sha256').update(text).digest('hex');
+
+function syncBatchDir(tenant: string, source: string, options: SyncCursorPathOptions): string {
+  assertTenantSlug(tenant);
+  assertSourceSystem(source);
+  if (!options.cursorsDir && !options.rootDir) {
+    return assertSafeRepositoryPath(
+      pathResolver.rootResolve(`${ingestSyncBatchRelativeRoot(tenant)}/${source}`),
+      { allowMissingLeaf: true }
+    );
+  }
+  return assertSafeRepositoryPath(
+    path.join(path.dirname(syncCursorPath(tenant, source, options)), `${source}-batches`),
+    { allowMissingLeaf: true }
+  );
+}
+
+export function readSyncBatch(
+  tenant: string,
+  source: string,
+  id: string,
+  options: SyncCursorPathOptions
+): SyncBatch {
+  if (!BATCH_ID.test(id)) throw new Error('[INGEST_BATCH_INVALID] invalid batch id');
+  const file = path.join(syncBatchDir(tenant, source, options), `${id}.json`);
+  const text = readTextFile(file);
+  const batch = parseSafeJsonInput(text, 'ingest sync batch') as SyncBatch;
+  if (
+    batchDigest(text) !== id ||
+    batch?.tenant_slug !== tenant ||
+    batch?.source_system !== source ||
+    typeof batch.from_cursor !== 'string' ||
+    typeof batch.to_cursor !== 'string' ||
+    !Array.isArray(batch.items)
+  )
+    throw new Error('[INGEST_BATCH_INVALID] batch digest or scope mismatch');
+  return batch;
+}
+
+export function listSyncBatchIds(
+  tenant: string,
+  source: string,
+  options: SyncCursorPathOptions
+): string[] {
+  const dir = syncBatchDir(tenant, source, options);
+  return safeExistsSync(dir)
+    ? safeReaddir(dir)
+        .map((file) => (file.endsWith('.json') ? file.slice(0, -5) : ''))
+        .filter((id) => BATCH_ID.test(id))
+        .sort()
+    : [];
+}
+
+function writeSyncRecord(file: string, text: string, createOnly = false): void {
+  safeMkdir(path.dirname(file), { recursive: true });
+  safeWriteFile(file, text, { createOnly });
+}
+
+export function persistSyncBatch(batch: SyncBatch, options: SyncCursorPathOptions): string {
+  const dir = syncBatchDir(batch.tenant_slug, batch.source_system, options);
+  const text = `${JSON.stringify(batch)}\n`;
+  const id = batchDigest(text);
+  try {
+    writeSyncRecord(path.join(dir, `${id}.json`), text, true);
+  } catch (error) {
+    if ((error as { code?: string }).code !== 'EEXIST') throw error;
+    readSyncBatch(batch.tenant_slug, batch.source_system, id, options);
+  }
+  return id;
+}
+
+function withCursorLock<T>(
+  tenant: string,
+  source: string,
+  options: SyncCursorPathOptions,
+  fn: () => T
+): T {
+  return withLockSync(`ingest-cursor-${batchDigest(syncCursorPath(tenant, source, options))}`, fn);
 }
 
 function isCursorValue(value: unknown): value is string | Record<string, string> {
@@ -158,6 +253,12 @@ function assertCursorState(
   }
   if (state.note !== undefined && typeof state.note !== 'string') {
     problems.push('note must be a string');
+  }
+  if (
+    state.batch_id !== undefined &&
+    (typeof state.batch_id !== 'string' || !BATCH_ID.test(state.batch_id))
+  ) {
+    problems.push('batch_id must be a content digest');
   }
   if (problems.length > 0) {
     throw new Error(
@@ -220,9 +321,7 @@ function writeCursorState(
 ): SyncCursorState {
   const file = syncCursorPath(tenantSlug, sourceSystem, options);
   assertCursorState(state, file);
-  safeMkdir(path.dirname(file), { recursive: true });
-  // safeWriteFile is atomic (temp file + rename) — no torn cursor on crash.
-  safeWriteFile(file, `${JSON.stringify(state, null, 2)}\n`);
+  writeSyncRecord(file, `${JSON.stringify(state, null, 2)}\n`);
   return state;
 }
 
@@ -232,6 +331,9 @@ export interface SyncCursorAdvance {
   /** Timestamp override for deterministic tests; default: wall clock. */
   now?: string;
   note?: string;
+  /** Watermark read before the source walk. Refuse stale commits. */
+  expected_updated_since?: string;
+  batch_id?: string;
 }
 
 /**
@@ -245,23 +347,39 @@ export function advanceSyncCursor(
   advance: SyncCursorAdvance,
   options: SyncCursorPathOptions = {}
 ): SyncCursorState {
-  const now = advance.now ?? nowIso();
-  const previous = readSyncCursor(tenantSlug, sourceSystem, options);
-  const state: SyncCursorState = {
-    tenant_slug: tenantSlug,
-    source_system: sourceSystem,
-    cursor_kind: advance.cursor_kind,
-    cursor_value: advance.cursor_value,
-    last_synced_at: now,
-    last_success_at: now,
-    consecutive_failures: 0,
-    ...(advance.note !== undefined
-      ? { note: advance.note }
-      : previous?.note !== undefined
-        ? { note: previous.note }
-        : {}),
-  };
-  return writeCursorState(tenantSlug, sourceSystem, state, options);
+  return withCursorLock(tenantSlug, sourceSystem, options, () => {
+    const now = advance.now ?? nowIso();
+    const previous = readSyncCursor(tenantSlug, sourceSystem, options);
+    const observed = previous?.cursor_kind === 'updated_since' ? previous.cursor_value : '';
+    if (
+      advance.expected_updated_since !== undefined &&
+      advance.expected_updated_since !== observed
+    ) {
+      throw new Error('[INGEST_CURSOR_CHANGED] another sync changed the watermark');
+    }
+    const batchId =
+      advance.batch_id ??
+      (advance.cursor_kind === previous?.cursor_kind &&
+      advance.cursor_value === previous.cursor_value
+        ? previous.batch_id
+        : undefined);
+    const state: SyncCursorState = {
+      tenant_slug: tenantSlug,
+      source_system: sourceSystem,
+      cursor_kind: advance.cursor_kind,
+      cursor_value: advance.cursor_value,
+      last_synced_at: now,
+      last_success_at: now,
+      consecutive_failures: 0,
+      ...(batchId ? { batch_id: batchId } : {}),
+      ...(advance.note !== undefined
+        ? { note: advance.note }
+        : previous?.note !== undefined
+          ? { note: previous.note }
+          : {}),
+    };
+    return writeCursorState(tenantSlug, sourceSystem, state, options);
+  });
 }
 
 export interface SyncCursorFailure {
@@ -283,26 +401,28 @@ export function recordSyncFailure(
   failure: SyncCursorFailure = {},
   options: SyncCursorPathOptions = {}
 ): SyncCursorState {
-  const now = failure.now ?? nowIso();
-  const previous = readSyncCursor(tenantSlug, sourceSystem, options);
-  const state: SyncCursorState = previous
-    ? {
-        ...previous,
-        last_synced_at: now,
-        consecutive_failures: previous.consecutive_failures + 1,
-        ...(failure.note !== undefined ? { note: failure.note } : {}),
-      }
-    : {
-        tenant_slug: tenantSlug,
-        source_system: sourceSystem,
-        cursor_kind: failure.cursor_kind ?? 'marker',
-        cursor_value: '',
-        last_synced_at: now,
-        last_success_at: '',
-        consecutive_failures: 1,
-        ...(failure.note !== undefined ? { note: failure.note } : {}),
-      };
-  return writeCursorState(tenantSlug, sourceSystem, state, options);
+  return withCursorLock(tenantSlug, sourceSystem, options, () => {
+    const now = failure.now ?? nowIso();
+    const previous = readSyncCursor(tenantSlug, sourceSystem, options);
+    const state: SyncCursorState = previous
+      ? {
+          ...previous,
+          last_synced_at: now,
+          consecutive_failures: previous.consecutive_failures + 1,
+          ...(failure.note !== undefined ? { note: failure.note } : {}),
+        }
+      : {
+          tenant_slug: tenantSlug,
+          source_system: sourceSystem,
+          cursor_kind: failure.cursor_kind ?? 'marker',
+          cursor_value: '',
+          last_synced_at: now,
+          last_success_at: '',
+          consecutive_failures: 1,
+          ...(failure.note !== undefined ? { note: failure.note } : {}),
+        };
+    return writeCursorState(tenantSlug, sourceSystem, state, options);
+  });
 }
 
 /**
@@ -314,8 +434,10 @@ export function resetSyncCursor(
   sourceSystem: string,
   options: SyncCursorPathOptions = {}
 ): boolean {
-  const file = syncCursorPath(tenantSlug, sourceSystem, options);
-  if (!safeExistsSync(file)) return false;
-  safeUnlink(file);
-  return true;
+  return withCursorLock(tenantSlug, sourceSystem, options, () => {
+    const file = syncCursorPath(tenantSlug, sourceSystem, options);
+    if (!safeExistsSync(file)) return false;
+    safeUnlink(file);
+    return true;
+  });
 }

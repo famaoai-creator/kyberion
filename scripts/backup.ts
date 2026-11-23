@@ -4,6 +4,7 @@ import { baseRoleEnvText } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { GENERATION_QUOTA_COUNTER_REPO_SUBPATH } from '@agent/core/generation-quota';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
+import { withLockSync } from '@agent/core/foundation/lock-utils';
 import { resolveTenant } from '@agent/core/organization/tenant-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -21,6 +22,8 @@ import {
 } from '@agent/core/secure-io';
 import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
 import {
+  LIVE_STORAGE_MAINTENANCE_LOCK,
+  ingestSyncBatchRelativeRoot,
   tenantRuntimePartitionOf,
   tenantRuntimePartitionPaths,
   type TenantRuntimePartitionPath,
@@ -53,7 +56,7 @@ import {
   verifyWithheldCredentialMembers,
   type ManifestCredentialRead,
   type WithheldRestoreRoot,
-  manifestCredentialCount,
+  inspectWithheldRestoreRoots,
 } from './lib/backup/backup-file-selection.js';
 import {
   BACKUP_PASSPHRASE_ENV,
@@ -441,6 +444,7 @@ export function resolveBackupPlan(options: PlanOptions): BackupPlan {
       // DA-08: incremental-sync cursor state (DA-03) rides along in the
       // tenant export so an offboarded tenant's sync position is restorable.
       `active/shared/runtime/ingest-cursors/${tenant}`,
+      ingestSyncBatchRelativeRoot(tenant),
       `${GENERATION_QUOTA_COUNTER_REPO_SUBPATH}/${tenant}`,
     ]) {
       addIfExists(entries, repoPath, pathExists);
@@ -1077,6 +1081,7 @@ function isTenantBackupEntry(entry: string, tenant: string): boolean {
     `customer/${tenant}`,
     `customers/${tenant}`,
     `active/shared/runtime/ingest-cursors/${tenant}`,
+    ingestSyncBatchRelativeRoot(tenant),
     `${GENERATION_QUOTA_COUNTER_REPO_SUBPATH}/${tenant}`,
   ];
   if (exactRoots.some((root) => isArchiveEntryWithinRoot(entry, root))) return true;
@@ -1326,11 +1331,7 @@ export function restoreBackup(
   options: BackupCliOptions,
   passphraseDeps: BackupPassphraseDeps = {},
   controls: {
-    /**
-     * Archive subtrees never written to the target (the restore drill withholds
-     * credential roots so a disposable copy never holds tokens). A member that
-     * still lands there (tar ignored --exclude) is removed and the restore fails.
-     */
+    /** Archive subtrees excluded from the restore target, such as credentials in a drill. */
     withholdRoots?: string[];
   } = {}
 ): {
@@ -1352,11 +1353,21 @@ export function restoreBackup(
       `[BACKUP_RESTORE_TARGET_OUTSIDE_REPOSITORY] restore target is outside this checkout — governed I/O cannot write or verify it | next: restore under this checkout (e.g. active/shared/tmp/<restore>), or run pnpm backup restore from inside the clean checkout you are rebuilding (its --target . restores over that checkout's state; never point a drill there) | evidence: ${target}`
     );
   }
+  const restore = () => restoreBackupToTarget(options, passphraseDeps, controls, archive, target);
+  return targetRel === '' ? withLockSync(LIVE_STORAGE_MAINTENANCE_LOCK, restore, 0) : restore();
+}
+
+function restoreBackupToTarget(
+  options: BackupCliOptions,
+  passphraseDeps: BackupPassphraseDeps,
+  controls: { withholdRoots?: string[] },
+  archive: string,
+  target: string
+) {
+  // Decrypted payload and staged partitions are plaintext: removed on every path.
   if (safeExistsSync(target) && safeReaddir(target).length > 0 && !options.force) {
     throw new Error(`Restore target is not empty; pass --force to restore into ${target}`);
   }
-
-  // Decrypted payload and staged partitions are plaintext: removed on every path.
   return withPlaintextTempDir(`restore-${stamp()}-${randomUUID().slice(0, 8)}`, (tempDir) => {
     const plainArchive = archive.endsWith('.enc') ? path.join(tempDir, 'payload.tar.gz') : archive;
     if (archive.endsWith('.enc')) {
@@ -1397,23 +1408,12 @@ export function restoreBackup(
       stampId: stamp(),
       withheldRoots: controls.withholdRoots,
     });
-    const withheld = (controls.withholdRoots ?? []).map((root) => {
-      const landed = path.join(target, root);
-      if (safeExistsSync(landed)) {
-        safeRmSync(landed, { recursive: true, force: true });
-        throw new Error(
-          `[BACKUP_RESTORE_WITHHOLD_FAILED] tar wrote withheld archive members into the target; they were removed | next: restore with a tar that honours --exclude | evidence: ${root}`
-        );
-      }
-      return {
-        root,
-        archived_members: members.filter((member) => member.startsWith(`${root}/`)).length,
-        manifest_file_count: manifestCredentialCount(manifest.credential_reads, root),
-        ...(manifest.credential_reads?.find((entry) => entry.root === root)?.uncounted
-          ? { uncounted: true }
-          : {}),
-      };
-    });
+    const withheld = inspectWithheldRestoreRoots(
+      target,
+      controls.withholdRoots ?? [],
+      members,
+      manifest.credential_reads
+    );
     const trimmedTails = extracted.trimmedTails;
     const ledgerVerification = extracted.ledgerVerification;
     const quarantinePaths: string[] = [];

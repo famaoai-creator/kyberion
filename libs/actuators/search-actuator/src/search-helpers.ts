@@ -8,6 +8,7 @@ import { stripElementBlocks, stripTags } from '@agent/core/foundation/html-sanit
 import { decodeEntities } from '@agent/core/foundation/text-escaping';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { createAjv } from '@agent/core/foundation';
+import { assertNetworkEgress } from '@agent/core/network';
 import {
   resolveWebSearchRuntime,
   type WebSearchResponse,
@@ -53,6 +54,8 @@ const DEFAULT_TOP_K = 5;
 const DEFAULT_MAX_CHARS = 8000;
 const FETCH_TIMEOUT_MS = 10000;
 const FETCH_BODY_CAP_BYTES = 1024 * 1024;
+const MAX_REDIRECTS = 5;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 let cachedValidator: ValidateFunction | null = null;
 
@@ -110,6 +113,23 @@ function extractPlainText(html: string): string {
   return decodeEntities(withoutTags).replace(/\s+/g, ' ').trim();
 }
 
+async function fetchReaderResponse(initial: URL, signal: AbortSignal): Promise<Response> {
+  let url = initial;
+  for (let redirects = 0; ; redirects++) {
+    assertNetworkEgress(url.toString());
+    const response = await fetch(url.toString(), { signal, redirect: 'manual' });
+    if (!REDIRECT_STATUSES.has(response.status)) return response;
+    await response.body?.cancel();
+    const location = response.headers.get('location');
+    if (!location || redirects === MAX_REDIRECTS) {
+      throw new Error(
+        'search-actuator: fetch_reader redirect is missing a location or exceeds the limit'
+      );
+    }
+    url = assertHttpUrl(new URL(location, url).toString());
+  }
+}
+
 export async function webSearch(
   params: NonNullable<SearchAction['params']>
 ): Promise<WebSearchResult> {
@@ -140,10 +160,7 @@ export async function fetchReader(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const response = await fetch(parsed.toString(), {
-      signal: controller.signal,
-      redirect: 'follow',
-    });
+    const response = await fetchReaderResponse(parsed, controller.signal);
     if (!response.ok) {
       throw new Error(`search-actuator: fetch_reader failed with status ${response.status}`);
     }

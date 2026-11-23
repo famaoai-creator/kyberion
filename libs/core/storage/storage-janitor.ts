@@ -8,6 +8,7 @@ import {
   rotatedSegmentStem,
 } from './append-only-store.js';
 import { withLockSync } from '../foundation/lock-utils.js';
+import { LIVE_STORAGE_MAINTENANCE_LOCK } from '../storage-layout.js';
 import {
   ledgerSegmentLastHash,
   listLedgerSegments,
@@ -1419,6 +1420,11 @@ export function sweepEmptyMissionDirs(opts: { dryRun: boolean }): SweepEmptyMiss
 }
 
 export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
+  if (opts.dryRun) return performJanitor(opts);
+  return withLockSync(LIVE_STORAGE_MAINTENANCE_LOCK, () => performJanitor(opts), 0);
+}
+
+function performJanitor(opts: { dryRun: boolean }): JanitorReport {
   const errors: string[] = [];
 
   // AL-01: single catalog load per run — never fatal (the loader falls back

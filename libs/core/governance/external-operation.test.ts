@@ -41,7 +41,11 @@ vi.mock('./accountability-charter-registry.js', () => ({
   findActiveCharter: vi.fn(() => null),
   loadCharterUsage: vi.fn(),
 }));
-vi.mock('./external-operation-store.js', () => ({ reserveExternalOperation: vi.fn() }));
+vi.mock('./external-operation-store.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./external-operation-store.js')>()),
+  reserveExternalOperation: vi.fn(),
+  persistExternalOperationOutcome: vi.fn(),
+}));
 vi.mock('../scope-envelope.js', () => ({ currentScopeEnvelope: vi.fn(() => undefined) }));
 vi.mock('./governance-action-recorder.js', () => ({ recordGovernanceAction: vi.fn() }));
 vi.mock('../surface/operator-notifications.js', () => ({ notifyOperator: vi.fn() }));

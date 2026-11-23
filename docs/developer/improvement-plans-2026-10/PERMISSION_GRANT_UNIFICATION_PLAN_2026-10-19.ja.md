@@ -229,6 +229,7 @@ resolveGrant({ capability, context }): {
 - **会議録音の判定**: `checkMeetingParticipationConsent(purpose: 'recording')` は、従来の voice-consent.json が無い(または無効な)とき、`meeting.recording` の常設許可を会議の URL / シリーズ ID で探す。見つかれば許可してミッションに紐づける。発話(`purpose: 'voice'`)は従来どおりミッションごとの voice-consent.json のみ。
 - **重複の解消**: meeting-actuator の `checkSpeakConsent` は coordinator の検査に委ねる。
 - **CLI** `pnpm kyberion grants list|check|grant|revoke`。`external_io` の capability は `grant --request-approval` で承認依頼を出し、人間が `pnpm kyberion approvals --approve <id>` で決めたあと `grant --approval-request-id <id>` で付与する(scope-approve と同じ流れ)。
+- 承認付きの発行・延長・取消は同じ排他制御を使う。承認消費後に保存が中断した場合は、同じ入力と承認 ID で再試行できる。保存前の処理記録と承認の消費記録が一致するときだけ再開し、有効期限は元の消費時刻から算出する。取消済みの Grant は延長できない。復元した Grant と承認は隔離され、復元先で自動的に有効にはならない。
 
 ## 7. PG-06/07 の実装仕様(2026-10-20)
 

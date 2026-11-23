@@ -120,7 +120,6 @@ describe('generation schedule tick (EV-01)', () => {
       limit: 100,
       warned: false,
     });
-    const release = vi.fn();
 
     await runGenerationScheduleAction({
       action: 'tick',
@@ -131,14 +130,15 @@ describe('generation schedule tick (EV-01)', () => {
         now: new Date('2026-08-10T03:00:00.000Z'),
         leaderId,
         runner: createTriggerRunner({ storePath: triggerStore }),
-        quota: { reserve: reserve as any, release: release as any },
+        quota: { reserve },
         resolveTenant: () => ({}),
       },
     });
 
     expect(reserve).toHaveBeenCalledWith(
       expect.objectContaining({ tenant_slug: 'client-a' }),
-      'generate_image'
+      'generate_image',
+      { finalCharge: true }
     );
     expect(handleAction).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -151,8 +151,59 @@ describe('generation schedule tick (EV-01)', () => {
         }),
       })
     );
-    expect(release).not.toHaveBeenCalled();
   });
+
+  it.each(['missing job id', 'lost response', 'before dispatch'])(
+    'charges only at the dispatch boundary: %s',
+    async (failure) => {
+      const scope = {
+        scope_kind: 'tenant',
+        tier: 'confidential',
+        tenant_slug: 'client-a',
+      } as const;
+      writeGenerationSchedule({
+        ...baseSchedule(),
+        scope,
+        job_template: { action: 'generate_image', params: {} },
+      });
+      const handleAction = vi.fn().mockResolvedValue({});
+      if (failure === 'lost response') handleAction.mockRejectedValue(new Error('connection lost'));
+      const reserve = vi.fn().mockReturnValue({
+        allowed: true,
+      });
+
+      const result = await runGenerationScheduleAction({
+        action: 'tick',
+        schedule: scheduleId,
+        scope,
+        deps: {
+          get handleAction() {
+            if (failure === 'before dispatch') throw new Error('actuator unavailable');
+            return handleAction;
+          },
+          now: new Date('2026-08-10T03:00:00.000Z'),
+          leaderId,
+          runner: createTriggerRunner({ storePath: triggerStore }),
+          quota: { reserve },
+          resolveTenant: () => ({}),
+        },
+      });
+
+      expect(result).toMatchObject({ results: [{ status: 'failed' }] });
+      if (failure === 'before dispatch') {
+        expect(handleAction).not.toHaveBeenCalled();
+        expect(reserve).not.toHaveBeenCalled();
+      } else {
+        expect(handleAction).toHaveBeenCalledOnce();
+        expect(reserve).toHaveBeenCalledExactlyOnceWith(scope, 'generate_image', {
+          finalCharge: true,
+        });
+      }
+      expect(
+        readGenerationSchedule(generationSchedulePath(scheduleId, scope)).run_lock
+      ).toBeFalsy();
+    }
+  );
 
   it('quota 拒否時は provider submission を行わず run lock を解放する', async () => {
     writeGenerationSchedule({
@@ -173,7 +224,6 @@ describe('generation schedule tick (EV-01)', () => {
       warned: true,
       reason: 'quota exceeded',
     });
-    const release = vi.fn();
 
     const result = (await runGenerationScheduleAction({
       action: 'tick',
@@ -184,14 +234,13 @@ describe('generation schedule tick (EV-01)', () => {
         now: new Date('2026-08-10T03:00:00.000Z'),
         leaderId,
         runner: createTriggerRunner({ storePath: triggerStore }),
-        quota: { reserve: reserve as any, release: release as any },
+        quota: { reserve },
         resolveTenant: () => ({}),
       },
     })) as { results: Record<string, unknown>[] };
 
     expect(result.results[0]).toMatchObject({ status: 'blocked' });
     expect(handleAction).not.toHaveBeenCalled();
-    expect(release).not.toHaveBeenCalled();
     expect(
       (
         readGenerationSchedule(

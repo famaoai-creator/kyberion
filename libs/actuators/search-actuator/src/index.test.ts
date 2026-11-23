@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { actuator, handleAction } from './index.js';
 import { describeOps } from './op-catalog.js';
+import * as network from '@agent/core/network';
 
 describe('search-actuator: op catalog', () => {
   it('exposes exactly web_search and fetch_reader as capture ops', () => {
@@ -84,6 +85,47 @@ afterEach(() => {
 });
 
 describe('search-actuator: fetch_reader', () => {
+  it('checks the next destination before sending a redirected request', async () => {
+    const policy = vi.spyOn(network, 'assertNetworkEgress').mockImplementation((url) => {
+      if (new URL(url).hostname !== 'example.com') throw new Error('redirect denied by policy');
+      return {
+        hostname: 'example.com',
+        egressDecision: {
+          hostname: 'example.com',
+          verdict: 'allow',
+          mode: 'enforce',
+          reason: 'fixture',
+        },
+      };
+    });
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: 'https://example.org/target' },
+      })
+    );
+    vi.stubGlobal('fetch', fetch);
+    try {
+      await expect(
+        handleAction({
+          op: 'fetch_reader',
+          params: { url: 'https://example.com/start' },
+        })
+      ).rejects.toThrow('redirect denied by policy');
+      expect(fetch).toHaveBeenCalledExactlyOnceWith(
+        'https://example.com/start',
+        expect.objectContaining({ redirect: 'manual' })
+      );
+      expect(policy.mock.calls.map(([url]) => url)).toEqual([
+        'https://example.com/start',
+        'https://example.org/target',
+      ]);
+    } finally {
+      policy.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('rejects non-http URLs', async () => {
     await expect(
       handleAction({ op: 'fetch_reader', params: { url: 'ftp://example.com/file' } })
