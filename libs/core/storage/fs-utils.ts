@@ -122,13 +122,21 @@ export async function getAllFilesAsync(dir: string, options: WalkOptions = {}): 
 }
 
 /**
- * Map an array through an async function with limited concurrency.
+ * Map an array through an async function with limited concurrency. Results
+ * keep input order. `concurrency` must be a positive integer (or `Infinity`);
+ * anything else rejects with a RangeError before any task runs — 0 would
+ * otherwise silently skip every item.
  */
 export async function mapAsync<T, R>(
   items: T[],
   concurrency: number,
   taskFn: (item: T) => Promise<R>
 ): Promise<R[]> {
+  if (!(Number.isInteger(concurrency) || concurrency === Infinity) || concurrency < 1) {
+    throw new RangeError(
+      `mapAsync: concurrency must be a positive integer, got ${String(concurrency)}`
+    );
+  }
   const results: R[] = [];
   const queue = [...items];
   const total = items.length;

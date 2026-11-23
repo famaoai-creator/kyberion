@@ -14,7 +14,13 @@ import {
   safeSymlinkSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { dedupContent, lookupIngestRegistry, parseIngestRegistryRecord } from './dedup.js';
+import { ingestDedupRegistryLockId } from '@agent/core/scope-offboarding';
+import {
+  dedupContent,
+  lookupIngestRegistry,
+  parseIngestRegistryRecord,
+  registryLockId,
+} from './dedup.js';
 import { handleAction } from './index.js';
 
 const HASH_A = 'a'.repeat(64);
@@ -252,5 +258,15 @@ describe('ingest:dedup (DA-04 acceptance 3)', () => {
     expect(dedupContent({ content_sha256: hashOf(9999), registry_path: bigPath })).toMatchObject({
       duplicate: true,
     });
+  });
+});
+
+describe('dedup registry lock id', () => {
+  it('matches the lock core scope offboarding takes to prune the registry', () => {
+    const registry = path.join(
+      pathResolver.rootDir(),
+      'active/shared/runtime/ingest/content-hash-registry.jsonl'
+    );
+    expect(registryLockId(registry)).toBe(ingestDedupRegistryLockId(registry));
   });
 });

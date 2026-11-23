@@ -111,6 +111,36 @@ describe('data-vault', () => {
       expect(result.data).toEqual({ content: 'original' });
     });
 
+    it('never serves a cached entry of a different tier (C-VAULT-005)', async () => {
+      await fetchWithVaultCache('notion', 'doc:tiered', vi.fn().mockResolvedValue({ v: 'conf' }), {
+        projectId: 'proj-tier',
+        tier: 'confidential',
+        ttlMs: 60_000,
+      });
+
+      const publicLoader = vi.fn().mockResolvedValue({ v: 'public' });
+      const result = await fetchWithVaultCache('notion', 'doc:tiered', publicLoader, {
+        projectId: 'proj-tier',
+        tier: 'public',
+        ttlMs: 60_000,
+      });
+
+      expect(publicLoader).toHaveBeenCalledOnce();
+      expect(result.fromCache).toBe(false);
+      expect(result.data).toEqual({ v: 'public' });
+      expect(result.entry.tier).toBe('public');
+
+      // A same-tier request is still a cache hit.
+      const again = vi.fn();
+      const hit = await fetchWithVaultCache('notion', 'doc:tiered', again, {
+        projectId: 'proj-tier',
+        tier: 'public',
+        ttlMs: 60_000,
+      });
+      expect(again).not.toHaveBeenCalled();
+      expect(hit.fromCache).toBe(true);
+    });
+
     it('fails closed when a persisted entry is tampered with', async () => {
       await fetchWithVaultCache('notion', 'doc:tampered', vi.fn().mockResolvedValue({ value: 1 }), {
         projectId: 'proj-tampered',

@@ -11,6 +11,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
+import { createHash } from 'node:crypto';
 
 /**
  * `var`, and created on first access: audit-chain (pulled in transitively by
@@ -221,7 +222,8 @@ import {
   collectScopeTargets,
   gcMissionRuntimeResidue,
   INGEST_DEDUP_REGISTRY_REPO_PATH,
-  offboardScope,
+  ingestDedupRegistryLockId,
+  offboardScope as offboardScopeDirect,
   OFFBOARDING_EXPORT_SUBDIR,
   PHYSICAL_LEGACY_TENANT_STATE_ROOTS,
   TENANT_RUNTIME_PARTITION_TARGET_KINDS,
@@ -237,8 +239,23 @@ import { restoreFromTrash, TRASH_REPO_SUBPATH } from './storage-janitor.js';
 import { STORAGE_RETENTION_AUDIT_FILENAME } from './storage-retention-catalog.js';
 import { withExecutionContext } from '../authority.js';
 import { recordDerivation } from '../information-assets/asset-derivation.js';
+import { fetchWithVaultCache } from './data-vault.js';
 
 const MISSION_ID = 'MIS-AL04-TEST';
+
+/**
+ * The operator flow: an execute that names no preview id is first reviewed
+ * as a dry run of the same scope and then bound to its `preview_id` (the
+ * library refuses an unbound execute — see the C-OFF-002 test, which calls
+ * {@link offboardScopeDirect}).
+ */
+function offboardScope(
+  input: Parameters<typeof offboardScopeDirect>[0]
+): ReturnType<typeof offboardScopeDirect> {
+  if (input.mode !== 'execute' || 'expectedPreviewId' in input) return offboardScopeDirect(input);
+  const preview = offboardScopeDirect({ ...input, mode: 'dry_run', approval: undefined });
+  return offboardScopeDirect({ ...input, expectedPreviewId: preview.preview_id });
+}
 
 function writeJson(filePath: string, value: unknown): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -640,22 +657,6 @@ describe('AL-04 tenant/project offboarding', () => {
       { path: 'active/projects/confidential/tenant-a/proj-shared', kind: 'project_tree' },
       { path: 'active/missions/confidential/MIS-PROJ-A', kind: 'mission_tree' },
     ]);
-  });
-
-  it('refuses to claim an unscoped data-vault entry during project offboarding', () => {
-    writeJson(abs('active/shared/data-vault/shared-project.json'), {
-      sourceType: 'confluence',
-      key: 'shared',
-      projectId: 'proj-shared',
-      tier: 'confidential',
-    });
-
-    expect(() =>
-      collectScopeTargets('project', 'proj-shared', {
-        tenantSlug: 'tenant-a',
-        organizationId: 'org-a',
-      })
-    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
   });
 
   it('exports and soft-deletes physical namespaces during tenant offboarding', () => {
@@ -1544,6 +1545,171 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     }
   });
 
+  it('keeps dedup-registry lines appended between plan and prune (C-OFF-007)', () => {
+    seedIngestResidue();
+    const LATE_OTHER = 'd'.repeat(64);
+    const LATE_TENANT = 'e'.repeat(64);
+    const hooks = globalThis as { __kyberion_offboard_write_hook__?: (target: string) => void };
+    let appended = false;
+    hooks.__kyberion_offboard_write_hook__ = (target) => {
+      // After the plan is fixed (manifest write) and before the registry
+      // prune, a concurrent ingest keeps registering content hashes.
+      if (appended || !target.endsWith('manifest.json')) return;
+      appended = true;
+      fs.appendFileSync(
+        abs(INGEST_DEDUP_REGISTRY_REPO_PATH),
+        `${JSON.stringify({ content_sha256: LATE_OTHER, target_path: 'knowledge/confidential/tenant-beta/y.md' })}\n` +
+          `${JSON.stringify({ content_sha256: LATE_TENANT, target_path: `${KNOWLEDGE_ROOT}/reports/q3.md` })}\n`
+      );
+    };
+    try {
+      const result = offboardScope({
+        scopeType: 'tenant',
+        scopeId: TENANT,
+        mode: 'execute',
+        approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+        nowIso: '2026-11-23T01:02:03.000Z',
+      });
+      expect(appended).toBe(true);
+      expect(result.status).toBe('offboarded');
+      const kept = registryLines();
+      expect(kept.some((line) => line.includes(LATE_OTHER))).toBe(true);
+      expect(kept.some((line) => line.includes(LATE_TENANT))).toBe(false);
+      expect(kept.some((line) => line.includes(BETA_HASH))).toBe(true);
+      expect(result.dedup_registry).toMatchObject({ matched: 3, removed: 3 });
+      const exported = fs.readFileSync(
+        abs(`${result.export_path}/dedup-registry-removed.jsonl`),
+        'utf8'
+      );
+      expect(exported).toContain(LATE_TENANT);
+      expect(exported).not.toContain(LATE_OTHER);
+      expect(result.verification).toEqual({ clean: true, leftovers: [] });
+    } finally {
+      delete hooks.__kyberion_offboard_write_hook__;
+    }
+  });
+
+  it('prunes the dedup registry under the lock its appenders hold (C-OFF-007)', () => {
+    seedIngestResidue();
+    const registryAbs = abs(INGEST_DEDUP_REGISTRY_REPO_PATH);
+    // Mirrors ingest-actuator dedup.ts registryLockId(absPath).
+    const appenderLock = `ingest-content-hash-registry-${createHash('sha256')
+      .update(registryAbs)
+      .digest('hex')
+      .slice(0, 32)}`;
+    const hooks = globalThis as { __kyberion_offboard_write_hook__?: (target: string) => void };
+    let lockedDuringRewrite: boolean | undefined;
+    hooks.__kyberion_offboard_write_hook__ = (target) => {
+      if (path.resolve(target) !== path.resolve(registryAbs)) return;
+      try {
+        withLockSync(appenderLock, () => undefined, 0);
+        lockedDuringRewrite = false;
+      } catch {
+        lockedDuringRewrite = true;
+      }
+    };
+    try {
+      const result = offboardScope({
+        scopeType: 'tenant',
+        scopeId: TENANT,
+        mode: 'execute',
+        approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      });
+      expect(result.status).toBe('offboarded');
+      expect(lockedDuringRewrite).toBe(true);
+    } finally {
+      delete hooks.__kyberion_offboard_write_hook__;
+    }
+  });
+
+  it('rewrites the manifest with the final dedup prune counts (review #4)', () => {
+    seedIngestResidue();
+    const hooks = globalThis as { __kyberion_offboard_write_hook__?: (target: string) => void };
+    let appended = false;
+    hooks.__kyberion_offboard_write_hook__ = (target) => {
+      if (appended || !target.endsWith('manifest.json')) return;
+      appended = true;
+      fs.appendFileSync(
+        abs(INGEST_DEDUP_REGISTRY_REPO_PATH),
+        `${JSON.stringify({ content_sha256: 'e'.repeat(64), target_path: `${KNOWLEDGE_ROOT}/late.md` })}\n`
+      );
+    };
+    try {
+      const result = offboardScope({
+        scopeType: 'tenant',
+        scopeId: TENANT,
+        mode: 'execute',
+        approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      });
+      expect(result.status).toBe('offboarded');
+      const manifest = JSON.parse(
+        fs.readFileSync(abs(`${result.export_path}/manifest.json`), 'utf8')
+      );
+      expect(manifest.dedup_registry).toEqual({
+        matched: 3,
+        removed: 3,
+        export_file: `${result.export_path}/dedup-registry-removed.jsonl`,
+      });
+    } finally {
+      delete hooks.__kyberion_offboard_write_hook__;
+    }
+  });
+
+  it('leaves a manifest naming no missing export file when the registry lock times out (review #4)', () => {
+    seedIngestResidue();
+    const result = withLockSync(
+      ingestDedupRegistryLockId(abs(INGEST_DEDUP_REGISTRY_REPO_PATH)),
+      () =>
+        offboardScope({
+          scopeType: 'tenant',
+          scopeId: TENANT,
+          mode: 'execute',
+          approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+        })
+    );
+    expect(result.status).toBe('error');
+    expect(result.reason).toContain('[LOCK_TIMEOUT]');
+    expect(fs.existsSync(abs(`${result.export_path}/dedup-registry-removed.jsonl`))).toBe(false);
+    const manifest = JSON.parse(
+      fs.readFileSync(abs(`${result.export_path}/manifest.json`), 'utf8')
+    );
+    expect(manifest.dedup_registry).toEqual({ matched: 2, removed: 0 });
+    // Registry untouched: the prune never ran.
+    expect(registryLines()).toHaveLength(4);
+  }, 20_000);
+
+  it('skips the export and the rewrite when the locked recompute finds nothing to remove (review #10)', () => {
+    seedIngestResidue();
+    const registryAbs = abs(INGEST_DEDUP_REGISTRY_REPO_PATH);
+    const hooks = globalThis as { __kyberion_offboard_write_hook__?: (target: string) => void };
+    let pruned = false;
+    let registryWrites = 0;
+    hooks.__kyberion_offboard_write_hook__ = (target) => {
+      if (path.resolve(target) === path.resolve(registryAbs)) registryWrites += 1;
+      if (pruned || !target.endsWith('manifest.json')) return;
+      pruned = true;
+      // The tenant's lines vanished between plan and prune.
+      fs.writeFileSync(
+        registryAbs,
+        `${JSON.stringify({ content_sha256: BETA_HASH, target_path: 'knowledge/confidential/tenant-beta/x.md' })}\n`
+      );
+    };
+    try {
+      const result = offboardScope({
+        scopeType: 'tenant',
+        scopeId: TENANT,
+        mode: 'execute',
+        approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      });
+      expect(result.status).toBe('offboarded');
+      expect(registryWrites).toBe(0);
+      expect(fs.existsSync(abs(`${result.export_path}/dedup-registry-removed.jsonl`))).toBe(false);
+      expect(result.dedup_registry).toEqual({ matched: 0, removed: 0 });
+    } finally {
+      delete hooks.__kyberion_offboard_write_hook__;
+    }
+  });
+
   it('keeps a dedup line with a dangerous JSON key as an unreadable record', () => {
     seedIngestResidue();
     fs.appendFileSync(
@@ -1915,5 +2081,288 @@ describe('tenant offboarding — legacy resident-dot copies (dot/tenants/<slug>)
           event.event === 'SCOPE_OFFBOARD_SOFT_DELETE' && event.path === `${DOT}/tenants/${TENANT}`
       )
     ).toMatchObject({ kind: 'tenant_learning_tree', approved_by: 'operator@example' });
+  });
+});
+
+describe('project offboarding — data-vault attribution (C-OFF-014)', () => {
+  /** service-engine `executeServicePresetCached` key shape for an admitted tenant binding. */
+  function admittedKey(tenant: string, projectId: string): string {
+    return `${tenant}:${projectId}:binding-1:get_page:0123456789abcdef`;
+  }
+
+  function vaultFiles(): string[] {
+    const dir = abs('active/shared/data-vault');
+    return fs.existsSync(dir)
+      ? fs.readdirSync(dir).map((name) => `active/shared/data-vault/${name}`)
+      : [];
+  }
+
+  function seedProjectLineage(tenant: string, organization: string): void {
+    writeJson(abs(`active/projects/confidential/${tenant}/proj-shared/state/project-state.json`), {
+      tenant_slug: tenant,
+      organization_id: organization,
+    });
+  }
+
+  it('claims only the filtered tenant’s vault entries written through the real vault', async () => {
+    seedProjectLineage('tenant-a', 'org-a');
+    seedProjectLineage('tenant-b', 'org-b');
+    await fetchWithVaultCache(
+      'confluence',
+      admittedKey('tenant-a', 'proj-shared'),
+      () => ({ a: 1 }),
+      {
+        projectId: 'proj-shared',
+      }
+    );
+    const [entryA] = vaultFiles();
+    await fetchWithVaultCache(
+      'confluence',
+      admittedKey('tenant-b', 'proj-shared'),
+      () => ({ b: 1 }),
+      {
+        projectId: 'proj-shared',
+      }
+    );
+
+    const targets = collectScopeTargets('project', 'proj-shared', {
+      tenantSlug: 'tenant-a',
+      organizationId: 'org-a',
+    });
+    const vaultTargets = targets.filter((target) => target.kind === 'data_vault_entry');
+    expect(vaultTargets).toEqual([{ path: entryA, kind: 'data_vault_entry' }]);
+  });
+
+  it('claims an unprefixed vault entry when the project has exactly the filtered lineage', async () => {
+    seedProjectLineage('tenant-a', 'org-a');
+    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
+
+    const targets = collectScopeTargets('project', 'proj-shared', {
+      tenantSlug: 'tenant-a',
+      organizationId: 'org-a',
+    });
+    expect(targets.filter((target) => target.kind === 'data_vault_entry')).toEqual(
+      vaultFiles().map((file) => ({ path: file, kind: 'data_vault_entry' }))
+    );
+  });
+
+  it('refuses an unprefixed vault entry when the project id is reused across lineages', async () => {
+    seedProjectLineage('tenant-a', 'org-a');
+    seedProjectLineage('tenant-b', 'org-b');
+    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
+
+    expect(() =>
+      collectScopeTargets('project', 'proj-shared', {
+        tenantSlug: 'tenant-a',
+        organizationId: 'org-a',
+      })
+    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
+  });
+
+  it('refuses an unprefixed entry when another lineage is known only from an archived mission (review #2)', async () => {
+    seedProjectLineage('tenant-a', 'org-a');
+    writeJson(
+      abs('active/archive/missions/confidential/tenant-b/MIS-OLD-B/mission-state.json'),
+      missionState({
+        mission_id: 'MIS-OLD-B',
+        tier: 'confidential',
+        status: 'archived',
+        tenant_slug: 'tenant-b',
+        organization_id: 'org-b',
+        relationships: { project: { project_id: 'proj-shared', relationship_type: 'belongs_to' } },
+      })
+    );
+    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
+
+    expect(() =>
+      collectScopeTargets('project', 'proj-shared', {
+        tenantSlug: 'tenant-a',
+        organizationId: 'org-a',
+      })
+    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
+  });
+
+  it('refuses an unprefixed entry when the project registry record names another lineage (review #2)', async () => {
+    seedProjectLineage('tenant-a', 'org-a');
+    writeJson(abs('active/shared/runtime/projects/proj-shared.json'), {
+      project_id: 'proj-shared',
+      tenant_slug: 'tenant-b',
+      organization_id: 'org-b',
+    });
+    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
+
+    expect(() =>
+      collectScopeTargets('project', 'proj-shared', {
+        tenantSlug: 'tenant-a',
+        organizationId: 'org-a',
+      })
+    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
+  });
+
+  it('refuses an unprefixed entry when no lineage of the project is known at all (review #2)', async () => {
+    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
+
+    expect(() =>
+      collectScopeTargets('project', 'proj-shared', {
+        tenantSlug: 'tenant-a',
+        organizationId: 'org-a',
+      })
+    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
+  });
+
+  it('unfiltered project offboarding refuses admitted entries of several tenants (review #3)', async () => {
+    await fetchWithVaultCache(
+      'confluence',
+      admittedKey('tenant-a', 'proj-shared'),
+      () => ({ a: 1 }),
+      {
+        projectId: 'proj-shared',
+      }
+    );
+    await fetchWithVaultCache(
+      'confluence',
+      admittedKey('tenant-b', 'proj-shared'),
+      () => ({ b: 1 }),
+      {
+        projectId: 'proj-shared',
+      }
+    );
+
+    expect(() => collectScopeTargets('project', 'proj-shared')).toThrow(
+      'PROJECT_DATA_VAULT_AMBIGUOUS'
+    );
+  });
+
+  it('unfiltered project offboarding refuses an admitted entry of a tenant other than the known lineage (review #3)', async () => {
+    seedProjectLineage('tenant-a', 'org-a');
+    await fetchWithVaultCache(
+      'confluence',
+      admittedKey('tenant-b', 'proj-shared'),
+      () => ({ b: 1 }),
+      {
+        projectId: 'proj-shared',
+      }
+    );
+
+    expect(() => collectScopeTargets('project', 'proj-shared')).toThrow(
+      'PROJECT_DATA_VAULT_AMBIGUOUS'
+    );
+  });
+
+  it('unfiltered project offboarding claims admitted entries of the one known tenant (review #3)', async () => {
+    seedProjectLineage('tenant-a', 'org-a');
+    await fetchWithVaultCache(
+      'confluence',
+      admittedKey('tenant-a', 'proj-shared'),
+      () => ({ a: 1 }),
+      {
+        projectId: 'proj-shared',
+      }
+    );
+
+    expect(
+      collectScopeTargets('project', 'proj-shared').filter((t) => t.kind === 'data_vault_entry')
+    ).toEqual(vaultFiles().map((file) => ({ path: file, kind: 'data_vault_entry' })));
+  });
+
+  it('tenant offboarding claims the tenant’s admitted entries cached under its project ids', async () => {
+    await fetchWithVaultCache('confluence', admittedKey('tenant-a', 'proj-a'), () => ({ a: 1 }), {
+      projectId: 'proj-a',
+    });
+    const [entryA] = vaultFiles();
+    await fetchWithVaultCache('confluence', admittedKey('tenant-b', 'proj-b'), () => ({ b: 1 }), {
+      projectId: 'proj-b',
+    });
+
+    expect(
+      collectScopeTargets('tenant', 'tenant-a').filter(
+        (target) => target.kind === 'data_vault_entry'
+      )
+    ).toEqual([{ path: entryA, kind: 'data_vault_entry' }]);
+  });
+});
+
+describe('tenant-nested mission trees (C-OFF-013)', () => {
+  function nestedMission(
+    tenant: string,
+    id: string,
+    overrides: Record<string, unknown> = {}
+  ): string {
+    const repoPath = `active/missions/confidential/${tenant}/${id}`;
+    writeJson(
+      abs(`${repoPath}/mission-state.json`),
+      missionState({ mission_id: id, tier: 'confidential', tenant_slug: tenant, ...overrides })
+    );
+    return repoPath;
+  }
+
+  it('collects active/missions/<tier>/<tenant>/<id> as mission_tree targets', () => {
+    const mine = nestedMission('tenant-alpha', 'MIS-NESTED-1', {
+      organization_id: 'org-a',
+      relationships: { project: { project_id: 'proj-n', relationship_type: 'belongs_to' } },
+    });
+    nestedMission('tenant-beta', 'MIS-NESTED-2', {
+      organization_id: 'org-b',
+      relationships: { project: { project_id: 'proj-n', relationship_type: 'belongs_to' } },
+    });
+
+    expect(
+      collectScopeTargets('tenant', 'tenant-alpha').filter(
+        (target) => target.kind === 'mission_tree'
+      )
+    ).toEqual([{ path: mine, kind: 'mission_tree' }]);
+    expect(
+      collectScopeTargets('project', 'proj-n', {
+        tenantSlug: 'tenant-alpha',
+        organizationId: 'org-a',
+      }).filter((target) => target.kind === 'mission_tree')
+    ).toEqual([{ path: mine, kind: 'mission_tree' }]);
+  });
+
+  it('never treats a reserved scope name (e.g. shared) as a tenant partition (review #7)', () => {
+    nestedMission('shared', 'MIS-RESERVED-1', { tenant_slug: 'tenant-alpha' });
+    expect(
+      collectScopeTargets('tenant', 'tenant-alpha').filter(
+        (target) => target.kind === 'mission_tree'
+      )
+    ).toEqual([]);
+    expect(collectScopeTargets('tenant', 'shared')).toEqual([]);
+  });
+
+  it('exports and soft-deletes a nested mission, then verifies clean', () => {
+    const mine = nestedMission('tenant-alpha', 'MIS-NESTED-1');
+    const other = nestedMission('tenant-beta', 'MIS-NESTED-2');
+    const scope = { scopeType: 'tenant' as const, scopeId: 'tenant-alpha' };
+    const preview = offboardScope(scope);
+    const result = offboardScope({
+      ...scope,
+      mode: 'execute',
+      expectedPreviewId: preview.preview_id,
+      approval: { approved_by: 'owner', purpose: 'nested mission retirement' },
+    });
+    expect(result.status).toBe('offboarded');
+    expect(result.soft_deleted).toContain(mine);
+    expect(fs.existsSync(abs(mine))).toBe(false);
+    expect(fs.existsSync(abs(`${result.export_path}/${mine}/mission-state.json`))).toBe(true);
+    expect(fs.existsSync(abs(`${other}/mission-state.json`))).toBe(true);
+    expect(result.verification).toEqual({ clean: true, leftovers: [] });
+  });
+});
+
+describe('execute is bound to a reviewed dry run (C-OFF-002)', () => {
+  it('refuses an approved execute that names no reviewed preview id', () => {
+    writeJson(abs('active/projects/public/tenant-alpha/workspace/plan.json'), { a: 1 });
+    const result = offboardScopeDirect({
+      scopeType: 'tenant',
+      scopeId: 'tenant-alpha',
+      mode: 'execute',
+      approval: { approved_by: 'owner', purpose: 'unreviewed' },
+    });
+    expect(result.status).toBe('approval_required');
+    expect(result.reason).toMatch(/preview/i);
+    expect(result.soft_deleted).toEqual([]);
+    expect(fs.existsSync(abs('active/projects/public/tenant-alpha/workspace/plan.json'))).toBe(
+      true
+    );
   });
 });

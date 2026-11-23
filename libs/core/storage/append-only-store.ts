@@ -86,8 +86,18 @@ const WRITE_BATCH_BYTES = DEFAULT_JSONL_CHUNK_BYTES;
  * `<stem>-YYYYMMDD-HHmmss.jsonl` sibling for a rotated live file.
  * Second-granularity stamps can collide when a busy log rotates twice in one
  * second (or a retry follows a partial failure); disambiguate with `-<n>`.
+ *
+ * Only `.jsonl` live files are rotatable — the catalog rejects `rotate` on any
+ * other path and segment discovery (`ROTATED_SEGMENT_SUFFIX_PATTERN`)
+ * only recognises `.jsonl` segments — so any other extension throws instead
+ * of producing an unchanged candidate (which never stops colliding).
  */
 export function rotatedSegmentPath(liveFilePath: string, now: Date): string {
+  if (!liveFilePath.endsWith('.jsonl')) {
+    throw new Error(
+      `rotatedSegmentPath: append-only store rotation requires a .jsonl live file, got ${liveFilePath}`
+    );
+  }
   const stamp = now.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
   for (let i = 0; ; i++) {
     const candidate = liveFilePath.replace(/\.jsonl$/, `-${stamp}${i > 0 ? `-${i}` : ''}.jsonl`);

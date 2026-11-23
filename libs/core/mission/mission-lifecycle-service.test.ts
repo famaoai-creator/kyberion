@@ -375,6 +375,7 @@ describe('mission-lifecycle-service — argv independence (SO-01 landmine regres
   );
   const missionIdArgvPolluted = `MSN-SO01-ARGV-A-${RUN_ID}`;
   const missionIdArgvClean = `MSN-SO01-ARGV-B-${RUN_ID}`;
+  const missionIdTyped = `MSN-SO01-TYPE-C-${RUN_ID}`;
   let originalArgv: string[];
   let previousCustomer: string | undefined;
 
@@ -405,7 +406,7 @@ describe('mission-lifecycle-service — argv independence (SO-01 landmine regres
     process.argv = originalArgv;
     if (previousCustomer === undefined) delete process.env.KYBERION_STANCE;
     else process.env.KYBERION_STANCE = previousCustomer;
-    for (const id of [missionIdArgvPolluted, missionIdArgvClean]) {
+    for (const id of [missionIdArgvPolluted, missionIdArgvClean, missionIdTyped]) {
       const missionPath = pathResolver.missionDir(id, 'public');
       fs.rmSync(missionPath, { recursive: true, force: true });
     }
@@ -472,6 +473,22 @@ describe('mission-lifecycle-service — argv independence (SO-01 landmine regres
     expect((state as any).is_ephemeral).toBeFalsy();
     expect(state!.status).toBe('active');
     expect(fs.existsSync(defaultTenantFile)).toBe(defaultTenantExisted);
+  });
+
+  it('start() keeps the created mission type and rejects a different explicit one', async () => {
+    const { missionLifecycleService: realFacade } = await import('./mission-lifecycle-service.js');
+    process.argv = [...originalArgv];
+    process.env.MISSION_ROLE = 'mission_controller';
+    await realFacade.create(missionIdTyped, 'public', 'default', 'reverse_spec');
+    await expect(
+      realFacade.start(missionIdTyped, 'public', 'worker', 'default', 'development')
+    ).rejects.toThrow(/MISSION_TYPE_MISMATCH/);
+    // No type on start: the saved type is used, not a 'development' default.
+    await realFacade.start(missionIdTyped, 'public');
+    const { loadState } = await import('./mission-state.js');
+    const state = loadState(missionIdTyped);
+    expect(state?.status).toBe('active');
+    expect(state?.mission_type).toBe('reverse_spec');
   });
 });
 

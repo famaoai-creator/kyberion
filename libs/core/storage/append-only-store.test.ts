@@ -99,6 +99,17 @@ describe('append-only-store', () => {
       safeWriteFile(live, '');
       expect(rotateStore(live, { now })).toBeNull();
     });
+
+    it('rejects a live path that is not .jsonl instead of looping on an unchanged candidate (C-AOS-015)', () => {
+      const now = new Date('2026-11-01T12:34:56.000Z');
+      const logPath = path.join(dir, 'items.log');
+      // Missing file: the old code returned the live path itself as the "segment".
+      expect(() => rotatedSegmentPath(logPath, now)).toThrow(/\.jsonl/);
+      // Existing, non-empty file: the old code spun forever on the same candidate.
+      safeWriteFile(logPath, 'line\n');
+      expect(() => rotateStore(logPath, { now })).toThrow(/\.jsonl/);
+      expect(read(logPath)).toBe('line\n');
+    });
   });
 
   describe('compactStoreByKey', () => {

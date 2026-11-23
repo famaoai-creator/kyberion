@@ -3,7 +3,7 @@ title: Runtime Storage Layout
 category: Architecture
 tags: [storage, artifacts, workspace, tmp, cache, staging, tier, multi-tenant, retention]
 importance: 8
-last_updated: 2026-11-05
+last_updated: 2026-11-23
 runtime_stages: [alignment, execution, review]
 ---
 
@@ -24,7 +24,7 @@ see it.
 
 | Purpose                      | What belongs there                                                                 | Place                                                                                                                         | API                                                               | Retention                                                   |
 | ---------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------- |
-| **scratch**                  | Intermediates and IPC handoffs a single run creates and consumes                   | `active/shared/tmp/<partition>/<domain>/`                                                                                     | `resolveStorageFloor('scratch', …)`                               | 1 day, delete                                               |
+| **scratch**                  | Intermediates and IPC handoffs a single run creates and consumes                   | `active/shared/tmp/<partition>/<domain>/`                                                                                     | `resolveStorageFloor('scratch', …)`                               | 1 day, delete (+2 days for unpromoted authored code, §3a)   |
 | **staging**                  | External files copied in for perception / ingest                                   | `active/shared/staging/<partition>/<domain>/<job>/`                                                                           | `resolveStorageFloor('staging', …)`                               | 3 days, delete                                              |
 | **cache**                    | Derived, re-generable data: digest-keyed sidecars, model / build trees, indexes    | `active/shared/cache/<partition>/<domain>/`                                                                                   | `resolveStorageFloor('cache', …)`                                 | 30 days per partition, delete (a miss only costs a rebuild) |
 | **workspace**                | Directories a worker operates in: clones, sandboxes, browser profiles, device runs | `active/shared/runtime/workspaces/<id>/`                                                                                      | `createScratchWorkspace` (workforce/workspace-ledger.ts)          | lease + ledger sweep                                        |
@@ -32,7 +32,7 @@ see it.
 | **artifact** (organization)  | Deliverables owned by an organization (daily digests, org-wide reports)            | `active/organizations/<tier>/<tenant\|shared>/<org>/artifacts/<class>/`                                                       | `writeScopedArtifact({ scope: { organization, tenant? } })`       | review_required — never silently expired                    |
 | **artifact** (tenant/system) | Deliverables owned by a tenant or by the platform, with no narrower scope          | `active/shared/artifacts/<partition>/<class>/`                                                                                | `writeScopedArtifact({ scope: { tenant } })` / `{ system: true }` | review_required — never silently expired                    |
 | **state**                    | Durable registries, cursors, quotas, pending flows — anything that must survive    | `active/shared/runtime/<domain>/` (+ `physicalScopedPath` for tenant namespaces)                                              | governed catalogs / `writeGovernedArtifactJson`                   | per retention-catalog entry                                 |
-| **log**                      | Audit, process, surface, trace logs                                                | `active/shared/logs/`                                                                                                         | `logger`, audit chain                                             | 30 days                                                     |
+| **log**                      | Audit, process, surface, trace logs                                                | `active/shared/logs/`                                                                                                         | `logger`, audit chain                                             | per catalog entry: 30 days delete; `logs/audit` archived    |
 
 Decision rule for the boundary cases:
 
@@ -540,6 +540,22 @@ ingest commit.
   auto-offboarded, though backups include them), so a new root fails to
   compile until its disposition is decided. Null-disposition partitions are
   never listed or counted as post-offboard leftovers.
+- Offboarding execution is bound to a reviewed dry run: an approved execute that names
+  no `expectedPreviewId` (CLI `--preview-id`) returns `approval_required` and deletes
+  nothing. Tenant-nested missions (`active/missions/<tier>/<tenant>/<id>`) are collected
+  as `mission_tree` targets alongside flat ones. Shared files that hold several tenants'
+  lines (the ingest dedup registry, legacy metrics ledgers, the legacy delegation trace and
+  notification queue) are pruned by rewriting them under the lock their appenders take,
+  from a fresh read at prune time; the removed lines survive only in the offboarding
+  export. The export manifest is rewritten after each prune with the actual counts and
+  names an export file only once it exists, so a lock timeout part-way leaves a manifest
+  that matches the disk. Data vault entries carry no tenant field, so project offboarding
+  attributes an entry by its key (`<tenant>:<projectId>:…` for tenant-admitted service
+  calls). An unprefixed entry is claimed only when the filter's lineage is the one lineage
+  known for that project id (workspaces, active and archived missions, the project
+  registry record); an unfiltered run refuses when admitted keys name several tenants or
+  one other than the known lineage. Otherwise it refuses with
+  `PROJECT_DATA_VAULT_AMBIGUOUS`.
 - A restore refuses (`[BACKUP_RESTORE_APPEND_ONLY_CONFLICT]`) to lay an
   append-only partition or customer decision case over a target that already
   holds files. A chain has no head anchor, so the restore relies on this guard. The target is checked again
@@ -633,6 +649,73 @@ organizations' digests. The standup and retro cadences (`core:organization_stand
 `…/report/retros/` the same way, their notifications land in the sovereign
 operator inbox like the daily digest, and the pipeline context and trace carry
 only counts and artifact paths — never the joined all-tenant text.
+
+## 3a. Retention enforcement (storage janitor)
+
+The storage janitor (`libs/core/storage/storage-janitor.ts`) applies
+`knowledge/product/governance/storage-retention-catalog.json`. What it does,
+by floor:
+
+- **TTL precedence** is the same in every scanner: an explicit caller option
+  (`scanTmp` `ttlMs`, `rotateLogs` / `sweepSupervisorEventFiles`
+  `retentionDays`) > the catalog entry's `ttl_days` > the built-in default.
+  In `rotateLogs` the option replaces only the logs-root TTL; a nested entry
+  keeps its own `ttl_days` and action. The scheduled janitor passes no
+  option, so the catalog decides.
+- **Logs** are resolved per file to the longest-prefix catalog entry, so a
+  nested entry overrides the logs root for its subtree. The shipped catalog
+  deletes `active/shared/logs/**` after 30 days, but `active/shared/logs/audit`
+  (`archive`, 90 days, audited) moves expired files to
+  `active/archive/<repo-rel>`. A hash-chained audit day file
+  (`logs/audit/audit-YYYY-MM-DD.jsonl`) and its tenant mirrors are expired
+  together under the audit chain lock and are only ever archived or
+  soft-deleted, never unlinked — an entry that would unlink one is reported
+  as an error and the day stays live.
+- **tmp**: files past the 1-day TTL are deleted, except that an unpromoted
+  job directory holding authored code or ADF keeps its files
+  `code_grace_days` (2) longer. During the grace the janitor warns with the
+  exact `pnpm scratch:promote` command and lists the directory in
+  `active/shared/runtime/system/scratch-promotion-candidates.json`
+  (`libs/core/storage/scratch-promotion-grace.ts`).
+- **Append-only stores** (`action: rotate`) roll to
+  `<stem>-YYYYMMDD-HHmmss.jsonl` siblings, with `-<n>` appended on a
+  same-second collision; only `.jsonl` live files are rotatable.
+- **Audit first.** When an expiry must be audited (`audit: true`, archive,
+  soft delete, data-vault expiry), the retention audit record is written
+  before the file is moved or unlinked. If the record cannot be written, the
+  file stays where it is, a diagnostic warning is logged, and the next sweep
+  retries. If the move or unlink fails after the record was written, a
+  `RETENTION_EXPIRY_FAILED` record follows it.
+- **Data vault** entries are expired by their own `expiresAt`, through the
+  catalog's `active/shared/data-vault` entry. Every expiry is audited first;
+  one that cannot be audited is kept and listed in the janitor report's
+  errors.
+- **Fallback.** If the catalog is missing, corrupt or invalid, the janitor
+  uses `BUILTIN_RETENTION_DEFAULTS` (`storage-retention-catalog.ts`) and
+  reports `retentionCatalogSource: builtin-defaults`. The fallback copies the
+  shipped catalog's rules for tmp (with the code grace), staging (3 days),
+  the cache partitions (30 days; `cache/system/tool-runtimes`
+  `review_required`), logs (30 days) with `logs/audit` archived at 90 days,
+  and the pre-catalog runtime TTLs. It declares `active/audit` and
+  `active/archive` `review_required`, with their nested system-ledger and
+  trash entries. Everything else the catalog governs (other runtime and
+  event-store entries, other append-only stores) is kept until the catalog
+  loads again. Tests require every built-in entry to equal its shipped
+  entry (every field except `note`, `backup` included), and every shipped
+  entry nested under a built-in root to have such a twin, so the fallback
+  never deletes more than the catalog would.
+
+**Known gap: the data vault is not partitioned.** `active/shared/data-vault/`
+holds every tier's and tenant's entries flat, one `<sha256>.json` per entry.
+The tier exists only as a field inside the entry. That breaks the floor
+partition rule in §2 (tier first, then tenant). It stays this way until the
+owner decides on a design. Until then, do not add new tenant-bound data to the
+vault expecting partition-level isolation. Two consequences follow from the
+flat layout: entries are keyed without their tier, so callers asking for the
+same key under different tiers replace each other's entry (a cache hit is
+served only for the requested tier); and an entry written by an unadmitted call
+records no owner, so offboarding can attribute it only from what else is known
+about its project id.
 
 ## 4. Migration status
 

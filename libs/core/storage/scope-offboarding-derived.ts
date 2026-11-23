@@ -153,6 +153,12 @@ export interface OffboardScopeInput {
   organizationId?: string;
   /** `dry_run` (default) only reports; `execute` exports then deletes. */
   mode?: 'dry_run' | 'execute';
+  /**
+   * `preview_id` of the dry run the approver reviewed. REQUIRED when `mode`
+   * is `execute`: an execute without it, or whose freshly computed preview
+   * differs (targets or shared-ledger rows changed), returns
+   * `approval_required` and deletes nothing. Ignored by a dry run.
+   */
   expectedPreviewId?: string;
   approval?: OffboardApproval;
   /** Clock override for deterministic export directory names in tests. */

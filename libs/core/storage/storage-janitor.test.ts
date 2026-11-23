@@ -233,6 +233,7 @@ import {
   listUncoveredRuntimeDirs,
   listUncoveredRuntimeEntries,
   listUncoveredRuntimeFiles,
+  listUncoveredEventStoreDirs,
   DEFAULT_TMP_TTL_MS,
   DEFAULT_TRASH_GRACE_DAYS,
   DEFAULT_SUPERVISOR_EVENTS_RETENTION_DAYS,
@@ -744,7 +745,7 @@ describe('storage-janitor', () => {
     });
 
     it('identifies log files older than retention period', () => {
-      const oldLog = path.join(logsDir, 'audit', 'audit-2025-01-01.jsonl');
+      const oldLog = path.join(logsDir, 'traces', 'traces-2025-01-01.jsonl');
       writeFile(oldLog);
       setMtime(oldLog, 31 * 24 * 60 * 60 * 1000); // 31 days old
 
@@ -769,6 +770,34 @@ describe('storage-janitor', () => {
       const result = rotateLogs({ dryRun: false, retentionDays: 30 });
       expect(result.rotated).toContain(oldLog);
       expect(fs.existsSync(oldLog)).toBe(false);
+    });
+
+    it('explicit retentionDays overrides the logs-root catalog TTL, like scanTmp ttlMs (C-JAN-004)', () => {
+      writeCatalogFile({
+        version: '1.10.0',
+        entries: [
+          { path: 'active/shared/logs', artifact_class: 'log', ttl_days: 30, action: 'delete' },
+          {
+            path: 'active/shared/logs/audit',
+            artifact_class: 'evidence',
+            ttl_days: 90,
+            action: 'archive',
+            audit: true,
+          },
+        ],
+      });
+      const trace = path.join(logsDir, 'traces', 'traces-old.jsonl');
+      const auditFile = path.join(logsDir, 'audit', 'mission-closure.jsonl');
+      writeFile(trace);
+      writeFile(auditFile);
+      setMtime(trace, 5 * RETENTION_DAY_MS);
+      setMtime(auditFile, 5 * RETENTION_DAY_MS);
+
+      // Option precedence: explicit option > catalog entry TTL > built-in default.
+      expect(rotateLogs({ dryRun: true, retentionDays: 2 }).expired).toContain(trace);
+      expect(rotateLogs({ dryRun: true }).expired).not.toContain(trace);
+      // The override replaces the logs-root TTL only; a nested entry keeps its own policy.
+      expect(rotateLogs({ dryRun: true, retentionDays: 2 }).expired).not.toContain(auditFile);
     });
   });
 
@@ -1224,6 +1253,83 @@ describe('storage-janitor', () => {
       expect(result.deleted).not.toContain(malformedFile);
       expect(fs.existsSync(malformedFile)).toBe(true);
     });
+
+    it('records each vault deletion in the retention audit (C-JAN-005)', async () => {
+      await fetchWithVaultCache('notion', 'expired-audit', () => ({ value: 1 }), {
+        projectId: 'janitor-test',
+        ttlMs: 60_000,
+      });
+      const validFile = path.join(dataVaultDir, fs.readdirSync(dataVaultDir)[0]!);
+      const persisted = JSON.parse(fs.readFileSync(validFile, 'utf8')) as Record<string, unknown>;
+      const expiresAt = new Date(Date.now() - 1_000).toISOString();
+      persisted.expiresAt = expiresAt;
+      fs.writeFileSync(validFile, JSON.stringify(persisted));
+
+      expect(scanDataVault({ dryRun: true }).expired).toContain(validFile);
+      expect(readRetentionAudit()).toHaveLength(0); // dry-run writes no record
+
+      const result = scanDataVault({ dryRun: false });
+      expect(result.deleted).toContain(validFile);
+      const repoRel = path.relative(testRootDir(), validFile).split(path.sep).join('/');
+      const records = readRetentionAudit().filter((r) => r.path === repoRel);
+      expect(records).toHaveLength(1);
+      expect(records[0]).toMatchObject({
+        event: 'RETENTION_DELETE',
+        policy_path: 'active/shared/data-vault',
+        expires_at: expiresAt,
+      });
+    });
+  });
+
+  describe('audit-first expiry', () => {
+    /** Make the retention audit log unappendable (a directory at its path). */
+    function blockRetentionAudit(): void {
+      fs.mkdirSync(path.join(logsDir, 'audit', STORAGE_RETENTION_AUDIT_FILENAME), {
+        recursive: true,
+      });
+    }
+
+    it('keeps an expired vault entry and reports the error when its audit record cannot be written', async () => {
+      await fetchWithVaultCache('notion', 'expired-blocked', () => ({ value: 1 }), {
+        projectId: 'janitor-test',
+        ttlMs: 60_000,
+      });
+      const validFile = path.join(dataVaultDir, fs.readdirSync(dataVaultDir)[0]!);
+      const persisted = JSON.parse(fs.readFileSync(validFile, 'utf8')) as Record<string, unknown>;
+      persisted.expiresAt = new Date(Date.now() - 1_000).toISOString();
+      fs.writeFileSync(validFile, JSON.stringify(persisted));
+      blockRetentionAudit();
+
+      const result = scanDataVault({ dryRun: false });
+      expect(result.expired).toContain(validFile);
+      expect(result.deleted).toEqual([]);
+      expect(fs.existsSync(validFile)).toBe(true);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors![0]).toContain('audit record could not be written');
+    });
+
+    it('never unlinks an audited log file whose audit record cannot be written', () => {
+      writeCatalogFile({
+        version: '1.10.0',
+        entries: [
+          {
+            path: 'active/shared/logs',
+            artifact_class: 'log',
+            ttl_days: 30,
+            action: 'delete',
+            audit: true,
+          },
+        ],
+      });
+      const trace = path.join(logsDir, 'traces', 'traces-old.jsonl');
+      writeFile(trace);
+      setMtime(trace, 31 * RETENTION_DAY_MS);
+      blockRetentionAudit();
+
+      const result = rotateLogs({ dryRun: false });
+      expect(result.rotated).not.toContain(trace);
+      expect(fs.existsSync(trace)).toBe(true);
+    });
   });
 
   /** XP-06 zombie sweep — orphaned delegation-child PID reaping. */
@@ -1582,6 +1688,42 @@ describe('storage-janitor', () => {
       expect(fs.existsSync(oldFile)).toBe(false);
     });
 
+    it('fallback mirrors the shipped catalog: logs/audit is archived at 90d, staging/cache expire (C-ESS-007)', () => {
+      writeCatalogFile('{broken json!!');
+      const shared = path.dirname(tmpDir);
+      const auditFile = path.join(logsDir, 'audit', 'mission-closure.jsonl');
+      const trace = path.join(logsDir, 'traces', 'traces-old.jsonl');
+      const staged = path.join(shared, 'staging', 'system', 'inbound.bin');
+      const cached = path.join(shared, 'cache', 'system', 'thing.json');
+      const toolRuntime = path.join(shared, 'cache', 'system', 'tool-runtimes', 'bin.tar');
+      for (const f of [auditFile, trace, staged, cached, toolRuntime]) writeFile(f);
+      setMtime(auditFile, 31 * RETENTION_DAY_MS);
+      setMtime(trace, 31 * RETENTION_DAY_MS);
+      setMtime(staged, 4 * RETENTION_DAY_MS);
+      setMtime(cached, 31 * RETENTION_DAY_MS);
+      setMtime(toolRuntime, 365 * RETENTION_DAY_MS);
+
+      const catalog = loadRetentionCatalog();
+      expect(catalog.source).toBe('builtin-defaults');
+      // Past the logs-root 30d but inside the audit 90d: never deleted under fallback.
+      const logs = rotateLogs({ dryRun: false, catalog });
+      expect(logs.rotated).toContain(trace);
+      expect(logs.expired).not.toContain(auditFile);
+      expect(fs.existsSync(auditFile)).toBe(true);
+      // Past 90d: archived, not unlinked.
+      setMtime(auditFile, 91 * RETENTION_DAY_MS);
+      const later = rotateLogs({ dryRun: false, catalog });
+      expect(later.archived).toContain(auditFile);
+      expect(later.rotated).not.toContain(auditFile);
+      expect(fs.existsSync(archiveFileOf('active/shared/logs/audit/mission-closure.jsonl'))).toBe(
+        true
+      );
+
+      const floors = scanStorageFloors({ dryRun: true, catalog });
+      expect(floors.expired).toEqual(expect.arrayContaining([staged, cached]));
+      expect(floors.expired).not.toContain(toolRuntime); // review_required, never expired
+    });
+
     it('falls back to builtin defaults on a corrupt catalog — janitor never dies', () => {
       writeCatalogFile('{broken json!!');
       const oldFile = path.join(tmpDir, 'stale-under-default-ttl.json');
@@ -1609,6 +1751,27 @@ describe('storage-janitor', () => {
       expect(report.uncoveredRuntimeDirs).toContain('active/shared/runtime/mystery-dir');
       expect(report.uncoveredRuntimeDirs).not.toContain('active/shared/runtime/browser-receipts');
       expect(fs.existsSync(mysteryFile)).toBe(true); // reported, not deleted
+    });
+
+    it('listUncoveredEventStoreDirs counts a nested entry as covering its top-level dir, like runtime coverage', () => {
+      writeCatalogFile({
+        version: '1.0.0',
+        entries: [
+          {
+            path: 'presence/bridge/runtime/a/b',
+            artifact_class: 'log',
+            ttl_days: 7,
+            action: 'delete',
+          },
+        ],
+      });
+      const root = path.join(testRootDir(), 'presence', 'bridge', 'runtime');
+      writeFile(path.join(root, 'a', 'b', 'x.jsonl'));
+      writeFile(path.join(root, 'c', 'y.jsonl'));
+
+      const uncovered = listUncoveredEventStoreDirs();
+      expect(uncovered).toContain('presence/bridge/runtime/c');
+      expect(uncovered).not.toContain('presence/bridge/runtime/a');
     });
 
     it('listUncoveredRuntimeDirs honors catalog coverage including note-only entries', () => {

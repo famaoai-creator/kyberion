@@ -124,7 +124,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       tier: StorageDataTier = 'confidential',
       persona: string = 'worker',
       tenantId: string = 'default',
-      missionType: string = 'development',
+      missionType?: string,
       visionRef?: string,
       relationships: any = {},
       tenantSlug?: string,
