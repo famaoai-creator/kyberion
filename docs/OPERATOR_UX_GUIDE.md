@@ -842,7 +842,11 @@ This checks the Mission's startup prerequisites and validates the stored gate
 definition. It does not evaluate the gate evidence. When the workflow declares
 alignment approval, the alignment gate is the first gate that can activate the
 Mission. The actual `gate-pass` evaluates evidence before activation and phase
-advancement. Admission prepared from a WorkItem uses its governed activation
+advancement. A gate the workflow marks as a required human hold (`require_signature`, for
+example the reverse_spec scope and code-graph holds) passes only with a human approval:
+`gate-pass <ID> <GATE_ID> --request-approval`, the person runs
+`pnpm kyberion approvals --approve <id>`, then
+`gate-pass <ID> <GATE_ID> --approval-request-id <id>` signs the pass in their name. Admission prepared from a WorkItem uses its governed activation
 flow, which records the exact admission brief before marking the Mission
 active.
 

@@ -185,15 +185,80 @@ export async function gatePass(
     );
     return;
   }
+  // Human holds (MO-02): --request-approval files the human decision;
+  // --approval-request-id applies it as a signed override. A required hold
+  // (catalog require_signature) is never passed by this command alone.
+  const hold = gateFile && !gateFile.endsWith('.json') ? gateFile : undefined;
+  const holdApprovalId = getOptionValue('--approval-request-id', argv);
+  let pendingHoldRecord:
+    import('@agent/core/mission/mission-gate-hold-approval').MissionGateHoldRecord | undefined;
+  let holdMissionPath = '';
+  if (hold) {
+    const holdApproval = await import('@agent/core/mission/mission-gate-hold-approval');
+    const { resolveRequiredHumanHolds } = holdApproval;
+    if (hasCliFlag(argv, '--request-approval')) {
+      inspectActivation(hold);
+      const { missionControllerRequester } = await import('../lib/cli/cli-approval-requester.js');
+      const request = holdApproval.createMissionGateHoldApprovalRequest({
+        missionId,
+        gateId: hold,
+        note,
+        requester: missionControllerRequester(getOptionValue('--requested-by', argv)),
+      });
+      print(JSON.stringify(request, null, 2));
+      logger.info(
+        `Human approval: review with \`pnpm kyberion approvals\`, then \`pnpm kyberion approvals --approve ${request.id}\`. ` +
+          `Afterwards pass the gate with \`pnpm mission gate-pass ${missionId.toUpperCase()} ${hold} --approval-request-id ${request.id}\`.`
+      );
+      return;
+    }
+    if (holdApprovalId) {
+      inspectActivation(hold);
+      const prepared = holdApproval.prepareMissionGateHoldRecord({
+        missionId,
+        gateId: hold,
+        approvalRequestId: holdApprovalId,
+      });
+      pendingHoldRecord = prepared.record;
+      holdMissionPath = prepared.missionPath;
+    }
+    // A gate whose phase waits for an earlier pending hold cannot advance the
+    // mission; refuse instead of reporting a pass that changes nothing.
+    const holdPhase = readStoredMissionGate(missionId.toUpperCase(), hold)?.definition.phase;
+    const earlier = holdPhase
+      ? holdApproval.pendingHumanHoldBeforePhase(missionId, holdPhase)
+      : undefined;
+    if (earlier && earlier.gateId !== hold) {
+      throw new DiagnosticError({
+        code: 'HUMAN_HOLD_PENDING',
+        what: `${hold} (phase ${holdPhase}) comes after the human hold ${earlier.gateId}, which is not approved (${earlier.reason})`,
+        why: 'phases behind an unapproved human hold neither advance nor complete their tasks',
+        next: `pnpm mission gate-pass ${missionId.toUpperCase()} ${earlier.gateId} --request-approval, have the person approve it, pass it with --approval-request-id <id>, then re-run this gate-pass`,
+      });
+    }
+    if (
+      !pendingHoldRecord &&
+      resolveRequiredHumanHolds(missionId).some((entry) => entry.gateId === hold)
+    ) {
+      throw new DiagnosticError({
+        code: 'HUMAN_HOLD_APPROVAL_REQUIRED',
+        what: `${hold} is a human hold of ${missionId.toUpperCase()} — a person must approve it`,
+        why: 'the workflow marks this gate require_signature; gate-pass alone does not pass it',
+        next: `pnpm mission gate-pass ${missionId.toUpperCase()} ${hold} --request-approval, then the person runs pnpm kyberion approvals --approve <id>, then gate-pass ... --approval-request-id <id>`,
+      });
+    }
+  }
   // Process-template gates (MO-01/MO-02): when a stored gate definition
   // exists, machine-evaluate its checks instead of recording a bare override.
-  // The operator command itself satisfies reviewer/human confirmation checks.
+  // The operator command itself satisfies reviewer/human confirmation checks
+  // (a required human hold is decided by its approval proof instead).
   if (gateFile && !gateFile.endsWith('.json')) {
     inspectActivation(gateFile);
     const stored = await evaluateStoredMissionGate({
       missionId,
       gateId: gateFile,
       humanConfirmed: true,
+      ...(pendingHoldRecord ? { pendingHoldRecord } : {}),
     });
     if (stored.found && stored.evaluation) {
       const upperId = missionId.toUpperCase();
@@ -212,6 +277,27 @@ export async function gatePass(
         },
       });
       if (stored.evaluation.verdict === 'pass') {
+        if (pendingHoldRecord) {
+          const { writeMissionGateHoldRecord } =
+            await import('@agent/core/mission/mission-gate-hold-approval');
+          const recordPath = writeMissionGateHoldRecord(holdMissionPath, pendingHoldRecord);
+          auditChain.record({
+            agentId: executionAgentId('operator'),
+            action: 'gate.human_hold_approved',
+            operation: `gate-pass:${gateFile}`,
+            result: 'completed',
+            metadata: {
+              mission_id: upperId,
+              gate_id: gateFile,
+              approval_request_id: pendingHoldRecord.approval_request_id,
+              approved_by: pendingHoldRecord.approved_by,
+              record_path: recordPath,
+            },
+          });
+          logger.info(
+            `   Human hold signed for ${pendingHoldRecord.approved_by} (approval ${pendingHoldRecord.approval_request_id}).`
+          );
+        }
         if (await activateMissionOnGateProgress(upperId, stored.evaluation)) {
           logger.info('   Mission status: planned → active (first gate passed).');
         }
@@ -232,6 +318,11 @@ export async function gatePass(
       }
       return;
     }
+  }
+  if (pendingHoldRecord) {
+    throw new Error(
+      `[MISSION_GATE_NOT_FOUND] ${missionId.toUpperCase()} has no stored gate definition ${gateFile}; a human hold approval applies only to a stored gate.`
+    );
   }
   requireGateScope();
   const gatePath = await resolveGate(missionId, gateFile);

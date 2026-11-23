@@ -58,6 +58,7 @@ import { findMissionPath } from '../path-resolver.js';
 import { missionPathOrNull } from './mission-lookup.js';
 import { loadMissionStateSnapshot } from './mission-orchestration-phase-gates.js';
 import { unchangedAiDlcContractFailure } from './mission-aidlc-gate-projection.js';
+import { pendingHumanHoldBeforePhase } from './mission-gate-hold-proof.js';
 import {
   createApprovalBackedManualDriveGate,
   type ManualDriveApprovalGate,
@@ -585,6 +586,27 @@ export async function provisionGoalDrivenTaskKnowledge(input: {
   }
 }
 
+/** MO-02: a task behind an unapproved required human hold is never dispatched. */
+function humanHoldDispatchRefusal(
+  missionId: string,
+  task: PlannedNextTask,
+  teamRole: string,
+  agentId: string
+): DispatchMissionTaskOutcome | null {
+  const hold = pendingHumanHoldBeforePhase(missionId, String(task.phase || ''));
+  if (!hold) return null;
+  return {
+    task_id: task.task_id,
+    team_role: teamRole,
+    agent_id: agentId,
+    dispatched: false,
+    dispatch_error: `human hold ${hold.gateId} (phase ${hold.phase}) not approved: ${hold.reason}`,
+    rollup_used: false,
+    result_schema_ok: false,
+    needs_count: 1,
+  };
+}
+
 export async function dispatchGoalDrivenMissionTask(
   input: {
     missionId: string;
@@ -598,6 +620,13 @@ export async function dispatchGoalDrivenMissionTask(
   },
   traceCtx: TraceContext
 ): Promise<DispatchMissionTaskOutcome | null> {
+  const held = humanHoldDispatchRefusal(
+    input.missionId,
+    input.task,
+    input.teamRole,
+    input.assignment.agent_id
+  );
+  if (held) return held;
   const workItemSourceRef = `mission:${input.missionId}:${input.task.task_id}:goal`;
   // D1: the goal-driven task is a step of the mission's Issue (its ownership item).
   const parentItemId = resolveMissionTaskParentItemId(input.missionId, undefined);
@@ -1012,6 +1041,13 @@ export function originateMissionDispatchDelegationChain(input: {
 export async function dispatchPlannedMissionTask(
   input: DispatchPlannedMissionTaskInput
 ): Promise<DispatchMissionTaskOutcome | null> {
+  const held = humanHoldDispatchRefusal(
+    input.missionId,
+    input.task,
+    input.teamRole,
+    input.assignment.agent_id
+  );
+  if (held) return held;
   const failedContract = input.task.phase
     ? unchangedAiDlcContractFailure(input.missionId, input.task.phase)
     : null;

@@ -103,6 +103,7 @@ import {
   scopeApproveEffectBinding,
 } from './mission-scope-payload.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
+import { formatHumanHoldWait, humanHoldTaskBlocker } from './mission-gate-hold-proof.js';
 
 function safeMissionRoot(missionDir: string): string {
   return assertSafeRepositoryPath(missionDir, { allowMissingLeaf: true });
@@ -1043,6 +1044,12 @@ export async function recordEvidence(args: {
             `task ${args.taskId} not completed — it waits for a customer decision (requires_customer) | the evidence is recorded; confirm the customer decision (customer-decision confirm), then resume the mission | mission=${upperId} consumer=${decisionCheck.consumer ?? ''} proposals=${heldIds.join(',')}`
           );
         }
+        // A task after an unapproved required human hold keeps its evidence too.
+        const holdBlocker = humanHoldTaskBlocker(upperId, missionPath, () =>
+          readMissionNextTasks(missionPath)
+        );
+        const ownHold = holdBlocker(args.taskId);
+        if (ownHold) logger.warn(formatHumanHoldWait(upperId, args.taskId, ownHold));
         const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.taskId, {
           verifiedSourceTarget: verified.sourceTarget,
           canCascade: reviewTargetCascadeGuard(missionPath),
@@ -1050,6 +1057,7 @@ export async function recordEvidence(args: {
           // lets a held task close (the hold check fails closed).
           isHeld: (taskId) =>
             (taskId === args.taskId && heldIds.length > 0) ||
+            Boolean(holdBlocker(taskId)) ||
             isTaskAwaitingCustomerDecision({ missionId: upperId, taskId }),
         });
         taskCompletion = {
@@ -1061,7 +1069,8 @@ export async function recordEvidence(args: {
         if (
           !autoComplete.completed &&
           autoComplete.reason !== 'already completed' &&
-          heldIds.length === 0
+          heldIds.length === 0 &&
+          !ownHold
         ) {
           logger.warn(
             `task ${args.taskId} not completed — ${autoComplete.reason} | next: write the deliverable / close the listed dependencies, then record-evidence again | mission=${upperId}`
@@ -1373,9 +1382,16 @@ export async function recordArtifactReview(args: {
     // concurrent write. A task held for a customer decision stays open, as in
     // record-evidence.
     if (evaluation.ready) {
+      const holdBlocker = humanHoldTaskBlocker(upperId, missionPath, () =>
+        readMissionNextTasks(missionPath)
+      );
+      const ownHold = holdBlocker(args.reviewTaskId);
+      if (ownHold) logger.warn(formatHumanHoldWait(upperId, args.reviewTaskId, ownHold));
       autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.reviewTaskId, {
         canCascade: reviewTargetCascadeGuard(missionPath),
-        isHeld: (taskId) => isTaskAwaitingCustomerDecision({ missionId: upperId, taskId }),
+        isHeld: (taskId) =>
+          Boolean(holdBlocker(taskId)) ||
+          isTaskAwaitingCustomerDecision({ missionId: upperId, taskId }),
       });
     }
   });

@@ -29,6 +29,11 @@ Lifecycle Commands:
   finish   <ID> [--seal]         Archive a completed mission (optionally encrypt)
   gate-pass <ID> <GATE_ID> [--machine-only] [--dry-run --json]
                                  Preview startup and stored gate, or evaluate and advance
+                                 Human hold: --request-approval [--requested-by <ACTOR>] files a
+                                 human approval bound to the gate and its inputs; the person runs
+                                 'pnpm kyberion approvals --approve <id>'; then --approval-request-id
+                                 <id> passes it signed in their name. Required holds
+                                 (require_signature) pass only this way.
   resume   [ID]                  Resume the last active mission and replay orchestration journal (or specify ID)
   pause    <ID> [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
                                  Pause an active mission without losing state

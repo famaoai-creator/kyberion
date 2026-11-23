@@ -22,6 +22,7 @@ import { evaluateMissionIntentDrift } from './mission-intent-delta.js';
 import { latestSnapshot } from '../intent/intent-snapshot-store.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { normalizeMissionGateCheckPaths } from './mission-gate-input-fingerprint.js';
+import { applyMissionGateHoldProof, resolveRequiredHumanHolds } from './mission-gate-hold-proof.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '../secure-io.js';
 import {
   loadMissionPhaseGateDefinitionAtPath,
@@ -160,6 +161,7 @@ export async function evaluateMissionPhaseExitGates(
   const priorRecords = loadMissionGateRecords(missionId);
   const failures: PhaseExitGateOutcome['failures'] = [];
   const driftSummary = evaluateMissionIntentDrift(missionId);
+  const requiredGateIds = new Set(resolveRequiredHumanHolds(missionId).map((hold) => hold.gateId));
   const hasPersistedDriftGate = definitions.some(
     (definition) => definition.gate.id === 'INTENT_DRIFT'
   );
@@ -175,9 +177,13 @@ export async function evaluateMissionPhaseExitGates(
           }
         : await evaluateMissionGate({
             missionId,
-            gate: normalizeMissionGateCheckPaths(
-              enrichGateWithTaskOutcomes(missionId, definition.gate),
-              safeMissionPath(missionId, '')
+            gate: applyMissionGateHoldProof(
+              missionId,
+              normalizeMissionGateCheckPaths(
+                enrichGateWithTaskOutcomes(missionId, definition.gate),
+                safeMissionPath(missionId, '')
+              ),
+              { requiredGateIds }
             ),
             evidenceDir: safeMissionPath(missionId, 'gates'),
             blocking: resolvePhaseGateMode() === 'enforce',
