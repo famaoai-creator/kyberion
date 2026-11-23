@@ -302,6 +302,20 @@ binding — the approval is for exactly the text the human read. When the missio
 die instead, triage recommends `cancel` → `archive --mission <ID> --execute` (no approval
 required; cancel is an unguarded operator action).
 
+**Required human holds** (a gate check `human_override` with `require_signature` in the
+workflow catalog, e.g. the reverse_spec scope and code-graph holds) follow the same
+approval-mediated shape and are enforced in every mode:
+
+```bash
+pnpm mission gate-pass <ID> <GATE_ID> --request-approval         # files the request
+pnpm kyberion approvals --approve <request-id>                    # the person decides
+pnpm mission gate-pass <ID> <GATE_ID> --approval-request-id <request-id>
+```
+
+Until the hold passes, `record-evidence` records evidence for later-phase tasks without
+completing them, the worker does not dispatch them, later gates refuse with
+`HUMAN_HOLD_PENDING`, and `finish` is blocked.
+
 **Ordering rule**: never delete the worktree before the mission reaches a terminal
 status. The mission ledger is a gitignored micro-repo under `active/missions/<tier>/` of
 whichever checkout ran `mission_controller` — deleting that checkout deletes the ledger
