@@ -227,6 +227,38 @@
     {
       "id": "pipelines/document-review.json",
       "reason": "Explicit document/design review run by an operator per document-review-playbook.md and pipelines/README.md. Its wisdom:document_review caller is exercised by orphan_op_reachability.test.ts; no background model usage or automatic risk acceptance."
+    },
+    {
+      "id": "pipelines/_scratch-aoi-decisions.json",
+      "reason": "Bizsim scratch: aoi-dynamics tenant decision-rights evaluation run by hand during the organization simulation (pipelines/README.md scratch list); evidence lives under active/shared/tmp/confidential/shared/bizsim-202611-aoi/."
+    },
+    {
+      "id": "pipelines/_scratch-aoi-profile.json",
+      "reason": "Bizsim scratch: lands the aoi-dynamics organization profile into tenant knowledge; run by hand once per simulation cycle (pipelines/README.md scratch list)."
+    },
+    {
+      "id": "pipelines/_scratch-aoi-tenant-assets.json",
+      "reason": "Bizsim scratch: seeds aoi-dynamics decision-rights and financial-model knowledge; run by hand during tenant bootstrap (pipelines/README.md scratch list)."
+    },
+    {
+      "id": "pipelines/_scratch-bizsim-contract-wisdom.json",
+      "reason": "Bizsim scratch: contract-risk wisdom extraction over the IPA model subcontract sample; run by hand, outputs evidence JSON under the bizsim scratch partition (pipelines/README.md)."
+    },
+    {
+      "id": "pipelines/_scratch-bizsim-decisions.json",
+      "reason": "Bizsim scratch: famao-lab decision-rights evaluation; run by hand during the original business simulation (pipelines/README.md scratch list)."
+    },
+    {
+      "id": "pipelines/_scratch-bizsim2-doc-lifecycle.json",
+      "reason": "Bizsim scratch: the organization-scoped document lifecycle loop (brief→layout render→artifact registration→extract→text edit→decision→evidence); run by hand per simulation, documented in pipelines/README.md and AOI-ORGANIZATION-RUN-REPORT.md."
+    },
+    {
+      "id": "pipelines/_scratch-bizsim2-idempotency.json",
+      "reason": "Bizsim scratch: idempotency probe for media:register_artifact if_exists:reuse; run by hand to prove append-only ledger behavior (pipelines/README.md scratch list)."
+    },
+    {
+      "id": "pipelines/_scratch-repro-mdref.json",
+      "reason": "Reproduction scratch for docx markdown-reference extraction; run by hand when investigating document_digest regressions (pipelines/README.md scratch list)."
     }
   ],
   "actuator_ops": [

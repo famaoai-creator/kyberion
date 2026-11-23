@@ -1,0 +1,102 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "scratch-bizsim-contract-wisdom",
+  "version": "1.0.0",
+  "name": "BizSim: contract-review wisdom continuation",
+  "description": "SCRATCH continuation of contract-review — typed participants passed explicitly (template's personas_from is stale). Remove after the simulation.",
+  "context": {
+    "mission_id": "BIZSIM-20261123",
+    "hypotheses_output": "active/shared/tmp/confidential/shared/bizsim-202611/evidence/contract-risks-raw.json",
+    "critique_output": "active/shared/tmp/confidential/shared/bizsim-202611/evidence/contract-risks.json",
+    "dissent_output": "active/shared/tmp/confidential/shared/bizsim-202611/evidence/dissent-log.json",
+    "participants": [
+      {
+        "participant_id": "legal-conservative",
+        "team_role_id": "defender",
+        "organization_role_id": "legal_strategist",
+        "perspective_ids": ["legal_strategist"],
+        "agent_profile_id": "critique-worker",
+        "authority_role_id": "legal_strategist",
+        "reasoning_route_id": "claude-cli",
+        "security_scope": {
+          "mission_id": "BIZSIM-20261123",
+          "participant_id": "legal-conservative",
+          "read_tiers": ["public"],
+          "write_tier": "public",
+          "purpose": "contract risk review — legal conservative lens",
+          "external_egress": "allow"
+        }
+      },
+      {
+        "participant_id": "ops-focused",
+        "team_role_id": "operator",
+        "organization_role_id": "finance_controller",
+        "perspective_ids": ["operations"],
+        "agent_profile_id": "critique-worker",
+        "authority_role_id": "operator",
+        "reasoning_route_id": "claude-cli",
+        "security_scope": {
+          "mission_id": "BIZSIM-20261123",
+          "participant_id": "ops-focused",
+          "read_tiers": ["public"],
+          "write_tier": "public",
+          "purpose": "contract risk review — operational feasibility lens",
+          "external_egress": "allow"
+        }
+      },
+      {
+        "participant_id": "red-team-adversary",
+        "team_role_id": "attacker",
+        "organization_role_id": "cyber_security",
+        "perspective_ids": ["red-team-adversary"],
+        "agent_profile_id": "critique-worker",
+        "authority_role_id": "cyber_security",
+        "reasoning_route_id": "claude-cli",
+        "security_scope": {
+          "mission_id": "BIZSIM-20261123",
+          "participant_id": "red-team-adversary",
+          "read_tiers": ["public"],
+          "write_tier": "public",
+          "purpose": "contract risk review — adversarial worst-case lens",
+          "external_egress": "allow"
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "id": "diverge_risks",
+      "role": "sink",
+      "op": "wisdom:perspective_fanout",
+      "params": {
+        "participants_from": "participants",
+        "min_hypotheses_per_participant": 2,
+        "topic": "Identify material risks in the contract at active/shared/tmp/confidential/shared/bizsim-202611/evidence/contract.md (IPA model development subcontract contract, second edition)",
+        "output_path": "{{hypotheses_output}}",
+        "output_tier": "public"
+      }
+    },
+    {
+      "id": "critique_risks",
+      "role": "sink",
+      "op": "wisdom:typed_cross_critique",
+      "params": {
+        "input": "{{hypotheses_output}}",
+        "participants_from": "participants",
+        "output_path": "{{critique_output}}",
+        "output_tier": "public"
+      }
+    },
+    {
+      "id": "record_dissent",
+      "role": "sink",
+      "op": "wisdom:emit_dissent_log",
+      "params": {
+        "source": "{{critique_output}}",
+        "output_path": "{{dissent_output}}",
+        "mission_id": "{{mission_id}}",
+        "topic": "contract-review"
+      }
+    }
+  ]
+}

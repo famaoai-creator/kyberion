@@ -1,0 +1,80 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "scratch-aoi-decisions",
+  "version": "1.0.0",
+  "name": "BizSim AOI: tenant decision-rights evaluation chain",
+  "description": "SCRATCH simulation (bizsim-202611-aoi): evaluate three business decisions through the aoi-dynamics tenant decision-rights matrix + approval gate. Remove after the simulation.",
+  "context": {
+    "sim_id": "BIZSIM-20261123-AOI",
+    "tenant_slug": "aoi-dynamics",
+    "out_dir": "active/shared/tmp/confidential/shared/bizsim-202611-aoi"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/runtime-preflight.json",
+        "context": { "preflight_cmd": "node --version" }
+      }
+    },
+    {
+      "id": "eval_vendor_payment_340k",
+      "role": "sink",
+      "op": "approval:evaluate_decision_rights",
+      "params": {
+        "operation_id": "bizsim-aoi:vendor_invoice_payment:outsourcing-nov",
+        "correlation_id": "BIZSIM-20261123-AOI:vendor_payment_340k",
+        "decision_type": "vendor_invoice_payment",
+        "caller_role": "finance_controller",
+        "amount": 340000,
+        "tenant_slug": "{{tenant_slug}}",
+        "mission_id": "{{sim_id}}",
+        "channel": "mission",
+        "title": "Vendor invoice payment: 外注費11月分 ¥340,000",
+        "summary": "テナント閾値 ¥300,000 超過のため over_threshold エスカレーション期待。"
+      }
+    },
+    {
+      "id": "eval_expense_50k",
+      "role": "sink",
+      "op": "approval:evaluate_decision_rights",
+      "params": {
+        "operation_id": "bizsim-aoi:expense_reimbursement:travel-nov",
+        "correlation_id": "BIZSIM-20261123-AOI:expense_50k",
+        "decision_type": "expense_reimbursement",
+        "caller_role": "operator",
+        "amount": 50000,
+        "tenant_slug": "{{tenant_slug}}",
+        "mission_id": "{{sim_id}}",
+        "channel": "mission",
+        "title": "Expense reimbursement: 交通費 ¥50,000",
+        "summary": "テナント閾値 ¥30,000 超過 — over_threshold エスカレーション期待(famao-lab既定¥100kでは human_acceptance のみ)。"
+      }
+    },
+    {
+      "id": "eval_contract_signature",
+      "role": "sink",
+      "op": "approval:evaluate_decision_rights",
+      "params": {
+        "operation_id": "bizsim-aoi:contract_signature:ipa-model-dev-contract",
+        "correlation_id": "BIZSIM-20261123-AOI:contract_signature",
+        "decision_type": "contract_signature",
+        "caller_role": "legal_strategist",
+        "risk_level": "medium",
+        "tenant_slug": "{{tenant_slug}}",
+        "mission_id": "{{sim_id}}",
+        "channel": "mission",
+        "title": "Contract signature: IPAモデル開発委託契約(レビュー済みドラフト)",
+        "summary": "risk_level=medium の契約締結 — 人間最終決裁へのエスカレーション期待。"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "aoi-dynamics tenant decision evaluations complete" }
+    }
+  ]
+}

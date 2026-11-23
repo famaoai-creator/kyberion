@@ -1038,6 +1038,56 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         [params.export_as || 'last_pdf_design']: invoiceProtocol,
       };
     },
+    pdf_text_edit: async () => {
+      const fromKey = resolve(params.from) || 'last_pdf_design';
+      const design = ctx[fromKey];
+      if (!design || typeof design !== 'object') {
+        throw new Error(`pdf_text_edit could not find context key: ${fromKey}`);
+      }
+      const edits = Array.isArray(params.edits) ? params.edits : [];
+      if (!edits.length) {
+        throw new Error('pdf_text_edit requires params.edits: [{match, replace, page?}]');
+      }
+      let applied = 0;
+      const patchText = (value: unknown, pageIdx?: number): unknown => {
+        if (typeof value !== 'string' || !value) return value;
+        let out = value;
+        for (const edit of edits) {
+          if (!edit || typeof edit.match !== 'string' || typeof edit.replace !== 'string') {
+            throw new Error('pdf_text_edit edits require {match, replace} strings');
+          }
+          if (edit.page !== undefined && pageIdx !== undefined && edit.page !== pageIdx) continue;
+          if (out.includes(edit.match)) {
+            out = out.split(edit.match).join(edit.replace);
+            applied++;
+          }
+        }
+        return out;
+      };
+      const next = JSON.parse(JSON.stringify(design)) as PdfDesignProtocol;
+      // Aesthetic elements (render path) — text-bearing types only.
+      for (const el of next.aesthetic?.elements ?? []) {
+        if ((el.type === 'text' || el.type === 'heading') && el.text) {
+          const patched = patchText(el.text, el.page ?? 0);
+          if (patched !== el.text) el.text = patched as string;
+        }
+      }
+      // Page-scoped elements + plain page text (analysis/fallback paths).
+      (next.content?.pages ?? []).forEach((page, pageIdx: number) => {
+        for (const el of page.elements ?? []) {
+          if (el.text) el.text = patchText(el.text, pageIdx) as string;
+        }
+        if (typeof page.text === 'string') page.text = patchText(page.text, pageIdx) as string;
+      });
+      if (next.source?.body) next.source.body = patchText(next.source.body) as string;
+      if (typeof next.content?.text === 'string')
+        next.content.text = patchText(next.content.text) as string;
+      logger.info(`[MEDIA] pdf_text_edit applied ${applied} replacement(s).`);
+      return {
+        ...ctx,
+        [params.export_as || 'last_pdf_design']: next,
+      };
+    },
     document_diagram_asset_from_brief: async () => {
       const fromKey = resolve(params.from) || 'last_json';
       const rawBrief = ctx[fromKey];

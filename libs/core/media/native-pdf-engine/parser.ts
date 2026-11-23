@@ -1,16 +1,10 @@
 import * as path from 'node:path';
 import * as zlib from 'node:zlib';
 import { createHash } from 'node:crypto';
-import { nowIso } from '../../foundation/time.js';
 import { pathResolver } from '../../path-resolver.js';
 import { safeMkdir, safeReadFile, safeWriteFile } from '../../secure-io.js';
 import { decodeEntities } from '../../foundation/text-escaping.js';
-import type {
-  PdfDesignProtocol,
-  PdfLayoutElement,
-  PdfPage,
-  PdfImageElement,
-} from '../../contracts/pdf-protocol.js';
+import type { PdfLayoutElement, PdfPage, PdfImageElement } from '../../contracts/pdf-protocol.js';
 import { clamp } from '../../foundation/text.js';
 import { decodeFilterChain, parseDecodeParms, parseFilterNames } from './filters.js';
 import * as pdfStructure from './structure.js';
@@ -1395,21 +1389,35 @@ export class NativePdfParser {
     let currentCtm: AffineMatrix = [...identityMatrix];
     const btCtmMap: AffineMatrix[] = [];
 
+    const btColorMap: Array<[number, number, number] | undefined> = [];
+    let currentFill: [number, number, number] | undefined;
+    const fillStack: Array<[number, number, number] | undefined> = [];
     const ctmTokenRegex =
-      /\bq\b|\bQ\b|(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+cm\b|\bBT\b/g;
+      /\bq\b|\bQ\b|(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+cm\b|\bBT\b|(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+rg\b/g;
     let ctmTokenMatch: RegExpExecArray | null;
     while ((ctmTokenMatch = ctmTokenRegex.exec(content)) !== null) {
       const token = ctmTokenMatch[0].trim();
       if (token === 'q') {
         ctmStack.push([...currentCtm]);
+        fillStack.push(currentFill);
         continue;
       }
       if (token === 'Q') {
         if (ctmStack.length > 0) currentCtm = ctmStack.pop() as AffineMatrix;
+        if (fillStack.length > 0) currentFill = fillStack.pop();
         continue;
       }
       if (token === 'BT') {
         btCtmMap.push([...currentCtm]);
+        btColorMap.push(currentFill);
+        continue;
+      }
+      if (token.endsWith('rg')) {
+        currentFill = [
+          Math.min(1, Math.max(0, parseFloat(ctmTokenMatch[7]) || 0)),
+          Math.min(1, Math.max(0, parseFloat(ctmTokenMatch[8]) || 0)),
+          Math.min(1, Math.max(0, parseFloat(ctmTokenMatch[9]) || 0)),
+        ];
         continue;
       }
       if (token.endsWith('cm')) {
@@ -1436,14 +1444,27 @@ export class NativePdfParser {
         fontName: '',
         fontObjectId: undefined as number | undefined,
         leading: 0,
+        color: btColorMap[i - 1] as [number, number, number] | undefined,
       };
 
       const opRegex =
-        /\/[A-Za-z0-9_.-]+\s+-?\d*\.?\d+\s+Tf|-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+Tm|-?\d*\.?\d+\s+-?\d*\.?\d+\s+TD|-?\d*\.?\d+\s+-?\d*\.?\d+\s+Td|-?\d*\.?\d+\s+TL|T\*|\[(?:.|\r|\n)*?\]\s*TJ|\((?:\\.|[^\\)])*\)\s*Tj|<[0-9A-Fa-f\s]+>\s*Tj/g;
+        /\/[A-Za-z0-9_.-]+\s+-?\d*\.?\d+\s+Tf|-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+Tm|-?\d*\.?\d+\s+-?\d*\.?\d+\s+TD|-?\d*\.?\d+\s+-?\d*\.?\d+\s+Td|-?\d*\.?\d+\s+TL|T\*|-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+rg|\[(?:.|\r|\n)*?\]\s*TJ|\((?:\\.|[^\\)])*\)\s*Tj|<[0-9A-Fa-f\s]+>\s*Tj/g;
       let match: RegExpExecArray | null;
 
       while ((match = opRegex.exec(block)) !== null) {
         const token = match[0].trim();
+
+        if (token.endsWith(' rg')) {
+          const rgMatch = token.match(/^(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+rg$/);
+          if (rgMatch) {
+            state.color = [
+              Math.min(1, Math.max(0, parseFloat(rgMatch[1]) || 0)),
+              Math.min(1, Math.max(0, parseFloat(rgMatch[2]) || 0)),
+              Math.min(1, Math.max(0, parseFloat(rgMatch[3]) || 0)),
+            ];
+          }
+          continue;
+        }
 
         if (token.endsWith(' Tf')) {
           const tfMatch = token.match(/^\/([A-Za-z0-9_.-]+)\s+(-?\d*\.?\d+)\s+Tf$/);
@@ -1632,7 +1653,13 @@ export class NativePdfParser {
 
   private buildTextElement(
     text: string,
-    state: { x: number; y: number; fontSize: number; fontName: string },
+    state: {
+      x: number;
+      y: number;
+      fontSize: number;
+      fontName: string;
+      color?: [number, number, number];
+    },
     pageHeight: number
   ): PdfLayoutElement {
     const fontSize = Math.max(8, state.fontSize || 12);
@@ -1647,6 +1674,7 @@ export class NativePdfParser {
       text: text.replace(/\s+/g, ' ').trim(),
       fontSize,
       fontName: state.fontName || undefined,
+      ...(state.color ? { color: state.color } : {}),
     };
   }
 
@@ -1916,43 +1944,5 @@ export class NativePdfParser {
 }
 
 // ── Public Extraction API ───────────────────────────────────
-
-export async function distillNativePdfDesign(sourcePath: string): Promise<PdfDesignProtocol> {
-  const parser = new NativePdfParser(sourcePath);
-  const metadata = parser.extractMetadata();
-  const pages = parser.extractPages();
-  const outlines = parser.extractOutlines();
-  const acroForm = parser.extractAcroForm();
-  const fullText = pages.map((p) => p.text).join('\n\n');
-  const elements = pages.flatMap((page) => [
-    ...(page.elements || []),
-    ...(page.images || []).map((image) => ({
-      type: 'image' as const,
-      x: image.x,
-      y: image.y,
-      width: image.width,
-      height: image.height,
-    })),
-  ]);
-  const fonts = Array.from(
-    new Set(
-      elements
-        .filter((element): element is PdfLayoutElement => element.type !== 'image')
-        .map((element) => element.fontName)
-        .filter(Boolean)
-    )
-  ) as string[];
-  const xBuckets = Array.from(new Set(elements.map((element) => Math.round(element.x / 40))));
-  const layout = xBuckets.length >= 2 ? 'multi-column' : 'single-column';
-
-  return {
-    version: '4.0.0',
-    generatedAt: nowIso(),
-    source: { format: 'markdown' as any, body: fullText, title: metadata.title },
-    content: { text: fullText, pages },
-    metadata: { ...metadata, pageCount: pages.length },
-    outlines,
-    acroForm,
-    aesthetic: { layout, elements, fonts },
-  };
-}
+// `distillNativePdfDesign` lives in ./parser-distill.js (design-protocol
+// projection, kept separate to stay under the source-size ratchet).

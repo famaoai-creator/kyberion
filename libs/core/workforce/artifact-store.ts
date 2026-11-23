@@ -53,6 +53,7 @@ import {
   type ArtifactRecord,
 } from './artifact-record.js';
 
+export type { RetentionArtifactClass } from '../storage/storage-retention-catalog.js';
 export type GovernedArtifactRole =
   | 'slack_bridge'
   | 'chronos_gateway'

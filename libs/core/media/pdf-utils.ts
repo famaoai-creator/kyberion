@@ -2,7 +2,7 @@
  * PDF Utilities
  * Extracts a PdfDesignProtocol ADF from a .pdf file natively.
  */
-import { distillNativePdfDesign } from './native-pdf-engine/parser.js';
+import { distillNativePdfDesign } from './native-pdf-engine/parser-distill.js';
 import type { PdfDesignProtocol, PdfImageElement, PdfPage } from '../contracts/pdf-protocol.js';
 
 /**

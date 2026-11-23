@@ -145,6 +145,75 @@ function deriveReasoningMode(backendName: string, synthetic = false): 'placehold
 // preserve end-to-end pipeline executability in offline environments.
 // ---------------------------------------------------------------------------
 
+/**
+ * [WISDOM_PERSONA_COMPAT] Synthesize typed participants from unscoped persona
+ * labels so `personas`/`personas_from` templates keep working during the
+ * typed-participant migration. Prefer passing `participants` directly.
+ * The synthesized scope derives mission/tenant/tier from the step context —
+ * it never widens beyond the op's declared output_tier.
+ */
+function participantsFromPersonaLabels(
+  personas: unknown[],
+  ctx: Record<string, unknown>,
+  outputTier: 'personal' | 'confidential' | 'public',
+  opName: string
+): ReasoningParticipant[] {
+  const missionId =
+    typeof ctx.mission_id === 'string' && ctx.mission_id.trim() ? ctx.mission_id : 'shared';
+  const tenantSlug =
+    typeof ctx.tenant_slug === 'string' && ctx.tenant_slug.trim()
+      ? ctx.tenant_slug.trim()
+      : undefined;
+  return personas
+    .map((label) => String(label ?? '').trim())
+    .filter((label) => label.length > 0)
+    .map((label) => {
+      const participantId =
+        label
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '') || 'persona';
+      return {
+        participant_id: participantId,
+        team_role_id: 'facilitator',
+        perspective_ids: [participantId],
+        agent_profile_id: 'critique-worker',
+        authority_role_id: 'mission_controller',
+        reasoning_route_id: 'default',
+        security_scope: {
+          mission_id: missionId,
+          participant_id: participantId,
+          ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+          read_tiers: [outputTier],
+          write_tier: outputTier,
+          purpose: `${opName} persona '${label}'`,
+        },
+      } satisfies ReasoningParticipant;
+    });
+}
+
+/** Resolve typed participants, falling back to persona-label synthesis. */
+function resolveParticipantsParam(input: {
+  params: Record<string, unknown>;
+  ctx: Record<string, unknown>;
+  resolved: (key: string) => unknown;
+  outputTier: 'personal' | 'confidential' | 'public';
+  opName: string;
+}): ReasoningParticipant[] {
+  const { params, ctx, resolved, outputTier, opName } = input;
+  const direct =
+    resolved('participants') || ctx[String(params.participants_from || 'participants')] || [];
+  if (Array.isArray(direct) && direct.length > 0) return direct;
+  const personas = resolved('personas') || ctx[String(params.personas_from || 'personas')] || [];
+  if (Array.isArray(personas) && personas.length > 0) {
+    logger.warn(
+      `[WISDOM_PERSONA_COMPAT] ${opName} received unscoped persona labels; pass typed participants via participants/participants_from`
+    );
+    return participantsFromPersonaLabels(personas, ctx, outputTier, opName);
+  }
+  return [];
+}
+
 export async function a2aFanout(input: {
   personas: string[];
   min_hypotheses_per_persona: number;
@@ -1371,19 +1440,28 @@ const WISDOM_OP_HANDLERS: Record<string, WisdomOpHandler> = {
   },
 
   perspective_fanout: async ({ params, ctx, resolved, assign }) => {
-    const participantsResolved =
-      resolved('participants') || ctx[params.participants_from || 'participants'] || [];
+    const outputTier = resolved('output_tier') || 'public';
+    const participantsResolved = resolveParticipantsParam({
+      params,
+      ctx,
+      resolved,
+      outputTier,
+      opName: 'perspective_fanout',
+    });
     const fragmentsResolved =
       resolved('context_fragments') ||
       ctx[params.context_fragments_from || 'context_fragments'] ||
       [];
     const result = await perspectiveFanout({
-      participants: Array.isArray(participantsResolved) ? participantsResolved : [],
+      participants: participantsResolved,
       candidate_fragments: Array.isArray(fragmentsResolved) ? fragmentsResolved : [],
-      min_hypotheses_per_participant: Number(resolved('min_hypotheses_per_participant')) || 2,
+      min_hypotheses_per_participant:
+        Number(resolved('min_hypotheses_per_participant')) ||
+        Number(resolved('min_hypotheses_per_persona')) ||
+        2,
       topic: resolved('topic'),
       output_path: resolved('output_path'),
-      output_tier: resolved('output_tier') || 'public',
+      output_tier: outputTier,
     });
     return { handled: true, ctx: assign(result) };
   },
@@ -1399,13 +1477,19 @@ const WISDOM_OP_HANDLERS: Record<string, WisdomOpHandler> = {
   },
 
   typed_cross_critique: async ({ params, ctx, resolved, assign }) => {
-    const participantsResolved =
-      resolved('participants') || ctx[params.participants_from || 'participants'] || [];
+    const outputTier = resolved('output_tier') || 'public';
+    const participantsResolved = resolveParticipantsParam({
+      params,
+      ctx,
+      resolved,
+      outputTier,
+      opName: 'typed_cross_critique',
+    });
     const result = await typedCrossCritique({
       source_path: resolved('input') || resolved('source_path'),
-      participants: Array.isArray(participantsResolved) ? participantsResolved : [],
+      participants: participantsResolved,
       output_path: resolved('output_path'),
-      output_tier: resolved('output_tier') || 'public',
+      output_tier: outputTier,
     });
     return { handled: true, ctx: assign(result) };
   },

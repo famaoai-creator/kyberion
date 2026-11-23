@@ -1,0 +1,291 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "scratch-bizsim2-doc-lifecycle",
+  "version": "1.0.0",
+  "name": "BizSim2: data-model-driven document lifecycle (AOI Dynamics)",
+  "description": "SCRATCH — new business-loop pipeline (not reusing the original bizsim pipelines). Driven by the document-brief data model (document_type / document_profile / layout_template_id): qualified-invoice brief -> layout-rendered PDF (standard + compact) -> governed artifact registration -> pdf_extract -> pdf_text_edit (layout-aware text change) -> re-render -> register -> decision-gate evaluation -> evidence JSON. Tenant: aoi-dynamics.",
+  "context": {
+    "mission_id": "BIZSIM2-DOCLIFE-AOI",
+    "tenant_slug": "aoi-dynamics",
+    "organization_id": "aoi-dynamics",
+    "out_dir": "active/shared/tmp/confidential/shared/bizsim-202611-aoi/v2",
+    "brief_standard": "active/shared/tmp/confidential/shared/bizsim-202611/invoice-brief-aoi.json",
+    "brief_compact": "active/shared/tmp/confidential/shared/bizsim-202611/invoice-brief-aoi-compact.json"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/runtime-preflight.json",
+        "context": {
+          "preflight_cmd": "node --version"
+        }
+      }
+    },
+    {
+      "id": "read_brief_standard",
+      "role": "source",
+      "op": "system:read_json",
+      "produces": "brief_std",
+      "params": {
+        "path": "{{brief_standard}}"
+      }
+    },
+    {
+      "id": "compose_pdf_standard",
+      "role": "transform",
+      "op": "media:document_pdf_from_brief",
+      "consumes": "brief_std",
+      "produces": {
+        "channel": "pdf_design_std",
+        "type": "PdfDesign"
+      },
+      "params": {
+        "from": "brief_std",
+        "export_as": "pdf_design_std"
+      }
+    },
+    {
+      "id": "render_pdf_standard",
+      "role": "sink",
+      "op": "media:pdf_render",
+      "consumes": "pdf_design_std",
+      "produces": {
+        "channel": "pdf_path_std",
+        "type": "FilePath"
+      },
+      "params": {
+        "design_from": "pdf_design_std",
+        "path": "{{out_dir}}/invoice-AOI-2026-0007-standard.pdf"
+      }
+    },
+    {
+      "id": "register_pdf_standard",
+      "role": "sink",
+      "op": "media:register_artifact",
+      "produces": {
+        "channel": "reg_std",
+        "type": "ArtifactRegistration"
+      },
+      "params": {
+        "path": "{{out_dir}}/invoice-AOI-2026-0007-standard.pdf",
+        "artifact_class": "export",
+        "name": "invoice-AOI-2026-0007-standard.pdf",
+        "tenant_slug": "{{tenant_slug}}",
+        "organization_id": "{{organization_id}}",
+        "tier": "confidential",
+        "export_as": "reg_std",
+        "meta": {
+          "artifact_kind": "document",
+          "document_type": "invoice",
+          "document_profile": "qualified-invoice",
+          "layout_template_id": "jp-qualified-invoice-standard",
+          "invoice_number": "AOI-2026-0007",
+          "retention_class": "financial-record",
+          "loop": "bizsim2-doc-lifecycle"
+        },
+        "if_exists": "reuse"
+      }
+    },
+    {
+      "id": "read_brief_compact",
+      "role": "source",
+      "op": "system:read_json",
+      "produces": "brief_cmp",
+      "params": {
+        "path": "{{brief_compact}}"
+      }
+    },
+    {
+      "id": "compose_pdf_compact",
+      "role": "transform",
+      "op": "media:document_pdf_from_brief",
+      "consumes": "brief_cmp",
+      "produces": {
+        "channel": "pdf_design_cmp",
+        "type": "PdfDesign"
+      },
+      "params": {
+        "from": "brief_cmp",
+        "export_as": "pdf_design_cmp"
+      }
+    },
+    {
+      "id": "render_pdf_compact",
+      "role": "sink",
+      "op": "media:pdf_render",
+      "consumes": "pdf_design_cmp",
+      "produces": {
+        "channel": "pdf_path_cmp",
+        "type": "FilePath"
+      },
+      "params": {
+        "design_from": "pdf_design_cmp",
+        "path": "{{out_dir}}/invoice-AOI-2026-0007-compact.pdf"
+      }
+    },
+    {
+      "id": "register_pdf_compact",
+      "role": "sink",
+      "op": "media:register_artifact",
+      "produces": {
+        "channel": "reg_cmp",
+        "type": "ArtifactRegistration"
+      },
+      "params": {
+        "path": "{{out_dir}}/invoice-AOI-2026-0007-compact.pdf",
+        "artifact_class": "export",
+        "name": "invoice-AOI-2026-0007-compact.pdf",
+        "tenant_slug": "{{tenant_slug}}",
+        "organization_id": "{{organization_id}}",
+        "tier": "confidential",
+        "export_as": "reg_cmp",
+        "meta": {
+          "artifact_kind": "document",
+          "document_type": "invoice",
+          "document_profile": "qualified-invoice",
+          "layout_template_id": "jp-qualified-invoice-compact",
+          "invoice_number": "AOI-2026-0007",
+          "retention_class": "financial-record",
+          "loop": "bizsim2-doc-lifecycle"
+        },
+        "if_exists": "reuse"
+      }
+    },
+    {
+      "id": "extract_standard_pdf",
+      "role": "source",
+      "op": "media:pdf_extract",
+      "produces": {
+        "channel": "extracted_design",
+        "type": "PdfDesign"
+      },
+      "params": {
+        "path": "{{out_dir}}/invoice-AOI-2026-0007-standard.pdf",
+        "export_as": "extracted_design"
+      }
+    },
+    {
+      "id": "persist_extracted_design",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "extracted_design",
+      "produces": {
+        "channel": "design_json_path",
+        "type": "FilePath"
+      },
+      "params": {
+        "path": "{{out_dir}}/extracted-design-standard.json",
+        "format": "json",
+        "content": "{{extracted_design}}"
+      }
+    },
+    {
+      "id": "edit_invoice_text",
+      "role": "transform",
+      "op": "media:pdf_text_edit",
+      "consumes": "extracted_design",
+      "produces": {
+        "channel": "edited_design",
+        "type": "PdfDesign"
+      },
+      "params": {
+        "from": "extracted_design",
+        "export_as": "edited_design",
+        "edits": [
+          {
+            "match": "AOI-2026-0007",
+            "replace": "AOI-2026-0008"
+          },
+          {
+            "match": "サンプル産業株式会社",
+            "replace": "葵商事株式会社"
+          }
+        ]
+      }
+    },
+    {
+      "id": "render_edited_pdf",
+      "role": "sink",
+      "op": "media:pdf_render",
+      "consumes": "edited_design",
+      "produces": {
+        "channel": "pdf_path_edit",
+        "type": "FilePath"
+      },
+      "params": {
+        "design_from": "edited_design",
+        "path": "{{out_dir}}/invoice-AOI-2026-0008-edited.pdf"
+      }
+    },
+    {
+      "id": "register_edited_pdf",
+      "role": "sink",
+      "op": "media:register_artifact",
+      "produces": {
+        "channel": "reg_edit",
+        "type": "ArtifactRegistration"
+      },
+      "params": {
+        "path": "{{out_dir}}/invoice-AOI-2026-0008-edited.pdf",
+        "artifact_class": "export",
+        "name": "invoice-AOI-2026-0008-edited.pdf",
+        "tenant_slug": "{{tenant_slug}}",
+        "organization_id": "{{organization_id}}",
+        "tier": "confidential",
+        "export_as": "reg_edit",
+        "meta": {
+          "artifact_kind": "document",
+          "document_type": "invoice",
+          "document_profile": "qualified-invoice",
+          "derived_from": "invoice-AOI-2026-0007-standard.pdf",
+          "edit_op": "pdf_text_edit",
+          "retention_class": "financial-record",
+          "loop": "bizsim2-doc-lifecycle"
+        },
+        "if_exists": "reuse"
+      }
+    },
+    {
+      "id": "eval_invoice_payment",
+      "role": "sink",
+      "op": "approval:evaluate_decision_rights",
+      "params": {
+        "operation_id": "bizsim2:vendor_invoice_payment:aoi-2026-0007",
+        "correlation_id": "MSN-AOI-BIZSIM-20261123:invoice_payment",
+        "decision_type": "vendor_invoice_payment",
+        "caller_role": "finance_controller",
+        "amount": 1429560,
+        "mission_id": "{{mission_id}}",
+        "channel": "mission",
+        "title": "Invoice payment AOI-2026-0007: ¥1,429,560",
+        "summary": "支払決裁 — 請求書発行→支払承認の業務ループ接続点。",
+        "export_as": "decision_eval"
+      },
+      "produces": {
+        "channel": "decision_eval",
+        "type": "DecisionEvaluation"
+      }
+    },
+    {
+      "id": "write_evidence",
+      "role": "sink",
+      "op": "system:write_file",
+      "produces": {
+        "channel": "evidence_path",
+        "type": "FilePath"
+      },
+      "params": {
+        "path": "{{out_dir}}/lifecycle-evidence.json",
+        "format": "json",
+        "content": {
+          "loop": "bizsim2-doc-lifecycle",
+          "registered": ["{{reg_std}}", "{{reg_cmp}}", "{{reg_edit}}"],
+          "decision": "{{decision_eval}}"
+        }
+      }
+    }
+  ]
+}

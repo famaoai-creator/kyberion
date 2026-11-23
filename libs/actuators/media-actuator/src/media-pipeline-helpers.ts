@@ -246,5 +246,10 @@ export async function executeMediaPipeline(
     );
   }
 
-  return { status: result.status, results: result.results, context: ctx };
+  return {
+    status: result.status,
+    results: result.results,
+    context: ctx,
+    total_steps: result.total_steps,
+  };
 }
