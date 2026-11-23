@@ -507,5 +507,6 @@ export function readMeetingMinutesContent(
   key: string,
   scope: MinutesScope
 ): MinutesContent | null {
-  return MINUTES_READERS[source]?.(key, scope) ?? null;
+  if (!Object.hasOwn(MINUTES_READERS, source)) return null;
+  return MINUTES_READERS[source](key, scope);
 }

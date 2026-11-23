@@ -300,7 +300,10 @@ function narrowViewerScope(
   requested?: string | null
 ): string[] | 'all' {
   const value = requested?.trim() || undefined;
-  const valid = value === undefined || VIEWER_SCOPE_ID_VALIDATORS[kind](value);
+  const validator = Object.hasOwn(VIEWER_SCOPE_ID_VALIDATORS, kind)
+    ? VIEWER_SCOPE_ID_VALIDATORS[kind]
+    : () => false;
+  const valid = value === undefined || validator(value);
   if (!valid) throw new SurfaceViewerScopeError(403, `invalid viewer ${kind} scope: ${value}`);
   if (value && allowed !== 'all' && !allowed.includes(value)) {
     throw new SurfaceViewerScopeError(403, `viewer ${kind} scope denied: ${value}`);

@@ -24,6 +24,9 @@ vi.mock('@agent/core/surface/surface-management-mutations', () => ({
   readSurfaceManagementExact: async (_auth: unknown, _files: string[], fn: () => unknown) => fn(),
   verifySurfaceManagementAuthorization: mocks.verify,
   readSurfaceManagementResource: mocks.read,
+  isOrganizationManagementResource: (resource: { kind?: string }) =>
+    resource?.kind === 'organization',
+  isProjectManagementResource: (resource: { kind?: string }) => resource?.kind === 'project',
   SurfaceManagementError: class extends Error {
     constructor(
       public code: string,

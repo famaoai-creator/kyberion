@@ -37,6 +37,7 @@ describeStoreGrantBoundary(
           'withCredentialCustodyWriteCapability',
           'CREDENTIAL_MATERIAL_GRANT_ISSUANCE_RIGHT',
           'CREDENTIAL_CUSTODY_STORE_ISSUANCE_RIGHT',
+          'isTenantCredentialCustody',
         ],
       ],
       ['libs/core/secret/secret-guard.ts', ['assertAccountCredentialMaterialRead']],

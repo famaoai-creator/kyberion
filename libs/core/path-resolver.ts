@@ -623,6 +623,8 @@ const VOLATILE_ID_ASSERTS: Record<'session' | 'mission', (id: string, raw: unkno
 };
 
 export function assertVolatileId(kind: 'session' | 'mission', value: unknown): string {
+  if (!Object.hasOwn(VOLATILE_ID_ASSERTS, kind))
+    throw new Error(`[path-resolver] unknown volatile id kind '${String(kind)}'`);
   const id = typeof value === 'string' ? value.trim() : '';
   VOLATILE_ID_ASSERTS[kind](id, value);
   return id;

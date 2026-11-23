@@ -135,16 +135,17 @@ async function handlePost(req: NextRequest, context: { params: Promise<{ id: str
             ...(note ? ['--note', note] : []),
             ...decidedByArgs,
           ];
+    const env = {
+      ...serverDelegatedChildEnv('mission_controller'),
+      KYBERION_SCOPE_ENV_PATH: isolatedScopeEnvPath(),
+      KYBERION_TIER: inquiry.tier ?? '',
+      KYBERION_TENANT: inquiry.tenant_slug ?? '',
+      KYBERION_ORGANIZATION_ID: inquiry.organization_id ?? '',
+      KYBERION_STANCE: '',
+      KYBERION_CUSTOMER: '',
+    };
     const result = safeExecResult(process.execPath, args, {
-      env: {
-        ...serverDelegatedChildEnv('mission_controller'),
-        KYBERION_SCOPE_ENV_PATH: isolatedScopeEnvPath(),
-        KYBERION_TIER: inquiry.tier ?? '',
-        KYBERION_TENANT: inquiry.tenant_slug ?? '',
-        KYBERION_ORGANIZATION_ID: inquiry.organization_id ?? '',
-        KYBERION_STANCE: '',
-        KYBERION_CUSTOMER: '',
-      },
+      env,
       cwd: rootDir,
       timeoutMs: CONTROLLER_TIMEOUT_MS,
       maxOutputMB: 5,

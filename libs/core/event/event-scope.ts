@@ -172,7 +172,7 @@ const REQUIRED_FOR_KIND: Record<EventScopeKind, (context: ScopeContext) => boole
 };
 
 function requiredForKind(kind: EventScopeKind, context: ScopeContext): boolean {
-  if (!EVENT_SCOPE_KINDS.includes(kind)) return false;
+  if (!Object.hasOwn(REQUIRED_FOR_KIND, kind)) return false;
   return REQUIRED_FOR_KIND[kind](context);
 }
 

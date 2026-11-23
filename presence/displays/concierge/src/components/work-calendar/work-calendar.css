@@ -134,7 +134,7 @@
 
 .wc-command {
   font-family: var(--kb-ui-font-mono);
-  padding: 0 4px;
+  padding: 0 var(--kb-ui-space-1);
   border-radius: var(--kb-ui-radius-sm);
   background: var(--kb-ui-surface-sunken);
   color: var(--kb-ui-text);
@@ -359,7 +359,7 @@
 .wc-lane {
   position: relative;
   height: 120px;
-  margin: var(--kb-ui-space-1, 4px) 0;
+  margin: var(--kb-ui-space-1) 0;
   border: 1px solid var(--kb-ui-border-subtle, rgba(0, 0, 0, 0.08));
   border-radius: 4px;
   background-image: repeating-linear-gradient(
@@ -395,7 +395,7 @@
 
 .wc-lane__label {
   display: block;
-  padding: 0 2px;
+  padding: 0 calc(var(--kb-ui-space-1) / 2);
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
@@ -444,7 +444,7 @@
   font-size: 9px;
   color: var(--kb-ui-fg-muted, #555);
   background: var(--kb-ui-bg, #fff);
-  padding: 0 2px;
+  padding: 0 calc(var(--kb-ui-space-1) / 2);
   border-radius: 2px;
 }
 
