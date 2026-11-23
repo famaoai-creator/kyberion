@@ -6,7 +6,7 @@ category: Fixed
   - Append-only store rotation on a path that is not `.jsonl` now throws instead of looping forever.
   - `ROTATED_SEGMENT_SUFFIX_PATTERN` now matches the `-<n>` collision segments, and the janitor and runtime coverage use one shared definition (`isRotatedSegmentName`).
   - `rotateLogs` applies an explicit `retentionDays` before the catalog TTL, the same way the other scanners do.
-  - An audited expiry writes its record before deleting. If the record cannot be written, the file stays and the run reports an error; this includes data-vault expiries, which were previously deleted with no audit record.
+  - An audited expiry writes its record before deleting. If the record cannot be written, the file stays and every scanner lists it in the janitor report's errors; this includes data-vault expiries, which were previously deleted with no audit record.
   - The built-in retention fallback used when the catalog cannot be read now mirrors the shipped catalog: staging and cache expire, `logs/audit` is archived rather than deleted after 30 days, and a test pins every field.
   - Nested catalog entries count as covering their event-store directory.
   - `mapAsync` rejects a concurrency that is not a positive integer.

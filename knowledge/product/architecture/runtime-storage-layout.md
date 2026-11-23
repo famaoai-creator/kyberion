@@ -683,9 +683,11 @@ by floor:
 - **Audit first.** When an expiry must be audited (`audit: true`, archive,
   soft delete, data-vault expiry), the retention audit record is written
   before the file is moved or unlinked. If the record cannot be written, the
-  file stays where it is, a diagnostic warning is logged, and the next sweep
-  retries. If the move or unlink fails after the record was written, a
-  `RETENTION_EXPIRY_FAILED` record follows it.
+  file stays where it is and the next sweep retries. Every scanner lists such
+  kept files in the janitor report's errors (`<scanner>: <path>: <why>`) and
+  logs one summary warning per sweep. If the move or unlink fails after the
+  record was written, a `RETENTION_EXPIRY_FAILED` record follows it. A file that
+  is already gone when its expiry runs is skipped, not reported.
 - **Data vault** entries are expired by their own `expiresAt`, through the
   catalog's `active/shared/data-vault` entry. Every expiry is audited first;
   one that cannot be audited is kept and listed in the janitor report's
