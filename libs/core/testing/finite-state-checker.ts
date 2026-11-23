@@ -1,3 +1,8 @@
+import { config } from '../foundation/config.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('finite-state-checker');
+
 /** Explicit-state safety checking. Completeness is relative to the supplied finite model. */
 export interface ModelStep<State> {
   action: string;
@@ -21,6 +26,18 @@ export type SafetyCheckResult<State> = {
   trace?: ModelStep<State>[];
 };
 
+/**
+ * KYBERION_MODEL_STATS=1 logs each exploration's outcome as a JSON line, so
+ * a model author can read the real visited/transition counts directly —
+ * `KYBERION_MODEL_STATS=1 pnpm exec vitest run <model file>`.
+ */
+function reportStats<State>(result: SafetyCheckResult<State>): SafetyCheckResult<State> {
+  if (config.bool('KYBERION_MODEL_STATS')) {
+    logger.info(`model stats ${JSON.stringify({ ...result, trace: undefined })}`);
+  }
+  return result;
+}
+
 /** Breadth-first exploration; hitting the budget must never report verification. */
 export function checkFiniteStateSafety<State>(
   model: SafetyModel<State>,
@@ -42,7 +59,7 @@ export function checkFiniteStateSafety<State>(
   };
   for (const state of model.initial) {
     if (!add({ action: 'initial', state })) {
-      return { status: 'inconclusive', visited: seen.size, transitions };
+      return reportStats({ status: 'inconclusive', visited: seen.size, transitions });
     }
   }
   if (!nodes.length) throw new Error('A safety model needs at least one initial state');
@@ -57,20 +74,20 @@ export function checkFiniteStateSafety<State>(
         trace.push(node.step);
         index = node.parent;
       }
-      return {
+      return reportStats({
         status: 'violated',
         visited: seen.size,
         transitions,
         invariant: name,
         trace: trace.reverse(),
-      };
+      });
     }
     for (const step of model.next(state)) {
       transitions++;
       if (!add(step, cursor)) {
-        return { status: 'inconclusive', visited: seen.size, transitions };
+        return reportStats({ status: 'inconclusive', visited: seen.size, transitions });
       }
     }
   }
-  return { status: 'verified', visited: seen.size, transitions };
+  return reportStats({ status: 'verified', visited: seen.size, transitions });
 }

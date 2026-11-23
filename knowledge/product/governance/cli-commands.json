@@ -2077,6 +2077,16 @@
       "group": "dev"
     },
     {
+      "id": "script.check.stale-dist",
+      "script": "check:stale-dist",
+      "command": "check stale-dist",
+      "noun": "check",
+      "verb": "stale-dist",
+      "audience": "dev",
+      "description": "cli_cmd_script_check_stale_dist",
+      "group": "dev"
+    },
+    {
       "id": "script.chronos.dev",
       "script": "chronos:dev",
       "command": "chronos dev",

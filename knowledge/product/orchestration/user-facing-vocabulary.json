@@ -11240,6 +11240,11 @@
         "ja": "ランタイムモード設定の整合性を確認する。",
         "qps-ploc": "⟦Ƈħėƈķ ŧħė řůñŧïɱė ɱőḓė ƈőñƒïɠůřȧŧïőñ ƒőř ƈőñşïşŧėñƈẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       },
+      "cli_cmd_script_check_stale_dist": {
+        "en": "Fail when dist outputs are stale vs their TypeScript sources",
+        "ja": "TypeScript ソースより古い dist 出力を検出して失敗させる",
+        "qps-ploc": "⟦Ƒȧïŀ ẇħėñ ḓïşŧ őůŧṗůŧş ȧřė şŧȧŀė ṽş ŧħėïř ŦẏṗėŞƈřïṗŧ şőůřƈėş ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
       "cli_cmd_script_surfaces_screenshots": {
         "en": "Capture before/after screenshots of the UI surfaces.",
         "ja": "UI サーフェスの変更前後のスクリーンショットを撮る。",

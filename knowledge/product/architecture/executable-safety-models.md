@@ -50,6 +50,15 @@ predicate, or key can conceal a real defect. Exceptions propagate as errors.
 The `visited` count is the number of discovered unique states, including queued
 states; it is not the number of states whose predicates have already run.
 
+To read the real exploration counts while pinning a model (instead of
+deliberately failing an assertion to see the diff), set `KYBERION_MODEL_STATS=1` —
+each `checkFiniteStateSafety` call logs its result as one JSON line
+(`status`, `visited`, `transitions`, and the violated invariant name when any):
+
+```bash
+KYBERION_MODEL_STATS=1 pnpm exec vitest run <model file>
+```
+
 `libs/core/pipeline/adf-lifecycle.model.test.ts` independently models hook outcomes,
 repair availability, call histories and successful phases. It exhausts 26 states
 and 24 transitions, checking:
@@ -328,6 +337,7 @@ the reconciliation checks.
 The PR publication host takes the artifact write lock before opening the exact
 file grant for the review or body. Repeating publication preparation reuses
 only byte-identical evidence and retains a single scoped index entry.
+
 ## Actuator dispatch increment
 
 `libs/core/actuator/actuator-dispatch.model.test.ts` specifies one op dispatch
