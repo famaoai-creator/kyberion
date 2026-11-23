@@ -240,7 +240,10 @@ import { restoreFromTrash, TRASH_REPO_SUBPATH } from './storage-janitor.js';
 import { STORAGE_RETENTION_AUDIT_FILENAME } from './storage-retention-catalog.js';
 import { withExecutionContext } from '../authority.js';
 import { recordDerivation } from '../information-assets/asset-derivation.js';
-import { fetchWithVaultCache } from './data-vault.js';
+import {
+  fetchWithServicePresetCache,
+  type ServicePresetCacheScope,
+} from './service-preset-cache.js';
 
 const MISSION_ID = 'MIS-AL04-TEST';
 
@@ -852,10 +855,12 @@ describe('AL-04 tenant/project offboarding', () => {
   });
 
   it('never verifies a scope clean when a listing is refused', () => {
-    writeJson(abs('active/shared/data-vault/other-entry.json'), { projectId: 'someone-else' });
+    writeJson(abs('active/shared/observability/delegations/other-record.json'), {
+      tenant_slug: 'someone-else',
+    });
     expect(verifyScopeOffboarded('tenant', 'tenant-alpha')).toEqual({ clean: true, leftovers: [] });
     const state = globalThis as Record<string, unknown>;
-    state.__kyberion_al04_deny_readdir__ = abs('active/shared/data-vault');
+    state.__kyberion_al04_deny_readdir__ = abs('active/shared/observability/delegations');
     try {
       const verification = verifyScopeOffboarded('tenant', 'tenant-alpha');
       expect(verification.clean).toBe(false);
@@ -873,9 +878,12 @@ describe('AL-04 tenant/project offboarding', () => {
   });
 });
 
-describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vault', () => {
+describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, service-preset cache', () => {
   const TENANT = 'tenant-alpha';
   const KNOWLEDGE_ROOT = `knowledge/confidential/${TENANT}`;
+  const ALPHA_CACHE = `active/shared/cache/confidential/${TENANT}/service-preset`;
+  const LEGACY_ALPHA = 'active/shared/data-vault/alpha-entry.json';
+  const LEGACY_BETA = 'active/shared/data-vault/beta-entry.json';
   const ALPHA_HASH = 'a'.repeat(64);
   const ALPHA_HASH_2 = 'c'.repeat(64);
   const BETA_HASH = 'b'.repeat(64);
@@ -929,19 +937,27 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
       { content_sha256: BETA_HASH, target_path: 'knowledge/confidential/tenant-beta/x.md' },
       '{corrupt line',
     ]);
-    // Data-vault entries keyed by projectId.
-    writeJson(abs('active/shared/data-vault/alpha-entry.json'), {
-      sourceType: 'confluence',
-      key: 'k1',
-      projectId: TENANT,
-      tier: 'confidential',
+    // Service-preset cache partitions on the cache floor: the tenant's, and
+    // another tenant's plus the untenanted one (both must survive).
+    writeJson(abs(`${ALPHA_CACHE}/project/proj-a/entry.json`), { secret: 1 });
+    writeJson(
+      abs('active/shared/cache/confidential/tenant-beta/service-preset/global/entry.json'),
+      {
+        keep: true,
+      }
+    );
+    writeJson(abs('active/shared/cache/confidential/shared/service-preset/global/entry.json'), {
+      keep: true,
+    });
+    // LEGACY flat vault: an entry admitted for this tenant, and one for another.
+    writeJson(abs(LEGACY_ALPHA), {
+      key: `${TENANT}:proj-a:binding-1:get_page:0123`,
+      projectId: 'proj-a',
       data: { secret: 1 },
     });
-    writeJson(abs('active/shared/data-vault/other-entry.json'), {
-      sourceType: 'confluence',
-      key: 'k2',
-      projectId: 'someone-else',
-      tier: 'confidential',
+    writeJson(abs(LEGACY_BETA), {
+      key: 'tenant-beta:proj-b:binding-1:get_page:0123',
+      projectId: 'proj-b',
       data: { keep: true },
     });
     // Classic active/ residue so the pre-DA-08 flow is exercised together.
@@ -959,18 +975,18 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
         { path: KNOWLEDGE_ROOT, kind: 'tenant_knowledge_tree' },
         { path: `active/shared/runtime/ingest-cursors/${TENANT}`, kind: 'ingest_cursors_tree' },
         { path: `active/shared/runtime/ingest/quota/${TENANT}`, kind: 'ingest_cursors_tree' },
-        { path: 'active/shared/data-vault/alpha-entry.json', kind: 'data_vault_entry' },
+        { path: ALPHA_CACHE, kind: 'service_preset_cache_tree' },
       ])
     );
-    expect(result.targets.map((t) => t.path)).not.toContain(
-      'active/shared/data-vault/other-entry.json'
-    );
+    expect(
+      result.targets.filter((t) => t.kind === 'service_preset_cache_tree').map((t) => t.path)
+    ).toEqual([ALPHA_CACHE]);
     expect(result.dedup_registry).toEqual({ matched: 2, removed: 0 });
 
     // Nothing changed on disk.
     expect(fs.existsSync(abs(`${KNOWLEDGE_ROOT}/_ledger/assets.jsonl`))).toBe(true);
     expect(fs.existsSync(abs(`active/shared/runtime/ingest-cursors/${TENANT}`))).toBe(true);
-    expect(fs.existsSync(abs('active/shared/data-vault/alpha-entry.json'))).toBe(true);
+    expect(fs.existsSync(abs(ALPHA_CACHE))).toBe(true);
     expect(registryLines()).toHaveLength(4);
 
     // And the standalone verification agrees there are still traces.
@@ -1737,7 +1753,7 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     expect(result.dedup_registry).toBeUndefined();
   });
 
-  it('execute leaves zero trace — knowledge, ledger, cursors, quota, dedup lines, vault — all audited', () => {
+  it('execute leaves zero trace — knowledge, ledger, cursors, quota, dedup lines, cache — all audited', () => {
     seedIngestResidue();
     const result = offboardScope({
       scopeType: 'tenant',
@@ -1754,7 +1770,9 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     expect(fs.existsSync(abs(KNOWLEDGE_ROOT))).toBe(false);
     expect(fs.existsSync(abs(`active/shared/runtime/ingest-cursors/${TENANT}`))).toBe(false);
     expect(fs.existsSync(abs(`active/shared/runtime/ingest/quota/${TENANT}`))).toBe(false);
-    expect(fs.existsSync(abs('active/shared/data-vault/alpha-entry.json'))).toBe(false);
+    expect(fs.existsSync(abs(ALPHA_CACHE))).toBe(false);
+    expect(fs.existsSync(abs(LEGACY_ALPHA))).toBe(false);
+    expect(fs.existsSync(abs(LEGACY_BETA))).toBe(true);
 
     // The dedup registry kept exactly the other tenant's line + the corrupt line.
     const kept = registryLines();
@@ -1767,7 +1785,12 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     // Everything else survives.
     expect(fs.existsSync(abs('knowledge/confidential/tenant-beta/x.md'))).toBe(true);
     expect(fs.existsSync(abs('active/shared/runtime/ingest-cursors/tenant-beta'))).toBe(true);
-    expect(fs.existsSync(abs('active/shared/data-vault/other-entry.json'))).toBe(true);
+    expect(
+      fs.existsSync(abs('active/shared/cache/confidential/tenant-beta/service-preset/global'))
+    ).toBe(true);
+    expect(
+      fs.existsSync(abs('active/shared/cache/confidential/shared/service-preset/global'))
+    ).toBe(true);
 
     // Export-before-delete: knowledge (incl. ledger), and the removed
     // dedup-registry lines as a verbatim JSONL copy.
@@ -1788,7 +1811,8 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
         KNOWLEDGE_ROOT,
         `active/shared/runtime/ingest-cursors/${TENANT}`,
         `active/shared/runtime/ingest/quota/${TENANT}`,
-        'active/shared/data-vault/alpha-entry.json',
+        ALPHA_CACHE,
+        LEGACY_ALPHA,
       ])
     );
     expect(events.find((e) => e.event === 'SCOPE_OFFBOARD_DEDUP_REGISTRY_PRUNE')).toMatchObject({
@@ -2085,276 +2109,168 @@ describe('tenant offboarding — legacy resident-dot copies (dot/tenants/<slug>)
   });
 });
 
-describe('project offboarding — data-vault attribution (C-OFF-014)', () => {
-  /** service-engine `executeServicePresetCached` key shape for an admitted tenant binding. */
-  function admittedKey(tenant: string, projectId: string): string {
-    return `${tenant}:${projectId}:binding-1:get_page:0123456789abcdef`;
+describe('project offboarding — service-preset cache by partition path (C-OFF-014)', () => {
+  const cacheRoot = (tier: string, tenant: string, projectId: string) =>
+    `active/shared/cache/${tier}/${tenant}/service-preset/project/${projectId}`;
+
+  async function cache(scope: ServicePresetCacheScope, key: string): Promise<void> {
+    await fetchWithServicePresetCache('confluence', key, () => ({ key }), { scope });
   }
 
-  function vaultFiles(): string[] {
-    const dir = abs('active/shared/data-vault');
-    return fs.existsSync(dir)
-      ? fs.readdirSync(dir).map((name) => `active/shared/data-vault/${name}`)
-      : [];
+  function cacheTargets(...args: Parameters<typeof collectScopeTargets>): string[] {
+    return collectScopeTargets(...args)
+      .filter((target) => target.kind === 'service_preset_cache_tree')
+      .map((target) => target.path);
   }
 
-  function seedProjectLineage(tenant: string, organization: string): void {
+  it('claims only the filter tenant’s project subtree, never another tenant’s', async () => {
+    await cache({ tier: 'confidential', tenant: 'tenant-a', projectId: 'proj-shared' }, 'k1');
+    await cache({ tier: 'public', tenant: 'tenant-a', projectId: 'proj-shared' }, 'k2');
+    await cache({ tier: 'confidential', tenant: 'tenant-b', projectId: 'proj-shared' }, 'k3');
+    await cache({ tier: 'confidential', tenant: 'tenant-a', projectId: 'proj-other' }, 'k4');
+    await cache({ tier: 'confidential', projectId: 'proj-shared' }, 'k5');
+
+    expect(
+      cacheTargets('project', 'proj-shared', { tenantSlug: 'tenant-a', organizationId: 'org-a' })
+    ).toEqual([
+      cacheRoot('confidential', 'tenant-a', 'proj-shared'),
+      cacheRoot('public', 'tenant-a', 'proj-shared'),
+    ]);
+  });
+
+  function seedWorkspace(tenant: string, organization: string): void {
     writeJson(abs(`active/projects/confidential/${tenant}/proj-shared/state/project-state.json`), {
       tenant_slug: tenant,
       organization_id: organization,
     });
   }
 
-  it('claims only the filtered tenant’s vault entries written through the real vault', async () => {
-    seedProjectLineage('tenant-a', 'org-a');
-    seedProjectLineage('tenant-b', 'org-b');
-    await fetchWithVaultCache(
-      'confluence',
-      admittedKey('tenant-a', 'proj-shared'),
-      () => ({ a: 1 }),
-      {
-        projectId: 'proj-shared',
-      }
-    );
-    const [entryA] = vaultFiles();
-    await fetchWithVaultCache(
-      'confluence',
-      admittedKey('tenant-b', 'proj-shared'),
-      () => ({ b: 1 }),
-      {
-        projectId: 'proj-shared',
-      }
-    );
+  it('an unfiltered project offboarding with no tenant partitions claims the untenanted subtree', async () => {
+    await cache({ tier: 'confidential', projectId: 'proj-shared' }, 'k1');
 
-    const targets = collectScopeTargets('project', 'proj-shared', {
-      tenantSlug: 'tenant-a',
-      organizationId: 'org-a',
+    expect(cacheTargets('project', 'proj-shared')).toEqual([
+      cacheRoot('confidential', 'shared', 'proj-shared'),
+    ]);
+  });
+
+  it('an unfiltered project offboarding claims the single resolved lineage tenant’s subtree', async () => {
+    seedWorkspace('tenant-a', 'org-a');
+    await cache({ tier: 'confidential', tenant: 'tenant-a', projectId: 'proj-shared' }, 'k1');
+    await cache({ tier: 'confidential', projectId: 'proj-shared' }, 'k2');
+    // Another tenant's same-id project is not this project's lineage: left alone.
+    await cache({ tier: 'confidential', tenant: 'tenant-z', projectId: 'proj-shared' }, 'k3');
+
+    expect(cacheTargets('project', 'proj-shared')).toEqual([
+      cacheRoot('confidential', 'tenant-a', 'proj-shared'),
+      cacheRoot('confidential', 'shared', 'proj-shared'),
+    ]);
+  });
+
+  it('an unfiltered project offboarding fails closed on a tenant partition without one known lineage tenant', async () => {
+    await cache({ tier: 'confidential', tenant: 'tenant-a', projectId: 'proj-shared' }, 'k1');
+    // No lineage at all.
+    expect(() => collectScopeTargets('project', 'proj-shared')).toThrow(
+      'PROJECT_SERVICE_PRESET_CACHE_AMBIGUOUS'
+    );
+    // Two lineage tenants: still ambiguous.
+    seedWorkspace('tenant-b', 'org-b');
+    writeJson(abs('active/shared/runtime/projects/proj-shared.json'), {
+      tenant_slug: 'tenant-c',
+      organization_id: 'org-c',
     });
-    const vaultTargets = targets.filter((target) => target.kind === 'data_vault_entry');
-    expect(vaultTargets).toEqual([{ path: entryA, kind: 'data_vault_entry' }]);
-  });
-
-  it('claims an unprefixed vault entry when the project has exactly the filtered lineage', async () => {
-    seedProjectLineage('tenant-a', 'org-a');
-    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
-
-    const targets = collectScopeTargets('project', 'proj-shared', {
-      tenantSlug: 'tenant-a',
-      organizationId: 'org-a',
-    });
-    expect(targets.filter((target) => target.kind === 'data_vault_entry')).toEqual(
-      vaultFiles().map((file) => ({ path: file, kind: 'data_vault_entry' }))
+    expect(() => collectScopeTargets('project', 'proj-shared')).toThrow(
+      /PROJECT_SERVICE_PRESET_CACHE_AMBIGUOUS.*several tenants/
     );
+    // A tenant filter always resolves it.
+    expect(
+      cacheTargets('project', 'proj-shared', { tenantSlug: 'tenant-a', organizationId: 'org-a' })
+    ).toEqual([cacheRoot('confidential', 'tenant-a', 'proj-shared')]);
   });
 
-  it('refuses an unprefixed vault entry when the project id is reused across lineages', async () => {
-    seedProjectLineage('tenant-a', 'org-a');
-    seedProjectLineage('tenant-b', 'org-b');
-    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
-
-    expect(() =>
-      collectScopeTargets('project', 'proj-shared', {
-        tenantSlug: 'tenant-a',
-        organizationId: 'org-a',
-      })
-    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
-  });
-
-  it('refuses an unprefixed entry when another lineage is known only from an archived mission (review #2)', async () => {
-    seedProjectLineage('tenant-a', 'org-a');
-    writeJson(
-      abs('active/archive/missions/confidential/tenant-b/MIS-OLD-B/mission-state.json'),
-      missionState({
-        mission_id: 'MIS-OLD-B',
+  it('LEGACY: tenant offboarding claims flat data-vault entries keyed for the tenant only', () => {
+    const vault = 'active/shared/data-vault';
+    const legacy = (name: string, record: Record<string, unknown>) =>
+      writeJson(abs(`${vault}/${name}.json`), {
+        sourceType: 'confluence',
         tier: 'confidential',
-        status: 'archived',
-        tenant_slug: 'tenant-b',
-        organization_id: 'org-b',
-        relationships: { project: { project_id: 'proj-shared', relationship_type: 'belongs_to' } },
-      })
+        data: {},
+        ...record,
+      });
+    legacy('a-admitted', { key: 'tenant-a:proj-a:binding-1:get_page:0123', projectId: 'proj-a' });
+    legacy('b-admitted', { key: 'tenant-b:proj-b:binding-1:get_page:0123', projectId: 'proj-b' });
+    // Unadmitted entries are shared by definition: projectId == tenant slug is not a claim.
+    legacy('unadmitted', { key: 'get_page:0123', projectId: 'tenant-a' });
+
+    const targets = collectScopeTargets('tenant', 'tenant-a').filter(
+      (target) => target.kind === 'legacy_data_vault_entry'
     );
-    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
-
-    expect(() =>
-      collectScopeTargets('project', 'proj-shared', {
-        tenantSlug: 'tenant-a',
-        organizationId: 'org-a',
-      })
-    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
+    expect(targets).toEqual([
+      { path: `${vault}/a-admitted.json`, kind: 'legacy_data_vault_entry' },
+    ]);
   });
 
-  function archivedProjectMission(repoPath: string, overrides: Record<string, unknown> = {}): void {
-    writeJson(
-      abs(`${repoPath}/mission-state.json`),
-      missionState({
-        mission_id: path.posix.basename(repoPath),
-        tier: 'confidential',
-        status: 'archived',
-        relationships: { project: { project_id: 'proj-shared', relationship_type: 'belongs_to' } },
-        ...overrides,
-      })
+  it('LEGACY: project offboarding claims the project’s tenant-keyed flat data-vault entries', () => {
+    const vault = 'active/shared/data-vault';
+    const legacy = (name: string, record: Record<string, unknown>) =>
+      writeJson(abs(`${vault}/${name}.json`), { tier: 'confidential', data: {}, ...record });
+    legacy('a-admitted', { key: 'tenant-a:proj-x:binding-1:get_page:0123', projectId: 'proj-x' });
+    legacy('b-admitted', { key: 'tenant-b:proj-x:binding-1:get_page:0123', projectId: 'proj-x' });
+    legacy('a-other', { key: 'tenant-a:proj-y:binding-1:get_page:0123', projectId: 'proj-y' });
+    legacy('unadmitted', { key: 'get_page:0123', projectId: 'proj-x' });
+    const legacyTargets = (...args: Parameters<typeof collectScopeTargets>) =>
+      collectScopeTargets(...args)
+        .filter((target) => target.kind === 'legacy_data_vault_entry')
+        .map((target) => target.path);
+
+    // Filtered: only the filter tenant's entries of this project.
+    expect(
+      legacyTargets('project', 'proj-x', { tenantSlug: 'tenant-a', organizationId: 'org-a' })
+    ).toEqual([`${vault}/a-admitted.json`]);
+    // Unfiltered with no lineage: two tenants hold entries — fail closed.
+    expect(() => collectScopeTargets('project', 'proj-x')).toThrow(
+      'PROJECT_SERVICE_PRESET_CACHE_AMBIGUOUS'
     );
-  }
-
-  it('refuses an unprefixed entry when a tenant-free archived mission (<tier>/shared/<ID>) references the project', async () => {
-    seedProjectLineage('tenant-a', 'org-a');
-    archivedProjectMission('active/archive/missions/confidential/shared/MIS-FREE-1');
-    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
-
-    expect(() =>
-      collectScopeTargets('project', 'proj-shared', {
-        tenantSlug: 'tenant-a',
-        organizationId: 'org-a',
-      })
-    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
-  });
-
-  it('refuses an unprefixed entry when a legacy flat archived mission (<root>/<ID>) references the project', async () => {
-    seedProjectLineage('tenant-a', 'org-a');
-    archivedProjectMission('active/archive/missions/MIS-LEGACY-1', {
-      tenant_slug: 'tenant-b',
-      organization_id: 'org-b',
-    });
-    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
-
-    expect(() =>
-      collectScopeTargets('project', 'proj-shared', {
-        tenantSlug: 'tenant-a',
-        organizationId: 'org-a',
-      })
-    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
-  });
-
-  it('refuses an unprefixed entry when an ephemeral-tier archived mission references the project', async () => {
-    seedProjectLineage('tenant-a', 'org-a');
-    archivedProjectMission('active/archive/missions/ephemeral/tenant-b/MIS-EPH-1', {
-      tier: 'public',
-      tenant_slug: 'tenant-b',
-      organization_id: 'org-b',
-    });
-    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
-
-    expect(() =>
-      collectScopeTargets('project', 'proj-shared', {
-        tenantSlug: 'tenant-a',
-        organizationId: 'org-a',
-      })
-    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
-  });
-
-  it('still claims an unprefixed entry when the only archived reference is the filter lineage', async () => {
-    seedProjectLineage('tenant-a', 'org-a');
-    archivedProjectMission('active/archive/missions/confidential/tenant-a/MIS-OLD-A', {
+    // Unfiltered with a single lineage tenant: that tenant's entries only.
+    writeJson(abs('active/projects/confidential/tenant-a/proj-x/state/project-state.json'), {
       tenant_slug: 'tenant-a',
       organization_id: 'org-a',
     });
-    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
-
-    expect(
-      collectScopeTargets('project', 'proj-shared', {
-        tenantSlug: 'tenant-a',
-        organizationId: 'org-a',
-      }).filter((target) => target.kind === 'data_vault_entry')
-    ).toEqual(vaultFiles().map((file) => ({ path: file, kind: 'data_vault_entry' })));
+    expect(legacyTargets('project', 'proj-x')).toEqual([`${vault}/a-admitted.json`]);
   });
 
-  it('refuses an unprefixed entry when the project registry record names another lineage (review #2)', async () => {
-    seedProjectLineage('tenant-a', 'org-a');
-    writeJson(abs('active/shared/runtime/projects/proj-shared.json'), {
-      project_id: 'proj-shared',
-      tenant_slug: 'tenant-b',
-      organization_id: 'org-b',
+  it('tenant offboarding claims the tenant’s whole service-preset partition of every tier', async () => {
+    await cache({ tier: 'confidential', tenant: 'tenant-a', projectId: 'proj-a' }, 'k1');
+    await cache({ tier: 'personal', tenant: 'tenant-a' }, 'k2');
+    await cache({ tier: 'confidential', tenant: 'tenant-b', projectId: 'proj-b' }, 'k3');
+    await cache({ tier: 'confidential' }, 'k4');
+
+    expect(cacheTargets('tenant', 'tenant-a')).toEqual([
+      'active/shared/cache/personal/tenant-a/service-preset',
+      'active/shared/cache/confidential/tenant-a/service-preset',
+    ]);
+    // A reserved partition name is never treated as a tenant.
+    expect(cacheTargets('tenant', 'shared')).toEqual([]);
+  });
+
+  it('a project offboarding execute removes the subtree and leaves other partitions', async () => {
+    writeJson(abs('active/projects/confidential/tenant-a/proj-shared/state/project-state.json'), {
+      tenant_slug: 'tenant-a',
+      organization_id: 'org-a',
     });
-    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
-
-    expect(() =>
-      collectScopeTargets('project', 'proj-shared', {
-        tenantSlug: 'tenant-a',
-        organizationId: 'org-a',
-      })
-    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
-  });
-
-  it('refuses an unprefixed entry when no lineage of the project is known at all (review #2)', async () => {
-    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
-
-    expect(() =>
-      collectScopeTargets('project', 'proj-shared', {
-        tenantSlug: 'tenant-a',
-        organizationId: 'org-a',
-      })
-    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
-  });
-
-  it('unfiltered project offboarding refuses admitted entries of several tenants (review #3)', async () => {
-    await fetchWithVaultCache(
-      'confluence',
-      admittedKey('tenant-a', 'proj-shared'),
-      () => ({ a: 1 }),
-      {
-        projectId: 'proj-shared',
-      }
-    );
-    await fetchWithVaultCache(
-      'confluence',
-      admittedKey('tenant-b', 'proj-shared'),
-      () => ({ b: 1 }),
-      {
-        projectId: 'proj-shared',
-      }
-    );
-
-    expect(() => collectScopeTargets('project', 'proj-shared')).toThrow(
-      'PROJECT_DATA_VAULT_AMBIGUOUS'
-    );
-  });
-
-  it('unfiltered project offboarding refuses an admitted entry of a tenant other than the known lineage (review #3)', async () => {
-    seedProjectLineage('tenant-a', 'org-a');
-    await fetchWithVaultCache(
-      'confluence',
-      admittedKey('tenant-b', 'proj-shared'),
-      () => ({ b: 1 }),
-      {
-        projectId: 'proj-shared',
-      }
-    );
-
-    expect(() => collectScopeTargets('project', 'proj-shared')).toThrow(
-      'PROJECT_DATA_VAULT_AMBIGUOUS'
-    );
-  });
-
-  it('unfiltered project offboarding claims admitted entries of the one known tenant (review #3)', async () => {
-    seedProjectLineage('tenant-a', 'org-a');
-    await fetchWithVaultCache(
-      'confluence',
-      admittedKey('tenant-a', 'proj-shared'),
-      () => ({ a: 1 }),
-      {
-        projectId: 'proj-shared',
-      }
-    );
-
-    expect(
-      collectScopeTargets('project', 'proj-shared').filter((t) => t.kind === 'data_vault_entry')
-    ).toEqual(vaultFiles().map((file) => ({ path: file, kind: 'data_vault_entry' })));
-  });
-
-  it('tenant offboarding claims the tenant’s admitted entries cached under its project ids', async () => {
-    await fetchWithVaultCache('confluence', admittedKey('tenant-a', 'proj-a'), () => ({ a: 1 }), {
-      projectId: 'proj-a',
-    });
-    const [entryA] = vaultFiles();
-    await fetchWithVaultCache('confluence', admittedKey('tenant-b', 'proj-b'), () => ({ b: 1 }), {
-      projectId: 'proj-b',
+    await cache({ tier: 'confidential', tenant: 'tenant-a', projectId: 'proj-shared' }, 'k1');
+    await cache({ tier: 'confidential', tenant: 'tenant-b', projectId: 'proj-shared' }, 'k2');
+    const result = offboardScope({
+      scopeType: 'project',
+      scopeId: 'proj-shared',
+      tenantSlug: 'tenant-a',
+      organizationId: 'org-a',
+      mode: 'execute',
+      approval: { approved_by: 'operator', purpose: 'project closed' },
     });
 
-    expect(
-      collectScopeTargets('tenant', 'tenant-a').filter(
-        (target) => target.kind === 'data_vault_entry'
-      )
-    ).toEqual([{ path: entryA, kind: 'data_vault_entry' }]);
+    expect(result.status).toBe('offboarded');
+    expect(fs.existsSync(abs(cacheRoot('confidential', 'tenant-a', 'proj-shared')))).toBe(false);
+    expect(fs.existsSync(abs(cacheRoot('confidential', 'tenant-b', 'proj-shared')))).toBe(true);
   });
 });
 

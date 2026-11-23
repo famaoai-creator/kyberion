@@ -1236,8 +1236,10 @@
       "custody": {
         "kind": "unscoped-legacy"
       },
-      "status": "active",
-      "sources": ["scope-model"]
+      "status": "legacy-move",
+      "moves_to": "floor.cache",
+      "sources": ["scope-model"],
+      "note": "Retired flat service-preset cache; entries now live at active/shared/cache/<tier>/<tenant|shared>/service-preset/. Nothing writes here; the janitor's legacy sweep expires leftovers (storage-retention-catalog)."
     },
     {
       "id": "runtime.service-bindings-backup",

@@ -8,7 +8,15 @@ import {
   rotatedSegmentStem,
 } from './append-only-store.js';
 import { withLockSync } from '../foundation/lock-utils.js';
-import { LIVE_STORAGE_MAINTENANCE_LOCK } from '../storage-layout.js';
+import {
+  LIVE_STORAGE_MAINTENANCE_LOCK,
+  STORAGE_DATA_TIERS,
+  STORAGE_FLOOR_ROOTS,
+} from '../storage-layout.js';
+import {
+  SERVICE_PRESET_CACHE_DOMAIN,
+  loadServicePresetCacheEntryAtPath,
+} from './service-preset-cache.js';
 import {
   ledgerSegmentLastHash,
   listLedgerSegments,
@@ -43,7 +51,6 @@ export {
 } from './storage-runtime-coverage.js';
 import { logger } from '../core.js';
 import { withExecutionContext } from '../authority.js';
-import { loadVaultEntryAtPath } from './data-vault.js';
 import {
   DELEGATION_CHILDREN_REGISTRY_SUBPATH,
   loadDelegationChildrenRegistryAtPath,
@@ -203,23 +210,6 @@ export interface RotateLogsResult {
   errors?: string[];
 }
 
-export interface ScanDataVaultOptions {
-  dryRun: boolean;
-  /** Preloaded retention catalog; loaded on demand when omitted. */
-  catalog?: LoadedRetentionCatalog;
-}
-
-export interface ScanDataVaultResult {
-  expired: string[];
-  deleted: string[];
-  /** Expired entries moved to `active/archive/.trash/` (catalog `soft_delete_days`). */
-  softDeleted: string[];
-  /** Expired entries moved to `active/archive/<repo-rel>` (catalog `action: archive`). */
-  archived: string[];
-  /** Expired entries left in place because their expiry (or its audit record) failed. */
-  errors?: string[];
-}
-
 export interface ScanRuntimeResult {
   expired: string[];
   deleted: string[];
@@ -272,6 +262,7 @@ export interface JanitorReport {
   deletedTmp: number;
   expiredLogs: number;
   rotatedLogs: number;
+  /** Leftovers of the retired flat data vault expired / deleted this run (legacy sweep). */
   expiredDataVault: number;
   deletedDataVault: number;
   expiredRuntime: number;
@@ -532,49 +523,80 @@ export function rotateLogs(opts: RotateLogsOptions): RotateLogsResult {
 }
 
 /**
- * Expire data-vault entries whose own `expiresAt` has passed. Disposal goes
- * through {@link expireFilePerPolicy} under the catalog's
- * `active/shared/data-vault` entry, like every other janitor expiry (so a
- * declared `soft_delete_days` / `archive` is honored). Each expiry is always
- * written to the retention audit: the trigger is the entry's self-declared
- * `expiresAt`, not a catalog TTL, so the audit record is the only trace of
- * why it went.
+ * Expire service-preset cache entries (`active/shared/cache/<tier>/<partition>/
+ * service-preset/**`) whose own `expiresAt` has passed. Disposal goes through
+ * the catalog entry that governs the file (the cache tier partition), and each
+ * expiry is audited first — the trigger is the entry's self-declared expiry,
+ * not a catalog TTL, so the audit record is the only trace of why it went.
+ * The partition's 30-day mtime rule (scanStorageFloors) stays as a backstop.
  */
-export function scanDataVault(opts: ScanDataVaultOptions): ScanDataVaultResult {
+export function scanServicePresetCache(opts: {
+  dryRun: boolean;
+  catalog?: LoadedRetentionCatalog;
+}): ScanRuntimeResult {
   const catalog = opts.catalog ?? loadRetentionCatalog();
-  const policy = retentionEntryForExactPath(catalog, 'active/shared/data-vault');
-  const dir = shared('data-vault');
+  const now = Date.now();
   const expired: string[] = [];
   const errors: string[] = [];
   const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
-
-  const files = collectFiles(dir);
-  for (const filePath of files) {
-    if (!filePath.endsWith('.json')) continue;
-    let entry: ReturnType<typeof loadVaultEntryAtPath>;
+  for (const tier of STORAGE_DATA_TIERS) {
+    const tierDir = nodePath.join(rootDir(), STORAGE_FLOOR_ROOTS.cache, tier);
+    let partitions: string[];
     try {
-      if (!safeExistsSync(filePath)) continue;
-      entry = loadVaultEntryAtPath(filePath);
-    } catch {
-      continue; // skip malformed entries
+      partitions = safeExistsSync(tierDir) ? safeReaddir(tierDir) : [];
+    } catch (err) {
+      errors.push(expiryFailure(tierDir, err));
+      continue;
     }
-    if (!entry?.expiresAt || Date.parse(entry.expiresAt) > Date.now()) continue;
-    expired.push(filePath);
-    if (opts.dryRun) continue;
-    // Audit-first: a failed expiry keeps the entry and is retried next sweep.
-    expireOrRecord(filePath, policy, outcome, errors, {
-      expires_at: entry.expiresAt,
-      reason: 'data-vault entry expiresAt elapsed (storage janitor)',
-    });
+    for (const partition of partitions) {
+      for (const filePath of collectFiles(
+        nodePath.join(tierDir, partition, SERVICE_PRESET_CACHE_DOMAIN)
+      )) {
+        if (!filePath.endsWith('.json')) continue;
+        const entry = loadServicePresetCacheEntryAtPath(filePath);
+        if (!entry?.expiresAt || Date.parse(entry.expiresAt) > now) continue;
+        const policy = retentionEntryForPath(catalog, repoRelativePosix(filePath));
+        if (!policy || policy.action === 'review_required') continue;
+        expired.push(filePath);
+        if (opts.dryRun) continue;
+        // Audit-first: a failed expiry keeps the entry and is retried next sweep.
+        expireOrRecord(filePath, policy, outcome, errors, {
+          expires_at: entry.expiresAt,
+          reason: 'service-preset cache entry expiresAt elapsed (storage janitor)',
+        });
+      }
+    }
   }
-
   return {
     expired,
     deleted: outcome.deleted,
     softDeleted: outcome.softDeleted,
     archived: outcome.archived,
-    ...withErrors('data-vault', errors),
+    ...withErrors('service-preset-cache', errors),
   };
+}
+
+/** Retired flat data vault: the service-preset cache now lives on the cache floor. */
+export const LEGACY_DATA_VAULT_RETENTION_PATH = 'active/shared/data-vault';
+
+/**
+ * Expire leftovers of the retired flat data vault (`active/shared/data-vault/`,
+ * replaced by the cache-floor service-preset cache, service-preset-cache.ts).
+ * Files are swept by mtime under the catalog's legacy entry (TTL, audited),
+ * like any declared directory. Remove this sweep together with that entry once
+ * deployments no longer hold the directory.
+ */
+export function scanLegacyDataVault(opts: {
+  dryRun: boolean;
+  catalog?: LoadedRetentionCatalog;
+}): ScanRuntimeResult {
+  const catalog = opts.catalog ?? loadRetentionCatalog();
+  const entry = retentionEntryForExactPath(catalog, LEGACY_DATA_VAULT_RETENTION_PATH);
+  const rules =
+    entry && entry.ttl_days !== undefined && entry.action !== 'review_required'
+      ? [{ repoRelativeDir: entry.path, ttlMs: entry.ttl_days * RETENTION_DAY_MS, entry }]
+      : [];
+  return sweepRepoRootedRules('data-vault', rules, catalog, opts.dryRun);
 }
 
 export function scanRuntime(opts: {
@@ -1554,14 +1576,14 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
     errors.push(`logs: ${err?.message ?? String(err)}`);
   }
 
-  let vaultResult: ScanDataVaultResult = {
+  let vaultResult: ScanRuntimeResult = {
     expired: [],
     deleted: [],
     softDeleted: [],
     archived: [],
   };
   try {
-    vaultResult = scanDataVault({ dryRun: opts.dryRun, catalog });
+    vaultResult = scanLegacyDataVault({ dryRun: opts.dryRun, catalog });
     for (const failure of vaultResult.errors ?? []) errors.push(`data-vault: ${failure}`);
   } catch (err: any) {
     errors.push(`data-vault: ${err?.message ?? String(err)}`);
@@ -1605,6 +1627,20 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
       errors.push(`storage-floors: ${failure}`);
   } catch (err: any) {
     errors.push(`storage-floors: ${err?.message ?? String(err)}`);
+  }
+  // Service-preset cache entries past their own expiresAt count as floor expiries.
+  try {
+    const presetResult = scanServicePresetCache({ dryRun: opts.dryRun, catalog });
+    for (const failure of presetResult.errors ?? [])
+      errors.push(`service-preset-cache: ${failure}`);
+    storageFloorResult = {
+      expired: [...storageFloorResult.expired, ...presetResult.expired],
+      deleted: [...storageFloorResult.deleted, ...presetResult.deleted],
+      softDeleted: [...storageFloorResult.softDeleted, ...presetResult.softDeleted],
+      archived: [...storageFloorResult.archived, ...presetResult.archived],
+    };
+  } catch (err: any) {
+    errors.push(`service-preset-cache: ${err?.message ?? String(err)}`);
   }
 
   let supervisorEventsResult: ScanRuntimeResult = {

@@ -20,7 +20,7 @@ import {
 } from './operator-service-connection-admission.js';
 import { SecureFetchError } from '../network.js';
 import { loadServiceEndpointsCatalog } from './service-endpoint-registry.js';
-import { fetchWithVaultCache } from '../storage/data-vault.js';
+import { fetchWithServicePresetCache } from '../storage/service-preset-cache.js';
 import { resolveServiceBinding, resolveServiceTransportAuth } from './service-binding.js';
 import { getServicePresetRecord } from './service-preset-registry.js';
 import {
@@ -48,11 +48,11 @@ export { withMcpStartupAttempt } from './service-mcp-execution.js';
 export type { McpApprovalContinuation } from './service-mcp-execution.js';
 
 export interface ServicePresetCacheOptions {
-  /** When set, the result is cached in the Data Vault for this many milliseconds. */
+  /** When set, the result is cached on the cache floor for this many milliseconds. */
   cache_ttl_ms?: number;
-  /** Project scope for the vault entry (defaults to _global). */
+  /** Project subtree of the cache entry (defaults to the partition's `global` subtree). */
   project_id?: string;
-  /** Data tier for vault storage (defaults to confidential). */
+  /** Data tier of the cache partition (defaults to confidential). */
   tier?: StorageDataTier;
 }
 
@@ -371,9 +371,10 @@ export async function executeServicePreset(
 }
 
 /**
- * Vault-cached variant of executeServicePreset.
- * Wraps the call in fetchWithVaultCache so repeated identical requests
- * are served from active/shared/data-vault/ within the TTL window.
+ * Cached variant of executeServicePreset. Repeated identical requests are
+ * served within the TTL window from the cache floor partition of the caller:
+ * `active/shared/cache/<tier>/<admitted tenant|shared>/service-preset/…`
+ * (storage/service-preset-cache.ts), so the owner follows from the path.
  */
 export async function executeServicePresetCached(
   serviceId: string,
@@ -400,22 +401,31 @@ export async function executeServicePresetCached(
       '[POLICY_VIOLATION] Service cache project does not match admitted project scope'
     );
   }
-  const cacheProjectId = admission
-    ? admittedProjectId || admission.securityScope.tenant_slug || admission.securityScope.tenant_id
-    : cacheOpts.project_id;
-  const scopedCacheKey = admission
-    ? `${admission.securityScope.tenant_slug ?? admission.securityScope.tenant_id ?? 'unknown'}:${cacheProjectId ?? '_tenant'}:${admission.bindingId}:${cacheKey}`
-    : cacheKey;
-  const { data: result, fromCache } = await fetchWithVaultCache(
+  // The admission contract already bound this tenant to the execution identity.
+  const tenant = admission ? resolveTenantAlias(admission.securityScope) : undefined;
+  if (admission && !tenant) {
+    throw new Error('[POLICY_VIOLATION] Service cache admission carries no tenant');
+  }
+  const projectId = admission ? admittedProjectId : cacheOpts.project_id;
+  // A miss writes the partition, so an admitted call caches in its write tier.
+  const admittedTier = admission?.securityScope.write_tier;
+  if (admittedTier && cacheOpts.tier && cacheOpts.tier !== admittedTier) {
+    throw new Error('[POLICY_VIOLATION] Service cache tier does not match admitted write tier');
+  }
+
+  const { data: result, fromCache } = await fetchWithServicePresetCache(
     serviceId,
-    scopedCacheKey,
+    admission ? `${admission.bindingId}:${cacheKey}` : cacheKey,
     () => executeServicePreset(serviceId, action, params, auth, undefined, tenantBindingCapability),
     {
       ttlMs: cacheOpts.cache_ttl_ms,
-      projectId: cacheProjectId,
-      tier: cacheOpts.tier ?? 'confidential',
+      scope: {
+        tier: admittedTier ?? cacheOpts.tier ?? 'confidential',
+        ...(tenant ? { tenant } : {}),
+        ...(projectId ? { projectId } : {}),
+      },
     }
   );
-  if (fromCache) logger.info(`[ENGINE:VAULT] cache hit for ${serviceId}:${action}`);
+  if (fromCache) logger.info(`[ENGINE:CACHE] cache hit for ${serviceId}:${action}`);
   return { result, fromCache };
 }

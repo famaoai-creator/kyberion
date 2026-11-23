@@ -150,8 +150,8 @@ export interface RetentionCatalogEntry {
   path: string;
   artifact_class: RetentionArtifactClass;
   /**
-   * TTL in days. Omitted for note-only entries (e.g. data-vault, whose files
-   * carry their own per-entry `expiresAt` and are self-expiring).
+   * TTL in days. Omitted for note-only entries (e.g. the cache floor root,
+   * whose legacy root files are evicted by their own writer).
    */
   ttl_days?: number;
   action: RetentionAction;
@@ -331,9 +331,11 @@ export const BUILTIN_RETENTION_DEFAULTS: readonly RetentionCatalogEntry[] = Obje
   {
     path: 'active/shared/data-vault',
     artifact_class: 'cache',
+    ttl_days: 30,
     action: 'delete',
+    audit: true,
     backup: 'exclude',
-    note: 'self-expiring: each JSON entry carries its own expiresAt honored per-file by the janitor',
+    note: 'legacy: retired flat data vault; leftovers expire 30 days after their last write',
   },
 ]) as readonly RetentionCatalogEntry[];
 
@@ -632,7 +634,7 @@ export function runtimeRetentionRules(
 /**
  * EV-06: append-only event stores that live OUTSIDE `active/shared/runtime/`.
  *
- * The janitor's scan functions were rooted at tmp / logs / data-vault / runtime
+ * The janitor's scan functions were rooted at tmp / logs / runtime
  * / trash, so these trees were neither TTL-governed nor reported as uncovered —
  * an undeclared path under `runtime/` at least shows up in the janitor report,
  * while a path outside every scan root is invisible. That invisibility is how

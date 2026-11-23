@@ -118,10 +118,15 @@ describe('storage-retention-catalog', () => {
       expect(ttlBySubdir.get('browser-receipts')).toBe(90 * RETENTION_DAY_MS);
       expect(ttlBySubdir.get('procedure-deltas')).toBe(14 * RETENTION_DAY_MS);
       expect(ttlBySubdir.get('a2a-conversations')).toBe(30 * RETENTION_DAY_MS);
-      // data-vault is a note-only (self-expiring) entry: declared but no TTL.
+      // The retired flat data vault keeps a legacy entry: leftovers expire
+      // after the cache partitions' TTL, audited, and are never backed up.
       const vault = loaded.entries.find((e) => e.path === 'active/shared/data-vault');
-      expect(vault).toBeDefined();
-      expect(vault?.ttl_days).toBeUndefined();
+      expect(vault).toMatchObject({
+        ttl_days: 30,
+        action: 'delete',
+        audit: true,
+        backup: 'exclude',
+      });
     });
 
     it('DA-08: the ingest system directories are catalog-governed (janitor never reports them uncovered)', () => {

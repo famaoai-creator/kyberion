@@ -497,7 +497,7 @@ What `--scope all` archives: `active/`, `vault/`, `knowledge/personal/` and
 `active/shared/{tmp,staging,cache}` floors, every
 `storage-retention-catalog.json` entry marked `"backup": "exclude"` (fully
 regenerable data such as indexes, probe caches and test-run fixtures, plus the
-re-fetchable `active/shared/data-vault` cache and the soft-delete grace floor
+retired flat `active/shared/data-vault` cache, now legacy, and the soft-delete grace floor
 `active/archive/.trash`; a
 `cache`/`tmp` class alone never excludes, because staging stores like distill
 candidates or queued events hold pending state), the backup output directory and earlier archives in it, and the managed tool-runtime

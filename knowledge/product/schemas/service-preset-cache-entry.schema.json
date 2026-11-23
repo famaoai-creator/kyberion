@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "service-preset-cache-entry.schema.json",
+  "title": "Service-preset cache entry",
+  "description": "Validated TTL cache entry of a service-preset call, stored on the cache floor at active/shared/cache/<tier>/<tenant|shared>/service-preset/ (libs/core/storage/service-preset-cache.ts). tier, tenant and projectId must equal the partition the file sits in.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["serviceId", "key", "tier", "data", "contentHash", "createdAt"],
+  "properties": {
+    "serviceId": { "type": "string", "minLength": 1 },
+    "key": { "type": "string", "minLength": 1 },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "tenant": { "type": "string", "minLength": 1 },
+    "projectId": { "type": "string", "minLength": 1 },
+    "data": {},
+    "contentHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" }
+  }
+}

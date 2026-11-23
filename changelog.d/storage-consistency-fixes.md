@@ -6,7 +6,7 @@ category: Fixed
   - Append-only store rotation on a path that is not `.jsonl` now throws instead of looping forever.
   - `ROTATED_SEGMENT_SUFFIX_PATTERN` now matches the `-<n>` collision segments, and the janitor and runtime coverage use one shared definition (`isRotatedSegmentName`).
   - `rotateLogs` applies an explicit `retentionDays` before the catalog TTL, the same way the other scanners do.
-  - An audited expiry writes its record before deleting. If the record cannot be written, the file stays and every scanner lists it in the janitor report's errors; this includes data-vault expiries, which were previously deleted with no audit record.
+  - An audited expiry writes its record before deleting. If the record cannot be written, the file stays and every scanner lists it in the janitor report's errors; this includes self-expiring cache entries (now the service-preset cache sweep), which were previously deleted with no audit record.
   - The built-in retention fallback used when the catalog cannot be read now mirrors the shipped catalog: staging and cache expire, `logs/audit` is archived rather than deleted after 30 days, and a test pins every field.
   - Nested catalog entries count as covering their event-store directory.
   - `mapAsync` rejects a concurrency that is not a positive integer.
@@ -14,8 +14,8 @@ category: Fixed
   - The ingest dedup registry is pruned under the lock its appenders take, re-reading it at prune time, so lines appended after planning are no longer lost.
   - Tenant-nested missions (`active/missions/<tier>/<tenant>/<id>`) are offboarded.
   - An execute without a reviewed `expectedPreviewId` returns `approval_required`.
-  - Data-vault entries are attributed by their key and refused as `PROJECT_DATA_VAULT_AMBIGUOUS` unless one lineage is known.
+  - Superseded before release: key-based data-vault attribution (`PROJECT_DATA_VAULT_AMBIGUOUS`) was replaced by path-based offboarding of the service-preset cache; see `service-preset-cache-floor.md`.
   - The export manifest records the final prune counts and names an export file only once it exists.
-- **Data vault**: a cache hit is served only for the requested tier, and the unused `vault_id` / `cache_key` filters are removed.
+- **Data vault**: superseded before release — the vault is retired and the service-preset cache keeps one partition per tier and tenant on the cache floor; see `service-preset-cache-floor.md`.
 - **`mission start --mission-type`**: a type that differs from the created mission now fails with `[MISSION_TYPE_MISMATCH]` instead of being silently ignored. A start without the flag no longer defaults to `development`.
-- **Docs**: `runtime-storage-layout.md` now matches the code: retention enforcement, offboarding, and the flat data vault as a known gap. The reverse_spec, legacy_migration and kickoff playbooks note where the mission type is set, the operator persona the code-graph pipeline needs, and that human holds are enforced only with `KYBERION_GATE_OVERRIDE_SIGNATURE=enforce`.
+- **Docs**: `runtime-storage-layout.md` now matches the code: retention enforcement, offboarding, and (until `service-preset-cache-floor.md` closed it) the flat data vault as a known gap. The reverse_spec, legacy_migration and kickoff playbooks note where the mission type is set, the operator persona the code-graph pipeline needs, and that human holds are enforced only with `KYBERION_GATE_OVERRIDE_SIGNATURE=enforce`.
