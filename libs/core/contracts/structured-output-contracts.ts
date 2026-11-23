@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { AGENT_CONTEXT_MODES } from './context-boundary.js';
-import { GateAiAssessmentSchema } from '../mission/gate-ai-assessment.js';
+import { GateAiAssessmentSchema } from './gate-ai-assessment.js';
 import type {
   A2ATaskContract,
   A2ATaskContext,

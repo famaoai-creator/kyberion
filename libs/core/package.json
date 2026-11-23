@@ -916,6 +916,10 @@
       "types": "./dist/contracts/execution-bounds.d.ts",
       "default": "./dist/contracts/execution-bounds.js"
     },
+    "./contracts/gate-ai-assessment": {
+      "types": "./dist/contracts/gate-ai-assessment.d.ts",
+      "default": "./dist/contracts/gate-ai-assessment.js"
+    },
     "./contracts/generation-job": {
       "types": "./dist/contracts/generation-job.d.ts",
       "default": "./dist/contracts/generation-job.js"
