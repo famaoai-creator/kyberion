@@ -89,19 +89,22 @@ function tenantPartitionsHoldingProject(projectId: string): string[] {
 }
 
 /**
- * Tenant whose partition an UNFILTERED project offboarding claims: the single
- * tenant the project's lineage resolves to. When a tenant partition holds the
- * project but the lineage is not exactly one tenant, refuse rather than leave
- * (or guess) another tenant's cache.
+ * Tenant whose data an UNFILTERED project offboarding claims: the single
+ * tenant the project's lineage resolves to. When `holding` (tenants that hold
+ * data of the project) is non-empty but the lineage is not exactly one tenant,
+ * refuse rather than leave (or guess) another tenant's data.
  */
-function unfilteredProjectTenant(projectId: string): string | undefined {
-  const holding = tenantPartitionsHoldingProject(projectId);
+function unfilteredProjectTenant(
+  projectId: string,
+  holding: readonly string[],
+  evidence: string
+): string | undefined {
   if (holding.length === 0) return undefined;
   const known = [...knownProjectTenants(projectId)];
   if (known.length === 1) return known[0];
   const lineage = known.length === 0 ? 'no tenant' : `several tenants (${known.join(', ')})`;
   throw new Error(
-    `[PROJECT_SERVICE_PRESET_CACHE_AMBIGUOUS] project '${projectId}' has service-preset cache in tenant partition(s) ${holding.join(', ')} but its lineage resolves to ${lineage} | next: rerun the project offboarding with tenantSlug and organizationId | evidence: ${STORAGE_FLOOR_ROOTS.cache}/<tier>/<tenant>/service-preset/project/`
+    `[PROJECT_SERVICE_PRESET_CACHE_AMBIGUOUS] project '${projectId}' has service-preset cache data of tenant(s) ${holding.join(', ')} but its lineage resolves to ${lineage} | next: rerun the project offboarding with tenantSlug and organizationId | evidence: ${evidence}`
   );
 }
 
@@ -128,7 +131,11 @@ export function collectServicePresetCacheTargets(
       servicePresetCacheProjectRoot(tier, tenant, scopeId)
     );
   } else {
-    const tenant = unfilteredProjectTenant(scopeId);
+    const tenant = unfilteredProjectTenant(
+      scopeId,
+      tenantPartitionsHoldingProject(scopeId),
+      `${STORAGE_FLOOR_ROOTS.cache}/<tier>/<tenant>/service-preset/project/`
+    );
     subtrees = [...(tenant ? [tenant] : []), undefined].flatMap((partition) =>
       STORAGE_DATA_TIERS.map((tier) => servicePresetCacheProjectRoot(tier, partition, scopeId))
     );
@@ -140,26 +147,52 @@ export function collectServicePresetCacheTargets(
 
 /**
  * LEGACY — remove with the `active/shared/data-vault` retention entry and the
- * janitor's `scanLegacyDataVault`. Until the flat vault's leftovers expire, a
- * tenant offboarding still claims the entries a tenant-admitted service call
- * wrote there: their key is `<tenant>:<projectId>:<bindingId>:<cacheKey>`
- * with `<projectId>` equal to the entry's projectId. Unadmitted entries are
- * shared by definition and never claimed (the earlier projectId == tenant
- * heuristic is dropped deliberately).
+ * janitor's `scanLegacyDataVault`. Until the flat vault's leftovers expire,
+ * offboarding still claims the entries a tenant-admitted service call wrote
+ * there: their key is `<tenant>:<projectId>:<bindingId>:<cacheKey>` with
+ * `<projectId>` equal to the entry's projectId. Unadmitted entries are shared
+ * by definition and never claimed (the earlier projectId == tenant heuristic
+ * is dropped deliberately).
+ *
+ * - Tenant: the tenant's admitted entries.
+ * - Project with a tenant filter: the filter tenant's entries of the project.
+ * - Project without a filter: the single lineage tenant's entries of the
+ *   project; fails closed like the cache when that tenant is not unique.
  */
-export function collectLegacyDataVaultTargets(tenant: string): OffboardTarget[] {
-  if (!isPartitionTenant(tenant)) return [];
+export function collectLegacyDataVaultTargets(
+  scopeType: OffboardScopeType,
+  scopeId: string,
+  filter: PhysicalNamespaceFilter = {}
+): OffboardTarget[] {
   const vaultDir = pathResolver.rootResolve('active/shared/data-vault');
-  const targets: OffboardTarget[] = [];
+  const admitted: Array<{ tenant: string; projectId: string; path: string }> = [];
   for (const name of listDirEntries(vaultDir)) {
     if (!name.endsWith('.json')) continue;
     const filePath = safeOptionalRepositoryPath(path.join(vaultDir, name));
     if (!filePath) continue;
     const record = readJsonRecord(filePath);
     if (typeof record?.key !== 'string' || typeof record.projectId !== 'string') continue;
-    const segments = record.key.split(':');
-    if (segments.length < 4 || segments[0] !== tenant || segments[1] !== record.projectId) continue;
-    targets.push({ path: repoRelativePosix(filePath), kind: 'legacy_data_vault_entry' });
+    const [tenant, projectId, ...rest] = record.key.split(':');
+    if (rest.length < 2 || projectId !== record.projectId || !isPartitionTenant(tenant ?? '')) {
+      continue;
+    }
+    admitted.push({ tenant: tenant!, projectId, path: repoRelativePosix(filePath) });
   }
-  return targets;
+  let wanted: (entry: { tenant: string; projectId: string }) => boolean;
+  if (scopeType === 'tenant') {
+    wanted = (entry) => entry.tenant === scopeId;
+  } else {
+    const ofProject = admitted.filter((entry) => entry.projectId === scopeId);
+    const tenant =
+      filter.tenantSlug ??
+      unfilteredProjectTenant(
+        scopeId,
+        [...new Set(ofProject.map((entry) => entry.tenant))],
+        'active/shared/data-vault/'
+      );
+    wanted = (entry) => entry.projectId === scopeId && entry.tenant === tenant;
+  }
+  return admitted
+    .filter(wanted)
+    .map((entry) => ({ path: entry.path, kind: 'legacy_data_vault_entry' as const }));
 }

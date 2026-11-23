@@ -2207,11 +2207,35 @@ describe('project offboarding — service-preset cache by partition path (C-OFF-
     expect(targets).toEqual([
       { path: `${vault}/a-admitted.json`, kind: 'legacy_data_vault_entry' },
     ]);
+  });
+
+  it('LEGACY: project offboarding claims the project’s tenant-keyed flat data-vault entries', () => {
+    const vault = 'active/shared/data-vault';
+    const legacy = (name: string, record: Record<string, unknown>) =>
+      writeJson(abs(`${vault}/${name}.json`), { tier: 'confidential', data: {}, ...record });
+    legacy('a-admitted', { key: 'tenant-a:proj-x:binding-1:get_page:0123', projectId: 'proj-x' });
+    legacy('b-admitted', { key: 'tenant-b:proj-x:binding-1:get_page:0123', projectId: 'proj-x' });
+    legacy('a-other', { key: 'tenant-a:proj-y:binding-1:get_page:0123', projectId: 'proj-y' });
+    legacy('unadmitted', { key: 'get_page:0123', projectId: 'proj-x' });
+    const legacyTargets = (...args: Parameters<typeof collectScopeTargets>) =>
+      collectScopeTargets(...args)
+        .filter((target) => target.kind === 'legacy_data_vault_entry')
+        .map((target) => target.path);
+
+    // Filtered: only the filter tenant's entries of this project.
     expect(
-      collectScopeTargets('project', 'proj-a').filter(
-        (target) => target.kind === 'legacy_data_vault_entry'
-      )
-    ).toEqual([]);
+      legacyTargets('project', 'proj-x', { tenantSlug: 'tenant-a', organizationId: 'org-a' })
+    ).toEqual([`${vault}/a-admitted.json`]);
+    // Unfiltered with no lineage: two tenants hold entries — fail closed.
+    expect(() => collectScopeTargets('project', 'proj-x')).toThrow(
+      'PROJECT_SERVICE_PRESET_CACHE_AMBIGUOUS'
+    );
+    // Unfiltered with a single lineage tenant: that tenant's entries only.
+    writeJson(abs('active/projects/confidential/tenant-a/proj-x/state/project-state.json'), {
+      tenant_slug: 'tenant-a',
+      organization_id: 'org-a',
+    });
+    expect(legacyTargets('project', 'proj-x')).toEqual([`${vault}/a-admitted.json`]);
   });
 
   it('tenant offboarding claims the tenant’s whole service-preset partition of every tier', async () => {

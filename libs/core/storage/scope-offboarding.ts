@@ -294,7 +294,8 @@ export type OffboardTargetKind =
   | 'service_preset_cache_tree'
   /**
    * LEGACY: a flat `active/shared/data-vault/` entry a tenant-admitted call
-   * wrote (key prefix); removed with the legacy retention entry.
+   * wrote for the scope's tenant / project (key prefix); removed with the
+   * legacy retention entry.
    */
   | 'legacy_data_vault_entry'
   /** Tenant-scoped feedback, intent, audit, and collaboration runtime state. */
@@ -1089,8 +1090,8 @@ export function collectScopeTargets(
   // path: a project offboarding touches only its filter tenant's (or the
   // untenanted) partition, never another tenant's.
   targets.push(...collectServicePresetCacheTargets(scopeType, id, filter));
-  // LEGACY: flat data-vault entries admitted for the tenant (key prefix).
-  if (scopeType === 'tenant') targets.push(...collectLegacyDataVaultTargets(id));
+  // LEGACY: flat data-vault entries admitted for the tenant / the project's tenant (key prefix).
+  targets.push(...collectLegacyDataVaultTargets(scopeType, id, filter));
 
   // P3 (R-09): artifacts derived from the tenant's assets that live OUTSIDE
   // every collected tree (shared caches, cross-partition results) are reached
