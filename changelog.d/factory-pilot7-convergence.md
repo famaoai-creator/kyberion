@@ -1,25 +1,30 @@
-# factory-pilot7-convergence
+---
+category: Changed
+---
 
-Converge scattered conditional branches onto canonical registry-derived
-projections, on top of the #1581 durable data model hardening base.
-
-- `delegable` flags at 16 external-operation call sites now derive from
-  `isDelegableExternalOperation(...)`; remaining literals are allowlisted
-  with reasons and guarded by a new repo-wide contract test.
-- Operation egress classes (`tierSource` / `repositoryTarget` /
-  `tenantSystemRead`) moved into `EXTERNAL_OPERATION_CLASSES` in the
-  delegation registry; the admission path no longer carries inline op-id
-  lists. Contract tests pin classified ops to declared operations.
-- IO operation classes (`isContentMutating` / `isMutating` / `isReadLike` /
-  `isMetadataAncestorAccess`) added to `resource-access-scope.ts` and adopted
-  at 9 sites, deduplicating seven scattered `write|append|mkdir` checks and
-  the customer-decision metadata-ancestor rule.
-- `CharterScope` vocabulary + predicates sank into
-  `foundation/charter-scope.ts` (fixes a foundation→domain layering
-  inversion); remaining literal branches converted in onboarding, external
-  operation runtime and publication store code.
-- Custody projections added per union: `isPerson/Tenant/SystemCustody`
-  (`CustodyOwner`) and `is*RecordCustody` (`ViewerRecordCustody`), adopted in
-  provider egress and surface modules.
-- `union-literal-branch-baseline.json` strictly shrunk; no projection
-  allowlist entries added.
+- **External-operation `delegable` flags are registry-derived.** The 16 call
+  sites that hardcoded `delegable: true|false` now call
+  `isDelegableExternalOperation(<operationId>)`, and a new
+  `delegable-flag-literal` contract test fails on any future bare literal
+  outside a reasoned, staleness-checked allowlist (email custom adapters and
+  generic service effects remain context-forced by design).
+- **Operation egress classes live in the delegation registry.**
+  `EXTERNAL_OPERATION_CLASSES` in `external-operation-target.ts` declares
+  `tierSource`, `repositoryTarget` and `tenantSystemRead` per operation; the
+  admission path no longer carries inline op-id lists, and contract tests pin
+  every classified op to a declared registry entry.
+- **IO operation classes are canonical projections.** `resource-access-scope.ts`
+  exports `isContentMutatingResourceAccessOperation` (write|append),
+  `isMutatingResourceAccessOperation` (+mkdir), `isReadLikeResourceAccessOperation`
+  (read|metadata) and `isMetadataAncestorAccess`; nine call sites across the
+  path guard, tier guard, runtimes and store capabilities use them.
+- **`CharterScope` vocabulary moved to `foundation/charter-scope.ts`.** The
+  scope union and `isPersonalCharterScope` / `charterScopeTenantSlug` /
+  `charterScopesEqual` predicates are re-exported from
+  `accountability-charter.ts` unchanged; foundation-layer capabilities can now
+  consume them without a layer-direction violation.
+- **Custody predicates per union.** `isPerson/Tenant/SystemCustody` for
+  `CustodyOwner` and `is*RecordCustody` for `ViewerRecordCustody` replace
+  scattered `kind ===` branches in provider egress and surface modules.
+- The `union-literal-branch` baseline strictly shrank; validation-edge
+  literals that narrow untrusted input remain by design.
