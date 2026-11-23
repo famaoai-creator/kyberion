@@ -28,6 +28,10 @@ export type CollaborationKind =
   | 'failure'
   | 'completion'
   | 'unknown';
+export const isApprovalCollaborationKind = (kind: CollaborationKind): boolean =>
+  kind === 'approval';
+export const isWaitingCollaborationKind = (kind: CollaborationKind): boolean => kind === 'waiting';
+
 export type CollaborationSource =
   'mission' | 'task' | 'worker' | 'orchestration' | 'a2a' | 'trace' | 'surface' | 'runtime';
 export type CollaborationRedaction = 'summary' | 'reference_only' | 'redacted';

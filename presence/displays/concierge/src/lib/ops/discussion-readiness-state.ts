@@ -1,4 +1,5 @@
 import type { DiscussionReadinessReport } from '@agent/core/discussion/discussion-readiness';
+import { isClaudeDiscussionProvider } from '@agent/core/discussion/discussion-types';
 import type { DiscussionEngineChoice, DiscussionRunFormat } from './discussion-run-contract';
 
 export type ReadinessProvider = DiscussionReadinessReport['provider'];
@@ -75,7 +76,10 @@ export function parseDiscussionReadinessReport(
   const prerequisiteBlocked =
     checkFor('scope').status === 'blocked' || checkFor('adapter').status === 'blocked';
   if ((checkFor('egress_policy').status === 'unverified') !== prerequisiteBlocked) return null;
-  if ((provider === 'claude') !== (checkFor('executable').code === 'executable_unverified'))
+  if (
+    isClaudeDiscussionProvider(provider) !==
+    (checkFor('executable').code === 'executable_unverified')
+  )
     return null;
   return {
     provider,

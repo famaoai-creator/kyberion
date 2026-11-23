@@ -39,6 +39,7 @@ import {
   writeAgenda,
   type AgendaEntry,
   type DecisionAgenda,
+  isApprovalAgendaEntry,
 } from '@agent/core/customer-decision';
 import { ScriptExitError } from '../lib/harness.js';
 import {
@@ -315,7 +316,7 @@ function assertAnswerable(agenda: DecisionAgenda): void {
   const problems: string[] = [];
   for (const entry of agenda.entries) {
     if (
-      entry.kind === 'approval' &&
+      isApprovalAgendaEntry(entry) &&
       !entry.requires_customer &&
       entry.our_decision?.value === undefined
     ) {

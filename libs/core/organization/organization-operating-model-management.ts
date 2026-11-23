@@ -46,6 +46,7 @@ import {
   listOrganizationOperationRuns,
   loadOrganizationCadence,
   loadOrganizationOperation,
+  isMissionExecutionTarget,
 } from './organization-operating-model-operations.js';
 import { rollUpObjectiveProgress } from './organization-objective-progress.js';
 import { listOrganizationLearningCandidatesFromQueue } from './organization-learning-queue.js';
@@ -795,7 +796,10 @@ export function reconcileOrganizationCatalog(query: {
         return [`${entry.operation_id}:${ref}`];
       }
     }
-    if (entry.execution_target.kind === 'mission' && !loadState(ref, { rootDir: query.rootDir })) {
+    if (
+      isMissionExecutionTarget(entry.execution_target) &&
+      !loadState(ref, { rootDir: query.rootDir })
+    ) {
       return [`${entry.operation_id}:${ref}`];
     }
     if (

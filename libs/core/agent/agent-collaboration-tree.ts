@@ -19,7 +19,10 @@
  */
 
 import type { AgentActivityBoard } from './agent-activity-board.js';
-import type { AgentCollaborationEvent } from './agent-collaboration-events.js';
+import {
+  isApprovalCollaborationKind,
+  type AgentCollaborationEvent,
+} from './agent-collaboration-events.js';
 import type { AgentCollaborationProjection } from './agent-collaboration-projection.js';
 
 export type CollaborationWaitReason =
@@ -287,7 +290,7 @@ function createWaitSink(registry: TreeNodeRegistry): WaitSink {
 function collectOpenApprovals(events: AgentCollaborationEvent[]): AgentCollaborationEvent[] {
   const open = new Map<string, AgentCollaborationEvent>();
   for (const event of events) {
-    if (event.kind !== 'approval') continue;
+    if (!isApprovalCollaborationKind(event.kind)) continue;
     const key = event.request_id || event.correlation_id || event.source_event_id;
     if (APPROVAL_CLOSED_STATES.has((event.state_after || '').toLowerCase())) open.delete(key);
     else open.set(key, event);

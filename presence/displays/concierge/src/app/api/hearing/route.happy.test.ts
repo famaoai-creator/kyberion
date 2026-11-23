@@ -40,6 +40,12 @@ function configureHearingModules() {
         const argv = args[1] ?? [];
         if (argv[0] === 'dist/scripts/mission_controller.js') {
           spawn.calls.push({ args: argv, env: args[2]?.env as Record<string, string | undefined> });
+          if (argv.includes('--dry-run'))
+            return {
+              stdout: JSON.stringify({ input: { preflight: { ready: true } } }),
+              stderr: '',
+              status: 0,
+            };
           return { stdout: '', stderr: '', status: 0 };
         }
         if (argv[0] === 'dist/scripts/mission/mission_alignment_request.js') {
@@ -238,9 +244,12 @@ describe(
       expect(String((res.body.next_action as { href: string }).href)).toMatch(/^\/inbox(\?|$)/u);
       expect(spawn.calls.map((item) => item.args[0])).toEqual([
         'dist/scripts/mission_controller.js',
+        'dist/scripts/mission_controller.js',
         'dist/scripts/mission/mission_alignment_request.js',
       ]);
-      // Both children inherit the server's own role (bounded by its policy).
+      // The first child is the controller's dry-run preflight receipt.
+      expect(spawn.calls[0].args).toContain('--dry-run');
+      // All children inherit the server's own role (bounded by its policy).
       for (const item of spawn.calls) expect(item.env?.SYSTEM_ROLE).toBe('concierge');
       expect(spawn.calls[0].env?.KYBERION_TENANT).toBe(HEARING_TENANT);
       // The brief was written into the mission evidence under the real mission_controller role.

@@ -11,6 +11,8 @@ import {
 } from './surface-management-contract.js';
 export {
   SurfaceManagementError,
+  isOrganizationManagementResource,
+  isProjectManagementResource,
   organizationManagementVersion,
   projectManagementVersion,
   type SurfaceManagementAuthorization,

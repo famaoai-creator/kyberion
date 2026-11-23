@@ -17,6 +17,7 @@ import { loadSpendPolicy, resolveSpendPolicyForTenant } from '../finance/spend-g
 import { loadNotificationPreferences } from './operator-notifications.js';
 import { findActiveCharter } from '../governance/accountability-charter-registry.js';
 import type { WorkspaceGraph } from './workspace-graph.js';
+import { isTenantGraphNode } from './workspace-graph.js';
 import type { SetupBudgetSummary, SetupChecklistSignals } from './setup-checklist-model.js';
 
 export * from './setup-checklist-model.js';
@@ -64,7 +65,7 @@ export function collectSetupChecklistSignals(
   now: Date = new Date()
 ): SetupChecklistSignals {
   const count = (kind: string) => graph.nodes.filter((node) => node.kind === kind).length;
-  const tenants = graph.nodes.filter((node) => node.kind === 'tenant').map((node) => node.id);
+  const tenants = graph.nodes.filter(isTenantGraphNode).map((node) => node.id);
   const charter =
     tenants.length === 0
       ? false

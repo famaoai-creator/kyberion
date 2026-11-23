@@ -6,6 +6,7 @@ import {
   safeMoveSync,
   safeRmSync,
 } from '../secure-io.js';
+import { isMissionHearing, type HearingKind } from './hearing.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { readJson } from '../foundation/json.js';
 import { isValidTenantSlug } from '../entity-scope.js';
@@ -185,12 +186,9 @@ export function assertHearingEditable(record: HearingRecord | null): void {
 }
 
 /** A completion replay must not contradict an unresolved or mixed-kind record. */
-export function assertHearingHandoffReplay(
-  record: HearingRecord,
-  kind: 'mission' | 'inventory'
-): void {
+export function assertHearingHandoffReplay(record: HearingRecord, kind: HearingKind): void {
   if (record.handoff_pending) throw new HearingConflictError('handoff_unresolved');
-  const other = kind === 'mission' ? completionFields.slice(3) : completionFields.slice(0, 3);
+  const other = isMissionHearing(kind) ? completionFields.slice(3) : completionFields.slice(0, 3);
   if (other.some((key) => key in record)) throw new HearingConflictError('completion_locked');
 }
 
@@ -355,7 +353,7 @@ export function saveHearingCanvasVersion(
 export function reserveHearingHandoff(
   namespace: string,
   expected: HearingRecord,
-  kind: 'mission' | 'inventory',
+  kind: HearingKind,
   now: string
 ): HearingRecord {
   return updateHearingRecord(

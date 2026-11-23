@@ -25,6 +25,7 @@ import {
   type BoltReviewRouting,
   type DecisionAgenda,
   type DecisionReceipt,
+  isApprovalAgendaEntry,
 } from './model.js';
 
 export const MAX_ATTACHMENTS_PER_ENTRY = 6;
@@ -230,7 +231,7 @@ export function boltRoutingTargets(
 ): BoltRoutingTarget[] {
   if (!agenda.bolt_mission_id) return [];
   const approvals = new Set(
-    agenda.entries.filter((entry) => entry.kind === 'approval').map((entry) => entry.entry_id)
+    agenda.entries.filter((entry) => isApprovalAgendaEntry(entry)).map((entry) => entry.entry_id)
   );
   const targets = new Map<string, BoltRoutingTarget>();
   for (const receipt of receipts) {

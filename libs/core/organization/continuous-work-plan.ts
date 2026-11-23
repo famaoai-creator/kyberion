@@ -22,6 +22,11 @@ export interface ContinuousWorkPlan {
   project?: { name: string; summary: string; objective_ids?: string[] };
   missions: ContinuousWorkMission[];
 }
+
+export const isProjectWorkPlan = (plan: Pick<ContinuousWorkPlan, 'kind'>): boolean =>
+  plan.kind === 'project';
+export const isMissionWorkPlan = (plan: Pick<ContinuousWorkPlan, 'kind'>): boolean =>
+  plan.kind === 'mission';
 function object(value: unknown, keys: string[], label: string): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error(`${label} must be an object`);

@@ -149,28 +149,31 @@ function deepestScopeKind(context: ScopeContext): EventScopeKind {
   return 'system';
 }
 
-function requiredForKind(kind: EventScopeKind, context: ScopeContext): boolean {
-  if (!EVENT_SCOPE_KINDS.includes(kind)) return false;
-  if (kind === 'system')
-    return (
-      !context.tenant_slug &&
-      !context.organization_id &&
-      !context.project_id &&
-      !context.mission_id &&
-      !context.task_id &&
-      !context.session_id
-    );
-  if (kind === 'tenant') return Boolean(context.tenant_slug);
-  if (kind === 'organization') return Boolean(context.organization_id && context.tenant_slug);
-  if (kind === 'project')
-    return Boolean(
+/** Context requirement per scope kind — the membership table, not a switch. */
+const REQUIRED_FOR_KIND: Record<EventScopeKind, (context: ScopeContext) => boolean> = {
+  system: (context) =>
+    !context.tenant_slug &&
+    !context.organization_id &&
+    !context.project_id &&
+    !context.mission_id &&
+    !context.task_id &&
+    !context.session_id,
+  tenant: (context) => Boolean(context.tenant_slug),
+  organization: (context) => Boolean(context.organization_id && context.tenant_slug),
+  project: (context) =>
+    Boolean(
       context.project_id &&
       ((context.organization_id && context.tenant_slug) ||
         (context.tier === 'public' && !context.organization_id && !context.tenant_slug))
-    );
-  if (kind === 'mission') return Boolean(context.mission_id);
-  if (kind === 'task') return Boolean(context.task_id && context.mission_id);
-  return Boolean(context.session_id && context.task_id && context.mission_id);
+    ),
+  mission: (context) => Boolean(context.mission_id),
+  task: (context) => Boolean(context.task_id && context.mission_id),
+  session: (context) => Boolean(context.session_id && context.task_id && context.mission_id),
+};
+
+function requiredForKind(kind: EventScopeKind, context: ScopeContext): boolean {
+  if (!Object.hasOwn(REQUIRED_FOR_KIND, kind)) return false;
+  return REQUIRED_FOR_KIND[kind](context);
 }
 
 /** Normalize an event's scope while keeping customer stance outside authority. */

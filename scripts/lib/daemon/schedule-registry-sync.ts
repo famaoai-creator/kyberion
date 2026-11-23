@@ -18,6 +18,11 @@ type ScheduledPipelineInput = Parameters<typeof reconcileScheduledPipelines>[1][
 export type ScheduleScope =
   { kind: 'repository' } | { kind: 'tenant'; tenant_slug: string } | { kind: 'personal' };
 
+/** Tenant scopes are the only members carrying a slug — structural guard, no discriminant read. */
+export const isTenantScheduleScope = <S extends ScheduleScope>(
+  scope: S
+): scope is Extract<S, { kind: 'tenant' }> => 'tenant_slug' in scope;
+
 export interface ScheduleRegistrySyncDeps<S extends ScheduleScope = ScheduleScope> {
   rootDir?: string;
   /** Registered tenants' pipeline files (chronos collectTenantPipelineFiles). */
@@ -77,8 +82,7 @@ export function syncScheduleRegistry<S extends ScheduleScope>(
       if (!adf || !adf.schedule?.cron) continue;
       // Refuse to schedule a tenant pipeline whose runtime needs exceed its
       // tenant allowlist or the global ceiling (re-checked at run time too).
-      if (scope.kind === 'tenant')
-        deps.assertTenantRuntime(scope as Extract<S, { kind: 'tenant' }>, adf.runtime);
+      if (isTenantScheduleScope(scope)) deps.assertTenantRuntime(scope, adf.runtime);
       // Same deny-by-default bound for personal pipelines: the declared
       // `runtime` block must fit the personal allowlist (re-checked at run
       // time too).
@@ -91,12 +95,11 @@ export function syncScheduleRegistry<S extends ScheduleScope>(
       // repository schedule id (or another tenant's); personal schedules get
       // the same treatment so an operator-local file cannot shadow a
       // repository id either.
-      const id =
-        scope.kind === 'tenant'
-          ? `tenant-${(scope as Extract<ScheduleScope, { kind: 'tenant' }>).tenant_slug}-${baseId}`
-          : scope.kind === 'personal'
-            ? `personal-${baseId}`
-            : baseId;
+      const id = isTenantScheduleScope(scope)
+        ? `tenant-${scope.tenant_slug}-${baseId}`
+        : scope.kind === 'personal'
+          ? `personal-${baseId}`
+          : baseId;
 
       desired.push({
         id,

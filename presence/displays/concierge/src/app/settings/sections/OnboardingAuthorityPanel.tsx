@@ -6,6 +6,10 @@ import { frontDeskFetch as fetch } from '../../../lib/front-desk-fetch';
 import { conciergeText, type ConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
 import { InstallationAccessNotice } from './InstallationAccessNotice';
 import { isInstallationAccessCode } from '../../../lib/installation-access-client';
+
+const CHARTER_SCOPE_PERSON = 'person';
+const CHARTER_SCOPE_ORGANIZATION = 'organization';
+type CharterScopeKind = typeof CHARTER_SCOPE_PERSON | typeof CHARTER_SCOPE_ORGANIZATION;
 import { FormScope, asText } from './form-scope';
 import {
   Button,
@@ -140,7 +144,7 @@ export function OnboardingAuthorityPanel({
   selectedTenant?: string;
 }) {
   const t = (key: ConciergeMessageKey) => conciergeText(key, locale);
-  const [kind, setKind] = React.useState<'person' | 'organization'>('person');
+  const [kind, setKind] = React.useState<CharterScopeKind>(CHARTER_SCOPE_PERSON);
   const [tenant, setTenant] = React.useState(selectedTenant || '');
   const [operation, setOperation] = React.useState('');
   const [target, setTarget] = React.useState('');
@@ -162,7 +166,10 @@ export function OnboardingAuthorityPanel({
   const [error, setError] = React.useState<string | null>(null);
   const [reload, setReload] = React.useState(0);
   const [loadedScope, setLoadedScope] = React.useState('');
-  const scope = { scope_kind: kind, ...(kind === 'organization' ? { tenant_slug: tenant } : {}) };
+  const scope = {
+    scope_kind: kind,
+    ...(kind === CHARTER_SCOPE_ORGANIZATION ? { tenant_slug: tenant } : {}),
+  };
   const scopeKey = JSON.stringify(scope);
   const active = React.useRef(scopeKey);
   active.current = scopeKey;
@@ -227,12 +234,13 @@ export function OnboardingAuthorityPanel({
   const fingerprint = JSON.stringify(draft);
   const currentDraft = React.useRef(fingerprint);
   currentDraft.current = fingerprint;
-  const ready = loadedScope === scopeKey && !!overview && (kind === 'person' || !!tenant);
+  const ready =
+    loadedScope === scopeKey && !!overview && (kind === CHARTER_SCOPE_PERSON || !!tenant);
   React.useEffect(() => {
     setPreview(null);
   }, [fingerprint]);
   React.useEffect(() => {
-    if (kind === 'organization') setTenant(selectedTenant || '');
+    if (kind === CHARTER_SCOPE_ORGANIZATION) setTenant(selectedTenant || '');
   }, [kind, selectedTenant]);
   React.useEffect(() => {
     let cancelled = false;
@@ -252,7 +260,7 @@ export function OnboardingAuthorityPanel({
     setExpires('');
     setMode('grant');
     setRenewExisting(false);
-    if (kind === 'organization' && !tenant) return;
+    if (kind === CHARTER_SCOPE_ORGANIZATION && !tenant) return;
     const query = new URLSearchParams(scope);
     void fetch('/api/onboarding-authority?' + query, { cache: 'no-store' })
       .then(async (response) => {
@@ -471,7 +479,10 @@ export function OnboardingAuthorityPanel({
       checked ? [...new Set([...previous, token])] : previous.filter((value) => value !== token)
     );
   };
-  const tierTokens = ['public', kind === 'person' ? 'personal' : `confidential:${tenant}`];
+  const tierTokens = [
+    'public',
+    kind === CHARTER_SCOPE_PERSON ? 'personal' : `confidential:${tenant}`,
+  ];
   const tierFields = Object.fromEntries(
     (['read', 'write'] as const).flatMap((access) =>
       tierTokens.map((token) => [
@@ -542,7 +553,7 @@ export function OnboardingAuthorityPanel({
             ]}
           />
         </SettingRow>
-        {kind === 'organization' ? (
+        {kind === CHARTER_SCOPE_ORGANIZATION ? (
           <SettingRow label={t('authority.tenant')} control_id="authority-tenant">
             <Select
               id="authority-tenant"
@@ -577,7 +588,7 @@ export function OnboardingAuthorityPanel({
         ) : error ? (
           <Callout tone="danger" title={error} />
         ) : null}
-        {!overview && !error && (kind === 'person' || tenant) ? (
+        {!overview && !error && (kind === CHARTER_SCOPE_PERSON || tenant) ? (
           <p role="status" className="kb-text kb-text--muted">
             {t('authority.loading')}
           </p>
@@ -788,9 +799,10 @@ export function OnboardingAuthorityPanel({
                     {[
                       { token: 'public', label: t('authority.tier_public') },
                       {
-                        token: kind === 'person' ? 'personal' : `confidential:${tenant}`,
+                        token:
+                          kind === CHARTER_SCOPE_PERSON ? 'personal' : `confidential:${tenant}`,
                         label: t(
-                          kind === 'person'
+                          kind === CHARTER_SCOPE_PERSON
                             ? 'authority.tier_personal'
                             : 'authority.tier_confidential'
                         ),

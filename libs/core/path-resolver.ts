@@ -614,15 +614,19 @@ const VOLATILE_SESSION_ID = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9._])?
  * normalizes refs for backward compatibility, so `a/b` and `a-b` share a
  * directory; callers keying sensitive state must validate and reject instead.
  */
+const VOLATILE_ID_ASSERTS: Record<'session' | 'mission', (id: string, raw: unknown) => void> = {
+  session: (id, raw) => {
+    if (!VOLATILE_SESSION_ID.test(id) || id.includes('..'))
+      throw new Error(`[path-resolver] invalid session id '${String(raw)}'`);
+  },
+  mission: (id) => assertMissionIdArgument(id),
+};
+
 export function assertVolatileId(kind: 'session' | 'mission', value: unknown): string {
+  if (!Object.hasOwn(VOLATILE_ID_ASSERTS, kind))
+    throw new Error(`[path-resolver] unknown volatile id kind '${String(kind)}'`);
   const id = typeof value === 'string' ? value.trim() : '';
-  if (kind === 'mission') {
-    assertMissionIdArgument(id);
-    return id;
-  }
-  if (!VOLATILE_SESSION_ID.test(id) || id.includes('..')) {
-    throw new Error(`[path-resolver] invalid session id '${String(value)}'`);
-  }
+  VOLATILE_ID_ASSERTS[kind](id, value);
   return id;
 }
 

@@ -15,7 +15,11 @@ import {
   normalizeDiscussionConfig,
   readDiscussionRoom,
 } from './discussion-store.js';
-import type { DiscussionProvider, DiscussionRoomState } from './discussion-types.js';
+import {
+  isClaudeDiscussionProvider,
+  type DiscussionProvider,
+  type DiscussionRoomState,
+} from './discussion-types.js';
 
 export class DiscussionProviderError extends Error {
   constructor(
@@ -58,7 +62,8 @@ export function initializeDiscussionExecution(
       model: null,
       call_budget: mode === 'scripted' ? 0 : config.max_provider_calls!,
       timeout_ms: config.provider_timeout_ms!,
-      internal_turn_limit: mode === 'reasoning' && config.provider === 'claude' ? 3 : null,
+      internal_turn_limit:
+        mode === 'reasoning' && isClaudeDiscussionProvider(config.provider) ? 3 : null,
     },
   });
 }

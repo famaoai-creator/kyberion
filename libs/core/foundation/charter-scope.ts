@@ -18,6 +18,10 @@ export const isPersonalCharterScope = (
   scope: CharterScope
 ): scope is Extract<CharterScope, { kind: 'person' }> => scope.kind === 'person';
 
+export const isOrganizationCharterScope = (
+  scope: CharterScope
+): scope is Extract<CharterScope, { kind: 'organization' }> => scope.kind === 'organization';
+
 export const charterScopeTenantSlug = (scope: CharterScope): string | undefined =>
   isPersonalCharterScope(scope) ? undefined : scope.tenant_slug;
 

@@ -23,9 +23,11 @@ import { credentialExecutionIdentity } from '../foundation/credential-binding.js
 import {
   CREDENTIAL_CUSTODY_STORE_ISSUANCE_RIGHT,
   CREDENTIAL_MATERIAL_GRANT_ISSUANCE_RIGHT,
+  isTenantCredentialCustody,
   withCredentialCustodyWriteCapability,
   withCredentialMaterialCapability,
   withLentCredentialMaterialCapability,
+  type CredentialStoreCustody,
 } from '../foundation/credential-material-capability.js';
 import { readJson } from '../foundation/json.js';
 import { parseSafeJsonObjectValue } from '../foundation/safe-json.js';
@@ -376,11 +378,7 @@ function serialize(document: Record<string, unknown>): string {
   );
 }
 
-function custodyWrite(
-  custody: { kind: 'tenant' | 'person'; owner: string },
-  file: string,
-  content: string
-): void {
+function custodyWrite(custody: CredentialStoreCustody, file: string, content: string): void {
   assertStoreGrantIssuanceAllowed(CREDENTIAL_CUSTODY_STORE_ISSUANCE_RIGHT);
   const {
     tenantCleared: _c,
@@ -395,7 +393,7 @@ function custodyWrite(
         safeMkdir(pathResolver.rootResolve(file.replace(/\/[^/]+$/u, '')), { recursive: true });
         safeWriteFile(pathResolver.rootResolve(file), content, { mode: 0o600 });
       });
-    return custody.kind === 'tenant'
+    return isTenantCredentialCustody(custody)
       ? runInExecutionScope({ ...current, tenantBound: true, tenantSlug: custody.owner }, write)
       : write();
   });

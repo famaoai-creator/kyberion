@@ -26,6 +26,9 @@ export type WorkspaceSelection = {
 export type ResolvedWorkspaceSelection = WorkspaceSelection & {
   kind: 'tenant' | 'organization' | 'project' | 'operation';
 };
+
+export const isTenantWorkspaceSelection = (selection: ResolvedWorkspaceSelection): boolean =>
+  selection.kind === 'tenant';
 export type WorkspaceViewer = Pick<
   SurfaceViewerScope,
   'tenantSlugs' | 'organizationIds' | 'projectIds' | 'tierAccess'

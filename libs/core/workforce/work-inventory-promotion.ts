@@ -57,6 +57,7 @@ import {
   type WorkInventoryStep,
   type WorkInventoryTaxonomy,
   type WorkMethod,
+  isMissionPromotionKind,
   type WorkPromotionKind,
   type WorkObservationOrigin,
 } from './work-inventory.js';
@@ -181,6 +182,10 @@ export interface WorkInventoryPipelinePromotionPlan {
 
 export type WorkInventoryPromotionPlan =
   WorkInventoryMissionPromotionPlan | WorkInventoryPipelinePromotionPlan;
+
+export const isMissionPromotionPlan = (
+  plan: WorkInventoryPromotionPlan
+): plan is WorkInventoryMissionPromotionPlan => isMissionPromotionKind(plan.kind);
 
 export interface PlanWorkInventoryPromotionOptions {
   kind: WorkPromotionKind;
@@ -449,7 +454,7 @@ export function planWorkInventoryPromotion(
   const decidedBy: WorkInventoryDecidedBy = { kind: 'human', id: options.decided_by.id };
   const plannedAt = nowIso(options.now ?? new Date());
 
-  if (options.kind === 'mission') {
+  if (isMissionPromotionKind(options.kind)) {
     const missionId = workInventoryMissionId(entry.entry_id, entry.scope, options.missionIdPrefix);
     const tenantSlug = entry.scope.tenant_slug;
     const tier: Exclude<StorageDataTier, 'public'> = tenantSlug ? 'confidential' : 'personal';
@@ -668,7 +673,7 @@ export function executeMissionPromotion(
   plan: WorkInventoryPromotionPlan,
   options: ExecuteMissionPromotionOptions = {}
 ): ExecuteMissionPromotionResult {
-  if (plan.kind !== 'mission') {
+  if (!isMissionPromotionPlan(plan)) {
     throw new WorkInventoryPromotionError(
       'PLAN_MISMATCH',
       'executeMissionPromotion only runs mission plans; pipeline plans are handed to pnpm pipeline:promote by the operator'

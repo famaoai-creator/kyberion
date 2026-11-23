@@ -48,6 +48,8 @@ import {
   type CharterScope,
   type CharterUsage,
   type CharterValidationContext,
+  isOrganizationCharterScope,
+  isPersonalCharterScope,
 } from './accountability-charter.js';
 
 export interface CharterPathOptions {
@@ -70,7 +72,7 @@ function charterRoot(options: CharterPathOptions): string {
 
 export function charterDir(scope: CharterScope, options: CharterPathOptions = {}): string {
   const root = charterRoot(options);
-  if (scope.kind === 'person') return path.join(root, 'knowledge', 'personal', 'charters');
+  if (isPersonalCharterScope(scope)) return path.join(root, 'knowledge', 'personal', 'charters');
   if (!isValidTenantSlug(scope.tenant_slug)) {
     throw new Error(`[charter] invalid tenant slug '${scope.tenant_slug}'`);
   }
@@ -105,8 +107,9 @@ function scopedCharterIo<T>(
   const identity = currentExecutionScope();
   const publication = currentPrPublicationScope();
   if (
-    publication?.kind === 'organization' &&
-    scope.kind === 'organization' &&
+    publication !== undefined &&
+    isOrganizationCharterScope(publication) &&
+    isOrganizationCharterScope(scope) &&
     publication.tenant_slug === scope.tenant_slug &&
     writes.length > 0
   ) {
@@ -122,17 +125,17 @@ function scopedCharterIo<T>(
     publication &&
     writes.length === 0 &&
     publication.kind === scope.kind &&
-    (publication.kind === 'person' ||
-      (scope.kind === 'organization' && publication.tenant_slug === scope.tenant_slug))
+    (isPersonalCharterScope(publication) ||
+      (isOrganizationCharterScope(scope) && publication.tenant_slug === scope.tenant_slug))
   ) {
     const relative = files.map((file) => pathResolver.storeRelativePath(file));
     return withPrPublicationStoreAccess('charter-read', relative, [], action);
   }
-  if (scope.kind === 'person' && currentInstalledPersonCharterRuntime()) {
+  if (isPersonalCharterScope(scope) && currentInstalledPersonCharterRuntime()) {
     const relative = (file: string) => pathResolver.storeRelativePath(file);
     return withPersonCharterRegistryAccess(files.map(relative), writes.map(relative), action);
   }
-  if (scope.kind !== 'organization' || !identity?.tenantSlug) return action();
+  if (!isOrganizationCharterScope(scope) || !identity?.tenantSlug) return action();
   if (identity.tenantSlug !== scope.tenant_slug)
     throw new Error('[CHARTER_SCOPE_DENIED] Caller tenant differs from charter tenant');
   const relative = (file: string) => {
@@ -174,14 +177,15 @@ export function readCharter(
     }
     if (
       parsed.scope?.kind !== scope.kind ||
-      (scope.kind === 'organization' &&
-        (parsed.scope.kind !== 'organization' || parsed.scope.tenant_slug !== scope.tenant_slug))
+      (isOrganizationCharterScope(scope) &&
+        (!isOrganizationCharterScope(parsed.scope) ||
+          parsed.scope.tenant_slug !== scope.tenant_slug))
     )
       throw new Error(
         '[CHARTER_SCOPE_DENIED] Persisted charter scope differs from requested resource'
       );
     if (
-      scope.kind === 'person' &&
+      isPersonalCharterScope(scope) &&
       currentInstalledPersonCharterRuntime() &&
       parsed.accountable.actor !== currentInstalledPersonCharterRuntime()!.ownerActor
     )
@@ -525,8 +529,9 @@ function appendLedger(
   const file = ledgerPath(scope, charterId, options);
   const publication = currentPrPublicationScope();
   if (
-    scope.kind === 'organization' &&
-    publication?.kind === 'organization' &&
+    isOrganizationCharterScope(scope) &&
+    publication !== undefined &&
+    isOrganizationCharterScope(publication) &&
     publication.tenant_slug === scope.tenant_slug &&
     [
       'consumption',
@@ -544,7 +549,7 @@ function appendLedger(
     );
   }
   if (
-    scope.kind === 'person' &&
+    isPersonalCharterScope(scope) &&
     currentInstalledPersonCharterRuntime() &&
     [
       'consumption',
@@ -1000,10 +1005,9 @@ export function recordCharterDenial(
  * the (short) synchronous decision, never across an external effect.
  */
 export function withCharterDecisionLock<T>(scope: CharterScope, fn: () => T, timeoutMs = 5000): T {
-  const key =
-    scope.kind === 'organization'
-      ? `charter-decision:organization:${scope.tenant_slug}`
-      : 'charter-decision:person';
+  const key = isOrganizationCharterScope(scope)
+    ? `charter-decision:organization:${scope.tenant_slug}`
+    : 'charter-decision:person';
   return withLockSync(key, fn, timeoutMs);
 }
 

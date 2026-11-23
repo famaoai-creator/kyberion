@@ -29,6 +29,15 @@ type AttentionItem = {
   missionId?: string;
 };
 
+const ATTENTION_TARGET_VIEW: Record<AttentionItem['kind'], string> = {
+  mission: 'mission-control-plane',
+  runtime: 'runtime-lease-doctor',
+  surface: 'needs-attention',
+  delivery: 'recent-surface-outbox',
+};
+
+const isMissionAttentionItem = (item: AttentionItem): boolean => item.kind === 'mission';
+
 export function DiagnosticsAttentionSummary({
   tenant,
   onOpenView,
@@ -114,16 +123,7 @@ export function DiagnosticsAttentionSummary({
   };
 
   const openTarget = (item: AttentionItem) =>
-    onOpenView?.(
-      item.kind === 'mission'
-        ? 'mission-control-plane'
-        : item.kind === 'runtime'
-          ? 'runtime-lease-doctor'
-          : item.kind === 'surface'
-            ? 'needs-attention'
-            : 'recent-surface-outbox',
-      item.missionId
-    );
+    onOpenView?.(ATTENTION_TARGET_VIEW[item.kind], item.missionId);
 
   return (
     <Section
@@ -185,11 +185,11 @@ export function DiagnosticsAttentionSummary({
             item: (
               <span className="chronos-work-cell">
                 <span className="chronos-work-cell__title">
-                  {item.kind === 'mission' && item.missionId
+                  {isMissionAttentionItem(item) && item.missionId
                     ? humanizeMissionId(item.missionId)
                     : item.title}
                 </span>
-                {item.kind === 'mission' && item.missionId ? (
+                {isMissionAttentionItem(item) && item.missionId ? (
                   <ChronosMeta mono>{item.missionId}</ChronosMeta>
                 ) : null}
                 <ChronosMeta>{item.detail}</ChronosMeta>

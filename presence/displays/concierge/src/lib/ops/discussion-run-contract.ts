@@ -1,6 +1,7 @@
-import type {
-  DiscussionConfig,
-  DiscussionRoomState,
+import {
+  isDiscussionProvider,
+  type DiscussionConfig,
+  type DiscussionRoomState,
 } from '@agent/core/discussion/discussion-types';
 
 export type DiscussionRunFormat = 'brief' | 'panel' | 'dialogue';
@@ -60,9 +61,7 @@ export function readDiscussionExecutionConfig(
   }
   return {
     speaker,
-    ...(speaker !== 'scripted' && (provider === 'claude' || provider === 'codex')
-      ? { provider }
-      : {}),
+    ...(speaker !== 'scripted' && isDiscussionProvider(provider) ? { provider } : {}),
     single_pass: singlePass,
     ...(singlePass ? { max_rounds: 1 } : {}),
     max_provider_calls:

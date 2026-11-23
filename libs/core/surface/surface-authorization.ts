@@ -191,15 +191,15 @@ export function admitsCustody(
   custody: ViewerRecordCustody
 ): boolean {
   if (!custody || typeof custody !== 'object') return false;
-  if (custody.kind === 'tenant') {
+  if (isTenantRecordCustody(custody)) {
     if (typeof custody.ref !== 'string' || !isValidTenantSlug(custody.ref)) return false;
     return context.tenantSlugs === 'all' || context.tenantSlugs.includes(custody.ref);
   }
-  if (custody.kind === 'system') {
+  if (isSystemRecordCustody(custody)) {
     return context.tenantSlugs === 'all' || context.includeUntenanted === true;
   }
   return (
-    custody.kind === 'person' &&
+    isPersonRecordCustody(custody) &&
     validPersonId(custody.ref) &&
     viewerPersonIds(context).includes(custody.ref)
   );

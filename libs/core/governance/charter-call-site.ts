@@ -23,6 +23,7 @@ import {
 } from './accountability-charter.js';
 import type { ApprovalGateCharterInput } from './approval-gate-charter.js';
 import { findActiveCharter, type CharterPathOptions } from './accountability-charter-registry.js';
+import { isOrganizationCharterScope } from './accountability-charter.js';
 import {
   findCharterDecision,
   type CharterDecisionVocabulary,
@@ -140,10 +141,9 @@ export function charterInputForPipelineTrust(
     options.rootDir ? { rootDir: options.rootDir } : {}
   );
   if (!charter) return undefined;
-  const workerNhiId =
-    input.scope.kind === 'organization'
-      ? buildNhiId(input.scope.tenant_slug, null, workerSlug(input.agentId))
-      : buildTenantlessNhiId(workerSlug(input.agentId));
+  const workerNhiId = isOrganizationCharterScope(input.scope)
+    ? buildNhiId(input.scope.tenant_slug, null, workerSlug(input.agentId))
+    : buildTenantlessNhiId(workerSlug(input.agentId));
   const action: CharterAction = {
     actor: agentActor(workerNhiId, charter.accountable.actor),
     action_class: entry.action_class,

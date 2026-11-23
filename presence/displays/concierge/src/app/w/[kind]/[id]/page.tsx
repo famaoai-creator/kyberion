@@ -6,6 +6,11 @@ import { Badge, Callout, EmptyState, KeyValue, PageHeader, Section, Tabs } from 
 import { useConciergeI18n } from '../../../../lib/use-concierge-i18n';
 import { useWorkspaceResource } from '../../../../lib/use-workspace-resource';
 import {
+  isActorWorkspaceKind,
+  isApprovalWorkspaceKind,
+  isOrganizationWorkspaceKind,
+} from '../../../../lib/workspace-view';
+import {
   CONTAINABLE_KINDS,
   approvalNeedsDecision,
   decodeRouteSegment,
@@ -74,7 +79,11 @@ function EntityDetail({ t, kind, id }: { t: Translate; kind: GraphEntityKind; id
   // Which tenant's organization the id names (ids repeat across tenants); narrows only.
   const tenant = useSearchParams()?.get('tenant')?.trim() || undefined;
   const entity = useWorkspaceResource<GraphEntityView>(
-    workspaceApiPath('get', { kind, id, ...(kind === 'organization' && tenant ? { tenant } : {}) })
+    workspaceApiPath('get', {
+      kind,
+      id,
+      ...(isOrganizationWorkspaceKind(kind) && tenant ? { tenant } : {}),
+    })
   );
   const summary = useWorkspaceResource<WorkspaceGraphSummary>(workspaceApiPath('summary'));
   const approvalBriefs = useApprovalBriefs();
@@ -108,10 +117,9 @@ function EntityDetail({ t, kind, id }: { t: Translate; kind: GraphEntityKind; id
 
   const view = entity.data;
   const { node } = view;
-  const brief =
-    node.kind === 'approval'
-      ? (approvalBriefs.get(node.id) ?? parseDecisionBrief(node.brief))
-      : undefined;
+  const brief = isApprovalWorkspaceKind(node.kind)
+    ? (approvalBriefs.get(node.id) ?? parseDecisionBrief(node.brief))
+    : undefined;
   const title = nodeTitle(node, locale, brief);
   const summaryText = cardSummary(node.summary, 600);
   const facts = [
@@ -135,7 +143,7 @@ function EntityDetail({ t, kind, id }: { t: Translate; kind: GraphEntityKind; id
         {node.label !== node.id ? <span className="ws-mono">{node.id}</span> : null}
       </div>
       {summary.state === 'ready' ? <DegradedNotice t={t} degraded={summary.data.degraded} /> : null}
-      {node.kind === 'approval' ? <ApprovalNextStep t={t} node={node} /> : null}
+      {isApprovalWorkspaceKind(node.kind) ? <ApprovalNextStep t={t} node={node} /> : null}
       <div className="ws-columns">
         <div className="ws-stack">
           {view.goal ? (
@@ -153,7 +161,7 @@ function EntityDetail({ t, kind, id }: { t: Translate; kind: GraphEntityKind; id
             </Section>
           ) : null}
           {CONTAINABLE_KINDS[node.kind].length ? <Contents t={t} view={view} /> : null}
-          {node.kind === 'actor' ? (
+          {isActorWorkspaceKind(node.kind) ? (
             <Section title={t('ws_involvements_title')}>
               {view.involvements?.length ? (
                 <EntityList

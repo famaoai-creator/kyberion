@@ -285,16 +285,25 @@ export function narrowSurfaceViewerTier(
   return requested;
 }
 
+type ViewerScopeNarrowKind = 'tenant' | 'organization' | 'project';
+
+/** Scope id validator per narrowable viewer scope kind. */
+const VIEWER_SCOPE_ID_VALIDATORS: Record<ViewerScopeNarrowKind, (value: string) => boolean> = {
+  tenant: isValidTenantSlug,
+  organization: isValidChronosScopeId,
+  project: isValidChronosScopeId,
+};
+
 function narrowViewerScope(
-  kind: 'tenant' | 'organization' | 'project',
+  kind: ViewerScopeNarrowKind,
   allowed: string[] | 'all',
   requested?: string | null
 ): string[] | 'all' {
   const value = requested?.trim() || undefined;
-  const valid =
-    kind === 'tenant'
-      ? value === undefined || isValidTenantSlug(value)
-      : value === undefined || isValidChronosScopeId(value);
+  const validator = Object.hasOwn(VIEWER_SCOPE_ID_VALIDATORS, kind)
+    ? VIEWER_SCOPE_ID_VALIDATORS[kind]
+    : () => false;
+  const valid = value === undefined || validator(value);
   if (!valid) throw new SurfaceViewerScopeError(403, `invalid viewer ${kind} scope: ${value}`);
   if (value && allowed !== 'all' && !allowed.includes(value)) {
     throw new SurfaceViewerScopeError(403, `viewer ${kind} scope denied: ${value}`);

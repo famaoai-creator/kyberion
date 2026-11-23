@@ -8,7 +8,10 @@ import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { loadOrganizationOperationalState } from '@agent/core/organization/organization-operating-model-persistence';
 import { NextRequest, NextResponse } from 'next/server';
 import { listProjectRecords } from '@agent/core/project/project-registry';
-import { listWorkspaceTenantOptions } from '@agent/core/surface/workspace-scope';
+import {
+  isTenantWorkspaceSelection,
+  listWorkspaceTenantOptions,
+} from '@agent/core/surface/workspace-scope';
 import { guardOpsRequest, requireOpsAccess } from '../../../../lib/ops/ops-request-guard';
 import {
   resolveOpsViewerForRequest,
@@ -167,10 +170,9 @@ export function GET(req: NextRequest) {
         status: project.status,
         tier: project.tier,
       })),
-      selected:
-        workspace.selection.kind !== 'tenant'
-          ? workspace.selection.tenant_slug || null
-          : requested || (options.length === 1 ? options[0].slug : null),
+      selected: !isTenantWorkspaceSelection(workspace.selection)
+        ? workspace.selection.tenant_slug || null
+        : requested || (options.length === 1 ? options[0].slug : null),
       selectedOrganization: workspace.selection.organization_id || null,
       selectedProject: workspace.selection.project_id || null,
       selectedOperation: workspace.selection.operation_id || null,

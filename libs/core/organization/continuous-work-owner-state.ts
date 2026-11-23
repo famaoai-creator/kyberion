@@ -29,6 +29,7 @@ import {
   parseContinuousWorkPlan,
   type ContinuousWorkPlan,
   type ContinuousWorkMission,
+  isProjectWorkPlan,
 } from './continuous-work-plan.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReadFileSnapshot } from '../secure-io.js';
@@ -150,7 +151,7 @@ export function continuousWorkTargetIds(
   existingProjectId?: string
 ): { project_id: string; mission_ids: Record<string, string> } {
   const prefix = digest(actionRef).slice(0, 20).toUpperCase();
-  const project_id = plan.kind === 'project' ? `PRJ-CONT-${prefix}` : existingProjectId;
+  const project_id = isProjectWorkPlan(plan) ? `PRJ-CONT-${prefix}` : existingProjectId;
   if (!project_id)
     throw new Error(
       'Managed mission work requires charter.scope.project_id; use project kind to create a project'

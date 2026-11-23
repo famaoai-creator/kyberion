@@ -25,6 +25,8 @@ import {
   CustodyOwnerConflictError,
   custodyOwnerLabel,
   deriveCustodyOwner,
+  isPersonCustody,
+  isTenantCustody,
   type CustodyOwner,
 } from '../contracts/custody-owner.js';
 
@@ -246,17 +248,15 @@ function assertNoTrainingAttested(backendName: string, scope: ReasoningPayloadSc
   const custody = resolved.custody!;
   // Person custody needs two records (decided 2026-11-05): the installation's
   // no-training attestation, and the person's own consent.
-  const attestationSteps =
-    custody.kind === 'person'
-      ? `the installation's no-training attestation with '${custodyAttestationRequestCommand({ kind: 'system' }, provider)}' and the person's own consent with '${custodyAttestationRequestCommand(custody, provider)}' (decided by that person)`
-      : `one with '${custodyAttestationRequestCommand(custody, provider)}'`;
+  const attestationSteps = isPersonCustody(custody)
+    ? `the installation's no-training attestation with '${custodyAttestationRequestCommand({ kind: 'system' }, provider)}' and the person's own consent with '${custodyAttestationRequestCommand(custody, provider)}' (decided by that person)`
+    : `one with '${custodyAttestationRequestCommand(custody, provider)}'`;
   const next = `next: record ${attestationSteps}, or declare training_use 'training_eligible' explicitly`;
-  const subject =
-    custody.kind === 'tenant'
-      ? `tenant '${custody.tenant_slug}'`
-      : custody.kind === 'person'
-        ? `person custody (${custodyOwnerLabel(custody)})`
-        : 'the installation (system custody)';
+  const subject = isTenantCustody(custody)
+    ? `tenant '${custody.tenant_slug}'`
+    : isPersonCustody(custody)
+      ? `person custody (${custodyOwnerLabel(custody)})`
+      : 'the installation (system custody)';
   const attestation = lookupCustodyProviderAttestation({
     custody,
     provider,
@@ -264,7 +264,7 @@ function assertNoTrainingAttested(backendName: string, scope: ReasoningPayloadSc
   });
   const evidence = [
     `custody=${custodyOwnerLabel(custody)}`,
-    ...(custody.kind === 'tenant' ? [`tenant=${custody.tenant_slug}`] : []),
+    ...(isTenantCustody(custody) ? [`tenant=${custody.tenant_slug}`] : []),
     `provider=${provider}`,
     `attestation=${attestation.status}`,
   ].join(' ');
@@ -291,8 +291,9 @@ function assertNoTrainingAttested(backendName: string, scope: ReasoningPayloadSc
     }
     // A person's attestation is their consent; the no-training fact still
     // needs the installation's attestation or a policy declaration.
-    const evidenceGap =
-      custody.kind === 'person' ? personConsentNoTrainingEvidenceGap(provider!) : '';
+    const evidenceGap = isPersonCustody(custody)
+      ? personConsentNoTrainingEvidenceGap(provider!)
+      : '';
     if (evidenceGap) {
       deny(
         `${subject} consents to '${provider}', but its consent is not evidence that the provider does not train and ${evidenceGap}`,

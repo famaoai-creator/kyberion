@@ -1,3 +1,5 @@
+const OUTCOME_GROUP_LABEL = { decision: 'decisions', project: 'project' } as const;
+
 /**
  * Pure view model for the organization dashboard: which tenant to show, the
  * aggregate across several tenants, and how a key result reads (progress vs
@@ -160,7 +162,7 @@ export function interventionPresentation(point: {
   reason: string;
 }): InterventionPresentation {
   const action: InterventionAction =
-    point.kind === 'decision' ? 'decisions' : point.kind === 'project' ? 'project' : 'operations';
+    OUTCOME_GROUP_LABEL[point.kind as keyof typeof OUTCOME_GROUP_LABEL] ?? 'operations';
   const code = point.reason.match(RECONCILIATION_REASON)?.[1];
   if (code && RECONCILIATION_CODES.has(code)) {
     return { reason: { key: `ux_b_intervention_${code}` }, action };

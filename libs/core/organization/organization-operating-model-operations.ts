@@ -60,6 +60,10 @@ import type {
   QueueOrganizationLearningCandidateInput,
 } from './organization-operating-model.js';
 
+export const isMissionExecutionTarget = (
+  target: OrganizationOperationRecord['execution_target']
+): boolean => target.kind === 'mission';
+
 const PURPOSE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-purpose.schema.json'
 );

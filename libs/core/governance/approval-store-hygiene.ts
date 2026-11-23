@@ -30,6 +30,8 @@ import {
   tenantApprovalPartitionLogicalRoot,
   writeApprovalJsonAt,
   writeLocatedApprovalRequest,
+  isSystemApprovalPartition,
+  isTenantApprovalPartition,
   type ApprovalPartition,
   type ApprovalTenantPartition,
 } from './approval-store-location.js';
@@ -256,7 +258,7 @@ export function approvalRecordPartition(
   record: Pick<ApprovalRequestRecord, 'id' | 'storageChannel' | 'scope'>
 ): ApprovalPartition {
   const expected = approvalPartitionForScope(record.scope, { tenantActive: true });
-  if (expected.kind === 'system') return SYSTEM_APPROVAL_PARTITION;
+  if (isSystemApprovalPartition(expected)) return SYSTEM_APPROVAL_PARTITION;
   try {
     const found = readApprovalJsonAt<ApprovalRequestRecord>(
       expected,
@@ -277,7 +279,7 @@ function locateFixtureCandidates(
   return candidates.map((candidate) => {
     const record = byKey.get(`${candidate.storageChannel}/${candidate.requestId}`);
     const partition = record ? approvalRecordPartition(record) : SYSTEM_APPROVAL_PARTITION;
-    if (partition.kind === 'system') return candidate;
+    if (isSystemApprovalPartition(partition)) return candidate;
     return {
       ...candidate,
       partition,
@@ -338,7 +340,7 @@ export function purgeFixtureApprovals(options: {
       // bound one only its own; reads are not role-confined). The
       // trash move itself runs as the sovereign caller, as offboarding does.
       if (
-        candidate.partition.kind === 'tenant' &&
+        isTenantApprovalPartition(candidate.partition) &&
         !mayBindApprovalTenant(candidate.partition.tenant_slug)
       ) {
         continue;
@@ -379,10 +381,9 @@ export interface ExpiredPasskeyChallenge {
 
 /** Channel directory names under a location's root (system: coordination channels). */
 function listPartitionChannelDirs(partition: ApprovalPartition): string[] {
-  const root =
-    partition.kind === 'system'
-      ? approvalStoreRoots().coordination
-      : tenantApprovalPartitionLogicalRoot(partition);
+  const root = isSystemApprovalPartition(partition)
+    ? approvalStoreRoots().coordination
+    : tenantApprovalPartitionLogicalRoot(partition);
   try {
     return listApprovalDirAt(partition, root);
   } catch {
@@ -542,7 +543,7 @@ export function findLegacyTenantApprovals(
       kind: record.kind,
       tenantActive: activation ? isTenantActive(record) : true,
     });
-    if (partition.kind !== 'tenant') continue;
+    if (!isTenantApprovalPartition(partition)) continue;
     selected.push({
       storageChannel: record.storageChannel,
       requestId: record.id,

@@ -51,6 +51,11 @@ import {
   type Translate,
 } from './workspace-parts';
 import './workspace.css';
+import {
+  isApprovalWorkspaceKind,
+  isMissionWorkspaceKind,
+  isWorkItemWorkspaceKind,
+} from '../../lib/workspace-view';
 
 /**
  * One workspace kind as a list (or, for work items, a board) — searchable (`?q=`, server-side), filterable by
@@ -102,7 +107,7 @@ export function KindList({
   const { status, ...serverQuery } = query;
   // Work items read as Issues (D1): steps open inside their Issue. A text
   // search still finds a step by itself.
-  const issuesOnly = kind === 'work_item' && !serverQuery.q;
+  const issuesOnly = isWorkItemWorkspaceKind(kind) && !serverQuery.q;
   const list = useWorkspaceResource<{ items: GraphNode[] }>(
     workspaceApiPath('list', { kind, ...serverQuery, ...(issuesOnly ? { top_level: 'true' } : {}) })
   );
@@ -117,26 +122,27 @@ export function KindList({
   const lastReady = React.useRef<{ kind: GraphEntityKind; items: GraphNode[] } | null>(null);
   if (list.state === 'ready') lastReady.current = { kind, items: list.data.items };
   const stale =
-    list.state === 'loading' && kind === 'work_item' && lastReady.current?.kind === kind
+    list.state === 'loading' && isWorkItemWorkspaceKind(kind) && lastReady.current?.kind === kind
       ? lastReady.current.items
       : null;
   const listReady = list.state === 'ready' || stale !== null;
   const loaded = list.state === 'ready' ? list.data.items : (stale ?? []);
   // Pending approvals are listed and decided only in あなた待ち (IA contract §1:
   // no duplicated lists); this list keeps the decided history.
-  const items =
-    kind === 'approval' ? loaded.filter((item) => !approvalNeedsDecision(item.status)) : loaded;
+  const items = isApprovalWorkspaceKind(kind)
+    ? loaded.filter((item) => !approvalNeedsDecision(item.status))
+    : loaded;
   const facets = statusFacets(items);
   const shown = status ? items.filter((item) => item.status === status) : items;
   const narrowing = narrowingEntries(query);
   const filtered = Boolean(query.q || status);
   // Work items read as a kanban board and missions as a state board by
   // default; `?view=list` keeps the list.
-  const boardKind = kind === 'work_item' || kind === 'mission';
+  const boardKind = isWorkItemWorkspaceKind(kind) || isMissionWorkspaceKind(kind);
   const layout: BoardViewMode =
     boardKind && searchParams?.get('view') !== 'list' ? 'board' : 'list';
   const showBoard = boardKind && layout === 'board';
-  const canMove = useWorkItemMoveAccess(showBoard && kind === 'work_item');
+  const canMove = useWorkItemMoveAccess(showBoard && isWorkItemWorkspaceKind(kind));
 
   return (
     <div className={embedded ? 'ws-page ws-page--embedded' : 'ws-page'}>
@@ -147,7 +153,7 @@ export function KindList({
         </>
       )}
       {summary.state === 'ready' ? <DegradedNotice t={t} degraded={summary.data.degraded} /> : null}
-      {kind === 'approval' ? <NeedsYouLink reason="approval" locale={locale} /> : null}
+      {isApprovalWorkspaceKind(kind) ? <NeedsYouLink reason="approval" locale={locale} /> : null}
       {narrowing.length ? (
         <Callout
           tone="info"
@@ -200,8 +206,12 @@ export function KindList({
                   replaceQuery({ status: status === facet.status ? undefined : facet.status })
                 }
               >
-                {statusLabel(facet.status, kind === 'mission' ? 'mission' : undefined, kbT)} (
-                {facet.count})
+                {statusLabel(
+                  facet.status,
+                  isMissionWorkspaceKind(kind) ? 'mission' : undefined,
+                  kbT
+                )}{' '}
+                ({facet.count})
               </button>
             ))}
           </div>
@@ -217,7 +227,7 @@ export function KindList({
             <p className="ws-count-line" role="status">
               {t('ws_result_count', { count: shown.length })}
             </p>
-            {showBoard && kind === 'mission' ? (
+            {showBoard && isMissionWorkspaceKind(kind) ? (
               <MissionStateBoard
                 missions={shown.map((node) => ({
                   id: node.id,

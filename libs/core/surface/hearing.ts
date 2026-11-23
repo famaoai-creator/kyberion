@@ -87,6 +87,12 @@ export const WEB_APP_HEARING_SCENARIO: HearingScenario =
 /** Scenario ids, requirement ids and hearing session ids share one safe-segment grammar. */
 export const HEARING_SAFE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/u;
 
+/** Hearing completion families — the handoff record discriminant. */
+export type HearingKind = 'mission' | 'inventory';
+
+export const isMissionHearing = (kind: HearingKind): boolean => kind === 'mission';
+export const isInventoryHearing = (kind: HearingKind): boolean => kind === 'inventory';
+
 export type HearingRequirementId = string;
 
 export interface HearingRequirement {

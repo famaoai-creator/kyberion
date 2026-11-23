@@ -98,8 +98,18 @@ export function projectManagementVersion(
 ): string {
   return digest({ record, state: state ?? null });
 }
+export const isOrganizationManagementResource = (
+  resource: SurfaceManagementResource
+): resource is Extract<SurfaceManagementResource, { kind: 'organization' }> =>
+  resource.kind === 'organization';
+
+export const isProjectManagementResource = (
+  resource: SurfaceManagementResource
+): resource is Extract<SurfaceManagementResource, { kind: 'project' }> =>
+  resource.kind === 'project';
+
 export function version(resource: SurfaceManagementResource): string {
-  return resource.kind === 'organization'
+  return isOrganizationManagementResource(resource)
     ? organizationManagementVersion(resource.state, resource.purpose)
     : projectManagementVersion(resource.record, resource.state);
 }

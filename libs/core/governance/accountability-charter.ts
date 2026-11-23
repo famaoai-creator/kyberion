@@ -44,6 +44,7 @@ export {
   CHARTER_SCOPE_PERSON,
   charterScopeTenantSlug,
   charterScopesEqual,
+  isOrganizationCharterScope,
   isPersonalCharterScope,
   type CharterScope,
   type CharterScopeKind,

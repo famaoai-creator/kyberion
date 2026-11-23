@@ -40,6 +40,7 @@ import { checkLayerPrecedence, resolveAgendaEffective } from './effective.js';
 import type { CustomerDecisionInvite } from './invite.js';
 import {
   AGENDA_ENTRY_ID_PATTERN,
+  isApprovalAgendaEntry,
   type AgendaEntry,
   type DecisionAgenda,
   type DecisionReceipt,
@@ -278,7 +279,7 @@ function validateAnswer(
       }
       return { ok: true, value: current.value, commentOnly: false };
     case 'approve':
-      if (entry.kind !== 'approval') return { ok: false, error: 'choice_not_allowed' };
+      if (!isApprovalAgendaEntry(entry)) return { ok: false, error: 'choice_not_allowed' };
       return {
         ok: true,
         value:
@@ -286,12 +287,12 @@ function validateAnswer(
         commentOnly: false,
       };
     case 'request_changes':
-      if (entry.kind !== 'approval') return { ok: false, error: 'choice_not_allowed' };
+      if (!isApprovalAgendaEntry(entry)) return { ok: false, error: 'choice_not_allowed' };
       if (!answer.comment) return { ok: false, error: 'text_required' };
       return { ok: true, value: { approved: false, comment: answer.comment }, commentOnly: false };
     case 'reject':
       // CD-10: not approved, like request_changes; routed to the operator, not the backlog.
-      if (entry.kind !== 'approval') return { ok: false, error: 'choice_not_allowed' };
+      if (!isApprovalAgendaEntry(entry)) return { ok: false, error: 'choice_not_allowed' };
       if (!answer.comment) return { ok: false, error: 'text_required' };
       return {
         ok: true,

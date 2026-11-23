@@ -106,7 +106,7 @@ export function deriveCustodyOwner(input: CustodyOwnerInput): CustodyOwner {
       `custody kind '${String((declared as { kind?: unknown })?.kind)}' is not one of ${CUSTODY_OWNER_KINDS.join(', ')}`
     );
   }
-  if (declared.kind === 'tenant') {
+  if (isTenantCustody(declared)) {
     const declaredSlug =
       typeof declared.tenant_slug === 'string' ? declared.tenant_slug.trim() : '';
     if (!declaredSlug || declaredSlug !== tenantSlug) {
@@ -121,7 +121,7 @@ export function deriveCustodyOwner(input: CustodyOwnerInput): CustodyOwner {
       `${declared.kind} custody cannot hold material of tenant '${tenantSlug}'`
     );
   }
-  if (declared.kind === 'system') {
+  if (isSystemCustody(declared)) {
     if (input.tier === 'personal') {
       throw new CustodyOwnerConflictError(
         'system custody cannot hold personal-tier material; declare person custody instead'
@@ -135,8 +135,7 @@ export function deriveCustodyOwner(input: CustodyOwnerInput): CustodyOwner {
 
 /** Short, log-safe label: `system`, `tenant:<slug>`, `person` or `person:<principal>`. */
 export function custodyOwnerLabel(owner: CustodyOwner): string {
-  if (owner.kind === 'tenant') return `tenant:${owner.tenant_slug}`;
-  if (owner.kind === 'person')
-    return owner.principal_id ? `person:${owner.principal_id}` : 'person';
+  if (isTenantCustody(owner)) return `tenant:${owner.tenant_slug}`;
+  if (isPersonCustody(owner)) return owner.principal_id ? `person:${owner.principal_id}` : 'person';
   return 'system';
 }

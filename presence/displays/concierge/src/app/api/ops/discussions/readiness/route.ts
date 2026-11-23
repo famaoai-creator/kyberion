@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { inspectDiscussionReadiness } from '@agent/core/discussion/discussion-readiness';
+import { isDiscussionProvider } from '@agent/core/discussion/discussion-types';
 import { guardOpsRequest, requireOpsAccess } from '../../../../../lib/ops/ops-request-guard';
 import {
   DiscussionMissionScopeError,
@@ -25,7 +26,7 @@ export function GET(req: NextRequest) {
   const viewer = resolvedViewer.context;
   const params = req.nextUrl.searchParams;
   const provider = params.get('provider');
-  if (provider !== 'claude' && provider !== 'codex')
+  if (!isDiscussionProvider(provider))
     return NextResponse.json(
       { ok: false, error: 'Choose a supported Discussion provider.' },
       { status: 400 }

@@ -54,6 +54,7 @@ import {
   custodyOwnerLabel,
   deriveCustodyOwner,
   isPersonCustody,
+  isTenantCustody,
   type CustodyOwner,
 } from '../contracts/custody-owner.js';
 import {
@@ -465,7 +466,7 @@ export function lookupCustodyProviderAttestation(input: {
   tenant_registry_root_dir?: string;
 }): TenantProviderAttestationLookup {
   const custody = input.custody;
-  if (custody?.kind === 'tenant') {
+  if (custody !== undefined && isTenantCustody(custody)) {
     return lookupTenantAttestation({
       tenant_slug: custody.tenant_slug,
       provider: input.provider,
@@ -564,14 +565,15 @@ export function resolveProviderEgressCustody(input: {
  * `--tenant <slug>`; material without a tenant at `--custody system|person`.
  */
 export function custodyAttestationRequestCommand(custody: CustodyOwner, provider = '<id>'): string {
-  const target =
-    custody.kind === 'tenant' ? `--tenant ${custody.tenant_slug}` : `--custody ${custody.kind}`;
+  const target = isTenantCustody(custody)
+    ? `--tenant ${custody.tenant_slug}`
+    : `--custody ${custody.kind}`;
   return `pnpm onboarding llm attest ${target} --provider ${provider} --training-use none --plan <plan> --basis <url|ref> --attested-by <who> --request-approval`;
 }
 
 /** How a denial names the custody owner (tenant wording kept from before P1). */
 function custodySubject(custody: CustodyOwner): string {
-  if (custody.kind === 'tenant') return `tenant '${custody.tenant_slug}'`;
+  if (isTenantCustody(custody)) return `tenant '${custody.tenant_slug}'`;
   if (isPersonCustody(custody)) return `person custody (${custodyOwnerLabel(custody)})`;
   return 'the installation (system custody)';
 }
@@ -612,7 +614,7 @@ export function evaluateProviderEgress(input: ProviderEgressCheckInput): Evaluat
   const custody = resolved.custody;
   const tenantSlug = resolved.tenant_slug;
   let attestationInput: TenantPolicyInput | undefined;
-  if (custody.kind === 'tenant') {
+  if (isTenantCustody(custody)) {
     try {
       const policyInput = readTenantProfileAsPolicyInput(
         custody.tenant_slug,
@@ -690,14 +692,14 @@ export function evaluateProviderEgress(input: ProviderEgressCheckInput): Evaluat
   }
   if (attestation.status === 'expired') {
     return deny(
-      custody.kind === 'tenant'
+      isTenantCustody(custody)
         ? `'${provider}' attestation for tenant '${tenantSlug}' expired on ${attestation.expires_at}; re-verify the plan's training-use terms before sending ${dataTier} material.`
         : `'${provider}' attestation for ${custodySubject(custody)} expired on ${attestation.expires_at}; re-verify the plan's training-use terms before sending ${dataTier} material.`
     );
   }
   if (attestation.status === 'valid' && attestation.training_use !== 'none') {
     return deny(
-      `${custody.kind === 'tenant' ? `tenant '${tenantSlug}'` : custodySubject(custody)} attests training_use '${attestation.training_use}' for '${provider}'.`
+      `${isTenantCustody(custody) ? `tenant '${tenantSlug}'` : custodySubject(custody)} attests training_use '${attestation.training_use}' for '${provider}'.`
     );
   }
 

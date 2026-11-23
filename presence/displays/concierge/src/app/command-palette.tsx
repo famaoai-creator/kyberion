@@ -15,7 +15,7 @@ import {
   readSelectedTenant,
   withSelectedTenant,
 } from '../lib/tenant-context';
-import { entityHref, type GraphNode } from '../lib/workspace-view';
+import { entityHref, isTaskWorkspaceKind, type GraphNode } from '../lib/workspace-view';
 import {
   SETTINGS_CARDS,
   SETTINGS_CATEGORIES,
@@ -45,7 +45,7 @@ function workspaceHits(payload: unknown): GraphNode[] {
         (node): node is GraphNode =>
           !!node &&
           typeof node.kind === 'string' &&
-          node.kind !== 'task' &&
+          !isTaskWorkspaceKind(node.kind) &&
           typeof node.id === 'string' &&
           typeof node.label === 'string'
       )

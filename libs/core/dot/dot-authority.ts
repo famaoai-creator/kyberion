@@ -1,4 +1,5 @@
 import { findActiveCharter } from '../governance/accountability-charter-registry.js';
+import { isOrganizationCharterScope } from '../governance/accountability-charter.js';
 import { isInternalDotStoreRole, type DotCharter } from './dot-charter.js';
 
 /** A declared ref is an authority constraint, never an optional hint. */
@@ -22,7 +23,7 @@ export function assertDotAccountabilityCharter(
   if (
     !charter ||
     charter.charter_id !== ref ||
-    charter.scope.kind !== 'organization' ||
+    !isOrganizationCharterScope(charter.scope) ||
     charter.scope.tenant_slug !== dot.scope.tenant_slug ||
     !/^[0-9a-f]{64}$/.test(charter.accountable.statement_sha256)
   ) {

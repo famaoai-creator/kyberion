@@ -19,7 +19,12 @@ import { progressRecordInScope } from './front-desk-progress.js';
 import type { SurfaceViewerScope } from './surface-viewer-scope-contract.js';
 import { hearingNamespace } from './hearing-runtime.js';
 import { hearingScopedUrl, type HearingOwnerInput } from './hearing-scope.js';
-import type { HearingRecord } from './hearing.js';
+import {
+  isInventoryHearing,
+  isMissionHearing,
+  type HearingKind,
+  type HearingRecord,
+} from './hearing.js';
 
 /** Additive fields the mission hand-off owns on the hearing record. `hearing.ts`
  * (the base `HearingRecord` contract, `decided_by`/`decided_at` included) never
@@ -98,7 +103,7 @@ type StoredHearing = HearingRecord &
   HearingWorkInventoryHandoffFields;
 /** Used by: Studio, Concierge. */
 export interface HearingCompletion {
-  kind: 'mission' | 'inventory';
+  kind: HearingKind;
   status: 'ready' | 'unavailable';
   id?: string;
   next?: { href: string };
@@ -125,7 +130,7 @@ function completionHref(
   viewer: SurfaceViewerScope,
   options: HearingCompletionOptions
 ): string | undefined {
-  const item = resolveFrontDeskDestination(kind === 'mission' ? 'inbox' : 'progress', {
+  const item = resolveFrontDeskDestination(isMissionHearing(kind) ? 'inbox' : 'progress', {
     currentSurface: options.currentSurface,
     urls: readFrontDeskSurfaceUrls(),
     role: frontDeskRoleFromViewerScope(viewer),
@@ -139,7 +144,9 @@ function completionHref(
     if (values.length !== 1) return undefined;
   }
   const scoped = hearingScopedUrl(item.href, viewer);
-  return kind === 'inventory' ? hearingWorkInventoryHandoffHref(scoped, viewer, options) : scoped;
+  return isInventoryHearing(kind)
+    ? hearingWorkInventoryHandoffHref(scoped, viewer, options)
+    : scoped;
 }
 
 /** Mission project membership is canonical under relationships, unlike inventory scope.
@@ -212,7 +219,7 @@ export function readHearingCompletion(
       findHearingScenario(record.scenario)?.handoff === 'work_inventory' ? 'inventory' : 'mission';
     if (kind !== expectedKind) return unavailable;
     let id: string;
-    if (kind === 'mission') {
+    if (isMissionHearing(kind)) {
       if (!stored.mission_id || !stored.approval_request_id) return unavailable;
       const namespace = hearingNamespace(viewer.tenantSlugs);
       if (namespace === 'all' || namespace === 'unscoped') return unavailable;

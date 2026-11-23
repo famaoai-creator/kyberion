@@ -5,6 +5,9 @@ import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { resolveRoutingPacket } from '../intent/intent-resolver-entry.js';
 import type { SurfaceIntentResolutionOptions } from '../intent/router-contract.js';
 import {
+  isPhaseOverlayEntry,
+  isRoleOverlayEntry,
+  isTenantOverlayEntry,
   listSurfaceQueryOverlayCatalogEntries,
   loadSurfaceQueryOverlayCatalog,
 } from './surface-query-overlay-catalog.js';
@@ -163,7 +166,7 @@ function getRoleOverlayPathForRole(role?: string): string | null {
   const normalized = role?.trim();
   if (!normalized) return null;
   const catalogEntry = listSurfaceQueryOverlayCatalogEntries().find(
-    (entry) => entry.kind === 'role' && entry.role === normalized
+    (entry) => isRoleOverlayEntry(entry) && entry.role === normalized
   );
   return catalogEntry ? safeProviderConfigPath(pathResolver.knowledge(catalogEntry.path)) : null;
 }
@@ -172,7 +175,7 @@ function getPhaseOverlayPathForPhase(phase?: string): string | null {
   const normalized = phase?.trim();
   if (!normalized) return null;
   const catalogEntry = listSurfaceQueryOverlayCatalogEntries().find(
-    (entry) => entry.kind === 'phase' && entry.phase === normalized
+    (entry) => isPhaseOverlayEntry(entry) && entry.phase === normalized
   );
   return catalogEntry ? safeProviderConfigPath(pathResolver.knowledge(catalogEntry.path)) : null;
 }
@@ -193,7 +196,7 @@ function getTenantOverlayPath(scope?: ScopeContext): string | null {
   const normalizedScope = assertScopeContext(scope!, { requireTenant: true });
   const normalizedTenant = normalizedScope.tenant_slug!;
   const catalogEntry = listSurfaceQueryOverlayCatalogEntries().find(
-    (entry) => entry.kind === 'tenant' && entry.tenant === normalizedTenant
+    (entry) => isTenantOverlayEntry(entry) && entry.tenant === normalizedTenant
   );
   if (catalogEntry) return safeProviderConfigPath(pathResolver.knowledge(catalogEntry.path));
   return safeProviderConfigPath(
