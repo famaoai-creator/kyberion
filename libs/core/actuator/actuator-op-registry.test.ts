@@ -57,12 +57,16 @@ describe('actuator-op-registry', () => {
       'credential_usage_monthly',
       'decision_digest',
       'organization_digest',
+      'organization_improvement_scan',
       'organization_retro',
       'organization_standup',
       'pr_shadow_observe',
       'run_first_win_lifecycle',
       'run_health_degradation_watch',
+      'run_knowledge_hygiene_probe',
       'run_meeting_readiness_check',
+      'run_mission_hygiene',
+      'run_ops_health_probe',
       'run_tenant_drift_watch',
       'run_ui_ux_governance',
       'run_vitest',
@@ -77,6 +81,7 @@ describe('actuator-op-registry', () => {
       'continuous_operations_report',
       'customer_decision_learning',
       'customer_decision_reminders',
+      'organization_kr_measure',
       'organization_operation_tick',
       'organization_record_run',
       'programmatic_tool_call',
@@ -92,6 +97,8 @@ describe('actuator-op-registry', () => {
       'run_dependency_vulnerability_scan',
       'run_doc_examples_check',
       'run_i18n_hardcoding',
+      'run-janitor',
+      'run_janitor',
       'run_marketing_video_dry_run',
       'run_mission_create',
       'run_mission_start_from_issues',
@@ -106,9 +113,9 @@ describe('actuator-op-registry', () => {
       'validate_productivity_dry_run',
       'wait',
     ];
-    expect(captureOps).toHaveLength(14);
+    expect(captureOps).toHaveLength(18);
     expect(transformOps).toHaveLength(3);
-    expect(applyOps).toHaveLength(36);
+    expect(applyOps).toHaveLength(39);
     for (const op of captureOps) expect(determineActuatorStepType('core', op)).toBe('capture');
     for (const op of transformOps) expect(determineActuatorStepType('core', op)).toBe('transform');
     for (const op of applyOps) expect(determineActuatorStepType('core', op)).toBe('apply');
@@ -117,7 +124,7 @@ describe('actuator-op-registry', () => {
       ...(registeredCoreOps.capture || []),
       ...(registeredCoreOps.transform || []),
       ...(registeredCoreOps.apply || []),
-    ]).toHaveLength(53);
+    ]).toHaveLength(60);
   });
 
   it('prefers apply semantics when provider ops overlap', () => {
