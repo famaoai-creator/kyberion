@@ -47,6 +47,17 @@ const mocks = vi.hoisted(() => ({
   mcpTransportCtor: vi.fn(),
   mcpHttpClose: vi.fn().mockResolvedValue(undefined),
   mcpHttpTransportCtor: vi.fn(),
+  fetchWithServicePresetCache: vi.fn(
+    async (_serviceId: string, _key: string, loader: () => unknown) => ({
+      data: await loader(),
+      fromCache: false,
+      entry: {},
+    })
+  ),
+}));
+
+vi.mock('../storage/service-preset-cache.js', () => ({
+  fetchWithServicePresetCache: mocks.fetchWithServicePresetCache,
 }));
 
 vi.mock('./service-binding-registry.js', async (importOriginal) => ({
@@ -764,6 +775,60 @@ describe('executeServicePreset', () => {
     expect(mocks.authorizeTenant).not.toHaveBeenCalled();
     expect(mocks.resolveServiceBinding).not.toHaveBeenCalled();
     expect(mocks.secureFetch).not.toHaveBeenCalled();
+  });
+
+  it('caches an admitted call in the admitted tenant and project partition, others in shared', async () => {
+    const { executeServicePresetCached } = await import('./service-engine.js');
+    mocks.identity.mockReturnValue({ tenantSlug: 'acme' });
+    mocks.safeReadFile.mockImplementation((filePath: string) =>
+      filePath.includes('mock/path.json')
+        ? JSON.stringify({
+            operations: { read: { type: 'api', risk: 'read', method: 'GET', path: 'items' } },
+          })
+        : ''
+    );
+    mocks.secureFetch.mockResolvedValue({ ok: true });
+    const admission = issueTenantServiceEngineAdmission({
+      bindingId: 'binding-a',
+      approvalGranted: false,
+      securityScope: {
+        tenant_slug: 'acme',
+        mission_id: 'mission-a',
+        project_id: 'proj-a',
+        read_tiers: ['confidential'],
+        write_tier: 'confidential',
+        purpose: 'test',
+      },
+    });
+    await expect(
+      executeServicePresetCached(
+        'test-service',
+        'read',
+        { q: 1 },
+        'none',
+        { cache_ttl_ms: 1000 },
+        admission
+      )
+    ).resolves.toEqual({ result: { ok: true }, fromCache: false });
+    expect(mocks.fetchWithServicePresetCache).toHaveBeenLastCalledWith(
+      'test-service',
+      expect.stringMatching(/^binding-a:read:[0-9a-f]{16}$/),
+      expect.any(Function),
+      { ttlMs: 1000, scope: { tier: 'confidential', tenant: 'acme', projectId: 'proj-a' } }
+    );
+
+    mocks.identity.mockReturnValue({});
+    await executeServicePresetCached('test-service', 'read', {}, 'none', {
+      cache_ttl_ms: 1000,
+      project_id: 'local-proj',
+      tier: 'public',
+    });
+    expect(mocks.fetchWithServicePresetCache).toHaveBeenLastCalledWith(
+      'test-service',
+      expect.stringMatching(/^read:[0-9a-f]{16}$/),
+      expect.any(Function),
+      { ttlMs: 1000, scope: { tier: 'public', projectId: 'local-proj' } }
+    );
   });
 
   it('does not serve cached output after the service preset disappears', async () => {

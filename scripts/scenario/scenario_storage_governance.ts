@@ -1,17 +1,18 @@
 /**
  * Scenario runner: Storage & Data Governance
- * Exercises audit-chain, data-vault, process-logger end-to-end.
+ * Exercises audit-chain, the service-preset cache, process-logger end-to-end.
  * Run: node dist/scripts/scenario/scenario_storage_governance.js
  */
 
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { PARTITIONED_RUNTIME_LEDGER_ROOTS } from '@agent/core/storage-layout';
 import {
-  fetchWithVaultCache,
-  getVaultEntry,
-  invalidateVaultEntry,
-  listVaultEntries,
-} from '@agent/core/data-vault';
+  fetchWithServicePresetCache,
+  getServicePresetCacheEntry,
+  invalidateServicePresetCacheEntry,
+  servicePresetCacheProjectRoot,
+  type ServicePresetCacheScope,
+} from '@agent/core/service-preset-cache';
 import { createProcessLogger } from '@agent/core/process-logger';
 import { runJanitor } from '@agent/core/storage-janitor';
 import { sharedLogsAudit, sharedLogsProcess } from '@agent/core/path-resolver';
@@ -126,9 +127,9 @@ export async function main(print: Print = () => undefined): Promise<void> {
       warn('tenant_b tenant mirror not created yet');
     }
 
-    // ── Scenario 2: Data Vault ───────────────────────────────────
+    // ── Scenario 2: Service-preset cache ─────────────────────────
 
-    hr('Scenario 2 — Data Vault: cache miss → hit → TTL expiry → invalidate');
+    hr('Scenario 2 — Service-preset cache: cache miss → hit → TTL expiry → invalidate');
 
     let fetchCount = 0;
     async function simulatedConfluenceFetch(
@@ -143,62 +144,61 @@ export async function main(print: Print = () => undefined): Promise<void> {
       };
     }
 
+    // Untenanted scenario entries land in the tier's `shared` cache partition.
+    const scope: ServicePresetCacheScope = { tier: 'confidential', projectId: 'scenario-test' };
+
     // Miss
-    const result1 = await fetchWithVaultCache(
+    const result1 = await fetchWithServicePresetCache(
       'confluence',
       'page:demo-001',
       () => simulatedConfluenceFetch('demo-001'),
-      { ttlMs: 5_000, tier: 'confidential', projectId: 'scenario-test' }
+      { ttlMs: 5_000, scope }
     );
     ok(`cache miss → fetched (fetchCount=${fetchCount}, fromCache=${result1.fromCache})`);
-    info(`  stored at tier=${result1.entry.tier}, expires=${result1.entry.expiresAt}`);
+    info(`  stored under ${servicePresetCacheProjectRoot(scope.tier, undefined, 'scenario-test')}`);
+    info(`  expires=${result1.entry.expiresAt}`);
     info(`  contentHash=${result1.entry.contentHash.slice(0, 30)}...`);
 
     // Hit
-    const result2 = await fetchWithVaultCache(
+    const result2 = await fetchWithServicePresetCache(
       'confluence',
       'page:demo-001',
       () => simulatedConfluenceFetch('demo-001'),
-      { ttlMs: 5_000, projectId: 'scenario-test' }
+      { ttlMs: 5_000, scope }
     );
     ok(`cache hit (fetchCount still ${fetchCount}, fromCache=${result2.fromCache})`);
 
-    // Second source type — also miss
-    await fetchWithVaultCache(
+    // Second service — also miss
+    await fetchWithServicePresetCache(
       'gdrive',
       'file:finance-q1',
       async () => ({ name: 'Q1 Financial Summary', rows: 42, sheet: 'Example Securities' }),
-      { ttlMs: 3_600_000, tier: 'confidential', projectId: 'scenario-test' }
+      { ttlMs: 3_600_000, scope }
     );
     ok(`gdrive entry stored (fetchCount=${fetchCount})`);
 
-    // List entries
-    const entries = listVaultEntries({ projectId: 'scenario-test' });
-    ok(`vault entries for scenario-test project: ${entries.length}`);
-    for (const e of entries) {
-      info(`  · ${e.sourceType}/${e.key} (tier=${e.tier}, expires=${e.expiresAt?.slice(0, 19)})`);
-    }
-
     // Invalidate
-    const invalidated = invalidateVaultEntry('confluence', 'page:demo-001', 'scenario-test');
+    const invalidated = invalidateServicePresetCacheEntry('confluence', 'page:demo-001', scope);
     ok(`invalidated confluence/page:demo-001: ${invalidated}`);
 
     // Confirm miss after invalidation
-    const result3 = await fetchWithVaultCache(
+    const result3 = await fetchWithServicePresetCache(
       'confluence',
       'page:demo-001',
       () => simulatedConfluenceFetch('demo-001'),
-      { ttlMs: 5_000, projectId: 'scenario-test' }
+      { ttlMs: 5_000, scope }
     );
     ok(`post-invalidate fetch (fetchCount=${fetchCount}, fromCache=${result3.fromCache})`);
 
     // TTL expiry scenario (1ms TTL)
-    await fetchWithVaultCache('web', 'url:short-lived', async () => ({ content: 'ephemeral' }), {
-      ttlMs: 1,
-      projectId: 'scenario-test',
-    });
+    await fetchWithServicePresetCache(
+      'web',
+      'url:short-lived',
+      async () => ({ content: 'ephemeral' }),
+      { ttlMs: 1, scope }
+    );
     await new Promise((r) => setTimeout(r, 10));
-    const expired = getVaultEntry('web', 'url:short-lived', 'scenario-test');
+    const expired = getServicePresetCacheEntry('web', 'url:short-lived', scope);
     ok(`expired entry returns null: ${expired === null}`);
 
     // ── Scenario 3: ProcessLogger ────────────────────────────────
@@ -239,16 +239,14 @@ export async function main(print: Print = () => undefined): Promise<void> {
     ok(`janitor dry-run complete`);
     info(`  tmp/  expired: ${report.expiredTmp}`);
     info(`  logs/ expired: ${report.expiredLogs}`);
-    info(
-      `  vault expired: ${report.expiredDataVault} (just added scenario entries — all within TTL)`
-    );
+    info(`  legacy data-vault expired: ${report.expiredDataVault}`);
     info(`  errors:        ${report.errors.length}`);
 
     // ── Summary ──────────────────────────────────────────────────
 
     hr('All scenarios completed');
     ok('AuditChain: write, verify, tenant mirror ✓');
-    ok('DataVault: miss → hit → invalidate → expiry ✓');
+    ok('Service-preset cache: miss → hit → invalidate → expiry ✓');
     ok('ProcessLogger: JSONL file output ✓');
     ok('StorageJanitor: dry-run report ✓');
     emit('');

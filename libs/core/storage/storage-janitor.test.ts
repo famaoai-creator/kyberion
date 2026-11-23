@@ -214,7 +214,7 @@ import {
   scanStorageFloors,
   sweepSupervisorEventFiles,
   sweepStatusRules,
-  scanDataVault,
+  scanLegacyDataVault,
   sweepDelegationChildren,
   sweepWorkspaces,
   sweepEmptyMissionDirs,
@@ -242,7 +242,6 @@ import {
 } from './storage-janitor.js';
 import { SUPERVISOR_EVENTS_LEGACY_FILE } from '../agent/agent-runtime-events.js';
 import type { WorkspaceRecord } from '../workforce/workspace-ledger.js';
-import { fetchWithVaultCache } from './data-vault.js';
 import {
   RETENTION_CATALOG_REPO_PATH,
   RETENTION_DAY_MS,
@@ -1232,51 +1231,39 @@ describe('storage-janitor', () => {
     });
   });
 
-  describe('scanDataVault', () => {
-    it('deletes expired valid entries but leaves malformed entries untouched', async () => {
-      await fetchWithVaultCache('notion', 'expired', () => ({ value: 1 }), {
-        projectId: 'janitor-test',
-        ttlMs: 60_000,
-      });
-      const validFile = path.join(dataVaultDir, fs.readdirSync(dataVaultDir)[0]!);
-      const persisted = JSON.parse(fs.readFileSync(validFile, 'utf8')) as Record<string, unknown>;
-      persisted.expiresAt = new Date(Date.now() - 1_000).toISOString();
-      fs.writeFileSync(validFile, JSON.stringify(persisted));
+  describe('scanLegacyDataVault', () => {
+    const LEGACY_TTL_MS = 30 * RETENTION_DAY_MS;
 
-      const malformedFile = path.join(dataVaultDir, 'malformed.json');
-      writeFile(malformedFile, '{not-json');
+    it('expires leftovers of the retired flat vault by mtime and keeps fresh ones', () => {
+      const oldFile = path.join(dataVaultDir, 'old-entry.json');
+      const freshFile = path.join(dataVaultDir, 'fresh-entry.json');
+      writeFile(oldFile, '{not-json');
+      writeFile(freshFile);
+      setMtime(oldFile, LEGACY_TTL_MS + 1_000);
 
-      const result = scanDataVault({ dryRun: false });
+      const result = scanLegacyDataVault({ dryRun: false });
 
-      expect(result.deleted).toContain(validFile);
-      expect(fs.existsSync(validFile)).toBe(false);
-      expect(result.deleted).not.toContain(malformedFile);
-      expect(fs.existsSync(malformedFile)).toBe(true);
+      expect(result.deleted).toEqual([oldFile]);
+      expect(fs.existsSync(oldFile)).toBe(false);
+      expect(fs.existsSync(freshFile)).toBe(true);
     });
 
-    it('records each vault deletion in the retention audit (C-JAN-005)', async () => {
-      await fetchWithVaultCache('notion', 'expired-audit', () => ({ value: 1 }), {
-        projectId: 'janitor-test',
-        ttlMs: 60_000,
-      });
-      const validFile = path.join(dataVaultDir, fs.readdirSync(dataVaultDir)[0]!);
-      const persisted = JSON.parse(fs.readFileSync(validFile, 'utf8')) as Record<string, unknown>;
-      const expiresAt = new Date(Date.now() - 1_000).toISOString();
-      persisted.expiresAt = expiresAt;
-      fs.writeFileSync(validFile, JSON.stringify(persisted));
+    it('records each legacy vault deletion in the retention audit (C-JAN-005)', () => {
+      const oldFile = path.join(dataVaultDir, 'audited-entry.json');
+      writeFile(oldFile);
+      setMtime(oldFile, LEGACY_TTL_MS + 1_000);
 
-      expect(scanDataVault({ dryRun: true }).expired).toContain(validFile);
+      expect(scanLegacyDataVault({ dryRun: true }).expired).toContain(oldFile);
       expect(readRetentionAudit()).toHaveLength(0); // dry-run writes no record
 
-      const result = scanDataVault({ dryRun: false });
-      expect(result.deleted).toContain(validFile);
-      const repoRel = path.relative(testRootDir(), validFile).split(path.sep).join('/');
+      const result = scanLegacyDataVault({ dryRun: false });
+      expect(result.deleted).toContain(oldFile);
+      const repoRel = path.relative(testRootDir(), oldFile).split(path.sep).join('/');
       const records = readRetentionAudit().filter((r) => r.path === repoRel);
       expect(records).toHaveLength(1);
       expect(records[0]).toMatchObject({
         event: 'RETENTION_DELETE',
         policy_path: 'active/shared/data-vault',
-        expires_at: expiresAt,
       });
     });
   });
@@ -1289,21 +1276,16 @@ describe('storage-janitor', () => {
       });
     }
 
-    it('keeps an expired vault entry and reports the error when its audit record cannot be written', async () => {
-      await fetchWithVaultCache('notion', 'expired-blocked', () => ({ value: 1 }), {
-        projectId: 'janitor-test',
-        ttlMs: 60_000,
-      });
-      const validFile = path.join(dataVaultDir, fs.readdirSync(dataVaultDir)[0]!);
-      const persisted = JSON.parse(fs.readFileSync(validFile, 'utf8')) as Record<string, unknown>;
-      persisted.expiresAt = new Date(Date.now() - 1_000).toISOString();
-      fs.writeFileSync(validFile, JSON.stringify(persisted));
+    it('keeps an expired legacy vault file and reports the error when its audit record cannot be written', () => {
+      const oldFile = path.join(dataVaultDir, 'blocked-entry.json');
+      writeFile(oldFile);
+      setMtime(oldFile, 30 * RETENTION_DAY_MS + 1_000);
       blockRetentionAudit();
 
-      const result = scanDataVault({ dryRun: false });
-      expect(result.expired).toContain(validFile);
+      const result = scanLegacyDataVault({ dryRun: false });
+      expect(result.expired).toContain(oldFile);
       expect(result.deleted).toEqual([]);
-      expect(fs.existsSync(validFile)).toBe(true);
+      expect(fs.existsSync(oldFile)).toBe(true);
       expect(result.errors).toHaveLength(1);
       expect(result.errors![0]).toContain('audit record could not be written');
     });

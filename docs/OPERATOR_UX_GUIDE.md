@@ -203,7 +203,7 @@ Kyberion doctor is **`pnpm kyberion doctor`** (`pnpm run doctor` is equivalent).
 | Schedule                |          Cadence | Purpose                                                                                                                    |
 | ----------------------- | ---------------: | -------------------------------------------------------------------------------------------------------------------------- |
 | `volatile-gc-daily`     |  Daily 04:00 JST | Expire and roll over volatile working-memory faces.                                                                        |
-| `storage-janitor-daily` |  Daily 04:30 JST | Run governed TTL cleanup for tmp, logs, data-vault, and runtime retention directories.                                     |
+| `storage-janitor-daily` |  Daily 04:30 JST | Run governed TTL cleanup for tmp, logs, storage floors, legacy data-vault leftovers, and runtime retention directories.    |
 | `volatile-index-daily`  |  Daily 05:00 JST | Rebuild the volatile knowledge index.                                                                                      |
 | `daily-routine`         |  Daily 06:00 JST | Open daily journal/TODO and roll over pending items.                                                                       |
 | `weekly-review`         | Monday 07:00 JST | Open weekly review, nominate promotion candidates, write task-model routing stats, and summarize queued memory candidates. |

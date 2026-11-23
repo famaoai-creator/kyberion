@@ -92,6 +92,33 @@ deliberately and keep their download mtime. The download-cache root is never
 an install target and is never searched for interpreters or binaries; only the
 runtime root is. Never build either path by hand.
 
+### Service-preset cache
+
+`executeServicePresetCached` (`libs/core/service/service-engine.ts`) keeps its
+TTL cache on the cache floor (`libs/core/storage/service-preset-cache.ts`):
+
+```
+active/shared/cache/<tier>/<tenant|shared>/service-preset/project/<projectId>/<hash>.json
+active/shared/cache/<tier>/<tenant|shared>/service-preset/global/<hash>.json
+```
+
+- The tenant segment is the tenant of the call's admitted binding
+  (`resolveTenantAlias` of the admission's security scope). A call without an
+  admission uses the tier's `shared` partition. The project is the admitted
+  project, or the caller's `project_id` when there is no admission; without
+  one the entry goes to `global/`.
+- Ownership follows from the path. tier-guard and `tenant_scope` protect the
+  `personal` / `confidential` partitions like every floor, and no code reads
+  an owner out of the entry.
+- Each entry records its tier, tenant and project and is served only from the
+  partition those name: an entry copied into another partition is a miss.
+  Its own `expiresAt` is checked on read (an expired entry is a miss and is
+  rewritten). The cache floor rule (30 days) removes old files.
+- It replaces the flat `active/shared/data-vault/` store. That directory is a
+  legacy retention-catalog entry now: nothing writes there, and the janitor
+  deletes leftovers 30 days after their last write (audited) until the entry
+  is removed.
+
 ### Process start-up caches
 
 Two platform caches keep repeated child processes cheap. Both hold
@@ -549,13 +576,13 @@ ingest commit.
   from a fresh read at prune time; the removed lines survive only in the offboarding
   export. The export manifest is rewritten after each prune with the actual counts and
   names an export file only once it exists, so a lock timeout part-way leaves a manifest
-  that matches the disk. Data vault entries carry no tenant field, so project offboarding
-  attributes an entry by its key (`<tenant>:<projectId>:…` for tenant-admitted service
-  calls). An unprefixed entry is claimed only when the filter's lineage is the one lineage
-  known for that project id (workspaces, active and archived missions, the project
-  registry record); an unfiltered run refuses when admitted keys name several tenants or
-  one other than the known lineage. Otherwise it refuses with
-  `PROJECT_DATA_VAULT_AMBIGUOUS`.
+  that matches the disk. The service-preset cache is offboarded by path
+  (`scope-offboarding-cache.ts`): a tenant offboarding exports and soft-deletes
+  `active/shared/cache/<tier>/<tenant>/service-preset/` of every tier; a project
+  offboarding removes `…/service-preset/project/<id>/` from its filter tenant's
+  partition only, or from the untenanted `<tier>/shared/` partition when the run names
+  no tenant. It never touches another tenant's partition. The rest of a tenant's cache
+  floor partition is not offboarded and expires under the cache floor rule.
 - A restore refuses (`[BACKUP_RESTORE_APPEND_ONLY_CONFLICT]`) to lay an
   append-only partition or customer decision case over a target that already
   holds files. A chain has no head anchor, so the restore relies on this guard. The target is checked again
@@ -681,24 +708,26 @@ by floor:
   `<stem>-YYYYMMDD-HHmmss.jsonl` siblings, with `-<n>` appended on a
   same-second collision; only `.jsonl` live files are rotatable.
 - **Audit first.** When an expiry must be audited (`audit: true`, archive,
-  soft delete, data-vault expiry), the retention audit record is written
+  soft delete), the retention audit record is written
   before the file is moved or unlinked. If the record cannot be written, the
   file stays where it is and the next sweep retries. Every scanner lists such
   kept files in the janitor report's errors (`<scanner>: <path>: <why>`) and
   logs one summary warning per sweep. If the move or unlink fails after the
   record was written, a `RETENTION_EXPIRY_FAILED` record follows it. A file that
   is already gone when its expiry runs is skipped, not reported.
-- **Data vault** entries are expired by their own `expiresAt`, through the
-  catalog's `active/shared/data-vault` entry. Every expiry is audited first;
-  one that cannot be audited is kept and listed in the janitor report's
-  errors.
+- **Legacy data vault.** Leftovers of the retired flat
+  `active/shared/data-vault/` store are deleted 30 days after their last
+  write, audited, by `scanLegacyDataVault` under the catalog's legacy entry
+  (reported as `expiredDataVault` / `deletedDataVault`). Remove the sweep and
+  the entry once deployments no longer hold the directory.
 - **Fallback.** If the catalog is missing, corrupt or invalid, the janitor
   uses `BUILTIN_RETENTION_DEFAULTS` (`storage-retention-catalog.ts`) and
   reports `retentionCatalogSource: builtin-defaults`. The fallback copies the
   shipped catalog's rules for tmp (with the code grace), staging (3 days),
   the cache partitions (30 days; `cache/system/tool-runtimes`
   `review_required`), logs (30 days) with `logs/audit` archived at 90 days,
-  and the pre-catalog runtime TTLs. It declares `active/audit` and
+  the pre-catalog runtime TTLs and the legacy data vault (30 days, audited).
+  It declares `active/audit` and
   `active/archive` `review_required`, with their nested system-ledger and
   trash entries. Everything else the catalog governs (other runtime and
   event-store entries, other append-only stores) is kept until the catalog
@@ -706,18 +735,6 @@ by floor:
   entry (every field except `note`, `backup` included), and every shipped
   entry nested under a built-in root to have such a twin, so the fallback
   never deletes more than the catalog would.
-
-**Known gap: the data vault is not partitioned.** `active/shared/data-vault/`
-holds every tier's and tenant's entries flat, one `<sha256>.json` per entry.
-The tier exists only as a field inside the entry. That breaks the floor
-partition rule in §2 (tier first, then tenant). It stays this way until the
-owner decides on a design. Until then, do not add new tenant-bound data to the
-vault expecting partition-level isolation. Two consequences follow from the
-flat layout: entries are keyed without their tier, so callers asking for the
-same key under different tiers replace each other's entry (a cache hit is
-served only for the requested tier); and an entry written by an unadmitted call
-records no owner, so offboarding can attribute it only from what else is known
-about its project id.
 
 ## 4. Migration status
 

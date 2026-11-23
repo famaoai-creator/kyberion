@@ -43,7 +43,6 @@ export {
 } from './storage-runtime-coverage.js';
 import { logger } from '../core.js';
 import { withExecutionContext } from '../authority.js';
-import { loadVaultEntryAtPath } from './data-vault.js';
 import {
   DELEGATION_CHILDREN_REGISTRY_SUBPATH,
   loadDelegationChildrenRegistryAtPath,
@@ -203,23 +202,6 @@ export interface RotateLogsResult {
   errors?: string[];
 }
 
-export interface ScanDataVaultOptions {
-  dryRun: boolean;
-  /** Preloaded retention catalog; loaded on demand when omitted. */
-  catalog?: LoadedRetentionCatalog;
-}
-
-export interface ScanDataVaultResult {
-  expired: string[];
-  deleted: string[];
-  /** Expired entries moved to `active/archive/.trash/` (catalog `soft_delete_days`). */
-  softDeleted: string[];
-  /** Expired entries moved to `active/archive/<repo-rel>` (catalog `action: archive`). */
-  archived: string[];
-  /** Expired entries left in place because their expiry (or its audit record) failed. */
-  errors?: string[];
-}
-
 export interface ScanRuntimeResult {
   expired: string[];
   deleted: string[];
@@ -272,6 +254,7 @@ export interface JanitorReport {
   deletedTmp: number;
   expiredLogs: number;
   rotatedLogs: number;
+  /** Leftovers of the retired flat data vault expired / deleted this run (legacy sweep). */
   expiredDataVault: number;
   deletedDataVault: number;
   expiredRuntime: number;
@@ -531,50 +514,27 @@ export function rotateLogs(opts: RotateLogsOptions): RotateLogsResult {
   };
 }
 
+/** Retired flat data vault: the service-preset cache now lives on the cache floor. */
+export const LEGACY_DATA_VAULT_RETENTION_PATH = 'active/shared/data-vault';
+
 /**
- * Expire data-vault entries whose own `expiresAt` has passed. Disposal goes
- * through {@link expireFilePerPolicy} under the catalog's
- * `active/shared/data-vault` entry, like every other janitor expiry (so a
- * declared `soft_delete_days` / `archive` is honored). Each expiry is always
- * written to the retention audit: the trigger is the entry's self-declared
- * `expiresAt`, not a catalog TTL, so the audit record is the only trace of
- * why it went.
+ * Expire leftovers of the retired flat data vault (`active/shared/data-vault/`,
+ * replaced by the cache-floor service-preset cache, service-preset-cache.ts).
+ * Files are swept by mtime under the catalog's legacy entry (TTL, audited),
+ * like any declared directory. Remove this sweep together with that entry once
+ * deployments no longer hold the directory.
  */
-export function scanDataVault(opts: ScanDataVaultOptions): ScanDataVaultResult {
+export function scanLegacyDataVault(opts: {
+  dryRun: boolean;
+  catalog?: LoadedRetentionCatalog;
+}): ScanRuntimeResult {
   const catalog = opts.catalog ?? loadRetentionCatalog();
-  const policy = retentionEntryForExactPath(catalog, 'active/shared/data-vault');
-  const dir = shared('data-vault');
-  const expired: string[] = [];
-  const errors: string[] = [];
-  const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
-
-  const files = collectFiles(dir);
-  for (const filePath of files) {
-    if (!filePath.endsWith('.json')) continue;
-    let entry: ReturnType<typeof loadVaultEntryAtPath>;
-    try {
-      if (!safeExistsSync(filePath)) continue;
-      entry = loadVaultEntryAtPath(filePath);
-    } catch {
-      continue; // skip malformed entries
-    }
-    if (!entry?.expiresAt || Date.parse(entry.expiresAt) > Date.now()) continue;
-    expired.push(filePath);
-    if (opts.dryRun) continue;
-    // Audit-first: a failed expiry keeps the entry and is retried next sweep.
-    expireOrRecord(filePath, policy, outcome, errors, {
-      expires_at: entry.expiresAt,
-      reason: 'data-vault entry expiresAt elapsed (storage janitor)',
-    });
-  }
-
-  return {
-    expired,
-    deleted: outcome.deleted,
-    softDeleted: outcome.softDeleted,
-    archived: outcome.archived,
-    ...withErrors('data-vault', errors),
-  };
+  const entry = retentionEntryForExactPath(catalog, LEGACY_DATA_VAULT_RETENTION_PATH);
+  const rules =
+    entry && entry.ttl_days !== undefined && entry.action !== 'review_required'
+      ? [{ repoRelativeDir: entry.path, ttlMs: entry.ttl_days * RETENTION_DAY_MS, entry }]
+      : [];
+  return sweepRepoRootedRules('data-vault', rules, catalog, opts.dryRun);
 }
 
 export function scanRuntime(opts: {
@@ -1554,14 +1514,14 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
     errors.push(`logs: ${err?.message ?? String(err)}`);
   }
 
-  let vaultResult: ScanDataVaultResult = {
+  let vaultResult: ScanRuntimeResult = {
     expired: [],
     deleted: [],
     softDeleted: [],
     archived: [],
   };
   try {
-    vaultResult = scanDataVault({ dryRun: opts.dryRun, catalog });
+    vaultResult = scanLegacyDataVault({ dryRun: opts.dryRun, catalog });
     for (const failure of vaultResult.errors ?? []) errors.push(`data-vault: ${failure}`);
   } catch (err: any) {
     errors.push(`data-vault: ${err?.message ?? String(err)}`);

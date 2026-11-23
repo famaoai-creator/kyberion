@@ -113,7 +113,7 @@ export type { MissionStatus } from './mission/mission-status.js';
 export {
   scanTmp,
   rotateLogs,
-  scanDataVault,
+  scanLegacyDataVault,
   scanRuntime,
   sweepDelegationChildren,
   runJanitor,
@@ -141,7 +141,6 @@ export type {
   JanitorReport,
   ScanTmpResult,
   RotateLogsResult,
-  ScanDataVaultResult,
   ScanRuntimeResult,
   SweepTrashResult,
   SweepDelegationChildrenOptions,
@@ -252,23 +251,21 @@ export type {
   DelegationTimeoutRecord,
 } from './mission/delegation-concurrency.js';
 
-// Data Vault (external data source reference cache)
+// Service-preset TTL cache (cache floor, tier/tenant-partitioned)
 
 export {
-  fetchWithVaultCache,
-  getVaultEntry,
-  invalidateVaultEntry,
-  listVaultEntries,
-  loadVaultEntryAtPath,
-} from './storage/data-vault.js';
+  fetchWithServicePresetCache,
+  getServicePresetCacheEntry,
+  invalidateServicePresetCacheEntry,
+  servicePresetCachePartitionRoot,
+  servicePresetCacheProjectRoot,
+} from './storage/service-preset-cache.js';
 
 export type {
-  VaultEntry,
-  FetchWithVaultCacheOptions,
-  FetchWithVaultCacheResult,
-  DataVaultTier,
-  VaultEntryFilter,
-} from './storage/data-vault.js';
+  ServicePresetCacheEntry,
+  ServicePresetCacheScope,
+  FetchWithServicePresetCacheResult,
+} from './storage/service-preset-cache.js';
 
 // Process Logger (file-backed logger for long-running daemons)
 

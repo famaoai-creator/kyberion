@@ -25,7 +25,7 @@ const allowedCoreFsImports = [
   // TR-01: hermetic KYBERION_ROOT with a personal-tier registry fixture.
   'libs/core/testing/chronos-token-registry-reader.test.ts',
   'libs/core/agent/cli-subagent-team.e2e.test.ts',
-  'libs/core/storage/data-vault.test.ts',
+  'libs/core/storage/service-preset-cache.test.ts',
   'libs/core/design/creative-design-resolver.test.ts',
   'libs/core/design/semantic-design-tokens.test.ts',
   'libs/core/mission/delegation-concurrency.test.ts',

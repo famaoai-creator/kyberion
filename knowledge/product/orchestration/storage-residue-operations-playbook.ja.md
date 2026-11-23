@@ -97,7 +97,7 @@ retention catalog（正本）の 3 区分：
    `distill-candidates` 30d / `history-search` 30d / `reports` 90d(+14d trash+audit) /
    `health` 90d / `voice-loopback-receipts` 90d(+30d trash+audit) /
    `browser-receipts` 90d / `observability` 90d 残余 / `archive/.trash` sweep。
-   `data-vault` はエントリ内 `expiresAt` を per-file 尊重。
+   旧 `data-vault` は legacy エントリ（最終書き込みから 30d・監査付きで削除）。service-preset の TTL キャッシュは cache floor（`cache/<tier>/<tenant|shared>/service-preset/`）に移った。
 2. **`review_required`** — 自動削除されない＝**人が判断しない限り溜まる**:
    `browser`（セッション状態）/ `pipeline-runs` / `work-coordination` / `co-sessions` /
    `task-sessions` / `workspaces` / `artifacts` / `exports` / `archive` / `local-pads` /

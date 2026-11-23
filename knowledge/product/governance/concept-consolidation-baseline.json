@@ -277,7 +277,7 @@
     "libs/core/daemon/specs.ts": {
       "runtime_path_literal_budget": 3
     },
-    "libs/core/storage/data-vault.ts": {
+    "libs/core/storage/service-preset-cache.ts": {
       "json_state_write_budget": 1
     },
     "libs/core/organization/deal-documents.ts": {

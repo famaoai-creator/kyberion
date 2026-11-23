@@ -1144,10 +1144,6 @@
       "types": "./dist/surface/dashboard-event-parser.d.ts",
       "default": "./dist/surface/dashboard-event-parser.js"
     },
-    "./data-vault": {
-      "types": "./dist/storage/data-vault.d.ts",
-      "default": "./dist/storage/data-vault.js"
-    },
     "./deal-documents": {
       "types": "./dist/organization/deal-documents.d.ts",
       "default": "./dist/organization/deal-documents.js"
@@ -5855,6 +5851,10 @@
     "./service-pid-registry": {
       "types": "./dist/service/service-pid-registry.d.ts",
       "default": "./dist/service/service-pid-registry.js"
+    },
+    "./service-preset-cache": {
+      "types": "./dist/storage/service-preset-cache.d.ts",
+      "default": "./dist/storage/service-preset-cache.js"
     },
     "./service-preset-policy": {
       "types": "./dist/service/service-preset-policy.d.ts",

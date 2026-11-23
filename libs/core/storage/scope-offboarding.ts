@@ -53,7 +53,7 @@ import {
   listMissionDirs,
   missionScopeOf,
 } from './scope-offboarding-lineage.js';
-import { collectDataVaultEntryTargets } from './scope-offboarding-vault.js';
+import { collectServicePresetCacheTargets } from './scope-offboarding-cache.js';
 import { nowIso } from '../foundation/time.js';
 import { logger } from '../core.js';
 import {
@@ -284,8 +284,11 @@ export type OffboardTargetKind =
   | 'tenant_knowledge_tree'
   /** DA-08: the tenant's incremental-sync cursor subtree (DA-03). */
   | 'ingest_cursors_tree'
-  /** DA-08: one data-vault cache entry of the scope (projectId, or admitted-key tenant). */
-  | 'data_vault_entry'
+  /**
+   * The scope's service-preset cache subtree on the cache floor: a tenant's
+   * `cache/<tier>/<tenant>/service-preset/`, a project's `…/service-preset/project/<id>/`.
+   */
+  | 'service_preset_cache_tree'
   /** Tenant-scoped feedback, intent, audit, and collaboration runtime state. */
   | 'tenant_learning_tree'
   /** The tenant's partition of the resource-usage ledger (one per tier). */
@@ -918,10 +921,8 @@ export interface ScopeTargetOptions {
  * Everything that belongs to the scope: its project workspace tree(s), every
  * mission declaring it, and — for a tenant (DA-08) — the tenant's governed
  * knowledge root (incl. the DA-05 `_ledger/`), its ingest sync-cursor and
- * quota-counter subtrees, plus the scope's data-vault entries. Data-vault
- * entries carry only `projectId` and their key: a tenant's entries are those
- * keyed by its slug as projectId or cached through a tenant-admitted binding
- * (key prefix); see `collectDataVaultEntryTargets`.
+ * quota-counter subtrees, plus the scope's service-preset cache subtrees
+ * (by cache-floor partition path; see `collectServicePresetCacheTargets`).
  */
 export function collectScopeTargets(
   scopeType: OffboardScopeType,
@@ -1076,10 +1077,10 @@ export function collectScopeTargets(
   // project targets select only the matching lineage directory.
   targets.push(...collectPhysicalNamespaceTargets(scopeType, id, filter));
 
-  // DA-08 data-vault entries of the scope (projectId, or an admitted key's
-  // tenant). A lineage-filtered project never claims an unscoped entry whose
-  // project id is also known under another tenant/org (fails closed).
-  targets.push(...collectDataVaultEntryTargets(scopeType, id, filter));
+  // Service-preset cache subtrees, attributed by their cache-floor partition
+  // path: a project offboarding touches only its filter tenant's (or the
+  // untenanted) partition, never another tenant's.
+  targets.push(...collectServicePresetCacheTargets(scopeType, id, filter));
 
   // P3 (R-09): artifacts derived from the tenant's assets that live OUTSIDE
   // every collected tree (shared caches, cross-partition results) are reached
@@ -1209,8 +1210,8 @@ function computeLegacyLedgerPrune(
 
 /**
  * DA-08 acceptance check: does ANY trace of the scope remain (active/ trees,
- * tenant knowledge + ledger, sync cursors, quota counters, data-vault
- * entries, dedup-registry lines still pointing into the tenant knowledge
+ * tenant knowledge + ledger, sync cursors, quota counters, service-preset
+ * cache subtrees, dedup-registry lines still pointing into the tenant knowledge
  * root)? Run automatically after an execute; also callable standalone as the
  * `--verify` half of the ceremony. Post-delete the ledger no longer exists,
  * so registry leftovers are detected by landing-path prefix — the strongest

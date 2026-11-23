@@ -220,7 +220,7 @@ Routine cron-driven maintenance. Schedules are registered with chronos.
 | `ops-health-probe`     | Daily anomaly detection (store overgrowth, alert dominance, uncovered stores) filing deduplicated WorkItems — autonomous improvement loop stage 1+2. Schedule: `45 4 * * *`.         |
 
 - `knowledge-hygiene-probe.json` — daily autonomous knowledge-hygiene sweep (duplicate/stale/conflicting promotion candidates → findings + org-operations WorkItems)
-  | `storage-janitor` | Runs governed TTL cleanup for active/shared/tmp, shared logs, data-vault, and runtime retention directories via libs/core/storage/storage-janitor.ts. Schedule: `30 4 * * *`. |
+  | `storage-janitor` | Runs governed TTL cleanup for active/shared/tmp, shared logs, storage floors, legacy data-vault leftovers, and runtime retention directories via libs/core/storage/storage-janitor.ts. Schedule: `30 4 * * *`. |
   | `volatile-gc` | Volatile Knowledge Layer GC — single working-memory:run-gc op that scans all *.volatile.json sidecars, expires ttl/session faces, rolls over daily TODO items, and writes a summary to active/shared/... Schedule: `0 4 * * *`. |
   | `volatile-index` | Volatile Knowledge Layer — regenerates active/INDEX.volatile.{md,json} by scanning all *.volatile.json sidecars. Schedule: `0 5 * * *`. |
 
