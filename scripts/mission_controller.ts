@@ -361,7 +361,7 @@ async function startMission(
   tier: 'personal' | 'confidential' | 'public' = 'confidential',
   persona: string = 'worker',
   tenantId: string = 'default',
-  missionType: string = 'development',
+  missionType?: string,
   visionRef?: string,
   relationships: Partial<import('@agent/core/mission/mission-types').MissionRelationships> = {},
   tenantSlug?: string,

@@ -15,10 +15,17 @@
  *    (same `approved_by` + `purpose` evidence shape tier-guard requires of
  *    `cross_tenant_brokerage`), every step audited.
  *
- * Deletion discipline: everything here deletes through AL-04's soft-delete
- * (`softDeleteToTrash` → `active/archive/.trash/<original-path>`), so an
- * offboarding or residue GC is recoverable with `restoreFromTrash` until the
- * janitor's trash sweep purges it. Nothing in this module hard-deletes.
+ * Deletion discipline: every file and tree this module removes goes through
+ * AL-04's soft-delete (`softDeleteToTrash` → `active/archive/.trash/<original-path>`),
+ * so it is recoverable with `restoreFromTrash` until the janitor's trash
+ * sweep purges it. The one exception is a tenant's ROWS inside shared,
+ * tenant-mixed files (the ingest dedup registry, the pre-partition metrics
+ * ledgers, the legacy delegation trace and notification queue): those files
+ * cannot go to the trash wholesale, so offboarding rewrites them without the
+ * tenant's lines. The removed lines survive only in the offboarding export
+ * (`active/shared/exports/offboarding/…`), written verbatim right before each
+ * rewrite under the file's appender lock — restoring them is a manual
+ * re-append from that export, not `restoreFromTrash`.
  *
  * Contract: both entry points are IDEMPOTENT (a second run finds nothing
  * left and reports a no-op) and NEVER THROW — they are lifecycle hooks, and
@@ -26,14 +33,27 @@
  * succeeded. Failures surface as `status: 'error'` plus an audit record.
  */
 
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 export type { OffboardApproval, OffboardScopeInput } from './scope-offboarding-derived.js';
-import { readJson, readJsonLines } from '../foundation/json.js';
+import { readJsonLines } from '../foundation/json.js';
 import * as pathResolver from '../path-resolver.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import { readTextFile } from '../foundation/text.js';
 import { streamTextLines } from './jsonl-read.js';
-import { copyTree, listDirEntries } from './scope-offboarding-files.js';
+import {
+  copyTree,
+  listDirEntries,
+  readJsonRecord,
+  safeOptionalRepositoryPath,
+} from './scope-offboarding-files.js';
+import {
+  collectProjectWorkspaceTargets,
+  lineageMatches,
+  listMissionDirs,
+  missionScopeOf,
+} from './scope-offboarding-lineage.js';
+import { collectDataVaultEntryTargets } from './scope-offboarding-vault.js';
 import { nowIso } from '../foundation/time.js';
 import { logger } from '../core.js';
 import {
@@ -75,8 +95,6 @@ import {
   LEGACY_DELEGATION_RECORD_DIR,
   LEGACY_DELEGATION_TRACE_PATH,
 } from '../foundation/runtime-state-roots.js';
-import { loadMissionStateAtPath } from '../mission/mission-state-reader.js';
-import type { MissionState } from '../mission/mission-types.js';
 import {
   collectDerivedAssetTargets,
   readUnchangedDerivedTarget,
@@ -120,28 +138,9 @@ export interface GcMissionRuntimeResidueResult {
   error?: string;
 }
 
-function readJsonRecord(filePath: string): Record<string, unknown> | null {
-  try {
-    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
-    if (!safeExistsSync(safePath)) return null;
-    if (!safeStat(safePath).isFile()) return null;
-    return parseSafeJsonObjectValue(readJson<unknown>(safePath), `scope record ${filePath}`);
-  } catch {
-    return null;
-  }
-}
-
 /** Mission ids are compared case-insensitively (`findMissionPath` upper-cases). */
 function sameMission(value: unknown, missionId: string): boolean {
   return typeof value === 'string' && value.trim().toUpperCase() === missionId;
-}
-
-function safeOptionalRepositoryPath(filePath: string): string | undefined {
-  try {
-    return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
-  } catch {
-    return undefined;
-  }
 }
 
 function collectMissionResidue(missionId: string): MissionResidueCandidate[] {
@@ -285,7 +284,7 @@ export type OffboardTargetKind =
   | 'tenant_knowledge_tree'
   /** DA-08: the tenant's incremental-sync cursor subtree (DA-03). */
   | 'ingest_cursors_tree'
-  /** DA-08: one data-vault cache entry whose projectId equals the scope id. */
+  /** DA-08: one data-vault cache entry of the scope (projectId, or admitted-key tenant). */
   | 'data_vault_entry'
   /** Tenant-scoped feedback, intent, audit, and collaboration runtime state. */
   | 'tenant_learning_tree'
@@ -387,6 +386,17 @@ export const INGEST_CURSORS_REPO_SUBPATH = 'active/shared/runtime/ingest-cursors
 export const INGEST_DEDUP_REGISTRY_REPO_PATH =
   'active/shared/runtime/ingest/content-hash-registry.jsonl';
 const INGEST_QUOTA_REPO_SUBPATH = 'active/shared/runtime/ingest/quota';
+
+/**
+ * Lock id every dedup-registry appender holds around check→register
+ * (ingest-actuator `dedup.ts` `registryLockId`, keyed by the registry's
+ * safe absolute path). Mirrored as a literal for the same no-coupling reason
+ * as the paths above; the offboarding prune takes it so a registration that
+ * lands between plan and rewrite is never lost.
+ */
+export function ingestDedupRegistryLockId(registryAbsPath: string): string {
+  return `ingest-content-hash-registry-${createHash('sha256').update(registryAbsPath).digest('hex').slice(0, 32)}`;
+}
 /** metrics.ts RESOURCE_USAGE_LEDGER_ROOT (`<root>/<tier>/<tenant>/resource-usage.jsonl`). */
 export const USAGE_LEDGER_REPO_SUBPATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.resource_usage;
 /**
@@ -511,164 +521,6 @@ export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
  */
 function tenantKnowledgeRootDefault(tenantSlug: string): string {
   return `knowledge/confidential/${tenantSlug}`;
-}
-
-function missionStateScope(missionDir: string): {
-  tenantSlug?: string;
-  organizationId?: string;
-  projectId?: string;
-} {
-  const record = loadMissionStateAtPath(path.join(missionDir, 'mission-state.json')) as
-    | (MissionState & {
-        organization_profile?: { organization_id?: unknown };
-      })
-    | null;
-  if (!record) return {};
-  const organizationProfile = record.organization_profile;
-  return {
-    tenantSlug: record.tenant_slug,
-    organizationId:
-      record.organization_id ||
-      record.relationships?.organization?.organization_id ||
-      (typeof organizationProfile?.organization_id === 'string'
-        ? organizationProfile.organization_id
-        : undefined),
-    projectId: record.relationships?.project?.project_id,
-  };
-}
-
-function projectRecordScope(projectId: string): {
-  tenantSlug?: string;
-  organizationId?: string;
-} {
-  const record = readJsonRecord(
-    pathResolver.rootResolve(`active/shared/runtime/projects/${projectId}.json`)
-  );
-  return {
-    tenantSlug: typeof record?.tenant_slug === 'string' ? record.tenant_slug : undefined,
-    organizationId:
-      typeof record?.organization_id === 'string' ? record.organization_id : undefined,
-  };
-}
-
-function lineageMatches(
-  lineage: { tenantSlug?: string; organizationId?: string },
-  filter: PhysicalNamespaceFilter
-): boolean {
-  if (filter.tenantSlug && lineage.tenantSlug !== filter.tenantSlug) return false;
-  if (filter.organizationId && lineage.organizationId !== filter.organizationId) return false;
-  return true;
-}
-
-/**
- * Resolve the lineage of a project workspace.
- *
- * New workspaces use `active/projects/{tier}/{tenant}/{project}`. The direct
- * `active/projects/{tier}/{project}` form is legacy and can only be scoped by
- * the project registry record; when that record is absent, a tenant/org
- * filtered offboarding must leave the directory untouched.
- */
-function projectWorkspaceLineage(
-  workspace: string,
-  projectId: string,
-  tierDir: string
-): { tenantSlug?: string; organizationId?: string } {
-  const segments = path.relative(tierDir, workspace).split(path.sep).filter(Boolean);
-  const recordScope = projectRecordScope(projectId);
-  const operationalState = readJsonRecord(path.join(workspace, 'state', 'project-state.json'));
-  const tenantSlug =
-    typeof operationalState?.tenant_slug === 'string'
-      ? operationalState.tenant_slug
-      : segments.length >= 2 && segments[0] !== 'shared'
-        ? segments[0]
-        : recordScope.tenantSlug;
-  const organizationId =
-    typeof operationalState?.organization_id === 'string'
-      ? operationalState.organization_id
-      : recordScope.organizationId;
-  if (segments.length < 2) return { tenantSlug, organizationId };
-  return {
-    tenantSlug,
-    organizationId,
-  };
-}
-
-function collectProjectWorkspaceTargets(
-  projectId: string,
-  filter: PhysicalNamespaceFilter
-): Array<{ target: OffboardTarget; lineage: { tenantSlug?: string; organizationId?: string } }> {
-  const candidates: Array<{
-    target: OffboardTarget;
-    lineage: { tenantSlug?: string; organizationId?: string };
-  }> = [];
-  for (const tier of STORAGE_DATA_TIERS) {
-    const tierDir = path.join(pathResolver.rootDir(), 'active', 'projects', tier);
-    for (const owner of listDirEntries(tierDir)) {
-      const ownerDir = safeOptionalRepositoryPath(path.join(tierDir, owner));
-      if (!ownerDir) continue;
-      try {
-        if (!safeStat(ownerDir).isDirectory()) continue;
-      } catch {
-        continue;
-      }
-
-      const candidate = safeOptionalRepositoryPath(
-        owner === projectId ? ownerDir : path.join(ownerDir, projectId)
-      );
-      if (!candidate || !safeExistsSync(candidate)) continue;
-      try {
-        if (!safeStat(candidate).isDirectory()) continue;
-      } catch {
-        continue;
-      }
-      const lineage = projectWorkspaceLineage(candidate, projectId, tierDir);
-      if (lineageMatches(lineage, filter)) {
-        candidates.push({
-          target: { path: repoRelativePosix(candidate), kind: 'project_tree' },
-          lineage,
-        });
-      }
-    }
-  }
-  return candidates;
-}
-
-/**
- * Data-vault entry files (`active/shared/data-vault/*.json`) whose projectId
- * equals the scope id. Vault records written before scoped ownership existed
- * have no tenant/org lineage; project offboarding refuses to claim those
- * records rather than deleting a potentially shared entry.
- */
-function collectDataVaultEntryTargets(
-  scopeType: OffboardScopeType,
-  scopeId: string,
-  filter: PhysicalNamespaceFilter
-): OffboardTarget[] {
-  const targets: OffboardTarget[] = [];
-  const vaultDir = pathResolver.shared('data-vault');
-  for (const name of listDirEntries(vaultDir)) {
-    if (!name.endsWith('.json')) continue;
-    const filePath = path.join(vaultDir, name);
-    const record = readJsonRecord(filePath);
-    if (!record || record.projectId !== scopeId) continue;
-    if (scopeType === 'project' && (filter.tenantSlug || filter.organizationId)) {
-      const hasTenant = typeof record.tenant_slug === 'string';
-      const hasOrganization = typeof record.organization_id === 'string';
-      if (!hasTenant || !hasOrganization) {
-        throw new Error(
-          `[PROJECT_DATA_VAULT_AMBIGUOUS] data-vault entry '${name}' has no complete tenant/org lineage`
-        );
-      }
-      if (
-        record.tenant_slug !== filter.tenantSlug ||
-        record.organization_id !== filter.organizationId
-      ) {
-        continue;
-      }
-    }
-    targets.push({ path: repoRelativePosix(filePath), kind: 'data_vault_entry' });
-  }
-  return targets;
 }
 
 export const PHYSICAL_SCHEDULE_ROOT = 'active/shared/runtime/media-generation/schedules';
@@ -1066,10 +918,10 @@ export interface ScopeTargetOptions {
  * Everything that belongs to the scope: its project workspace tree(s), every
  * mission declaring it, and — for a tenant (DA-08) — the tenant's governed
  * knowledge root (incl. the DA-05 `_ledger/`), its ingest sync-cursor and
- * quota-counter subtrees, plus data-vault entries keyed by the scope id.
- * Data-vault entries use `VaultEntry.projectId` for both scope types — a
- * tenant that cached vault data under a projectId different from its slug is
- * NOT matched here (the projectId is the only scope key the vault carries).
+ * quota-counter subtrees, plus the scope's data-vault entries. Data-vault
+ * entries carry only `projectId` and their key: a tenant's entries are those
+ * keyed by its slug as projectId or cached through a tenant-admitted binding
+ * (key prefix); see `collectDataVaultEntryTargets`.
  */
 export function collectScopeTargets(
   scopeType: OffboardScopeType,
@@ -1120,25 +972,16 @@ export function collectScopeTargets(
     targets.push(...workspaceCandidates.map(({ target }) => target));
   }
 
-  // Mission trees declaring the scope in their state.
-  const missionsRoot = path.join(pathResolver.rootDir(), 'active', 'missions');
-  for (const tier of STORAGE_DATA_TIERS) {
-    const tierDir = path.join(missionsRoot, tier);
-    for (const name of listDirEntries(tierDir)) {
-      const missionDir = safeOptionalRepositoryPath(path.join(tierDir, name));
-      if (!missionDir) continue;
-      try {
-        if (!safeStat(missionDir).isDirectory()) continue;
-      } catch {
-        continue;
-      }
-      const scope = missionStateScope(missionDir);
-      const matches =
-        scopeType === 'tenant'
-          ? scope.tenantSlug === id
-          : scope.projectId === id && lineageMatches(scope, filter);
-      if (matches) targets.push({ path: repoRelativePosix(missionDir), kind: 'mission_tree' });
-    }
+  // Mission trees declaring the scope in their state, flat or tenant-nested.
+  for (const { missionDir, tenantPartition } of listMissionDirs()) {
+    const scope = missionScopeOf(missionDir, tenantPartition);
+    const matches =
+      scopeType === 'tenant'
+        ? tenantPartition
+          ? tenantPartition === id
+          : scope.tenantSlug === id
+        : scope.projectId === id && lineageMatches(scope, filter);
+    if (matches) targets.push({ path: repoRelativePosix(missionDir), kind: 'mission_tree' });
   }
 
   if (scopeType === 'project') {
@@ -1146,7 +989,12 @@ export function collectScopeTargets(
     if (!filter.tenantSlug && !filter.organizationId && matchingMissionDirs.length > 1) {
       const lineages = new Set(
         matchingMissionDirs.map((target) => {
-          const scope = missionStateScope(pathResolver.rootResolve(target.path));
+          // `active/missions/<tier>/<tenant>/<id>` carries its tenant partition.
+          const segments = target.path.split('/');
+          const scope = missionScopeOf(
+            pathResolver.rootResolve(target.path),
+            segments.length === 5 ? segments[3] : undefined
+          );
           return `${scope.tenantSlug || 'unknown'}/${scope.organizationId || 'unknown'}`;
         })
       );
@@ -1228,9 +1076,9 @@ export function collectScopeTargets(
   // project targets select only the matching lineage directory.
   targets.push(...collectPhysicalNamespaceTargets(scopeType, id, filter));
 
-  // DA-08 data-vault entries keyed by the scope id. Project entries require
-  // complete lineage when an explicit project scope is used; unscoped legacy
-  // entries are never silently assigned to a tenant/org.
+  // DA-08 data-vault entries of the scope (projectId, or an admitted key's
+  // tenant). A lineage-filtered project never claims an unscoped entry whose
+  // project id is also known under another tenant/org (fails closed).
   targets.push(...collectDataVaultEntryTargets(scopeType, id, filter));
 
   // P3 (R-09): artifacts derived from the tenant's assets that live OUTSIDE
@@ -1566,14 +1414,18 @@ function performOffboarding(input: OffboardScopeInput): OffboardScopeResult {
 
     const approvedBy = input.approval?.approved_by?.trim();
     const purpose = input.approval?.purpose?.trim();
-    const previewChanged =
-      input.expectedPreviewId !== undefined && input.expectedPreviewId !== result.preview_id;
-    if (!approvedBy || !purpose || previewChanged) {
+    // Execute is bound to a reviewed dry run: no preview id, no delete.
+    const previewMissing = !input.expectedPreviewId;
+    const previewChanged = !previewMissing && input.expectedPreviewId !== result.preview_id;
+    if (!approvedBy || !purpose || previewMissing || previewChanged) {
       result.status = 'approval_required';
-      result.reason = previewChanged
-        ? 'Scope targets changed. Review a fresh dry run before executing.'
-        : 'offboarding delete requires a human approval with approved_by and purpose ' +
-          '(dry_run needs none) — refusing to delete';
+      result.reason =
+        !approvedBy || !purpose
+          ? 'offboarding delete requires a human approval with approved_by and purpose ' +
+            '(dry_run needs none) — refusing to delete'
+          : previewMissing
+            ? 'offboarding execute requires expectedPreviewId (the preview_id of a reviewed dry run) — refusing to delete'
+            : 'Scope targets changed. Review a fresh dry run before executing.';
       appendRetentionAudit({
         event: 'SCOPE_OFFBOARD_DENIED',
         scope_type: scopeType,
@@ -1616,63 +1468,50 @@ function performOffboarding(input: OffboardScopeInput): OffboardScopeResult {
         path.join(exportDirAbs, ...target.path.split('/'))
       );
     }
-    // DA-08: the tenant's dedup-registry lines are exported verbatim too —
-    // the prune below removes them from the shared registry, and the export
-    // is the recoverable copy (the registry file itself is shared across
-    // tenants, so it never goes to the trash wholesale).
+    // DA-08: the tenant's dedup-registry lines and its pre-partition rows of
+    // the shared metrics ledgers / delegation trace are exported verbatim
+    // right before each is pruned, under the file's appender lock (see
+    // below) — the export is the recoverable copy (the shared files never go
+    // to the trash wholesale). The manifest names an export file only once it
+    // exists and is rewritten after every prune with the actual counts, so a
+    // lock failure part-way leaves a manifest that matches the export.
     const dedupExportFile = 'dedup-registry-removed.jsonl';
     if (dedupPrune && dedupPrune.removedLines.length > 0) {
-      const dedupExportPath = assertSafeRepositoryPath(path.join(exportDirAbs, dedupExportFile), {
-        allowMissingLeaf: true,
-      });
-      safeWriteFile(dedupExportPath, `${dedupPrune.removedLines.join('\n')}\n`);
-      result.dedup_registry = {
-        matched: dedupPrune.removedLines.length,
-        removed: 0,
-        export_file: `${result.export_path}/${dedupExportFile}`,
-      };
+      result.dedup_registry = { matched: dedupPrune.removedLines.length, removed: 0 };
     }
-    // The tenant's pre-partition rows of the shared metrics ledgers are
-    // exported verbatim right before they are pruned, under the ledger lock
-    // (see below); the manifest names the export file now.
     for (const { ledger, prune } of ledgerPrunes) {
-      result[ledger.result_key] = {
-        matched: prune.removedLines.length,
-        removed: 0,
-        export_file: `${result.export_path}/${ledger.export_file}`,
-      };
-    }
-    if (result.delegations_legacy) {
-      result.delegations_legacy.export_file = `${result.export_path}/${DELEGATION_LEGACY_EXPORT_DIR}`;
+      result[ledger.result_key] = { matched: prune.removedLines.length, removed: 0 };
     }
     const manifestPath = assertSafeRepositoryPath(path.join(exportDirAbs, 'manifest.json'), {
       allowMissingLeaf: true,
     });
-    safeWriteFile(
-      manifestPath,
-      JSON.stringify(
-        {
-          scope_type: scopeType,
-          scope_id: scopeId,
-          ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
-          ...(organizationId ? { organization_id: organizationId } : {}),
-          exported_at: currentIso,
-          approval: { approved_by: approvedBy, approved_at: approvedAt, purpose },
-          targets: result.targets,
-          ...(result.dedup_registry ? { dedup_registry: result.dedup_registry } : {}),
-          ...(result.usage_ledger_legacy
-            ? { usage_ledger_legacy: result.usage_ledger_legacy }
-            : {}),
-          ...(result.execution_metrics_legacy
-            ? { execution_metrics_legacy: result.execution_metrics_legacy }
-            : {}),
-          ...(result.delegations_legacy ? { delegations_legacy: result.delegations_legacy } : {}),
-          policy_ref: RETENTION_CATALOG_REPO_PATH,
-        },
-        null,
-        2
-      )
-    );
+    const writeManifest = (): void =>
+      safeWriteFile(
+        manifestPath,
+        JSON.stringify(
+          {
+            scope_type: scopeType,
+            scope_id: scopeId,
+            ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+            ...(organizationId ? { organization_id: organizationId } : {}),
+            exported_at: currentIso,
+            approval: { approved_by: approvedBy, approved_at: approvedAt, purpose },
+            targets: result.targets,
+            ...(result.dedup_registry ? { dedup_registry: result.dedup_registry } : {}),
+            ...(result.usage_ledger_legacy
+              ? { usage_ledger_legacy: result.usage_ledger_legacy }
+              : {}),
+            ...(result.execution_metrics_legacy
+              ? { execution_metrics_legacy: result.execution_metrics_legacy }
+              : {}),
+            ...(result.delegations_legacy ? { delegations_legacy: result.delegations_legacy } : {}),
+            policy_ref: RETENTION_CATALOG_REPO_PATH,
+          },
+          null,
+          2
+        )
+      );
+    writeManifest();
     appendRetentionAudit({
       event: 'SCOPE_OFFBOARD_EXPORTED',
       scope_type: scopeType,
@@ -1688,27 +1527,46 @@ function performOffboarding(input: OffboardScopeInput): OffboardScopeResult {
       reason: 'offboarding export completed',
     });
 
-    // DA-08: prune the tenant's lines out of the shared dedup registry
-    // (exported above). Audited like every other purge in this ceremony.
+    // DA-08: prune the tenant's lines out of the shared dedup registry. The
+    // registry is live (every ingest registers into it): under the lock its
+    // appenders hold, the prune is recomputed from the file as it is NOW
+    // (the tenant ledger still exists — trees are deleted only below),
+    // exported verbatim, then applied by one atomic rewrite, so lines
+    // registered since the plan survive. Audited like every other purge.
     if (dedupPrune && dedupPrune.removedLines.length > 0) {
       const registryAbs = assertSafeRepositoryPath(
         pathResolver.rootResolve(INGEST_DEDUP_REGISTRY_REPO_PATH),
         { allowMissingLeaf: true }
       );
-      safeWriteFile(
-        registryAbs,
-        dedupPrune.keptLines.length > 0 ? `${dedupPrune.keptLines.join('\n')}\n` : ''
-      );
-      if (result.dedup_registry) {
-        result.dedup_registry.removed = dedupPrune.removedLines.length;
-      }
+      const prune = withLockSync(ingestDedupRegistryLockId(registryAbs), () => {
+        const current = computeDedupRegistryPrune(scopeId);
+        // Nothing of the tenant's left (removed since the plan): no export, no rewrite.
+        if (current.removedLines.length === 0) return current;
+        const dedupExportPath = assertSafeRepositoryPath(path.join(exportDirAbs, dedupExportFile), {
+          allowMissingLeaf: true,
+        });
+        safeWriteFile(dedupExportPath, `${current.removedLines.join('\n')}\n`);
+        safeWriteFile(
+          registryAbs,
+          current.keptLines.length > 0 ? `${current.keptLines.join('\n')}\n` : ''
+        );
+        return current;
+      });
+      result.dedup_registry = {
+        matched: prune.removedLines.length,
+        removed: prune.removedLines.length,
+        ...(prune.removedLines.length > 0
+          ? { export_file: `${result.export_path}/${dedupExportFile}` }
+          : {}),
+      };
+      writeManifest();
       appendRetentionAudit({
         event: 'SCOPE_OFFBOARD_DEDUP_REGISTRY_PRUNE',
         scope_type: scopeType,
         scope_id: scopeId,
         path: INGEST_DEDUP_REGISTRY_REPO_PATH,
-        removed_lines: dedupPrune.removedLines.length,
-        kept_lines: dedupPrune.keptLines.length,
+        removed_lines: prune.removedLines.length,
+        kept_lines: prune.keptLines.length,
         export_path: result.export_path,
         approved_by: approvedBy,
         approved_at: approvedAt,
@@ -1730,6 +1588,7 @@ function performOffboarding(input: OffboardScopeInput): OffboardScopeResult {
       });
       const prune = withLockSync(metricsLedgerLockId(ledgerAbs), () => {
         const current = computeLegacyLedgerPrune(ledger, scopeId);
+        if (current.removedLines.length === 0) return current;
         const exportPath = assertSafeRepositoryPath(path.join(exportDirAbs, ledger.export_file), {
           allowMissingLeaf: true,
         });
@@ -1740,11 +1599,14 @@ function performOffboarding(input: OffboardScopeInput): OffboardScopeResult {
         );
         return current;
       });
-      const summary = result[ledger.result_key];
-      if (summary) {
-        summary.matched = prune.removedLines.length;
-        summary.removed = prune.removedLines.length;
-      }
+      result[ledger.result_key] = {
+        matched: prune.removedLines.length,
+        removed: prune.removedLines.length,
+        ...(prune.removedLines.length > 0
+          ? { export_file: `${result.export_path}/${ledger.export_file}` }
+          : {}),
+      };
+      writeManifest();
       appendRetentionAudit({
         event: ledger.audit_event,
         scope_type: scopeType,
@@ -1820,6 +1682,10 @@ function performOffboarding(input: OffboardScopeInput): OffboardScopeResult {
       if (result.delegations_legacy) {
         result.delegations_legacy.matched = Math.max(result.delegations_legacy.matched, removed);
         result.delegations_legacy.removed = removed;
+        if (removed > 0) {
+          result.delegations_legacy.export_file = `${result.export_path}/${DELEGATION_LEGACY_EXPORT_DIR}`;
+        }
+        writeManifest();
       }
     }
 

@@ -599,6 +599,25 @@ export function assertValidMissionId(missionId: string): void {
   }
 }
 
+/**
+ * `start` on an already-created mission cannot change its type: the task list and
+ * workflow were generated from the type at `create`. Reject an explicit, differing
+ * `--mission-type` instead of silently starting the saved type.
+ */
+export function assertStartMissionTypeMatches(
+  missionId: string,
+  savedType: string | undefined,
+  requestedType: string | undefined
+): void {
+  const requested = requestedType?.trim();
+  if (!savedType || !requested || requested === savedType) return;
+  throw new Error(
+    `[MISSION_TYPE_MISMATCH] Mission ${missionId} was created as '${savedType}', not '${requested}' — ` +
+      `the type is fixed at create | next: cancel this mission and recreate it with ` +
+      `\`pnpm mission create ${missionId} --mission-type ${requested}\`, or start without --mission-type`
+  );
+}
+
 export async function startMission(args: {
   id: string;
   tier?: StorageDataTier;
@@ -679,6 +698,7 @@ export async function startMission(args: {
   ) {
     throw new Error('[SCOPE_CONTEXT_INVALID] Startup scope differs from the saved Mission.');
   }
+  assertStartMissionTypeMatches(upperId, state?.mission_type, args.missionType);
   requireMissionScopeRegistration(
     {
       tenantSlug: state?.tenant_slug ?? tenantSlug,
@@ -851,7 +871,7 @@ export async function startMission(args: {
         state?.intent?.goal_summary ||
         state?.intent?.source_text ||
         visionRef ||
-        `Start mission ${upperId} (${missionType})`,
+        `Start mission ${upperId} (${state?.mission_type ?? missionType})`,
       source: 'mission_state',
       extraction: 'canonical_only',
       traceRef: state?.correlation_id,

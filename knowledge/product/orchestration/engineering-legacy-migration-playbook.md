@@ -8,7 +8,7 @@ workflow_ids: [legacy-migration-rebuild]
 
 # Engineering Legacy Migration Playbook
 
-Use mission type `legacy_migration` (class `code_change`) to rebuild a legacy system on a new
+Use mission type `legacy_migration` (class `code_change`; set it with `mission create --mission-type legacy_migration`) to rebuild a legacy system on a new
 architecture or stack (the "Reimagine" approach). The `legacy-migration-rebuild` workflow binds
 this playbook. Changing only the runtime, framework or libraries while keeping the code's
 business logic is a refactoring (`refactoring` mission), not a migration.

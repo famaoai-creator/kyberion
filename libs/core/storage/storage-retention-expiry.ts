@@ -59,8 +59,26 @@ export const DEFAULT_ROTATE_MIN_BYTES = 8 * 1024 * 1024;
  */
 export const DEFAULT_COMPACT_MIN_BYTES = 4 * 1024 * 1024;
 
-/** Rotated segments are named `<stem>-YYYYMMDD-HHmmss.jsonl`. */
-export const ROTATED_SEGMENT_SUFFIX_PATTERN = /-\d{8}-\d{6}\.jsonl$/;
+/**
+ * Rotated segments are named `<stem>-YYYYMMDD-HHmmss.jsonl`, or
+ * `<stem>-YYYYMMDD-HHmmss-<n>.jsonl` when a same-second rotation collides
+ * (see `rotatedSegmentPath`). Matches the tail of a full basename.
+ */
+export const ROTATED_SEGMENT_SUFFIX_PATTERN = /-\d{8}-\d{6}(?:-\d+)?\.jsonl$/;
+
+/** The part of a rotated segment basename after `<stem>-`. */
+const ROTATED_SEGMENT_STAMP_PATTERN = /^\d{8}-\d{6}(?:-\d+)?\.jsonl$/;
+
+/**
+ * True when `name` (a basename) is a rotated segment of the live store whose
+ * basename stem is `stem` (`rotatedSegmentStem`) — the single definition the
+ * janitor's segment sweep and runtime coverage both use.
+ */
+export function isRotatedSegmentName(name: string, stem: string): boolean {
+  return (
+    name.startsWith(`${stem}-`) && ROTATED_SEGMENT_STAMP_PATTERN.test(name.slice(stem.length + 1))
+  );
+}
 
 /** Grace applied to trashed files whose original path no longer has a covering catalog entry. */
 export const DEFAULT_TRASH_GRACE_DAYS = 30;
@@ -231,6 +249,13 @@ export interface ExpiryOutcome {
  *  - otherwise → hard delete (unchanged pre-AL-04 behavior).
  *  - `audit: true` (or any soft-delete, which needs a restore trail) → an
  *    audit JSONL record of what/why/policy ref.
+ *
+ * Audit first: when a record is required it is written BEFORE the file is
+ * moved or unlinked. If the record cannot be written, the file is left in
+ * place and this throws (the caller records it; the next sweep retries) — an audited expiry never
+ * happens without its record. If the move/unlink then fails, a best-effort
+ * `RETENTION_EXPIRY_FAILED` record follows the intent record and the error
+ * is rethrown.
  */
 export function expireFilePerPolicy(
   filePath: string,
@@ -239,26 +264,14 @@ export function expireFilePerPolicy(
   /** WI-16: extra audit fields (e.g. status-rule id/status) merged into the audit record when written. */
   auditExtra?: Record<string, unknown>
 ): void {
+  // Already gone (removed by its owner or a concurrent sweep since selection): nothing to expire.
+  if (!safeExistsSync(filePath)) return;
   const repoRel = repoRelativePosix(filePath);
   const archive = entry?.action === 'archive';
   const softDelete = !archive && entry?.soft_delete_days !== undefined;
-  if (archive) {
-    const archivePath = nodePath.join(rootDir(), ARCHIVE_REPO_SUBPATH, repoRel);
-    safeMkdir(nodePath.dirname(archivePath), { recursive: true });
-    safeMoveSync(filePath, archivePath);
-    outcome.archived.push(filePath);
-    logger.debug(`[JANITOR] archived: ${filePath} -> ${archivePath}`);
-  } else if (softDelete) {
-    softDeleteToTrash(filePath);
-    outcome.softDeleted.push(filePath);
-    logger.debug(`[JANITOR] soft-deleted (trash): ${filePath}`);
-  } else {
-    safeUnlinkSync(filePath);
-    outcome.deleted.push(filePath);
-    logger.debug(`[JANITOR] deleted: ${filePath}`);
-  }
-  if (entry?.audit || softDelete || archive || auditExtra) {
-    appendRetentionAudit({
+  const audited = Boolean(entry?.audit || softDelete || archive || auditExtra);
+  if (audited) {
+    const record = {
       event: archive
         ? 'RETENTION_ARCHIVE'
         : softDelete
@@ -278,7 +291,48 @@ export function expireFilePerPolicy(
       policy_ref: RETENTION_CATALOG_REPO_PATH,
       reason: 'retention TTL elapsed (storage janitor)',
       ...auditExtra,
-    });
+    };
+    try {
+      appendJsonLine(sharedLogsAudit(STORAGE_RETENTION_AUDIT_FILENAME), {
+        ts: nowIso(),
+        ...record,
+      });
+    } catch (err) {
+      const why = err instanceof Error ? err.message : String(err);
+      // The caller records the kept file and warns once per sweep.
+      throw new Error(`${repoRel}: not expired — audit record could not be written (${why})`);
+    }
+  }
+  try {
+    if (archive) {
+      const archivePath = nodePath.join(rootDir(), ARCHIVE_REPO_SUBPATH, repoRel);
+      safeMkdir(nodePath.dirname(archivePath), { recursive: true });
+      safeMoveSync(filePath, archivePath);
+      outcome.archived.push(filePath);
+      logger.debug(`[JANITOR] archived: ${filePath} -> ${archivePath}`);
+    } else if (softDelete) {
+      softDeleteToTrash(filePath);
+      outcome.softDeleted.push(filePath);
+      logger.debug(`[JANITOR] soft-deleted (trash): ${filePath}`);
+    } else {
+      safeUnlinkSync(filePath);
+      outcome.deleted.push(filePath);
+      logger.debug(`[JANITOR] deleted: ${filePath}`);
+    }
+  } catch (err) {
+    // Lost a race with another remover after the intent record: the file is gone, as intended.
+    if (!safeExistsSync(filePath)) return;
+    if (audited) {
+      appendRetentionAudit({
+        event: 'RETENTION_EXPIRY_FAILED',
+        path: repoRel,
+        policy_path: entry?.path,
+        policy_ref: RETENTION_CATALOG_REPO_PATH,
+        error: err instanceof Error ? err.message : String(err),
+        reason: 'expiry step failed after its audit record was written (storage janitor)',
+      });
+    }
+    throw err;
   }
 }
 

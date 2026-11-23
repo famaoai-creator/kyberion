@@ -16,6 +16,7 @@ import {
   appendOnlyStoreEntries,
   type LoadedRetentionCatalog,
 } from './storage-retention-catalog.js';
+import { isRotatedSegmentName } from './storage-retention-expiry.js';
 
 /** Tracked keep-files are infrastructure, not runtime stores. */
 const KEEP_FILE_BASENAMES = new Set(['.gitignore', '.gitkeep', '.gitattributes']);
@@ -65,15 +66,7 @@ export function listUncoveredRuntimeEntries(
     if (covered.has(name)) continue;
     // Rotated segments of a declared append-only store are governed by the
     // store's own rotate entry (segment TTL), not reported as uncovered.
-    if (
-      !isDir &&
-      segmentStems.some(
-        (stem) =>
-          name.startsWith(`${stem}-`) &&
-          /^\d{8}-\d{6}(-\d+)?\.jsonl$/.test(name.slice(stem.length + 1))
-      )
-    )
-      continue;
+    if (!isDir && segmentStems.some((stem) => isRotatedSegmentName(name, stem))) continue;
     uncovered.push(`active/shared/runtime/${name}`);
   }
   return uncovered;

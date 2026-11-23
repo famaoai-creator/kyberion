@@ -104,6 +104,7 @@ import {
   isAuditChainDayFile,
   auditChainDayMirrors,
   expireAuditChainDay,
+  isRotatedSegmentName,
   type ExpiryOutcome,
 } from './storage-retention-expiry.js';
 export {
@@ -114,6 +115,7 @@ export {
   DEFAULT_ROTATE_MIN_BYTES,
   DEFAULT_COMPACT_MIN_BYTES,
   ROTATED_SEGMENT_SUFFIX_PATTERN,
+  isRotatedSegmentName,
   DEFAULT_TRASH_GRACE_DAYS,
   TRASH_INDEX_FILENAME,
   appendRetentionAudit,
@@ -179,6 +181,8 @@ export interface ScanTmpResult {
   /** Expired files moved to `active/archive/<repo-rel>` by an `archive` entry. */
   archived: string[];
   codeGrace?: ReturnType<typeof reportScratchCodeGrace>; // dirs held by code_grace_days
+  /** Expired files kept because their expiry (e.g. its audit record) failed. */
+  errors?: string[];
 }
 
 export interface RotateLogsOptions {
@@ -195,17 +199,25 @@ export interface RotateLogsResult {
   softDeleted: string[];
   /** Expired files moved to `active/archive/<repo-rel>` by an `archive` entry. */
   archived: string[];
-  /** Audit chain days that could not be expired as a whole (left live). */
+  /** Expired files (incl. whole audit chain days) kept because their expiry failed. */
   errors?: string[];
 }
 
 export interface ScanDataVaultOptions {
   dryRun: boolean;
+  /** Preloaded retention catalog; loaded on demand when omitted. */
+  catalog?: LoadedRetentionCatalog;
 }
 
 export interface ScanDataVaultResult {
   expired: string[];
   deleted: string[];
+  /** Expired entries moved to `active/archive/.trash/` (catalog `soft_delete_days`). */
+  softDeleted: string[];
+  /** Expired entries moved to `active/archive/<repo-rel>` (catalog `action: archive`). */
+  archived: string[];
+  /** Expired entries left in place because their expiry (or its audit record) failed. */
+  errors?: string[];
 }
 
 export interface ScanRuntimeResult {
@@ -215,6 +227,8 @@ export interface ScanRuntimeResult {
   softDeleted: string[];
   /** Expired files moved to `active/archive/<repo-rel>` by an `archive` entry. */
   archived: string[];
+  /** Expired files kept because their expiry (e.g. its audit record) failed. */
+  errors?: string[];
 }
 
 /** AL-04 trash sweep result — see `sweepTrash`. */
@@ -345,6 +359,45 @@ export interface LegacyJanitorReport {
   removed: number;
 }
 
+/**
+ * Expire one file through {@link expireFilePerPolicy}. A failure — notably an
+ * audit record that could not be written (audit-first) — leaves the file in
+ * place and is recorded as `<repo-rel>: <why>` for the janitor report.
+ */
+function expireOrRecord(
+  filePath: string,
+  entry: RetentionCatalogEntry | null,
+  outcome: ExpiryOutcome,
+  errors: string[],
+  auditExtra?: Record<string, unknown>
+): void {
+  try {
+    expireFilePerPolicy(filePath, entry, outcome, auditExtra);
+  } catch (err) {
+    errors.push(expiryFailure(filePath, err));
+  }
+}
+
+function expiryFailure(filePath: string, err: unknown): string {
+  const repoRel = repoRelativePosix(filePath);
+  const message = err instanceof Error ? err.message : String(err);
+  return message.startsWith(repoRel) ? message : `${repoRel}: ${message}`;
+}
+
+/** One summary line per sweep instead of a warn per kept file. */
+function warnKeptExpiries(scanner: string, errors: readonly string[]): void {
+  if (errors.length === 0) return;
+  logger.warn(
+    `[JANITOR] ${scanner}: ${errors.length} expired file(s) kept — expiry failed | next: fix the cause (e.g. make the retention audit log appendable); the next sweep retries | evidence: first: ${errors[0]}`
+  );
+}
+
+/** Spread into a scanner result: `errors` only when something was kept. */
+function withErrors(scanner: string, errors: string[]): { errors?: string[] } {
+  warnKeptExpiries(scanner, errors);
+  return errors.length > 0 ? { errors } : {};
+}
+
 export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
   const catalog = opts.catalog ?? loadRetentionCatalog();
   const entry = retentionEntryForExactPath(catalog, 'active/shared/tmp');
@@ -353,17 +406,14 @@ export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
   const dir = sharedTmp();
   const now = Date.now();
   const expired: string[] = [];
+  const errors: string[] = [];
   const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
 
   const selection = selectExpiredTmpFiles(collectFiles(dir), ttlMs, now, entry?.code_grace_days);
   for (const filePath of selection.expired) {
     expired.push(filePath);
     if (opts.dryRun) continue;
-    try {
-      expireFilePerPolicy(filePath, entry, outcome);
-    } catch {
-      // skip
-    }
+    expireOrRecord(filePath, entry, outcome, errors);
   }
 
   // collectFiles only sees files, so job-scoped directories under tmp/ never
@@ -412,13 +462,19 @@ export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
     softDeleted: outcome.softDeleted,
     archived: outcome.archived,
     codeGrace: reportScratchCodeGrace(selection.grace, now, opts.dryRun),
+    ...withErrors('tmp', errors),
   };
 }
 
 export function rotateLogs(opts: RotateLogsOptions): RotateLogsResult {
   const catalog = opts.catalog ?? loadRetentionCatalog();
   const entry = retentionEntryForExactPath(catalog, 'active/shared/logs');
-  const fallbackRetentionDays =
+  // TTL precedence, uniform across scanners (scanTmp `ttlMs`,
+  // sweepSupervisorEventFiles `retentionDays`): explicit option > the catalog
+  // entry's ttl_days > the built-in default. Here it resolves the TTL of files
+  // governed by the logs ROOT entry; a nested entry (e.g. `logs/audit`) is a
+  // separate policy and always keeps its own ttl_days / action.
+  const rootRetentionDays =
     opts.retentionDays ??
     retentionTtlDaysForPath(catalog, 'active/shared/logs') ??
     DEFAULT_LOG_RETENTION_DAYS;
@@ -438,11 +494,10 @@ export function rotateLogs(opts: RotateLogsOptions): RotateLogsResult {
       // entries — never expire a file from this sweep.
       const fileEntry = retentionEntryForPath(catalog, repoRelativePosix(filePath)) ?? entry;
       if (!fileEntry || (fileEntry.action !== 'delete' && fileEntry.action !== 'archive')) continue;
-      // The fallback (catalog `logs` TTL, else the built-in 30d) applies only
+      // The root TTL (option > catalog `logs` TTL > built-in 30d) applies only
       // to files still governed by the logs root entry itself; a nested
       // note-only entry without ttl_days means "no expiry declared".
-      const ttlDays =
-        fileEntry.ttl_days ?? (fileEntry === entry ? fallbackRetentionDays : undefined);
+      const ttlDays = fileEntry === entry ? rootRetentionDays : fileEntry.ttl_days;
       if (ttlDays === undefined) continue;
       const stat = safeStat(filePath);
       if (now - stat.mtimeMs > ttlDays * RETENTION_DAY_MS) {
@@ -459,7 +514,7 @@ export function rotateLogs(opts: RotateLogsOptions): RotateLogsResult {
             }
           }
         } else if (!opts.dryRun) {
-          expireFilePerPolicy(filePath, fileEntry, outcome);
+          expireOrRecord(filePath, fileEntry, outcome, errors);
         }
       }
     } catch {
@@ -472,34 +527,54 @@ export function rotateLogs(opts: RotateLogsOptions): RotateLogsResult {
     rotated: outcome.deleted,
     softDeleted: outcome.softDeleted,
     archived: outcome.archived,
-    ...(errors.length > 0 ? { errors } : {}),
+    ...withErrors('logs', errors),
   };
 }
 
+/**
+ * Expire data-vault entries whose own `expiresAt` has passed. Disposal goes
+ * through {@link expireFilePerPolicy} under the catalog's
+ * `active/shared/data-vault` entry, like every other janitor expiry (so a
+ * declared `soft_delete_days` / `archive` is honored). Each expiry is always
+ * written to the retention audit: the trigger is the entry's self-declared
+ * `expiresAt`, not a catalog TTL, so the audit record is the only trace of
+ * why it went.
+ */
 export function scanDataVault(opts: ScanDataVaultOptions): ScanDataVaultResult {
+  const catalog = opts.catalog ?? loadRetentionCatalog();
+  const policy = retentionEntryForExactPath(catalog, 'active/shared/data-vault');
   const dir = shared('data-vault');
   const expired: string[] = [];
-  const deleted: string[] = [];
+  const errors: string[] = [];
+  const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
 
   const files = collectFiles(dir);
   for (const filePath of files) {
     if (!filePath.endsWith('.json')) continue;
+    let entry: ReturnType<typeof loadVaultEntryAtPath>;
     try {
       if (!safeExistsSync(filePath)) continue;
-      const entry = loadVaultEntryAtPath(filePath);
-      if (entry?.expiresAt && Date.parse(entry.expiresAt) <= Date.now()) {
-        expired.push(filePath);
-        if (!opts.dryRun) {
-          safeUnlinkSync(filePath);
-          deleted.push(filePath);
-        }
-      }
+      entry = loadVaultEntryAtPath(filePath);
     } catch {
-      // skip malformed entries
+      continue; // skip malformed entries
     }
+    if (!entry?.expiresAt || Date.parse(entry.expiresAt) > Date.now()) continue;
+    expired.push(filePath);
+    if (opts.dryRun) continue;
+    // Audit-first: a failed expiry keeps the entry and is retried next sweep.
+    expireOrRecord(filePath, policy, outcome, errors, {
+      expires_at: entry.expiresAt,
+      reason: 'data-vault entry expiresAt elapsed (storage janitor)',
+    });
   }
 
-  return { expired, deleted };
+  return {
+    expired,
+    deleted: outcome.deleted,
+    softDeleted: outcome.softDeleted,
+    archived: outcome.archived,
+    ...withErrors('data-vault', errors),
+  };
 }
 
 export function scanRuntime(opts: {
@@ -508,6 +583,7 @@ export function scanRuntime(opts: {
 }): ScanRuntimeResult {
   const now = Date.now();
   const expired: string[] = [];
+  const errors: string[] = [];
   const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
 
   const rules = runtimeRetentionRules(opts.catalog ?? loadRetentionCatalog());
@@ -519,11 +595,11 @@ export function scanRuntime(opts: {
         if (now - stat.mtimeMs > rule.ttlMs) {
           expired.push(filePath);
           if (!opts.dryRun) {
-            expireFilePerPolicy(filePath, rule.entry, outcome);
+            expireOrRecord(filePath, rule.entry, outcome, errors);
           }
         }
       } catch {
-        // skip
+        // skip (unreadable file)
       }
     }
   }
@@ -533,6 +609,7 @@ export function scanRuntime(opts: {
     deleted: outcome.deleted,
     softDeleted: outcome.softDeleted,
     archived: outcome.archived,
+    ...withErrors('runtime', errors),
   };
 }
 
@@ -553,7 +630,12 @@ export function scanEventStores(opts: {
   catalog?: LoadedRetentionCatalog;
 }): ScanRuntimeResult {
   const catalog = opts.catalog ?? loadRetentionCatalog();
-  return sweepRepoRootedRules(eventStoreRetentionRules(catalog), catalog, opts.dryRun);
+  return sweepRepoRootedRules(
+    'event-stores',
+    eventStoreRetentionRules(catalog),
+    catalog,
+    opts.dryRun
+  );
 }
 
 /**
@@ -566,16 +648,23 @@ export function scanStorageFloors(opts: {
   catalog?: LoadedRetentionCatalog;
 }): ScanRuntimeResult {
   const catalog = opts.catalog ?? loadRetentionCatalog();
-  return sweepRepoRootedRules(storageFloorRetentionRules(catalog), catalog, opts.dryRun);
+  return sweepRepoRootedRules(
+    'storage-floors',
+    storageFloorRetentionRules(catalog),
+    catalog,
+    opts.dryRun
+  );
 }
 
 function sweepRepoRootedRules(
+  scanner: string,
   rules: Array<{ repoRelativeDir: string; ttlMs: number; entry: RetentionCatalogEntry }>,
   catalog: LoadedRetentionCatalog,
   dryRun: boolean
 ): ScanRuntimeResult {
   const now = Date.now();
   const expired: string[] = [];
+  const errors: string[] = [];
   const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
   for (const rule of rules) {
     const dir = nodePath.join(rootDir(), rule.repoRelativeDir);
@@ -611,11 +700,11 @@ function sweepRepoRootedRules(
         if (now - stat.mtimeMs > rule.ttlMs) {
           expired.push(filePath);
           if (!dryRun) {
-            expireFilePerPolicy(filePath, rule.entry, outcome);
+            expireOrRecord(filePath, rule.entry, outcome, errors);
           }
         }
       } catch {
-        // skip
+        // skip (unreadable file)
       }
     }
   }
@@ -625,6 +714,7 @@ function sweepRepoRootedRules(
     deleted: outcome.deleted,
     softDeleted: outcome.softDeleted,
     archived: outcome.archived,
+    ...withErrors(scanner, errors),
   };
 }
 
@@ -693,6 +783,7 @@ function sweepStatusRulesInContext(opts: {
   const catalog = opts.catalog ?? loadRetentionCatalog();
   const now = Date.now();
   const expired: string[] = [];
+  const errors: string[] = [];
   const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
 
   for (const { entry, rule } of catalogStatusRules(catalog)) {
@@ -721,7 +812,7 @@ function sweepStatusRulesInContext(opts: {
           continue;
         }
         expired.push(filePath);
-        expireFilePerPolicy(filePath, entry, outcome, {
+        expireOrRecord(filePath, entry, outcome, errors, {
           status_rule_id: rule.id,
           status,
           status_field: rule.status_field,
@@ -739,6 +830,7 @@ function sweepStatusRulesInContext(opts: {
     deleted: outcome.deleted,
     softDeleted: outcome.softDeleted,
     archived: outcome.archived,
+    ...withErrors('status-rules', errors),
   };
 }
 
@@ -774,6 +866,7 @@ export function sweepSupervisorEventFiles(
   const retentionMs = retentionDays * RETENTION_DAY_MS;
   const now = Date.now();
   const expired: string[] = [];
+  const errors: string[] = [];
   const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
 
   const files = listSupervisorEventFiles({
@@ -788,11 +881,11 @@ export function sweepSupervisorEventFiles(
       if (now - stat.mtimeMs > retentionMs) {
         expired.push(file.path);
         if (!opts.dryRun) {
-          expireFilePerPolicy(file.path, entry, outcome);
+          expireOrRecord(file.path, entry, outcome, errors);
         }
       }
     } catch {
-      // skip
+      // skip (unreadable file)
     }
   }
 
@@ -801,6 +894,7 @@ export function sweepSupervisorEventFiles(
     deleted: outcome.deleted,
     softDeleted: outcome.softDeleted,
     archived: outcome.archived,
+    ...withErrors('supervisor-events', errors),
   };
 }
 
@@ -852,7 +946,7 @@ export function listUncoveredEventStoreDirs(catalog?: LoadedRetentionCatalog): s
  *
  *  - `rotate`: when the live file exceeds `rotate_min_bytes` (default
  *    {@link DEFAULT_ROTATE_MIN_BYTES}) it is renamed to a
- *    `<stem>-YYYYMMDD-HHmmss.jsonl` sibling. Writers reopen the canonical
+ *    `<stem>-YYYYMMDD-HHmmss[-<n>].jsonl` sibling. Writers reopen the canonical
  *    path per append, so appends continue uninterrupted. Segments past
  *    `ttl_days` are expired through {@link expireFilePerPolicy} with the
  *    entry's `segment_action` (default `delete`, `archive` for
@@ -860,9 +954,13 @@ export function listUncoveredEventStoreDirs(catalog?: LoadedRetentionCatalog): s
  *  - `compact`: when the file exceeds `compact_min_bytes` (default
  *    {@link DEFAULT_COMPACT_MIN_BYTES}) it is folded to the last record per
  *    `compact_key` (order of last appearance preserved; keyless records are
- *    kept verbatim). The pre-compaction file is first copied under
- *    `active/archive/jsonl-compaction/<repo-rel>.<stamp>.jsonl`, then the
- *    live file is rewritten through safeWriteFile's atomic temp+rename.
+ *    kept verbatim) by `compactStoreByKey`'s parked rewrite: the live file
+ *    is moved aside to a `.compacting-*` staging sibling, the survivors are
+ *    published back with an exclusive link (re-parking and merging any live
+ *    file a writer recreated meanwhile), and the raw union of the parked
+ *    copies is archived under
+ *    `active/archive/jsonl-compaction/<repo-rel-dir>/<stem>.<stamp>Z-<pid>.jsonl`
+ *    before the staging siblings are removed (see append-only-store.ts).
  *  - `self_managed: true` (either action): the writer owns live-file
  *    retention under its own lock (the trigger journal's 7-day dedupe
  *    window), so the janitor never rotates or compacts the live file and
@@ -1038,20 +1136,18 @@ export function sweepAppendOnlyStores(opts: {
             action: entry.segment_action ?? 'delete',
           };
           for (const name of safeReaddir(dir)) {
-            if (!name.startsWith(`${stem}-`)) continue;
-            const suffix = name.slice(stem.length + 1);
-            if (!/^\d{8}-\d{6}(-\d+)?\.jsonl$/.test(suffix)) continue;
+            if (!isRotatedSegmentName(name, stem)) continue;
             const segmentPath = nodePath.join(dir, name);
             try {
               const stat = safeStat(segmentPath);
               if (nowMs - stat.mtimeMs > entry.ttl_days * RETENTION_DAY_MS) {
                 result.segmentsExpired.push(segmentPath);
                 if (!opts.dryRun) {
-                  expireFilePerPolicy(segmentPath, segmentEntry, segmentOutcome);
+                  expireOrRecord(segmentPath, segmentEntry, segmentOutcome, result.errors);
                 }
               }
             } catch {
-              // skip
+              // skip (unreadable segment)
             }
           }
           result.segmentsDeleted.push(...segmentOutcome.deleted);
@@ -1445,6 +1541,7 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
   let tmpResult: ScanTmpResult = { expired: [], deleted: [], softDeleted: [], archived: [] };
   try {
     tmpResult = scanTmp({ dryRun: opts.dryRun, catalog });
+    for (const failure of tmpResult.errors ?? []) errors.push(`tmp: ${failure}`);
   } catch (err: any) {
     errors.push(`tmp: ${err?.message ?? String(err)}`);
   }
@@ -1457,9 +1554,15 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
     errors.push(`logs: ${err?.message ?? String(err)}`);
   }
 
-  let vaultResult: ScanDataVaultResult = { expired: [], deleted: [] };
+  let vaultResult: ScanDataVaultResult = {
+    expired: [],
+    deleted: [],
+    softDeleted: [],
+    archived: [],
+  };
   try {
-    vaultResult = scanDataVault({ dryRun: opts.dryRun });
+    vaultResult = scanDataVault({ dryRun: opts.dryRun, catalog });
+    for (const failure of vaultResult.errors ?? []) errors.push(`data-vault: ${failure}`);
   } catch (err: any) {
     errors.push(`data-vault: ${err?.message ?? String(err)}`);
   }
@@ -1472,6 +1575,7 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
   };
   try {
     runtimeResult = scanRuntime({ dryRun: opts.dryRun, catalog });
+    for (const failure of runtimeResult.errors ?? []) errors.push(`runtime: ${failure}`);
   } catch (err: any) {
     errors.push(`runtime: ${err?.message ?? String(err)}`);
   }
@@ -1484,6 +1588,7 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
   };
   try {
     eventStoreResult = scanEventStores({ dryRun: opts.dryRun, catalog });
+    for (const failure of eventStoreResult.errors ?? []) errors.push(`event-stores: ${failure}`);
   } catch (err: any) {
     errors.push(`event-stores: ${err?.message ?? String(err)}`);
   }
@@ -1496,6 +1601,8 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
   };
   try {
     storageFloorResult = scanStorageFloors({ dryRun: opts.dryRun, catalog });
+    for (const failure of storageFloorResult.errors ?? [])
+      errors.push(`storage-floors: ${failure}`);
   } catch (err: any) {
     errors.push(`storage-floors: ${err?.message ?? String(err)}`);
   }
@@ -1508,6 +1615,8 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
   };
   try {
     supervisorEventsResult = sweepSupervisorEventFiles({ dryRun: opts.dryRun, catalog });
+    for (const failure of supervisorEventsResult.errors ?? [])
+      errors.push(`supervisor-events: ${failure}`);
   } catch (err: any) {
     errors.push(`supervisor-events: ${err?.message ?? String(err)}`);
   }
@@ -1520,6 +1629,7 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
   };
   try {
     statusRulesResult = sweepStatusRules({ dryRun: opts.dryRun, catalog });
+    for (const failure of statusRulesResult.errors ?? []) errors.push(`status-rules: ${failure}`);
   } catch (err: any) {
     errors.push(`status-rules: ${err?.message ?? String(err)}`);
   }
@@ -1679,6 +1789,7 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
     softDeleted:
       tmpResult.softDeleted.length +
       logResult.softDeleted.length +
+      vaultResult.softDeleted.length +
       runtimeResult.softDeleted.length +
       eventStoreResult.softDeleted.length +
       storageFloorResult.softDeleted.length +

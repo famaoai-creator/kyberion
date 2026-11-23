@@ -172,6 +172,47 @@ describe('storage-retention-catalog', () => {
       const validate = ajv.compile(schema);
       expect(validate({ version: '1.0.0', entries: [...BUILTIN_RETENTION_DEFAULTS] })).toBe(true);
     });
+
+    /**
+     * C-ESS-007: the built-in fallback must mirror the shipped catalog's
+     * protective semantics, so an unreadable catalog never widens deletion.
+     */
+    // Every field except the free-text note is retention-relevant (action,
+    // TTLs, grace, audit, backup, segment/self-managed handling, …).
+    const retentionFields = (e: object | null | undefined) => {
+      if (!e) return e;
+      const { note: _note, ...rest } = e as Record<string, unknown>;
+      return rest;
+    };
+
+    it('builtin defaults mirror the shipped catalog entry-for-entry (all fields but note)', () => {
+      const loaded = loadRetentionCatalog({ catalogPath: SEEDED_CATALOG });
+      for (const builtin of BUILTIN_RETENTION_DEFAULTS) {
+        const shipped = retentionEntryForExactPath(loaded, builtin.path);
+        expect(shipped, `${builtin.path} is not in the shipped catalog`).not.toBeNull();
+        expect(retentionFields(builtin), builtin.path).toEqual(retentionFields(shipped));
+      }
+    });
+
+    it('every shipped entry under a root the fallback acts on has an identical builtin twin', () => {
+      // Longest-prefix resolution means a missing nested entry would let the
+      // fallback's parent rule govern a subtree the catalog protects — the
+      // fallback must never delete more than the catalog would.
+      const loaded = loadRetentionCatalog({ catalogPath: SEEDED_CATALOG });
+      const builtinByPath = new Map(BUILTIN_RETENTION_DEFAULTS.map((e) => [e.path, e]));
+      const roots = [...builtinByPath.keys()];
+      for (const entry of loaded.entries) {
+        if (!roots.some((root) => entry.path === root || entry.path.startsWith(`${root}/`))) {
+          continue;
+        }
+        expect(retentionFields(builtinByPath.get(entry.path)), entry.path).toEqual(
+          retentionFields(entry)
+        );
+      }
+      for (const p of ['active/shared/staging', 'active/audit', 'active/archive']) {
+        expect(builtinByPath.has(p), p).toBe(true);
+      }
+    });
   });
 
   describe('WI-16: status_rules vocabulary', () => {

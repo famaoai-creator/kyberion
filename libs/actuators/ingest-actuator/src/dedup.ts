@@ -138,7 +138,8 @@ export function lookupIngestRegistry(
   return supersedesCandidate ? { supersedesCandidate } : {};
 }
 
-function registryLockId(absPath: string): string {
+/** Lock id shared with core scope offboarding (`ingestDedupRegistryLockId`); a parity test pins them together. */
+export function registryLockId(absPath: string): string {
   return `ingest-content-hash-registry-${createHash('sha256').update(absPath).digest('hex').slice(0, 32)}`;
 }
 

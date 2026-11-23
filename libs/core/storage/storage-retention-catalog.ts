@@ -227,24 +227,86 @@ function retentionCatalogSchemaPath(): string {
 }
 
 /**
- * Mirrors the pre-AL-01 in-code constants exactly (behavior-unchanged
- * fallback): tmp 24h, logs 30d, browser-receipts 90d, procedure-deltas 14d,
- * a2a-conversations 30d, data-vault self-expiring.
+ * Fail-safe fallback used when the governance catalog cannot be loaded. It
+ * mirrors the shipped catalog's retention semantics for every floor the
+ * janitor sweeps on its own (tmp incl. code grace, staging, cache partitions,
+ * logs with the archived audit subtree) plus the runtime TTLs the pre-AL-01
+ * constants carried, and declares `active/audit` / `active/archive`
+ * `review_required` (with their nested ledger and trash entries) — so an
+ * unreadable catalog never widens deletion beyond what the catalog itself
+ * allows. Anything the shipped catalog governs outside these roots (other
+ * runtime / event-store entries, other append-only stores) is simply kept.
+ * `storage-retention-catalog.test.ts` pins every entry to the shipped catalog
+ * and requires a twin for every shipped entry nested under one of these roots.
  */
 export const BUILTIN_RETENTION_DEFAULTS: readonly RetentionCatalogEntry[] = Object.freeze([
   {
     path: 'active/shared/tmp',
     artifact_class: 'tmp',
     ttl_days: 1,
+    code_grace_days: 2,
     action: 'delete',
-    note: 'formerly DEFAULT_TMP_TTL_MS (24h)',
+    note: 'formerly DEFAULT_TMP_TTL_MS (24h); unpromoted authored code keeps a 2-day grace',
   },
+  {
+    path: 'active/shared/staging',
+    artifact_class: 'tmp',
+    ttl_days: 3,
+    action: 'delete',
+  },
+  {
+    path: 'active/shared/cache',
+    artifact_class: 'cache',
+    action: 'delete',
+    note: 'root carries no TTL; legacy root files are self-managed by their writer',
+  },
+  { path: 'active/shared/cache/system', artifact_class: 'cache', ttl_days: 30, action: 'delete' },
+  {
+    path: 'active/shared/cache/system/tool-runtimes',
+    artifact_class: 'cache',
+    action: 'review_required',
+  },
+  { path: 'active/shared/cache/public', artifact_class: 'cache', ttl_days: 30, action: 'delete' },
+  {
+    path: 'active/shared/cache/confidential',
+    artifact_class: 'cache',
+    ttl_days: 30,
+    action: 'delete',
+  },
+  { path: 'active/shared/cache/personal', artifact_class: 'cache', ttl_days: 30, action: 'delete' },
   {
     path: 'active/shared/logs',
     artifact_class: 'log',
     ttl_days: 30,
     action: 'delete',
     note: 'formerly DEFAULT_LOG_RETENTION_DAYS',
+  },
+  {
+    path: 'active/shared/logs/audit',
+    artifact_class: 'evidence',
+    ttl_days: 90,
+    action: 'archive',
+    audit: true,
+    note: 'audit evidence is archived, never unlinked (overrides the logs-root delete)',
+  },
+  { path: 'active/audit', artifact_class: 'evidence', action: 'review_required' },
+  {
+    path: 'active/audit/system-ledger.jsonl',
+    artifact_class: 'evidence',
+    action: 'rotate',
+    self_managed: true,
+    ttl_days: 365,
+    segment_action: 'archive',
+    audit: true,
+    note: 'writer-rotated hash-chained ledger; expired segments are archived with a receipt',
+  },
+  { path: 'active/archive', artifact_class: 'evidence', action: 'review_required' },
+  {
+    path: 'active/archive/.trash',
+    artifact_class: 'tmp',
+    action: 'delete',
+    backup: 'exclude',
+    note: 'soft-delete grace floor (purged by the trash sweep)',
   },
   {
     path: 'active/shared/runtime/browser-receipts',
@@ -270,6 +332,7 @@ export const BUILTIN_RETENTION_DEFAULTS: readonly RetentionCatalogEntry[] = Obje
     path: 'active/shared/data-vault',
     artifact_class: 'cache',
     action: 'delete',
+    backup: 'exclude',
     note: 'self-expiring: each JSON entry carries its own expiresAt honored per-file by the janitor',
   },
 ]) as readonly RetentionCatalogEntry[];
@@ -643,15 +706,23 @@ export function eventStoreRetentionRules(
 }
 
 /**
- * Immediate subdirectories of each event-store prefix that the catalog covers.
- * The janitor reports the rest, so a newly added event stream cannot quietly
- * inherit forever-retention.
+ * Event-store directories the catalog covers, for the janitor's uncovered
+ * report: each event-store entry's own path, plus the immediate subdirectory
+ * of its prefix that the entry sits under (`<prefix>/a/b` also covers
+ * `<prefix>/a`) — the same top-level rule as {@link coveredRuntimeSubdirs}.
+ * The janitor reports the immediate subdirectories not in this set, so a
+ * newly added event stream cannot quietly inherit forever-retention.
  */
 export function coveredEventStoreDirs(catalog: LoadedRetentionCatalog): Set<string> {
   const covered = new Set<string>();
   for (const entry of catalog.entries) {
     if (!isEventStorePath(entry.path)) continue;
     covered.add(entry.path);
+    for (const prefix of EVENT_STORE_PREFIXES) {
+      if (!entry.path.startsWith(`${prefix}/`)) continue;
+      const first = entry.path.slice(prefix.length + 1).split('/')[0];
+      if (first) covered.add(`${prefix}/${first}`);
+    }
   }
   return covered;
 }

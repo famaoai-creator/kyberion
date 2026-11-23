@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '../secure-io.js';
-import { getAllFiles } from './fs-utils.js';
+import { getAllFiles, mapAsync } from './fs-utils.js';
 
 const rootDir = pathResolver.sharedTmp('fs-utils-symlink-test');
 
@@ -39,4 +39,37 @@ describe('fs-utils traversal', () => {
       else process.env.MISSION_ROLE = saved.role;
     }
   });
+});
+
+describe('mapAsync concurrency (C-FSU-004)', () => {
+  it('maps every item in input order within the concurrency limit', async () => {
+    let active = 0;
+    let peak = 0;
+    const out = await mapAsync([1, 2, 3, 4, 5], 2, async (n) => {
+      active++;
+      peak = Math.max(peak, active);
+      // Yield so the other workers start before this one finishes.
+      await Promise.resolve();
+      await Promise.resolve();
+      active--;
+      return n * 10;
+    });
+    expect(out).toEqual([10, 20, 30, 40, 50]);
+    expect(peak).toBeLessThanOrEqual(2);
+    expect(await mapAsync([], 3, async (n: number) => n)).toEqual([]);
+  });
+
+  it.each([0, -1, Number.NaN, 1.5])(
+    'rejects concurrency %s with a clear error instead of skipping the work',
+    async (concurrency) => {
+      const seen: number[] = [];
+      await expect(
+        mapAsync([1, 2], concurrency, async (n) => {
+          seen.push(n);
+          return n;
+        })
+      ).rejects.toThrow(/mapAsync: concurrency must be a positive integer/);
+      expect(seen).toEqual([]);
+    }
+  );
 });

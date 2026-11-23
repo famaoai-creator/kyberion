@@ -43,10 +43,6 @@ export interface VaultEntryFilter {
   sourceType?: string;
   projectId?: string;
   includeExpired?: boolean;
-  /** @deprecated use sourceType */
-  vault_id?: string;
-  /** @deprecated use key */
-  cache_key?: string;
   tier?: DataVaultTier;
 }
 
@@ -201,8 +197,11 @@ export async function fetchWithVaultCache<T>(
   }
   const filePath = entryFilePath(sourceType, key, projectId);
 
+  // The entry file is keyed by (sourceType, projectId, key) only, so a hit
+  // must also match the requested tier: an entry cached under another tier is
+  // a miss and is replaced by the loader's result under the requested tier.
   const cached = readEntryFile<T>(filePath);
-  if (cached && !isExpired(cached)) {
+  if (cached && !isExpired(cached) && cached.tier === tier) {
     logger.info(`[DATA-VAULT] cache hit: ${sourceType}:${key}`);
     return { data: cached.data, fromCache: true, entry: cached };
   }

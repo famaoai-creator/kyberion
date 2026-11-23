@@ -9,7 +9,8 @@ workflow_ids: [reverse-spec-extraction]
 
 # Engineering Reverse Spec Playbook
 
-Use mission type `reverse_spec` (class `code_change`) to turn an existing code base — one with
+Use mission type `reverse_spec` (class `code_change`; pass `--mission-type reverse_spec` to
+`mission create` — the type is fixed there) to turn an existing code base — one with
 no specification, a stale one, or a black box — into specifications an AI agent can rely on.
 The `reverse-spec-extraction` workflow binds this playbook. Its output feeds either maintenance
 (answering "what does the system do today, and what breaks if I change X?") or a rebuild through
@@ -62,7 +63,10 @@ checker exits 0, never when an agent says so.
    **Tooling.** Instantiate the
    [`reverse-spec-code-graph`](../pipeline-templates/reverse-spec-code-graph.json) pipeline
    template (op `modeling:extract_code_graph`), passing `mission_evidence_dir`, `source_root`
-   and the scope exclusions as `exclude`. Route A parses each file with web-tree-sitter and runs
+   and the scope exclusions as `exclude`. Its final write lands in the mission directory, so run it
+   with an operator persona that may write mission evidence (`KYBERION_BASE_ROLE` exported in the
+   shell; pnpm scripts do not read `.env.local`); without one the write is refused. `exclude`
+   matches path prefixes, not globs, so list test files one by one. Route A parses each file with web-tree-sitter and runs
    the marker queries; route B scans the same files with each marker's line pattern. Rules live
    in [`code-graph-enumeration-rules.json`](../governance/code-graph-enumeration-rules.json):
    TypeScript/TSX, JavaScript, Python, Java, Scala, C#, PHP, Rust, Go, Ruby, C and C++ (official
@@ -130,7 +134,10 @@ widening the scope.
 ## Human holds
 
 The workflow stops for a person at scope confirmation, at the denominator freeze and at
-delivery (`human_override`). Also stop and raise a decision when: the denominator would shrink
+delivery (`human_override`). These holds are enforced only when
+`KYBERION_GATE_OVERRIDE_SIGNATURE=enforce`: in the default `warn` mode an unsigned override passes
+with a warning, and the task auto-completes on `record-evidence`. Until enforcement is on, the
+mission owner stops at each hold and gets the person's confirmation before recording the task. Also stop and raise a decision when: the denominator would shrink
 or change after the freeze; a document conflicts with the code at the design level (not a single
 drift); the same contradiction has three hypotheses or spans two sessions; a large piece of work
 appears that is not in the plan; or verification does not converge in three rounds.
