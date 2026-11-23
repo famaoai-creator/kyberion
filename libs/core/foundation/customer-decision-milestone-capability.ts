@@ -3,6 +3,8 @@ import {
   createSynchronousResourceGrantIssuer,
   currentResourceAccessScope,
   decideResourceAccess,
+  isContentMutatingResourceAccessOperation,
+  isMetadataAncestorAccess,
   type ResourceAccessOperation,
   type ResourceAccessScope,
 } from './resource-access-scope.js';
@@ -218,7 +220,7 @@ export function customerDecisionMilestoneGrantAllows(
   if (!scope || !isCustomerDecisionMilestoneCapability(scope)) return false;
   const root = `knowledge/confidential/${scope.tenantSlug}/decisions`;
   const under = target === root || target.startsWith(root + '/');
-  const ancestor = operation === 'metadata' && root.startsWith(target + '/');
+  const ancestor = isMetadataAncestorAccess(operation, root, target);
   if (!under && !ancestor) return false;
   return decideResourceAccess(scope, target, operation).allowed;
 }
@@ -236,7 +238,7 @@ registerStoreGrant({
   active: customerDecisionMilestoneGrantActive,
   authorizes: (target, operation) => customerDecisionMilestoneGrantAllows(target, operation),
   narrowing: ({ relativePath, operation, scope, content, readRepoFile }) =>
-    (operation === 'write' || operation === 'append') &&
+    isContentMutatingResourceAccessOperation(operation) &&
     !storeGrantActive('customer-decision-consumer') &&
     customerDecisionMilestoneGrantActive()
       ? caseRecordWriteDenial(

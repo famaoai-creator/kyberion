@@ -25,6 +25,10 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { parseNhiId } from '../contracts/nhi-id.js';
 import { isValidMemberId } from '../foundation/scope.js';
 import { STORAGE_FLOOR_ROOTS } from '../foundation/runtime-state-roots.js';
+import {
+  isContentMutatingResourceAccessOperation,
+  type ResourceAccessOperation,
+} from '../foundation/resource-access-scope.js';
 import { registerStoreGrant } from '../foundation/store-grant-registry.js';
 
 /**
@@ -169,11 +173,11 @@ export function withPersonCharterStoreAccess<T>(
 }
 export function personCharterResourceAccessAllowed(
   target: string,
-  operation: 'read' | 'write' | 'append' | 'mkdir' | 'metadata'
+  operation: ResourceAccessOperation
 ): boolean {
   const scope = liveGrant();
   if (!scope) return false;
-  return operation === 'write' || operation === 'append'
+  return isContentMutatingResourceAccessOperation(operation)
     ? scope.write.includes(target)
     : operation === 'mkdir'
       ? scope.mkdir.includes(target)
@@ -239,7 +243,7 @@ function effectiveRoot(target: string): boolean {
  */
 export function personCharterIoAllowed(
   target: string,
-  operation: 'read' | 'write' | 'append' | 'mkdir' | 'metadata'
+  operation: ResourceAccessOperation
 ): boolean {
   const grant = liveGrant();
   if (!grant) return true;
@@ -253,7 +257,7 @@ export function personCharterIoAllowed(
 /** Does the live grant authorize this I/O? Exactly what its narrowing admits. */
 export function personCharterGrantAuthorizes(
   target: string,
-  operation: 'read' | 'write' | 'append' | 'mkdir' | 'metadata'
+  operation: ResourceAccessOperation
 ): boolean {
   return Boolean(liveGrant()) && personCharterIoAllowed(target, operation);
 }

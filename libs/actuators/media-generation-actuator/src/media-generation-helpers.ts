@@ -2,6 +2,7 @@ import { safeWriteFile, safeCopyFileSync, safeExistsSync, safeMkdir } from '@age
 import { hostNodePlatform } from '@agent/core/platform-facts';
 import { executeServicePreset } from '@agent/core/service/service-engine';
 import { runExternalOperation } from '@agent/core/governance/external-operation';
+import { isDelegableExternalOperation } from '@agent/core/governance/external-operation-target';
 import { pathResolver } from '@agent/core/path-resolver';
 import { loadRecoveryPolicy as loadCoreRecoveryPolicy } from '@agent/core/recovery-policy';
 import { defineActuatorPipelineBase } from '@agent/core/actuator/actuator-sdk';
@@ -863,7 +864,7 @@ async function executePreparedGeneration(
       effect: { backend: resolveGenerationBackend(action, prepared.params), params },
       requiresApproval: true,
       // Grants pin the resolved backend_id — 'may generate on backend X'.
-      delegable: true,
+      delegable: isDelegableExternalOperation(`media:generation:${action}`),
     },
     () => executeServicePreset('media-generation', action, params),
     (receipt) =>

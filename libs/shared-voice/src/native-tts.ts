@@ -22,6 +22,7 @@
 
 import { spawn } from 'node:child_process';
 import { runExternalOperation } from '@agent/core/governance/external-operation';
+import { isDelegableExternalOperation } from '@agent/core/governance/external-operation-target';
 
 export type Platform = 'darwin' | 'linux' | 'win32';
 
@@ -117,7 +118,7 @@ export async function speak(text: string, opts: SpeakOptions = {}): Promise<Spea
       operationId: 'voice:speak',
       effect: { text, options: { voice: opts.voice, rate: opts.rate, timeoutMs } },
       requiresApproval: true,
-      delegable: true,
+      delegable: isDelegableExternalOperation('voice:speak'),
     },
     () =>
       new Promise<SpeakResult>((resolve, reject) => {

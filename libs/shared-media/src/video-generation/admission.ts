@@ -1,5 +1,6 @@
 import { runExternalOperation } from '@agent/core/governance/external-operation';
 import { wrapAdapterEffects } from '@agent/core/governance/adapter-effect-proxy';
+import { isDelegableExternalOperation } from '@agent/core/governance/external-operation-target';
 import type {
   VideoGenerationProvider,
   VideoGenerationRequest,
@@ -17,7 +18,7 @@ export function governVideoProvider<T extends VideoGenerationProvider>(provider:
         operationId: `media:video:${provider.provider}:submit`,
         effect: { provider: provider.provider, params },
         requiresApproval: true,
-        delegable: false,
+        delegable: isDelegableExternalOperation(`media:video:${provider.provider}:submit`),
       },
       () => originalSubmit.call(provider, params),
       (receipt) =>
@@ -38,7 +39,7 @@ export function governVideoProvider<T extends VideoGenerationProvider>(provider:
           operationId: `media:video:${provider.provider}:cancel`,
           effect: { provider: provider.provider, params: { provider_job_id: providerJobId } },
           requiresApproval: true,
-          delegable: false,
+          delegable: isDelegableExternalOperation(`media:video:${provider.provider}:cancel`),
         },
         async () => Reflect.apply(original, target, [providerJobId]),
         () => 'succeeded'

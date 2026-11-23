@@ -13,6 +13,7 @@ import {
 import { isHostImageHandoffOutput } from '../host-image-handoff.js';
 import { runExternalOperation } from '@agent/core/governance/external-operation';
 import { wrapAdapterEffects } from '@agent/core/governance/adapter-effect-proxy';
+import { isDelegableExternalOperation } from '@agent/core/governance/external-operation-target';
 
 const admittedImageMethods = new WeakSet<object>();
 
@@ -67,7 +68,7 @@ export function governImageProvider<T extends ImageGenerationProvider>(provider:
         operationId,
         effect: { provider: provider.id, params: snapshot, reference_content: referenceContent },
         requiresApproval,
-        delegable: false,
+        delegable: isDelegableExternalOperation(operationId),
       },
       () => {
         for (const reference of referenceContent) {

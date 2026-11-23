@@ -46,6 +46,7 @@ import {
   runExternalOperation,
   assertExternalOperationBatchResumable,
 } from '@agent/core/governance/external-operation';
+import { isDelegableExternalOperation } from '@agent/core/governance/external-operation-target';
 
 const VOICE_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/voice-actuator/manifest.json');
 const DEFAULT_VOICE_RETRY = getRetryDefaults('voice-actuator:defaults');
@@ -313,7 +314,7 @@ async function runPythonTtsBridge(
             },
           },
           requiresApproval: true,
-          delegable: false,
+          delegable: isDelegableExternalOperation('voice:render_provider'),
         },
         async () => {
           const result = execute();
@@ -676,7 +677,7 @@ export function registerVoicePlaybackPlatformAdapter(
           operationId: 'voice:playback',
           effect: { params: { platform: id, format, content_hash: contentHash } },
           requiresApproval: true,
-          delegable: true,
+          delegable: isDelegableExternalOperation('voice:playback'),
         },
         async () => {
           if (
@@ -698,7 +699,7 @@ export function registerVoicePlaybackPlatformAdapter(
           operationId: 'voice:speak',
           effect: { params: { platform: id, text, rate } },
           requiresApproval: true,
-          delegable: true,
+          delegable: isDelegableExternalOperation('voice:speak'),
         },
         async () => speak(text, rate),
         () => 'succeeded'
@@ -731,7 +732,7 @@ export function registerVoicePlaybackPlatformAdapter(
             },
           },
           requiresApproval: true,
-          delegable: false,
+          delegable: isDelegableExternalOperation('voice:playback'),
         },
         async () => {
           if (digest() !== sourceHash)
@@ -779,7 +780,7 @@ export function registerVoicePlaybackPlatformAdapter(
             },
           },
           requiresApproval: true,
-          delegable: false,
+          delegable: isDelegableExternalOperation('voice:render_provider'),
         },
         async () => {
           if (

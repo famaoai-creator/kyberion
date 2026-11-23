@@ -317,7 +317,7 @@ function buildPlan(principal: OnboardingAuthorityPrincipal, raw: unknown, option
           actor: accountable.id,
           authority_basis: {
             kind: 'owner',
-            evidence_ref: `member-registry:${accountable.id}:owner@${scope.kind === 'person' ? 'person' : scope.tenant_slug}`,
+            evidence_ref: `member-registry:${accountable.id}:owner@${isPersonalCharterScope(scope) ? 'person' : scope.tenant_slug}`,
           },
           expires_at,
           deputies: [],
@@ -336,7 +336,7 @@ function buildPlan(principal: OnboardingAuthorityPrincipal, raw: unknown, option
     `Receiving execution agent requests this ${input.mode === 'activate' ? 'activation' : 'delegation'}: ${runtime?.agent_id ?? 'not installed'}`,
     `Initiated by: ${principal.requesterId}; this is owner consent, not independent substantive review.`,
     `Accountable human: ${accountable.display_name} (${accountable.id})`,
-    `Scope: ${scope.kind === 'person' ? 'person (no tenant)' : scope.tenant_slug}`,
+    `Scope: ${isPersonalCharterScope(scope) ? 'person (no tenant)' : scope.tenant_slug}`,
     `Change: ${input.mode}`,
     ...(input.mode === 'activate'
       ? [
@@ -456,10 +456,9 @@ export function requestOnboardingAuthority(
         Math.min(Date.parse(plan.draft.accountable.expires_at), now.getTime() + 86_400_000)
       ).toISOString(),
       accountability: { finalDecision: 'human_only', payloadHash: digest, effectBinding: digest },
-      scope:
-        plan.scope.kind === 'person'
-          ? { tier: 'personal', scope_kind: 'system', nhi_id: installed.agentId }
-          : { tier: 'confidential', tenant_slug: plan.scope.tenant_slug },
+      scope: isPersonalCharterScope(plan.scope)
+        ? { tier: 'personal', scope_kind: 'system', nhi_id: installed.agentId }
+        : { tier: 'confidential', tenant_slug: plan.scope.tenant_slug },
     })
   );
   return requestReceipt(record);
@@ -492,7 +491,7 @@ function readPlan(
   if (plan.version !== 1 || hash(plan.scope) !== hash(scope))
     return deny('request outside selected scope');
   if (
-    scope.kind === 'person'
+    isPersonalCharterScope(scope)
       ? record.scope?.tier !== 'personal' ||
         record.scope?.tenant_slug !== undefined ||
         record.scope?.nhi_id !== plan.runtime?.agent_id

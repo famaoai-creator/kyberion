@@ -14,6 +14,7 @@ import {
   assertExternalOperationBatchResumable,
 } from '@agent/core/governance/external-operation';
 import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
+import { isDelegableExternalOperation } from '@agent/core/governance/external-operation-target';
 import { describeOps } from './op-catalog.js';
 
 export interface DeploymentParams {
@@ -49,7 +50,7 @@ async function deployRelease(params: DeploymentParams) {
       approvalPolicy: { intentId: RISKY_OPS.CONFIG_UPDATE, scope: 'governance' },
       // Delegation is adapter + environment (+ optional project) scoped —
       // a charter grants 'deploy <project> to <env> via <adapter>'.
-      delegable: true,
+      delegable: isDelegableExternalOperation('deployment:deploy_release'),
     },
     (providerCorrelationId) =>
       adapter.deploy({

@@ -42,6 +42,8 @@ import {
   admitsCustody,
   admitsScopeAudience,
   custodyOfScope,
+  isPersonRecordCustody,
+  isSystemRecordCustody,
   viewerPersonIds,
   type SurfaceAuthorizationContext,
 } from './surface-authorization.js';
@@ -61,7 +63,7 @@ function tiersOf(viewer: SurfaceAuthorizationContext): Tier[] {
 
 function personCustodyFields(scope: Parameters<typeof custodyOfScope>[0]): { owner_nhi?: string } {
   const custody = custodyOfScope(scope);
-  return custody.kind === 'person' ? { owner_nhi: custody.ref } : {};
+  return isPersonRecordCustody(custody) ? { owner_nhi: custody.ref } : {};
 }
 
 /** A memory candidate as the queue card shows it (summary clamped, origin humanized). */
@@ -120,7 +122,11 @@ function knowledgeFor(viewer: SurfaceAuthorizationContext): NeedsYouKnowledgeInp
       const audienceMatch = audience.some((id) => ids.includes(id));
       if (audience.length && !audienceMatch) return false;
       if (scope?.owner_nhi && !ids.includes(scope.owner_nhi) && !audienceMatch) return false;
-      if (sourceTier === 'personal' && custodyOfScope(scope).kind !== 'person' && !audienceMatch)
+      if (
+        sourceTier === 'personal' &&
+        !isPersonRecordCustody(custodyOfScope(scope)) &&
+        !audienceMatch
+      )
         return false;
       return true;
     })
@@ -184,7 +190,7 @@ function approvalsFor(viewer: SurfaceAuthorizationContext): CeoApprovalItem[] {
       // A public untenanted approval is everyone's — except when it names
       // an owner: person custody is identity-bound, never broadcast.
       const custody = custodyOfScope(record.scope);
-      if (!tenant && tier === 'public' && custody.kind === 'system') return true;
+      if (!tenant && tier === 'public' && isSystemRecordCustody(custody)) return true;
       return admitsCustody(viewer, custody);
     })
     .map((record) =>

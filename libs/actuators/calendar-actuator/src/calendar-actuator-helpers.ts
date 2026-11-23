@@ -11,6 +11,7 @@ import {
   type ExternalOperationAuthority,
 } from '@agent/core/governance/external-operation';
 import { runCalendarExternalEffect } from '@agent/core/meeting/calendar-external-effect';
+import { isDelegableExternalOperation } from '@agent/core/governance/external-operation-target';
 import {
   calendarBackendRegistry,
   createJxaCalendarBackend,
@@ -252,7 +253,7 @@ export async function handleAction(
         operationId: `calendar:${valid.op}`,
         effect: { op: valid.op, backend: selections[0].adapter.id, params: selections[0].params },
         requiresApproval: true,
-        delegable: true,
+        delegable: isDelegableExternalOperation(`calendar:${valid.op}`),
         authority: options.externalAuthority?.(valid),
       }
     : undefined;

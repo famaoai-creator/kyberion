@@ -25,9 +25,13 @@ import type { KnowledgeTier } from './knowledge-tier.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { runtimeStatePath } from './runtime-state-roots.js';
 import { isValidTenantSlug } from './scope.js';
+import {
+  isReadLikeResourceAccessOperation,
+  type ResourceAccessOperation,
+} from './resource-access-scope.js';
 import { registerStoreGrant } from './store-grant-registry.js';
 
-export type TaskSourceWorkspaceOperation = 'read' | 'write' | 'append' | 'mkdir' | 'metadata';
+export type TaskSourceWorkspaceOperation = ResourceAccessOperation;
 
 export interface TaskSourceWorkspaceWindow {
   /** Repository-relative target file. */
@@ -131,7 +135,7 @@ function windowAllows(
   target: string,
   operation: TaskSourceWorkspaceOperation
 ): boolean {
-  if ((operation === 'read' || operation === 'metadata') && target.startsWith('knowledge/product/'))
+  if (isReadLikeResourceAccessOperation(operation) && target.startsWith('knowledge/product/'))
     return true;
   if (operation === 'write') return current.writing && target === current.target;
   if (operation === 'append') return false;

@@ -18,6 +18,12 @@
  * held there admitted nothing.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
+import {
+  isContentMutatingResourceAccessOperation,
+  isMutatingResourceAccessOperation,
+  isReadLikeResourceAccessOperation,
+  type ResourceAccessOperation,
+} from './resource-access-scope.js';
 import { registerStoreGrant } from './store-grant-registry.js';
 
 /**
@@ -82,14 +88,14 @@ export function withPersonalApprovalCapability<T>(
  */
 export function personalApprovalIoAllowed(
   target?: string,
-  operation?: 'read' | 'write' | 'append' | 'mkdir' | 'metadata'
+  operation?: ResourceAccessOperation
 ): boolean {
   const window = registry.storage.getStore();
   if (!window || !registry.issued.has(window) || !window.isCurrent()) return false;
   if (target === undefined) return true;
-  if ((operation === 'read' || operation === 'metadata') && target.startsWith('knowledge/product/'))
+  if (isReadLikeResourceAccessOperation(operation) && target.startsWith('knowledge/product/'))
     return true;
-  if (operation === 'write' || operation === 'append')
+  if (isContentMutatingResourceAccessOperation(operation))
     return window.writing && target === window.path;
   if (operation === 'mkdir')
     return window.writing && (target === window.path || window.path.startsWith(target + '/'));
@@ -118,8 +124,8 @@ function within(target: string, root: string): boolean {
  * inside the window.
  */
 const PRODUCT_READ_ROOT = 'knowledge/product';
-const isWrite = (operation?: string) =>
-  operation === 'write' || operation === 'append' || operation === 'mkdir';
+const isWrite = (operation?: ResourceAccessOperation) =>
+  isMutatingResourceAccessOperation(operation);
 
 /**
  * Deny-only narrowing of every I/O made while a window is entered: the exact window admission,
@@ -128,7 +134,7 @@ const isWrite = (operation?: string) =>
  */
 export function personalApprovalIoNarrowing(
   target: string,
-  operation: 'read' | 'write' | 'append' | 'mkdir' | 'metadata'
+  operation: ResourceAccessOperation
 ): boolean {
   if (!personalApprovalWindowEntered()) return true;
   if (!personalApprovalIoAllowed(target, operation)) return false;
@@ -138,7 +144,7 @@ export function personalApprovalIoNarrowing(
 /** Does the live window authorize this I/O? Its admission, under the former role's grant roots. */
 export function personalApprovalGrantAuthorizes(
   target: string,
-  operation: 'read' | 'write' | 'append' | 'mkdir' | 'metadata'
+  operation: ResourceAccessOperation
 ): boolean {
   if (!personalApprovalWindowEntered() || !personalApprovalIoAllowed(target, operation))
     return false;

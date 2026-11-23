@@ -6,6 +6,7 @@ import {
   type ExternalOperationApprovalBlock,
 } from '../governance/external-operation.js';
 import { defaultOperationInterface } from '../governance/operation-protection.js';
+import { isDelegableExternalOperation } from '../governance/external-operation-target.js';
 import {
   describeRemoteMcpInterface,
   withTrustedRemoteMcpInterface,
@@ -97,7 +98,7 @@ export function connectGovernedMcpServer<T>(
             args: server.args,
           },
           requiresApproval: true,
-          delegable: false,
+          delegable: isDelegableExternalOperation('mcp:connect'),
           interface: () => defaultOperationInterface('service:mcp')!,
         },
         connect,
@@ -135,7 +136,7 @@ export async function executeGovernedMcpTool(
               arguments: privateArgs,
             },
             requiresApproval: true,
-            delegable: false,
+            delegable: isDelegableExternalOperation('mcp:call_tool'),
             interface: () => requireRemoteMcpInterface(discovered.server_digest, name),
           },
           () => client.callTool({ name, arguments: privateArgs }),

@@ -123,6 +123,19 @@ export type ViewerRecordCustody =
   | { kind: 'person'; ref: string }
   | { kind: 'invalid' };
 
+/** Canonical projections on the custody union — branch on these, not literals. */
+export const isSystemRecordCustody = (
+  custody: ViewerRecordCustody
+): custody is Extract<ViewerRecordCustody, { kind: 'system' }> => custody.kind === 'system';
+
+export const isTenantRecordCustody = (
+  custody: ViewerRecordCustody
+): custody is Extract<ViewerRecordCustody, { kind: 'tenant' }> => custody.kind === 'tenant';
+
+export const isPersonRecordCustody = (
+  custody: ViewerRecordCustody
+): custody is Extract<ViewerRecordCustody, { kind: 'person' }> => custody.kind === 'person';
+
 function validPersonId(id: unknown): id is string {
   return typeof id === 'string' && id.length > 0 && id.trim() === id && id !== '*';
 }
@@ -251,7 +264,7 @@ export function admitsScopeAudience(
     return false;
   const custody = custodyOfScope(scope);
   if (admitsCustody(context, custody)) return true;
-  if (custody.kind !== 'person') return false;
+  if (!isPersonRecordCustody(custody)) return false;
   const ids = viewerPersonIds(context);
   return (scope?.allowed_audience ?? []).some((id) => ids.includes(id));
 }

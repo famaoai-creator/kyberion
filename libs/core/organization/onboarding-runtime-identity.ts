@@ -22,7 +22,7 @@ import {
   claimedSessionId,
 } from './nhi-session-admission.js';
 import { resolveMemberByPrincipal } from './member-registry.js';
-import type { CharterScope } from '../governance/accountability-charter.js';
+import { isPersonalCharterScope, type CharterScope } from '../governance/accountability-charter.js';
 
 /** Exact reviewed names have distinct durable identities, including lossy slug forms. */
 export function normalizeOnboardingAgentSlug(agentId: string): string {
@@ -94,7 +94,7 @@ export type InstalledOnboardingRuntime =
   | { ready: false; reason: string };
 
 export function inspectInstalledOnboardingRuntime(scope: CharterScope): InstalledOnboardingRuntime {
-  if (scope.kind === 'person') return inspectInstalledPersonalRuntime();
+  if (isPersonalCharterScope(scope)) return inspectInstalledPersonalRuntime();
   if (getPluginExecutionContext()) return { ready: false, reason: 'host_runtime_required' };
   try {
     // This callback only reads canonical identity records. The worker body is

@@ -16,9 +16,10 @@ import { findActiveCharter } from './accountability-charter-registry.js';
 import { operationInterfaceResolver, withOperationInterface } from './operation-protection.js';
 import type { ResolvedActuatorOperation } from '../actuator/actuator-op-registry.js';
 export { operationInterfaceResolver } from './operation-protection.js';
-import type { CharterScope } from './accountability-charter.js';
+import { isPersonalCharterScope, type CharterScope } from './accountability-charter.js';
 import {
   EXTERNAL_OPERATION_DELEGATION,
+  externalOperationClass,
   isDelegableExternalOperation,
   resolveCharterExternalOperationTarget,
   externalOperationGrantMatches,
@@ -85,7 +86,7 @@ export function createOnboardingExternalOperationAuthority(options: {
       }),
       hasHuman: false,
       standingScope: scope,
-      ...(scope.kind === 'organization' ? { tenantSlug: scope.tenant_slug } : {}),
+      ...(!isPersonalCharterScope(scope) ? { tenantSlug: scope.tenant_slug } : {}),
     };
     // A destination grant never declassifies source content. Resolve source
     // provenance independently from the exact destination grant.
@@ -98,16 +99,18 @@ export function createOnboardingExternalOperationAuthority(options: {
     const effect = facts.effect as Record<string, unknown>;
     const target = resolveCharterExternalOperationTarget(facts.operationId, effect);
     const charter = findActiveCharter(scope, new Date());
-    if (!charter || !facts.delegable) return authority;
+    const opClass = externalOperationClass(facts.operationId);
+    if (!charter || !facts.delegable || !isDelegableExternalOperation(facts.operationId))
+      return authority;
     const ranks = { public: 1, confidential: 2, personal: 3 } as const;
     if (!(source.tier in ranks)) return authority;
     let effectiveTier = source.tier as keyof typeof ranks;
     let bodyTenant: string | undefined;
-    if (facts.operationId === 'vcs:pr_create' || facts.operationId === 'vcs:push') {
-      const push = facts.operationId === 'vcs:push';
-      const bodyTier = push ? effect.publication_source_tier : effect.body_source_tier;
-      const sourceTenant = push ? effect.publication_source_tenant : effect.body_source_tenant;
-      if (push && !(STORAGE_DATA_TIERS as readonly string[]).includes(String(bodyTier)))
+    if (opClass.tierSource) {
+      const { tierField, tenantField, storageTiersOnly } = opClass.tierSource;
+      const bodyTier = effect[tierField];
+      const sourceTenant = effect[tenantField];
+      if (storageTiersOnly && !(STORAGE_DATA_TIERS as readonly string[]).includes(String(bodyTier)))
         return authority;
       if (bodyTier === 'confidential') {
         if (typeof sourceTenant !== 'string') return authority;
@@ -126,14 +129,14 @@ export function createOnboardingExternalOperationAuthority(options: {
       ranks[effectiveTier] > ranks[source.tier as keyof typeof ranks]
     )
       return authority;
-    const isVcs = ['vcs:pr_create', 'vcs:pr_merge', 'vcs:push'].includes(facts.operationId);
+    const isVcs = opClass.repositoryTarget === true;
     // Reading the tenant's own business system brings data into that tenant's
     // scope; the only outbound value is that system's own credential.
-    const isTenantSystemRead = facts.operationId === 'browser:approval_queue_inspect';
+    const isTenantSystemRead = opClass.tenantSystemRead === true;
     if (isTenantSystemRead) {
       if (
         effectiveTier !== 'confidential' ||
-        scope.kind !== 'organization' ||
+        isPersonalCharterScope(scope) ||
         source.tenant_slug !== scope.tenant_slug
       )
         return authority;
@@ -147,10 +150,10 @@ export function createOnboardingExternalOperationAuthority(options: {
       )
         return authority;
       if (effectiveTier === 'personal') {
-        if (scope.kind !== 'person' || source.tenant_slug || bodyTenant) return authority;
+        if (!isPersonalCharterScope(scope) || source.tenant_slug || bodyTenant) return authority;
       } else {
         if (
-          scope.kind !== 'organization' ||
+          isPersonalCharterScope(scope) ||
           source.tenant_slug !== scope.tenant_slug ||
           (bodyTenant && bodyTenant !== scope.tenant_slug)
         )
@@ -158,8 +161,9 @@ export function createOnboardingExternalOperationAuthority(options: {
       }
     }
     // Public bodies in a tenant runtime do not erase that runtime's tenant.
-    if (scope.kind === 'organization' && source.tenant_slug !== scope.tenant_slug) return authority;
-    if (bodyTenant && (scope.kind !== 'organization' || bodyTenant !== scope.tenant_slug))
+    if (!isPersonalCharterScope(scope) && source.tenant_slug !== scope.tenant_slug)
+      return authority;
+    if (bodyTenant && (isPersonalCharterScope(scope) || bodyTenant !== scope.tenant_slug))
       return authority;
     const token =
       effectiveTier === 'confidential' ? `confidential:${source.tenant_slug}` : effectiveTier;
@@ -355,7 +359,7 @@ export function withRuntimeExternalOperationAuthority<T>(
     return installed.ready &&
       'agentActive' in installed &&
       installed.agentActive === true &&
-      scope.kind === 'person'
+      isPersonalCharterScope(scope)
       ? withInstalledPersonCharterRuntime(
           { ownerActor: installed.ownerId, agentId: installed.agentId },
           execute

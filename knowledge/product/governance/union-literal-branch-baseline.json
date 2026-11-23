@@ -27,7 +27,6 @@
     "libs/core/governance/charter-payment-settlement.ts": ["organization"],
     "libs/core/governance/charter-service.ts": ["organization"],
     "libs/core/governance/external-operation-proof.ts": ["approval"],
-    "libs/core/governance/external-operation-runtime.ts": ["organization"],
     "libs/core/information-assets/asset-derivation-read-capability.ts": ["tenant"],
     "libs/core/information-assets/asset-derivation.ts": ["tenant"],
     "libs/core/knowledge/learning-signal-sources.ts": ["tenant"],
