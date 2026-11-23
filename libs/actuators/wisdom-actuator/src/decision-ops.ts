@@ -172,7 +172,7 @@ function participantsFromPersonaLabels(
         label
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '') || 'persona';
+          .replace(/^-|-$/g, '') || 'persona';
       return {
         participant_id: participantId,
         team_role_id: 'facilitator',
