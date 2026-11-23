@@ -38,13 +38,19 @@ import type { BrowserBridgeControlStep } from './browser-bridge-mailbox.js';
 /** Repo-relative recordings store — the allowlisted root promote-procedure accepts. */
 const RECORDINGS_STORE_REL = runtimeStatePath('browser.recordingsStore').physicalPath;
 
-/** Ops that produce no replayable action — observation or bridge-level tab ops. */
+/**
+ * Ops that produce no replayable action — observation or bridge-level tab ops.
+ * `open_tab` is session establishment in interactive control: the action schema
+ * has no `url` field (replay opens `recording.tab.origin` itself), so an
+ * exported open_tab action could never satisfy the `browser:open_tab` contract.
+ */
 const NON_REPLAY_OPS = new Set<string>([
   'snapshot',
   'screenshot',
   'extract_text_ref',
   'list_tabs',
   'select_tab',
+  'open_tab',
 ]);
 
 /**

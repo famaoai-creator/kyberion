@@ -90,7 +90,9 @@ variables; the recording lands under the allowlisted recordings store with
 `review.status=pending`. Only steps that actually **completed** are exported —
 failed, declined or still-pending steps are dropped (the export reports the
 count), and a `press` with a non-default key is skipped because the recording
-schema cannot express it (replay defaults to Enter). `fill` values never reach
+schema cannot express it (replay defaults to Enter). The session-establishing
+`open_tab` is also skipped — replay opens `recording.tab.origin` itself and the
+action schema has no `url` field for it. `fill` values never reach
 the journal — they are scrubbed at write time — and export always emits the
 `user_input` variable placeholder instead.
 
@@ -100,6 +102,15 @@ still needs an approved review before it reaches the ProcedureCatalog and
 Pattern B replay. `--approve-all` on `promote`/`review` compresses
 export → review → promote into **one explicit operator judgment** — it is the
 human decision recorded, not a bypass.
+
+`promote` writes `procedures.json` through the tier guard: a bare shell runs as
+persona `unknown` and is denied. Run it under an authorized base role and,
+for a governed audit trail, inside a mission:
+
+```bash
+KYBERION_BASE_ROLE=sovereign MISSION_ID=<MSN-…> \
+  pnpm kyberion browser control promote --recording <BCR-…>
+```
 
 ## Vocabulary map
 
