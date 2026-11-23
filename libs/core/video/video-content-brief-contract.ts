@@ -172,7 +172,7 @@ export function compileVideoContentBriefToStoryboard(brief: VideoContentBrief): 
   const design = resolveCreativeDesign({ surface: 'video', tenantSlug, designSystemId });
   const useCreativeProjection =
     design.source === 'tenant-override' ||
-    (tenantDesign?.source !== 'tenant' &&
+    (!tenantDesign?.matchedPath &&
       design.selection?.source === 'explicit' &&
       (design.theme_source === 'catalog' || Boolean(design.design_style)));
   const creativeVars =
