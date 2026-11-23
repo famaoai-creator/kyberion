@@ -596,6 +596,62 @@ describe('direct-CLI usage accounting', () => {
     warn.mockRestore();
   });
 
+  it('record-evidence does not complete or cascade a task after an unapproved human hold (MO-02)', async (ctx) => {
+    const { missionId, missionPath, readTasks } = seedMission(
+      ctx,
+      [
+        {
+          task_id: 'scope',
+          status: 'planned',
+          deliverable: 'evidence/reverse-spec-scope.json',
+          phase: 'ingest',
+        },
+        {
+          task_id: 'graph',
+          status: 'planned',
+          dependencies: ['scope'],
+          deliverable: 'evidence/code-graph.json',
+          phase: 'code_graph',
+        },
+      ] as FixtureTask[],
+      ['evidence/reverse-spec-scope.json', 'evidence/code-graph.json']
+    );
+    const state = JSON.parse(
+      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+    );
+    state.process_template = {
+      workflow_id: 'reverse-spec-extraction',
+      phases: ['ingest', 'code_graph', 'delivery'],
+    };
+    safeWriteFile(`${missionPath}/mission-state.json`, JSON.stringify(state));
+    safeMkdir(`${missionPath}/gates/definitions`, { recursive: true });
+    safeWriteFile(
+      `${missionPath}/gates/definitions/REVERSE_SPEC_SCOPE_CONFIRMED.json`,
+      JSON.stringify({
+        mission_id: missionId,
+        phase: 'ingest',
+        position: 'exit',
+        gate: {
+          id: 'REVERSE_SPEC_SCOPE_CONFIRMED',
+          checks: [{ kind: 'human_override', params: { require_signature: true } }],
+        },
+      })
+    );
+    const warn = vi.spyOn(logger, 'warn');
+    // The scope task itself completes; the cascade stops at the hold.
+    const scope = await recordEvidence({ ...evidenceArgs(missionId), taskId: 'scope' });
+    expect(scope.task_completion?.completed).toBe(true);
+    expect(scope.task_completion?.cascaded).toEqual([]);
+    await recordEvidence({ ...evidenceArgs(missionId), taskId: 'graph' });
+    expect(readTasks().map((task) => task.status)).toEqual(['completed', 'planned']);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'task graph not completed — it comes after the human hold REVERSE_SPEC_SCOPE_CONFIRMED'
+      )
+    );
+    warn.mockRestore();
+  });
+
   it('says why a task stayed open: missing deliverable path and pending dependencies', async (ctx) => {
     const { missionId, missionPath, readTasks } = seedMission(
       ctx,

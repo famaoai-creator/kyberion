@@ -50,6 +50,9 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   // A prepared admission must resolve its exact Mission before activation.
   'libs/core/mission/mission-state.ts': 'lifecycle',
   'libs/core/mission/mission-task-supersede-proof.ts': 'lifecycle',
+  // Human hold proofs fail closed on hidden/ambiguous missions (not approved).
+  'libs/core/mission/mission-gate-hold-approval.ts': 'lifecycle',
+  'libs/core/mission/mission-gate-hold-proof.ts': 'lifecycle',
   'libs/core/mission/mission-task-supersede.ts': 'lifecycle',
   'libs/core/mission/mission-triage.ts': 'lifecycle',
   'libs/core/mission/mission-work-reconciliation.ts': 'lifecycle',

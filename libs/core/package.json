@@ -3688,6 +3688,10 @@
       "types": "./dist/mission/mission-task-supersede-proof.d.ts",
       "default": "./dist/mission/mission-task-supersede-proof.js"
     },
+    "./mission/mission-gate-hold-approval": {
+      "types": "./dist/mission/mission-gate-hold-approval.d.ts",
+      "default": "./dist/mission/mission-gate-hold-approval.js"
+    },
     "./mission/mission-team-binding": {
       "types": "./dist/mission/mission-team-binding.d.ts",
       "default": "./dist/mission/mission-team-binding.js"

@@ -7,7 +7,12 @@
  * @see knowledge/product/architecture/pibot-absorption-model.md
  */
 
-import { createWorkItem, getWorkItem, updateWorkItem, type WorkItem } from '../workforce/work-coordination.js';
+import {
+  createWorkItem,
+  getWorkItem,
+  updateWorkItem,
+  type WorkItem,
+} from '../workforce/work-coordination.js';
 import type { WorkItemContext } from '../workforce/work-coordination-types.js';
 
 export const MAX_VERDICT_REPAIRS = 2;

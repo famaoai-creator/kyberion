@@ -27,6 +27,7 @@ import { issueTaskGrantBestEffort } from '../task/task-scoped-grants.js';
 import type { MissionState } from './mission-types.js';
 import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { evaluatePhaseEntryGate } from './mission-process-planning.js';
+import { pendingHumanHoldBeforePhase } from './mission-gate-hold-proof.js';
 import { unchangedAiDlcContractFailure } from './mission-aidlc-gate-projection.js';
 import { recordTask } from './mission-maintenance.js';
 
@@ -368,6 +369,30 @@ async function dispatchMissionWorkItemsRound(
     // its tasks — same UX as unmet dependencies, re-dispatched once the gate
     // passes.
     const itemPhase = (item.metadata as Record<string, unknown> | undefined)?.phase;
+    // A phase (or a phaseless item) behind an unapproved human hold is not dispatched (MO-02).
+    const hold = pendingHumanHoldBeforePhase(
+      missionId,
+      typeof itemPhase === 'string' ? itemPhase : '',
+      missionPath
+    );
+    if (hold) {
+      record.status = 'deferred';
+      record.notes.push(
+        `human hold ${hold.gateId} (phase ${hold.phase}) not approved: ${hold.reason}`
+      );
+      recordRouting({ attempted: false, succeeded: false });
+      records.push(record);
+      appendDispatchEvent(dispatchEventPath(missionPath), {
+        event_type: 'workitem_dispatch_deferred',
+        mission_id: missionId,
+        item_id: item.item_id,
+        team_role: teamRole,
+        phase: typeof itemPhase === 'string' ? itemPhase : undefined,
+        gate_id: hold.gateId,
+        notes: record.notes,
+      });
+      continue;
+    }
     if (typeof itemPhase === 'string' && itemPhase) {
       const failedContract = unchangedAiDlcContractFailure(missionId, itemPhase);
       if (failedContract) {
