@@ -3332,6 +3332,10 @@
       "types": "./dist/mission/delegation-request.d.ts",
       "default": "./dist/mission/delegation-request.js"
     },
+    "./mission/gate-ai-assessment": {
+      "types": "./dist/mission/gate-ai-assessment.d.ts",
+      "default": "./dist/mission/gate-ai-assessment.js"
+    },
     "./mission/mission-admission": {
       "types": "./dist/mission/mission-admission.d.ts",
       "default": "./dist/mission/mission-admission.js"

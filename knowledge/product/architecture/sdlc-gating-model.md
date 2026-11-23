@@ -122,6 +122,16 @@ gate は単一文書ではなく、artifact bundle で成立します。
 - Mission Ledger
   - どの mission がどの project / track / gate / artifact に影響したかを結ぶ
 
+## AI Assessment — AI が評価し、人間が決裁する
+
+ゲート判定では、評価・スコア(確信度)の生成を AI が担い、最終決裁を人間(会議体 / approval-store)が担う構成を標準とします。
+
+- **AI評価の成果物**: `evidence/gate-ai-assessment.json`(契約: `schemas/gate-ai-assessment.schema.json`)。exit_criteria ごとの status/score、推奨判定(go/conditional_go/no_go/hold)・確信度、必須成果物の充足状態、評価した証跡の sha256 を記録する。
+- **助言であって権限ではない**: AI 評価は人間の判断材料。推奨に veto 権はなく、最終決裁は会議体が `gate-decision-record.json` に記録する。
+- **条件付きブロック**: 低確信・必須基準未充足・必須成果物欠落・証跡陳腐化のとき、会議体の開催を機械ゲート(`check_gate_ai_assessment`)が止める。人間はオーバーライド記録で迂回できる。
+- **hash-bound decision**: 判定記録はレビューした評価の sha256(`ai_assessment_sha256`)を持ち、評価差し替え後に古い判定を再利用できない(video の playback approval が eval report digest を持つのと同型)。
+- 参照実装: `gate-review-session` ワークフロー(mission-workflow-catalog)と `scripts/check/check_gate_ai_assessment.ts`。ポリシー/スキーマの pure 層は `libs/core/mission/gate-ai-assessment.ts` で、将来的にゲートエンジンのチェック種別としても再利用する。
+
 ## Recommendation
 
 実運用では、各 phase ごとに次の 3 つを固定すると運用しやすくなります。

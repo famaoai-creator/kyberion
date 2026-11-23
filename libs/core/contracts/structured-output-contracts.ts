@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { AGENT_CONTEXT_MODES } from './context-boundary.js';
+import { GateAiAssessmentSchema } from '../mission/gate-ai-assessment.js';
 import type {
   A2ATaskContract,
   A2ATaskContext,
@@ -282,6 +283,7 @@ export const structuredOutputSchemas = {
   planning_review_verdict: PlanningReviewVerdictSchema,
   a2a_task_contract: A2ATaskContractSchema,
   procedure_ranking: ProcedureRankingSchema,
+  gate_ai_assessment: GateAiAssessmentSchema,
 } as const;
 
 export type StructuredOutputSchemaName = keyof typeof structuredOutputSchemas;
