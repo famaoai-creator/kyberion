@@ -148,7 +148,7 @@ The approval is bound to the mission, the gate and a fingerprint of the gate inp
 file, or the frozen code graph). `gate-pass` signs the pass in the approver's name and records it
 under `gates/human-holds/`. Until then, `record-evidence` records evidence for later-phase tasks
 but does not complete them, `finish` is blocked, and `gate-pass` without an approval is refused.
-Editing the scope or the code graph after approval invalidates it and needs a new approval. The
+Editing the scope or the code graph after approval invalidates it and needs a new approval. If `finish` reports a hold's gate definition missing, the mission was not planned with this workflow: select it with `workflow-select` and re-plan with `plan-tasks --refresh-catalog`. The
 delivery hold is covered by the governed PR merge approval. Also stop and raise a decision when: the denominator would shrink
 or change after the freeze; a document conflicts with the code at the design level (not a single
 drift); the same contradiction has three hypotheses or spans two sessions; a large piece of work
