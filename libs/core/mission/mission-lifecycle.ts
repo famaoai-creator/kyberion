@@ -4,6 +4,7 @@
  */
 
 import * as path from 'node:path';
+import { pendingHumanHolds } from './mission-gate-hold-proof.js';
 import {
   addInboxEntry,
   normalizeStoredInboxPaths,
@@ -237,6 +238,24 @@ export function evaluateMissionFinishExitGate(
       );
     })
     .map((task) => String(task.task_id || task.description || 'unknown-task'));
+
+  // A required human hold must be decided by a person (approval proof), even
+  // when every task is closed — e.g. tasks closed before the hold existed.
+  const missionId = path.basename(missionDir).toUpperCase();
+  const pendingHolds = pendingHumanHolds(missionId, missionDir);
+  if (pendingHolds.length > 0) {
+    return {
+      ok: false,
+      reason:
+        `Human holds not approved: ${pendingHolds
+          .map((hold) => `${hold.gateId} (${hold.reason})`)
+          .join(', ')}. ` +
+        `Run \`pnpm mission gate-pass ${missionId} <GATE_ID> --request-approval\`, have the person ` +
+        'approve it with `pnpm kyberion approvals --approve <id>`, then pass the gate with ' +
+        '`--approval-request-id <id>`.',
+      pendingTasks,
+    };
+  }
 
   if (pendingTasks.length > 0) {
     return {

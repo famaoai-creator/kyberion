@@ -469,6 +469,7 @@ describe('Approval channel boundary', () => {
       'mission-scope',
       'mission-reconciliation',
       'mission-task-supersede',
+      'mission-gate-pass',
       'pipeline-await-state',
       'tenant-activation',
       'tenant-provider-attestation',

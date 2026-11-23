@@ -44,7 +44,7 @@ Reverse Spec Flow (aws-samples/sample-reverse-spec-flow, MIT-0). Checker:
    essence-layer spec a disposition: `migrate`, `discard` (with a reason — a dropped rule
    vanishes), or `human_decision` (open; the gate fails until a person decides). Choose a
    strategy — `strangler_fig`, `big_bang`, `parallel_run` or `branch_by_abstraction` — with at
-   least one rejected alternative and a rationale. This gate is held for human approval.
+   least one rejected alternative and a rationale. This gate is a required human hold: request it with `pnpm mission gate-pass <ID> MIGRATION_STRATEGY_APPROVED --request-approval`, the person approves with `pnpm kyberion approvals --approve <id>`, then pass it with `--approval-request-id <id>`. Until then later-phase tasks do not complete and `finish` is blocked; changing `evidence/migration-decisions.json` after approval needs a new approval.
 3. **Parity pin.** For every migrated spec write at least one parity scenario (`gherkin`,
    `golden` or `characterization`) under the mission and record its result on the legacy system.
    Known legacy bugs are pinned as `fail_recorded` — fixing them is a decision, not an accident.

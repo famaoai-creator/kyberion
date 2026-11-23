@@ -39,6 +39,10 @@ import {
 } from '../secure-io.js';
 import { loadMissionPhaseGateDefinitionAtPath } from './mission-phase-gate-definition-reader.js';
 import { normalizeMissionGateCheckPaths } from './mission-gate-input-fingerprint.js';
+import {
+  applyMissionGateHoldProof,
+  type MissionGateHoldRecord,
+} from './mission-gate-hold-proof.js';
 export { fingerprintMissionGateInputs } from './mission-gate-input-fingerprint.js';
 export {
   loadMissionGateRecordAtPath,
@@ -346,16 +350,20 @@ export async function evaluateStoredMissionGate(args: {
   gateId: string;
   humanConfirmed?: boolean;
   blocking?: boolean;
+  /** gate-pass --approval-request-id: the signed hold record it just built (not yet written). */
+  pendingHoldRecord?: MissionGateHoldRecord;
 }): Promise<StoredGateEvaluationResult> {
   const missionId = args.missionId.toUpperCase();
   const stored = readStoredMissionGate(missionId, args.gateId);
   if (!stored) return { found: false };
   const { missionDir, definition } = stored;
 
-  const gate = normalizeMissionGateCheckPaths(
-    definition.gate,
-    missionDir,
-    args.humanConfirmed ?? false
+  // A required human hold is decided only by its approval proof, never by
+  // the operator command itself (humanConfirmed).
+  const gate = applyMissionGateHoldProof(
+    missionId,
+    normalizeMissionGateCheckPaths(definition.gate, missionDir, args.humanConfirmed ?? false),
+    { pendingRecord: args.pendingHoldRecord }
   );
   const evaluation = await evaluateMissionGate({
     missionId,

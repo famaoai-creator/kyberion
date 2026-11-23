@@ -11889,7 +11889,10 @@
                 }
               },
               {
-                "kind": "human_override"
+                "kind": "human_override",
+                "params": {
+                  "require_signature": true
+                }
               }
             ]
           }
@@ -11941,7 +11944,10 @@
                 }
               },
               {
-                "kind": "human_override"
+                "kind": "human_override",
+                "params": {
+                  "require_signature": true
+                }
               }
             ]
           }
@@ -12298,7 +12304,10 @@
                 }
               },
               {
-                "kind": "human_override"
+                "kind": "human_override",
+                "params": {
+                  "require_signature": true
+                }
               }
             ]
           }

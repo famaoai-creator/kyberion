@@ -104,6 +104,24 @@ export function signHumanOverride(input: {
   };
 }
 
+/**
+ * Does `params` carry a signHumanOverride signature that verifies for this
+ * gate, approver and timestamp? The HMAC key is local, so a valid signature
+ * proves integrity of the record, not that a human decided — required holds
+ * additionally need the approval proof (mission-gate-hold-proof.ts).
+ */
+export function verifyHumanOverrideSignature(
+  gateId: string,
+  params: Record<string, unknown>
+): boolean {
+  const approvedBy = firstString(params.approved_by, params.approvedBy);
+  const approvedAt = firstString(params.approved_at, params.approvedAt);
+  const signature = firstString(params.signature);
+  if (!approvedBy || !approvedAt || !signature) return false;
+  return verifyA2AContent(overrideSignatureContent(gateId, approvedBy, approvedAt), signature)
+    .valid;
+}
+
 export interface MissionGateCheck {
   kind: MissionGateCheckKind;
   params?: Record<string, unknown>;
@@ -383,8 +401,11 @@ async function evaluateGateCheck(
         };
       }
       // MO-02: overrides must be attributable. warn mode preserves the old
-      // pass-through while logging what enforce would reject.
-      const mode = resolveGateOverrideSignatureMode();
+      // pass-through while logging what enforce would reject. A required hold
+      // (params.require_signature, set by the workflow catalog) is enforced in
+      // every mode.
+      const mode =
+        params.require_signature === true ? 'enforce' : resolveGateOverrideSignatureMode();
       const gateId = context?.gateId ?? 'unknown-gate';
       const approvedBy = firstString(params.approved_by, params.approvedBy);
       const approvedAt = firstString(params.approved_at, params.approvedAt);
@@ -401,7 +422,13 @@ async function evaluateGateCheck(
               : null;
       if (problem) {
         if (mode === 'enforce') {
-          return { passed: false, reason: `${problem} (KYBERION_GATE_OVERRIDE_SIGNATURE=enforce)` };
+          return {
+            passed: false,
+            reason:
+              params.require_signature === true
+                ? `${problem} (required human hold: gate-pass --request-approval, then --approval-request-id)`
+                : `${problem} (KYBERION_GATE_OVERRIDE_SIGNATURE=enforce)`,
+          };
         }
         gateLogger.warn(`${problem} — passing in warn mode (gate ${gateId})`);
       }

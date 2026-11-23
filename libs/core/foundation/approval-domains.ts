@@ -63,6 +63,7 @@ export const APPROVAL_DOMAINS: Readonly<Record<string, ApprovalDomainSpec>> = {
   'mission-scope': { decision: 'mission intent-drift scope approval' },
   'mission-reconciliation': { decision: 'mission work reconciliation approval' },
   'mission-task-supersede': { decision: 'mission task supersede approval' },
+  'mission-gate-pass': { decision: 'mission gate human hold approval (gate-pass)' },
   'pipeline-await-state': { decision: 'pipeline await-state authorization' },
   'tenant-activation': { decision: 'tenant activation gate' },
   'tenant-provider-attestation': { decision: 'tenant provider attestation' },
