@@ -394,7 +394,7 @@ export function resolveActuatorModulePath(actuatorId: string, entrypoint: string
   ) {
     throw new Error(`[OP_RESOLUTION_MANIFEST] invalid entrypoint for ${id || 'unknown actuator'}`);
   }
-  const jsEntrypoint = normalized.replace(/\.[^./]+$/u, '.js');
+  const jsEntrypoint = normalized.replace(/(\.[^./]+)?$/u, '.js');
   return `dist/libs/actuators/${id}/${jsEntrypoint}`;
 }
 

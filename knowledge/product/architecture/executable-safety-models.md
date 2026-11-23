@@ -1,7 +1,7 @@
 ---
 title: Executable safety models for orchestration
 tags: [formal-methods, verification, adf, lease, concurrency, testing, safety]
-last_updated: 2026-11-08
+last_updated: 2026-11-23
 ---
 
 # Executable safety models for orchestration
@@ -328,6 +328,227 @@ the reconciliation checks.
 The PR publication host takes the artifact write lock before opening the exact
 file grant for the review or body. Repeating publication preparation reuses
 only byte-identical evidence and retains a single scoped index entry.
+## Actuator dispatch increment
+
+`libs/core/actuator/actuator-dispatch.model.test.ts` specifies one op dispatch
+lifecycle — resolve → preflight → validate → dry-run plan → invoke — per step
+kind and dry-run flag. It exhausts 74 states and 66 transitions, checking:
+
+- A domain handler runs only after resolution, admission, and accepted input.
+- Denial and unknown ops never reach the handler.
+- Dry-run never invokes a non-capture handler; capture still observes.
+- Success requires an invocation or a declared validate-only path.
+
+It then enumerates production conformance: all 128 dispatch outcome
+assignments across the four step kinds, the five-scenario admission lattice of
+`runActuatorPipeline` (including block-overrides-grant), eight step-sequence
+failure masks, the dry-run plan table, `resolveCliActionKind` verb tables,
+120 capability-effect assignments including the undeclared fail-safe default,
+entrypoint containment for `resolveActuatorModulePath`, registry data
+invariants (pool disjointness, domain-over-shared specialization pinning,
+retired-op immutability), and catalog dispatch output normalization. Three
+deliberate mutations must each produce the intended counterexample.
+
+```bash
+pnpm exec vitest run libs/core/actuator/actuator-dispatch.model.test.ts libs/core/actuator/actuator-sdk.test.ts libs/core/actuator/actuator-op-registry.test.ts
+```
+
+Retries, sandbox enforcement, context payloads, and real actuator side effects
+remain outside the model; the same assurance boundary applies.
+
+## Voice dispatch increment
+
+`libs/shared-voice/src/voice-dispatch.model.test.ts` covers the reply-speech
+pipeline as three independent specifications.
+
+The streaming-playback model (`streamVoicePlayback`) specifies
+push → dequeue → synthesize → pause-gate → play, with pause resolved three
+ways (handle suspended, handle stopped owing a replay, handle without
+`pause()` left running) and segment supply bounded to three. It exhausts 165
+states and 537 transitions, checking:
+
+- A segment plays only after synthesis completes and the gate is open.
+- `stop()` drains all in-flight work; a stopped controller stays drained.
+- A paused player is held exactly one way — suspended, owed a replay, or
+  left running — and never two at once.
+- A pending replay is owed a spoken segment and blocks later admissions.
+- Quiescent success means every admitted segment spoke; a synthesis or
+  playback failure drains the run without invoking later segments.
+
+The two-stage barge-in model specifies `listening → paused → stopped` for
+`TwoStageBargeIn` under both `streaming_stt` configurations — 30 states and
+160 transitions with streaming STT, 34 and 164 without — checking:
+
+- `hard_stop` requires a prior `pause_tts` episode and is terminal for it.
+- `resume_tts` requires a pause episode; a stopped episode stays inert until
+  `reset()`.
+- The fallback hard stop needs sustained speech at the fallback bound and
+  applies only without streaming STT.
+
+The phrase chunker is checked differentially: an independent reference
+specification of `VoicePhraseChunker` — two-pass sentence-end search with
+the `. ` fallback, first-phrase break set and caps — is compared against the
+production class over more than 10,000 compositions of ten seed texts into
+up to three deltas, plus cap bounds, modulo-whitespace coverage, and a text
+walk proving every emitted boundary is a break char or a cap cut. Checking
+pinned a documented semantics: `. ` is only a fallback break, so boundaries
+around it legitimately depend on which deltas had arrived — both outcomes
+are legal cuts, not a partition violation.
+
+Five deliberate mutations must each produce the intended counterexample
+(gate bypass, stop leaving in-flight work, phantom replay, listening-phase
+hard stop, streaming-STT fallback). Conformance drives the real controllers
+with scripted sequences: synthesis/playback deferreds and fake handles for
+playback (including the `pause() === false` stop-and-replay path and the
+no-`pause()` unpausable path), and fake PCM chunks plus a manual clock for
+barge-in (including external VAD start/end accumulation and the
+partial-before-audio priority of `observeTick`).
+
+```bash
+pnpm exec vitest run libs/shared-voice/src/voice-dispatch.model.test.ts
+```
+
+Segments are counted, not bytes; audio RMS collapses to loud/quiet; STT
+partials collapse to words/filler/echo; wall time to a manual clock. Real
+TTS engines, `ffplay` children, voice-hub HTTP delegation, `streamTtsAudioPlayback`
+stream merging, and arbitrary event-loop schedules remain outside the model.
+
+## Video dispatch increment
+
+`libs/core/video/video-frame-bus.model.test.ts` covers the frame path as two
+independent specifications.
+
+The bounded-queue model specifies `BoundedVideoQueue` under all three
+overflow policies with frame supply bounded to four — 66 states and 112
+transitions for `drop_oldest`, 64 and 109 for `drop_newest`, 31 and 52 for
+`fail` — checking:
+
+- Queue depth and buffered milliseconds stay within policy on every push.
+- Push accounting is complete; every evicted or rejected frame — including
+  the frame that triggers a `fail` overflow — is counted as a drop (the
+  uncounted `fail` drop was fixed alongside this model).
+- Evictions take older frames than the survivors (`drop_oldest`), and
+  evicted or rejected frames never resurface in queue or delivery.
+- A pending reader receives the frame directly; `close()` drains every
+  waiter; a queue failure implies closed and poisons later reads.
+- Delivery order is preserved for admitted frames.
+
+The stub-bus model specifies `StubVideoFrameBus` lifecycle — explicit open,
+reader- and write-side auto-open, format negotiation, lease acquire/release,
+and the degraded path — with writes bounded to three. All three
+configurations (leased `drop_oldest`, leased `fail`, lease-free
+`drop_newest`) exhaust 173 states and 277 transitions, checking:
+
+- Once closed the bus stays closed and writes are dropped.
+- A held device lease requires an open bus; closing or degrading releases it.
+- An explicit open locks the negotiated format; a set format implies open.
+- A queue failure implies degraded or closed, and a degraded bus accepts no
+  more writes — write accounting stays frozen.
+- Reader waiters are bounded and a frame written to a waiting reader counts
+  as both written and delivered.
+
+Five deliberate mutations must each produce the intended counterexample
+(tail-eviction under `drop_oldest`, a waiter registered while the queue is
+nonempty, a close that retains waiters, a degraded-bus write, and a queue
+error that retains the lease). Conformance drives `BoundedVideoQueue` and
+`StubVideoFrameBus` directly: eviction order under each policy, `fail`
+poisoning both reads and writes, pending-reader handoff, post-close drain
+and the silent post-close write, format adoption and mismatch rejection,
+write-side auto-open, lease release on degrade and close, and the resulting
+`health()` report.
+
+`libs/shared-video/src/obs-virtual-camera.model.test.ts` specifies the
+`applySourceFilter` RPC protocol over obs-websocket:
+`GetSourceFilterList` → kind-drift / disabled-create guards → disable-first
+`SetSourceFilterEnabled(false)` → `SetSourceFilterSettings` or
+`CreateSourceFilter` → `SetSourceFilterEnabled(true)` → `GetSourceFilter`
+readback verification. Six request configurations exhaust 3–20 states and
+3–27 transitions each, checking:
+
+- A request completes only on a response matching its requestId; stale or
+  event frames are ignored.
+- Mutation never precedes the filter-list read, and a required disable is
+  acknowledged before settings mutate.
+- A created filter is enabled only when the request asked for it (OBS
+  creates filters enabled, so a disabled create fails closed instead of
+  briefly exposing an unrequested effect).
+- Success requires a readback-verified world — the model lets a server
+  acknowledge a mutation without applying it (`ok:ignored`), and such runs
+  can only reach `failed`, never `done`: the readback gate is
+  load-bearing.
+
+Four deliberate mutations must each produce the intended counterexample
+(stale-response acceptance, mutate-before-disable, skipped readback,
+disabled create). Conformance runs the production client against a fake
+obs-websocket server and pins the exact request sequences — including a
+new case: an acknowledged-but-ignored mutation fails closed with
+`OBS_FILTER_UNVERIFIED`.
+
+`libs/shared-video/src/video-filter-apply.model.test.ts` specifies the
+provider-neutral `applyVideoFilter` pipeline end to end —
+validate → resolve provider → capability gate → probe → prepare → governed
+`runExternalOperation` (approval-required, nondelegable) → commit → verify
+the returned filter metadata — across five provider configurations:
+auto-single and explicit-capable paths exhaust 14 states and 15
+transitions; auto-ambiguous and unknown-provider rejections take 3/3; an
+unsupported capability exits at 4/4. The model checks every gate in
+order: denied approval never commits, an explicit-provider or probe
+failure never redispatches to a second provider, capability is checked
+before any preparation, and a malformed target digest or a commit result
+whose identity differs from the request fails closed. A counted side
+effect also implies the pipeline reached its stage: a phase may only
+regress to `failed`, never back to an earlier gate. Two deliberate
+mutations (redispatch to a second provider, revalidate after a failed
+probe) produce the intended counterexamples.
+
+`libs/shared-video/src/camera-output.model.test.ts` covers two seams. The
+resolution differential enumerates every registry ordering, availability
+mask, and preference against `resolveCameraOutputBridge`: explicit ids
+must exist and probe successfully, `auto` skips the `stub` backend and
+returns the first probed-available backend **in id order** — the seam
+lists providers sorted by id, a semantic difference from the documented
+"registration order" that surfaced while writing the spec (the code
+comment was corrected). The v4l2 lifecycle model bounds starts to two and
+exhausts 35 states / 91 transitions on linux (8/19 off-linux): a lease is
+held only inside a live injection, at most one lease exists, settled runs
+retain neither lease nor running flag, a device probe precedes every
+injection, loop requests never reach the probe, and a healthy report
+requires a successful injection. Three mutations (retained lease,
+concurrent start, loop bypass) each produce the intended counterexample.
+Conformance against the real bridge — including a regression test for a
+defect found while writing the model — pins the mid-flight `stop()`
+semantics: a stop abandons the in-flight call (its lease is released and
+its start-guard cleared), and the abandoned call's settle must not
+release a later call's lease, clear its guard, or publish its result into
+shared health state (the bridge now tracks per-call lease ownership and a
+call token).
+
+`libs/core/virtual/virtual-camera-injection.model.test.ts` models
+`resolveSelection` as a 24-cell environment lattice — requested backend ×
+platform × device-path × ffmpeg-alive — exhausting 48 states and 24
+transitions: an unknown requested backend throws before any selection, a
+device backend requires an eligible platform, its required device path,
+and a live ffmpeg probe, and the replay fallback reason distinguishes a
+requested-but-ineligible backend from no-configured-backend. Two
+mutations (ghost-backend fallback, device selection with dead ffmpeg)
+produce the intended counterexamples. Conformance drives the production
+`probe()` over the real governed registry — including a linux device-mode
+selection, a requested-backend-unavailable report, and five `pickCamera`
+preference/differential cases (virtual cameras preferred, exact match,
+contained match, unmatched fallback, empty-inventory hint).
+
+```bash
+pnpm exec vitest run libs/core/video/video-frame-bus.model.test.ts libs/shared-video/src/obs-virtual-camera.model.test.ts libs/shared-video/src/video-filter-apply.model.test.ts libs/shared-video/src/camera-output.model.test.ts libs/core/virtual/virtual-camera-injection.model.test.ts
+```
+
+Frames are counted with duration collapsed to a fixed 33 ms; the OBS world
+collapses to {exists, enabled, settings-applied, kind-ok}; provider and
+backend registries collapse to their capability/eligibility bits; ffmpeg
+probing collapses to alive/dead. Real WebSocket framing, the Hello/Identify
+handshake and password challenge, wall-clock timeouts, device-lease
+contention beyond held/released, settings payload contents, real OBS and
+ffmpeg behavior, and multi-backend registries beyond the governed single
+entry remain outside the model.
 
 ## Assurance boundary
 

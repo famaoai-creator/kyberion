@@ -134,6 +134,11 @@
       "note": "module additions/moves can shift the layer map"
     },
     {
+      "change": "libs/shared-*/**/*.ts",
+      "docs": ["docs/COMPONENT_MAP.md"],
+      "note": "module additions/moves can shift the layer map"
+    },
+    {
       "change": "libs/actuators/**/*.ts",
       "docs": ["CAPABILITIES_GUIDE.md"],
       "note": "actuator ops change the capability surface"
