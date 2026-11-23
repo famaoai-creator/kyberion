@@ -43,49 +43,90 @@ export function missionStateScope(missionDir: string): {
   };
 }
 
+type MissionDirEntry = { missionDir: string; tenantPartition?: string };
+
+/** Archive tier directories, shared with path-resolver (the storage tiers plus `ephemeral`). */
+const { ARCHIVE_TIER_DIRS } = pathResolver;
+
+function isDirectory(candidate: string): boolean {
+  try {
+    return safeStat(candidate).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** Safe child directories of `dir`. */
+function childDirs(dir: string): Array<{ name: string; dir: string }> {
+  const children: Array<{ name: string; dir: string }> = [];
+  for (const name of listDirEntries(dir)) {
+    const child = safeOptionalRepositoryPath(path.join(dir, name));
+    if (child && isDirectory(child)) children.push({ name, dir: child });
+  }
+  return children;
+}
+
 /**
- * Every mission directory under `active/missions` (or, with `archived`,
- * `active/archive/missions`): the flat `<tier>/<id>` form and the
- * tenant-partitioned `<tier>/<tenant>/<id>` form (path-resolver
+ * Active missions under `active/missions/<tier>/`: the flat `<tier>/<id>`
+ * form and the tenant-partitioned `<tier>/<tenant>/<id>` form (path-resolver
  * `tenantMissionDir`). A tier entry holding its own `mission-state.json` is a
  * flat mission; otherwise an entry named like a tenant slug is a tenant
- * partition whose children are missions. `isValidTenantSlug` rejects every
- * `RESERVED_SCOPE_NAMES` entry (`shared`, the tier names), so a reserved
- * directory is never read as a tenant partition.
+ * partition whose children are missions. In this ACTIVE layout no `shared`
+ * partition exists (tenant-free missions are flat), and `isValidTenantSlug`
+ * rejects every `RESERVED_SCOPE_NAMES` entry, so a reserved directory is
+ * never read as a tenant partition here.
  */
-export function listMissionDirs(
-  options: { archived?: boolean } = {}
-): Array<{ missionDir: string; tenantPartition?: string }> {
-  const found: Array<{ missionDir: string; tenantPartition?: string }> = [];
-  const isDirectory = (candidate: string): boolean => {
-    try {
-      return safeStat(candidate).isDirectory();
-    } catch {
-      return false;
-    }
-  };
-  const missionsRoot = path.join(
-    pathResolver.rootDir(),
-    ...(options.archived ? ['active', 'archive', 'missions'] : ['active', 'missions'])
-  );
+function listActiveMissionDirs(): MissionDirEntry[] {
+  const found: MissionDirEntry[] = [];
+  const missionsRoot = path.join(pathResolver.rootDir(), 'active', 'missions');
   for (const tier of STORAGE_DATA_TIERS) {
-    const tierDir = path.join(missionsRoot, tier);
-    for (const name of listDirEntries(tierDir)) {
-      const entryDir = safeOptionalRepositoryPath(path.join(tierDir, name));
-      if (!entryDir || !isDirectory(entryDir)) continue;
-      if (safeExistsSync(path.join(entryDir, 'mission-state.json')) || !isValidTenantSlug(name)) {
-        found.push({ missionDir: entryDir });
+    for (const entry of childDirs(path.join(missionsRoot, tier))) {
+      if (
+        safeExistsSync(path.join(entry.dir, 'mission-state.json')) ||
+        !isValidTenantSlug(entry.name)
+      ) {
+        found.push({ missionDir: entry.dir });
         continue;
       }
-      for (const child of listDirEntries(entryDir)) {
-        const missionDir = safeOptionalRepositoryPath(path.join(entryDir, child));
-        if (missionDir && isDirectory(missionDir)) {
-          found.push({ missionDir, tenantPartition: name });
-        }
+      for (const child of childDirs(entry.dir)) {
+        found.push({ missionDir: child.dir, tenantPartition: entry.name });
       }
     }
   }
   return found;
+}
+
+/**
+ * Archived missions, enumerated the way path-resolver `findArchivedMissionDir`
+ * does: under the (configurable) `archivedMissionsRoot()`, the canonical
+ * `<tier>/<tenant|shared>/<ID>` layout for every archive tier (incl.
+ * `ephemeral`), plus legacy pre-partition `<root>/<ID>` directories. In the
+ * archive `shared` IS a partition — its children are tenant-free missions
+ * (no tenant lineage beyond what their state declares).
+ */
+function listArchivedMissionDirs(): MissionDirEntry[] {
+  const found: MissionDirEntry[] = [];
+  for (const entry of childDirs(pathResolver.archivedMissionsRoot())) {
+    if (!ARCHIVE_TIER_DIRS.has(entry.name)) {
+      found.push({ missionDir: entry.dir });
+      continue;
+    }
+    for (const segment of childDirs(entry.dir)) {
+      if (segment.name !== 'shared' && !isValidTenantSlug(segment.name)) continue;
+      for (const child of childDirs(segment.dir)) {
+        found.push({
+          missionDir: child.dir,
+          ...(segment.name === 'shared' ? {} : { tenantPartition: segment.name }),
+        });
+      }
+    }
+  }
+  return found;
+}
+
+/** Every active (default) or archived mission directory with its tenant partition. */
+export function listMissionDirs(options: { archived?: boolean } = {}): MissionDirEntry[] {
+  return options.archived ? listArchivedMissionDirs() : listActiveMissionDirs();
 }
 
 /** Mission lineage; a tenant-nested mission's partition is its tenant when the state omits it. */

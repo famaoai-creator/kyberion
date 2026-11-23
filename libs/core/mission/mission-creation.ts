@@ -871,7 +871,7 @@ export async function startMission(args: {
         state?.intent?.goal_summary ||
         state?.intent?.source_text ||
         visionRef ||
-        `Start mission ${upperId} (${missionType})`,
+        `Start mission ${upperId} (${state?.mission_type ?? missionType})`,
       source: 'mission_state',
       extraction: 'canonical_only',
       traceRef: state?.correlation_id,

@@ -1308,6 +1308,64 @@ describe('storage-janitor', () => {
       expect(result.errors![0]).toContain('audit record could not be written');
     });
 
+    it('runJanitor reports every scanner whose audited expiry was kept for want of an audit record', () => {
+      writeCatalogFile({
+        version: '1.10.0',
+        entries: [
+          {
+            path: 'active/shared/tmp',
+            artifact_class: 'tmp',
+            ttl_days: 1,
+            action: 'delete',
+            audit: true,
+          },
+          {
+            path: 'active/shared/logs',
+            artifact_class: 'log',
+            ttl_days: 30,
+            action: 'delete',
+            audit: true,
+          },
+          {
+            path: 'active/shared/runtime/browser-receipts',
+            artifact_class: 'evidence',
+            ttl_days: 90,
+            action: 'delete',
+            audit: true,
+          },
+          {
+            path: 'active/shared/staging',
+            artifact_class: 'tmp',
+            ttl_days: 3,
+            action: 'delete',
+            audit: true,
+          },
+        ],
+      });
+      const shared = path.dirname(tmpDir);
+      const files = {
+        tmp: path.join(tmpDir, 'job', 'old.txt'),
+        logs: path.join(logsDir, 'traces', 'old.jsonl'),
+        runtime: path.join(shared, 'runtime', 'browser-receipts', 'old.json'),
+        'storage-floors': path.join(shared, 'staging', 'system', 'old.bin'),
+      };
+      for (const f of Object.values(files)) {
+        writeFile(f);
+        setMtime(f, 120 * RETENTION_DAY_MS);
+      }
+      blockRetentionAudit();
+
+      const report = runJanitor({ dryRun: false });
+      for (const [scanner, f] of Object.entries(files)) {
+        expect(fs.existsSync(f), f).toBe(true);
+        const repoRel = path.relative(testRootDir(), f).split(path.sep).join('/');
+        expect(
+          report.errors.some((e) => e.startsWith(`${scanner}: ${repoRel}`)),
+          `${scanner} error for ${repoRel} in ${JSON.stringify(report.errors)}`
+        ).toBe(true);
+      }
+    });
+
     it('never unlinks an audited log file whose audit record cannot be written', () => {
       writeCatalogFile({
         version: '1.10.0',

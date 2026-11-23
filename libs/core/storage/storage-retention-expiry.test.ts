@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { rotatedSegmentPath, rotatedSegmentStem } from './append-only-store.js';
+import { randomUUID } from 'node:crypto';
+import { rootDir } from '../path-resolver.js';
 import {
+  expireFilePerPolicy,
   isRotatedSegmentName,
   ROTATED_SEGMENT_SUFFIX_PATTERN,
 } from './storage-retention-expiry.js';
@@ -27,5 +30,14 @@ describe('rotated segment naming (C-EXP-008)', () => {
     expect(isRotatedSegmentName('other-20261101-123456.jsonl', stem)).toBe(false);
     expect(isRotatedSegmentName('items.jsonl', stem)).toBe(false);
     expect(isRotatedSegmentName('items-20261101-123456-x.jsonl', stem)).toBe(false);
+  });
+});
+
+describe('expiry of a file that is already gone', () => {
+  it('treats a file removed before its expiry step as already expired, not as a failure', () => {
+    const gone = path.join(rootDir(), 'active/shared/tmp', `expiry-gone-${randomUUID()}.txt`);
+    const outcome = { deleted: [], softDeleted: [], archived: [] };
+    expect(() => expireFilePerPolicy(gone, null, outcome)).not.toThrow();
+    expect(outcome).toEqual({ deleted: [], softDeleted: [], archived: [] });
   });
 });

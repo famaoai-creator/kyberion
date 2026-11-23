@@ -252,7 +252,7 @@ export interface ExpiryOutcome {
  *
  * Audit first: when a record is required it is written BEFORE the file is
  * moved or unlinked. If the record cannot be written, the file is left in
- * place and this throws (the next sweep retries) — an audited expiry never
+ * place and this throws (the caller records it; the next sweep retries) — an audited expiry never
  * happens without its record. If the move/unlink then fails, a best-effort
  * `RETENTION_EXPIRY_FAILED` record follows the intent record and the error
  * is rethrown.
@@ -264,6 +264,8 @@ export function expireFilePerPolicy(
   /** WI-16: extra audit fields (e.g. status-rule id/status) merged into the audit record when written. */
   auditExtra?: Record<string, unknown>
 ): void {
+  // Already gone (removed by its owner or a concurrent sweep since selection): nothing to expire.
+  if (!safeExistsSync(filePath)) return;
   const repoRel = repoRelativePosix(filePath);
   const archive = entry?.action === 'archive';
   const softDelete = !archive && entry?.soft_delete_days !== undefined;
@@ -297,9 +299,7 @@ export function expireFilePerPolicy(
       });
     } catch (err) {
       const why = err instanceof Error ? err.message : String(err);
-      logger.warn(
-        `[JANITOR] ${repoRel} not expired — its retention audit record could not be written (${why}) | next: make ${STORAGE_RETENTION_AUDIT_FILENAME} appendable; the next sweep retries | evidence: file left in place`
-      );
+      // The caller records the kept file and warns once per sweep.
       throw new Error(`${repoRel}: not expired — audit record could not be written (${why})`);
     }
   }
@@ -320,6 +320,8 @@ export function expireFilePerPolicy(
       logger.debug(`[JANITOR] deleted: ${filePath}`);
     }
   } catch (err) {
+    // Lost a race with another remover after the intent record: the file is gone, as intended.
+    if (!safeExistsSync(filePath)) return;
     if (audited) {
       appendRetentionAudit({
         event: 'RETENTION_EXPIRY_FAILED',

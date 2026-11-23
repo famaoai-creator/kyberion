@@ -208,6 +208,7 @@ vi.mock('../path-resolver.js', async () => {
         ? nodePath.join(process.cwd(), 'knowledge', sub)
         : nodePath.join(factoryRoot(), 'knowledge', sub),
     findMissionPath: () => null,
+    archivedMissionsRoot: () => nodePath.join(factoryRoot(), 'active', 'archive', 'missions'),
   };
   // `pathResolver` (the namespace-style export) is what audit-chain — pulled
   // in transitively by NI-05's governance hook — reads at construction.
@@ -2180,6 +2181,81 @@ describe('project offboarding — data-vault attribution (C-OFF-014)', () => {
         organizationId: 'org-a',
       })
     ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
+  });
+
+  function archivedProjectMission(repoPath: string, overrides: Record<string, unknown> = {}): void {
+    writeJson(
+      abs(`${repoPath}/mission-state.json`),
+      missionState({
+        mission_id: path.posix.basename(repoPath),
+        tier: 'confidential',
+        status: 'archived',
+        relationships: { project: { project_id: 'proj-shared', relationship_type: 'belongs_to' } },
+        ...overrides,
+      })
+    );
+  }
+
+  it('refuses an unprefixed entry when a tenant-free archived mission (<tier>/shared/<ID>) references the project', async () => {
+    seedProjectLineage('tenant-a', 'org-a');
+    archivedProjectMission('active/archive/missions/confidential/shared/MIS-FREE-1');
+    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
+
+    expect(() =>
+      collectScopeTargets('project', 'proj-shared', {
+        tenantSlug: 'tenant-a',
+        organizationId: 'org-a',
+      })
+    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
+  });
+
+  it('refuses an unprefixed entry when a legacy flat archived mission (<root>/<ID>) references the project', async () => {
+    seedProjectLineage('tenant-a', 'org-a');
+    archivedProjectMission('active/archive/missions/MIS-LEGACY-1', {
+      tenant_slug: 'tenant-b',
+      organization_id: 'org-b',
+    });
+    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
+
+    expect(() =>
+      collectScopeTargets('project', 'proj-shared', {
+        tenantSlug: 'tenant-a',
+        organizationId: 'org-a',
+      })
+    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
+  });
+
+  it('refuses an unprefixed entry when an ephemeral-tier archived mission references the project', async () => {
+    seedProjectLineage('tenant-a', 'org-a');
+    archivedProjectMission('active/archive/missions/ephemeral/tenant-b/MIS-EPH-1', {
+      tier: 'public',
+      tenant_slug: 'tenant-b',
+      organization_id: 'org-b',
+    });
+    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
+
+    expect(() =>
+      collectScopeTargets('project', 'proj-shared', {
+        tenantSlug: 'tenant-a',
+        organizationId: 'org-a',
+      })
+    ).toThrow('PROJECT_DATA_VAULT_AMBIGUOUS');
+  });
+
+  it('still claims an unprefixed entry when the only archived reference is the filter lineage', async () => {
+    seedProjectLineage('tenant-a', 'org-a');
+    archivedProjectMission('active/archive/missions/confidential/tenant-a/MIS-OLD-A', {
+      tenant_slug: 'tenant-a',
+      organization_id: 'org-a',
+    });
+    await fetchWithVaultCache('web', 'url:a', () => ({ v: 1 }), { projectId: 'proj-shared' });
+
+    expect(
+      collectScopeTargets('project', 'proj-shared', {
+        tenantSlug: 'tenant-a',
+        organizationId: 'org-a',
+      }).filter((target) => target.kind === 'data_vault_entry')
+    ).toEqual(vaultFiles().map((file) => ({ path: file, kind: 'data_vault_entry' })));
   });
 
   it('refuses an unprefixed entry when the project registry record names another lineage (review #2)', async () => {

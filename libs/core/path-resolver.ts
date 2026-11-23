@@ -777,7 +777,13 @@ export function archivedMissionDir(
   );
 }
 
-const ARCHIVE_TIER_DIRS = new Set(['public', 'confidential', 'personal', 'ephemeral']);
+/** Tier directories under the mission archive root (storage tiers plus `ephemeral`). */
+export const ARCHIVE_TIER_DIRS: ReadonlySet<string> = new Set([
+  'public',
+  'confidential',
+  'personal',
+  'ephemeral',
+]);
 
 /** Tenant partition names inside an archive tier dir — slugs plus `shared`. */
 function archiveTenantSegments(tierDir: string): string[] {

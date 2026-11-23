@@ -181,6 +181,8 @@ export interface ScanTmpResult {
   /** Expired files moved to `active/archive/<repo-rel>` by an `archive` entry. */
   archived: string[];
   codeGrace?: ReturnType<typeof reportScratchCodeGrace>; // dirs held by code_grace_days
+  /** Expired files kept because their expiry (e.g. its audit record) failed. */
+  errors?: string[];
 }
 
 export interface RotateLogsOptions {
@@ -197,7 +199,7 @@ export interface RotateLogsResult {
   softDeleted: string[];
   /** Expired files moved to `active/archive/<repo-rel>` by an `archive` entry. */
   archived: string[];
-  /** Audit chain days that could not be expired as a whole (left live). */
+  /** Expired files (incl. whole audit chain days) kept because their expiry failed. */
   errors?: string[];
 }
 
@@ -225,6 +227,8 @@ export interface ScanRuntimeResult {
   softDeleted: string[];
   /** Expired files moved to `active/archive/<repo-rel>` by an `archive` entry. */
   archived: string[];
+  /** Expired files kept because their expiry (e.g. its audit record) failed. */
+  errors?: string[];
 }
 
 /** AL-04 trash sweep result — see `sweepTrash`. */
@@ -355,6 +359,45 @@ export interface LegacyJanitorReport {
   removed: number;
 }
 
+/**
+ * Expire one file through {@link expireFilePerPolicy}. A failure — notably an
+ * audit record that could not be written (audit-first) — leaves the file in
+ * place and is recorded as `<repo-rel>: <why>` for the janitor report.
+ */
+function expireOrRecord(
+  filePath: string,
+  entry: RetentionCatalogEntry | null,
+  outcome: ExpiryOutcome,
+  errors: string[],
+  auditExtra?: Record<string, unknown>
+): void {
+  try {
+    expireFilePerPolicy(filePath, entry, outcome, auditExtra);
+  } catch (err) {
+    errors.push(expiryFailure(filePath, err));
+  }
+}
+
+function expiryFailure(filePath: string, err: unknown): string {
+  const repoRel = repoRelativePosix(filePath);
+  const message = err instanceof Error ? err.message : String(err);
+  return message.startsWith(repoRel) ? message : `${repoRel}: ${message}`;
+}
+
+/** One summary line per sweep instead of a warn per kept file. */
+function warnKeptExpiries(scanner: string, errors: readonly string[]): void {
+  if (errors.length === 0) return;
+  logger.warn(
+    `[JANITOR] ${scanner}: ${errors.length} expired file(s) kept — expiry failed | next: fix the cause (e.g. make the retention audit log appendable); the next sweep retries | evidence: first: ${errors[0]}`
+  );
+}
+
+/** Spread into a scanner result: `errors` only when something was kept. */
+function withErrors(scanner: string, errors: string[]): { errors?: string[] } {
+  warnKeptExpiries(scanner, errors);
+  return errors.length > 0 ? { errors } : {};
+}
+
 export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
   const catalog = opts.catalog ?? loadRetentionCatalog();
   const entry = retentionEntryForExactPath(catalog, 'active/shared/tmp');
@@ -363,17 +406,14 @@ export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
   const dir = sharedTmp();
   const now = Date.now();
   const expired: string[] = [];
+  const errors: string[] = [];
   const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
 
   const selection = selectExpiredTmpFiles(collectFiles(dir), ttlMs, now, entry?.code_grace_days);
   for (const filePath of selection.expired) {
     expired.push(filePath);
     if (opts.dryRun) continue;
-    try {
-      expireFilePerPolicy(filePath, entry, outcome);
-    } catch {
-      // skip
-    }
+    expireOrRecord(filePath, entry, outcome, errors);
   }
 
   // collectFiles only sees files, so job-scoped directories under tmp/ never
@@ -422,6 +462,7 @@ export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
     softDeleted: outcome.softDeleted,
     archived: outcome.archived,
     codeGrace: reportScratchCodeGrace(selection.grace, now, opts.dryRun),
+    ...withErrors('tmp', errors),
   };
 }
 
@@ -473,7 +514,7 @@ export function rotateLogs(opts: RotateLogsOptions): RotateLogsResult {
             }
           }
         } else if (!opts.dryRun) {
-          expireFilePerPolicy(filePath, fileEntry, outcome);
+          expireOrRecord(filePath, fileEntry, outcome, errors);
         }
       }
     } catch {
@@ -486,7 +527,7 @@ export function rotateLogs(opts: RotateLogsOptions): RotateLogsResult {
     rotated: outcome.deleted,
     softDeleted: outcome.softDeleted,
     archived: outcome.archived,
-    ...(errors.length > 0 ? { errors } : {}),
+    ...withErrors('logs', errors),
   };
 }
 
@@ -520,15 +561,11 @@ export function scanDataVault(opts: ScanDataVaultOptions): ScanDataVaultResult {
     if (!entry?.expiresAt || Date.parse(entry.expiresAt) > Date.now()) continue;
     expired.push(filePath);
     if (opts.dryRun) continue;
-    try {
-      expireFilePerPolicy(filePath, policy, outcome, {
-        expires_at: entry.expiresAt,
-        reason: 'data-vault entry expiresAt elapsed (storage janitor)',
-      });
-    } catch (err) {
-      // Audit-first: the entry stays in place and is retried next sweep.
-      errors.push(err instanceof Error ? err.message : String(err));
-    }
+    // Audit-first: a failed expiry keeps the entry and is retried next sweep.
+    expireOrRecord(filePath, policy, outcome, errors, {
+      expires_at: entry.expiresAt,
+      reason: 'data-vault entry expiresAt elapsed (storage janitor)',
+    });
   }
 
   return {
@@ -536,7 +573,7 @@ export function scanDataVault(opts: ScanDataVaultOptions): ScanDataVaultResult {
     deleted: outcome.deleted,
     softDeleted: outcome.softDeleted,
     archived: outcome.archived,
-    ...(errors.length > 0 ? { errors } : {}),
+    ...withErrors('data-vault', errors),
   };
 }
 
@@ -546,6 +583,7 @@ export function scanRuntime(opts: {
 }): ScanRuntimeResult {
   const now = Date.now();
   const expired: string[] = [];
+  const errors: string[] = [];
   const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
 
   const rules = runtimeRetentionRules(opts.catalog ?? loadRetentionCatalog());
@@ -557,11 +595,11 @@ export function scanRuntime(opts: {
         if (now - stat.mtimeMs > rule.ttlMs) {
           expired.push(filePath);
           if (!opts.dryRun) {
-            expireFilePerPolicy(filePath, rule.entry, outcome);
+            expireOrRecord(filePath, rule.entry, outcome, errors);
           }
         }
       } catch {
-        // skip
+        // skip (unreadable file)
       }
     }
   }
@@ -571,6 +609,7 @@ export function scanRuntime(opts: {
     deleted: outcome.deleted,
     softDeleted: outcome.softDeleted,
     archived: outcome.archived,
+    ...withErrors('runtime', errors),
   };
 }
 
@@ -591,7 +630,12 @@ export function scanEventStores(opts: {
   catalog?: LoadedRetentionCatalog;
 }): ScanRuntimeResult {
   const catalog = opts.catalog ?? loadRetentionCatalog();
-  return sweepRepoRootedRules(eventStoreRetentionRules(catalog), catalog, opts.dryRun);
+  return sweepRepoRootedRules(
+    'event-stores',
+    eventStoreRetentionRules(catalog),
+    catalog,
+    opts.dryRun
+  );
 }
 
 /**
@@ -604,16 +648,23 @@ export function scanStorageFloors(opts: {
   catalog?: LoadedRetentionCatalog;
 }): ScanRuntimeResult {
   const catalog = opts.catalog ?? loadRetentionCatalog();
-  return sweepRepoRootedRules(storageFloorRetentionRules(catalog), catalog, opts.dryRun);
+  return sweepRepoRootedRules(
+    'storage-floors',
+    storageFloorRetentionRules(catalog),
+    catalog,
+    opts.dryRun
+  );
 }
 
 function sweepRepoRootedRules(
+  scanner: string,
   rules: Array<{ repoRelativeDir: string; ttlMs: number; entry: RetentionCatalogEntry }>,
   catalog: LoadedRetentionCatalog,
   dryRun: boolean
 ): ScanRuntimeResult {
   const now = Date.now();
   const expired: string[] = [];
+  const errors: string[] = [];
   const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
   for (const rule of rules) {
     const dir = nodePath.join(rootDir(), rule.repoRelativeDir);
@@ -649,11 +700,11 @@ function sweepRepoRootedRules(
         if (now - stat.mtimeMs > rule.ttlMs) {
           expired.push(filePath);
           if (!dryRun) {
-            expireFilePerPolicy(filePath, rule.entry, outcome);
+            expireOrRecord(filePath, rule.entry, outcome, errors);
           }
         }
       } catch {
-        // skip
+        // skip (unreadable file)
       }
     }
   }
@@ -663,6 +714,7 @@ function sweepRepoRootedRules(
     deleted: outcome.deleted,
     softDeleted: outcome.softDeleted,
     archived: outcome.archived,
+    ...withErrors(scanner, errors),
   };
 }
 
@@ -731,6 +783,7 @@ function sweepStatusRulesInContext(opts: {
   const catalog = opts.catalog ?? loadRetentionCatalog();
   const now = Date.now();
   const expired: string[] = [];
+  const errors: string[] = [];
   const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
 
   for (const { entry, rule } of catalogStatusRules(catalog)) {
@@ -759,7 +812,7 @@ function sweepStatusRulesInContext(opts: {
           continue;
         }
         expired.push(filePath);
-        expireFilePerPolicy(filePath, entry, outcome, {
+        expireOrRecord(filePath, entry, outcome, errors, {
           status_rule_id: rule.id,
           status,
           status_field: rule.status_field,
@@ -777,6 +830,7 @@ function sweepStatusRulesInContext(opts: {
     deleted: outcome.deleted,
     softDeleted: outcome.softDeleted,
     archived: outcome.archived,
+    ...withErrors('status-rules', errors),
   };
 }
 
@@ -812,6 +866,7 @@ export function sweepSupervisorEventFiles(
   const retentionMs = retentionDays * RETENTION_DAY_MS;
   const now = Date.now();
   const expired: string[] = [];
+  const errors: string[] = [];
   const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
 
   const files = listSupervisorEventFiles({
@@ -826,11 +881,11 @@ export function sweepSupervisorEventFiles(
       if (now - stat.mtimeMs > retentionMs) {
         expired.push(file.path);
         if (!opts.dryRun) {
-          expireFilePerPolicy(file.path, entry, outcome);
+          expireOrRecord(file.path, entry, outcome, errors);
         }
       }
     } catch {
-      // skip
+      // skip (unreadable file)
     }
   }
 
@@ -839,6 +894,7 @@ export function sweepSupervisorEventFiles(
     deleted: outcome.deleted,
     softDeleted: outcome.softDeleted,
     archived: outcome.archived,
+    ...withErrors('supervisor-events', errors),
   };
 }
 
@@ -1087,11 +1143,11 @@ export function sweepAppendOnlyStores(opts: {
               if (nowMs - stat.mtimeMs > entry.ttl_days * RETENTION_DAY_MS) {
                 result.segmentsExpired.push(segmentPath);
                 if (!opts.dryRun) {
-                  expireFilePerPolicy(segmentPath, segmentEntry, segmentOutcome);
+                  expireOrRecord(segmentPath, segmentEntry, segmentOutcome, result.errors);
                 }
               }
             } catch {
-              // skip
+              // skip (unreadable segment)
             }
           }
           result.segmentsDeleted.push(...segmentOutcome.deleted);
@@ -1485,6 +1541,7 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
   let tmpResult: ScanTmpResult = { expired: [], deleted: [], softDeleted: [], archived: [] };
   try {
     tmpResult = scanTmp({ dryRun: opts.dryRun, catalog });
+    for (const failure of tmpResult.errors ?? []) errors.push(`tmp: ${failure}`);
   } catch (err: any) {
     errors.push(`tmp: ${err?.message ?? String(err)}`);
   }
@@ -1518,6 +1575,7 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
   };
   try {
     runtimeResult = scanRuntime({ dryRun: opts.dryRun, catalog });
+    for (const failure of runtimeResult.errors ?? []) errors.push(`runtime: ${failure}`);
   } catch (err: any) {
     errors.push(`runtime: ${err?.message ?? String(err)}`);
   }
@@ -1530,6 +1588,7 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
   };
   try {
     eventStoreResult = scanEventStores({ dryRun: opts.dryRun, catalog });
+    for (const failure of eventStoreResult.errors ?? []) errors.push(`event-stores: ${failure}`);
   } catch (err: any) {
     errors.push(`event-stores: ${err?.message ?? String(err)}`);
   }
@@ -1542,6 +1601,8 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
   };
   try {
     storageFloorResult = scanStorageFloors({ dryRun: opts.dryRun, catalog });
+    for (const failure of storageFloorResult.errors ?? [])
+      errors.push(`storage-floors: ${failure}`);
   } catch (err: any) {
     errors.push(`storage-floors: ${err?.message ?? String(err)}`);
   }
@@ -1554,6 +1615,8 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
   };
   try {
     supervisorEventsResult = sweepSupervisorEventFiles({ dryRun: opts.dryRun, catalog });
+    for (const failure of supervisorEventsResult.errors ?? [])
+      errors.push(`supervisor-events: ${failure}`);
   } catch (err: any) {
     errors.push(`supervisor-events: ${err?.message ?? String(err)}`);
   }
@@ -1566,6 +1629,7 @@ function performJanitor(opts: { dryRun: boolean }): JanitorReport {
   };
   try {
     statusRulesResult = sweepStatusRules({ dryRun: opts.dryRun, catalog });
+    for (const failure of statusRulesResult.errors ?? []) errors.push(`status-rules: ${failure}`);
   } catch (err: any) {
     errors.push(`status-rules: ${err?.message ?? String(err)}`);
   }
