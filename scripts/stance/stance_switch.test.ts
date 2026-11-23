@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({
   safeWriteFile: vi.fn(),
   listTenantProfileSlugs: vi.fn(() => [] as string[]),
   readTenantProfile: vi.fn((_slug: string) => null as { status: string } | null),
+  resolveOrganizationProfile: vi.fn(),
+  loadOrganizationProfile: vi.fn(),
   classifyError: vi.fn((err: any) => ({
     category: 'unknown',
     message: String(err?.message || err),
@@ -34,8 +36,9 @@ vi.mock('@agent/core', () => ({
 }));
 
 vi.mock('@agent/core/path-resolver', async (importOriginal) => ({
-  // Authority loads the tracked tenant schema before per-test fixture roots apply.
-  rootResolve: (await importOriginal<typeof import('@agent/core/path-resolver')>()).rootResolve,
+  // Authority loads tracked governance from the real checkout. The CLI
+  // facade's pathResolver points to the per-test stance fixture.
+  ...(await importOriginal<typeof import('@agent/core/path-resolver')>()),
   pathResolver: mocks.pathResolver,
 }));
 
@@ -52,6 +55,11 @@ vi.mock('@agent/core/foundation/json', () => ({ readJson: mocks.readJson }));
 vi.mock('@agent/core/tenant-registry', () => ({
   listTenantProfileSlugs: mocks.listTenantProfileSlugs,
   readTenantProfile: mocks.readTenantProfile,
+}));
+
+vi.mock('@agent/core/organization-profile', () => ({
+  resolveTenantOrganizationProfilePath: mocks.resolveOrganizationProfile,
+  loadOrganizationProfileAtPath: mocks.loadOrganizationProfile,
 }));
 
 vi.mock('@agent/core/error-classifier', () => ({
@@ -75,6 +83,7 @@ describe('stance_switch', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     if (tmpDir && fs.existsSync(tmpDir)) {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -106,7 +115,14 @@ describe('stance_switch', () => {
     const result = mod.switchStance('acme');
 
     expect(result.envPath).toBe(envPath);
-    expect(fs.readFileSync(envPath, 'utf8')).toBe('export KYBERION_STANCE=acme\n');
+    expect(fs.readFileSync(envPath, 'utf8').trim().split('\n')).toEqual([
+      'export KYBERION_STANCE=acme',
+      'export KYBERION_STANCE_SCOPE_BOUND=1',
+      'unset KYBERION_TIER KYBERION_PROJECT_ID MISSION_ID KYBERION_TASK_ID KYBERION_NHI_SESSION',
+      "export KYBERION_NHI_ID=''",
+      'unset KYBERION_TENANT',
+      'unset KYBERION_ORGANIZATION_ID',
+    ]);
   });
 
   function fixture(stanceJson: unknown): void {
@@ -131,6 +147,13 @@ describe('stance_switch', () => {
     fixture({
       acting_for: { tenant_slug: 'tenant-a', organization_id: 'delivery', org_role: 'pm' },
     });
+    vi.stubEnv('KYBERION_TENANT', 'tenant-b');
+    const { currentExecutionScope } = await import('@agent/core/foundation');
+    mocks.resolveOrganizationProfile.mockReturnValue({ path: 'organization-profile.json' });
+    mocks.loadOrganizationProfile.mockImplementation(() => {
+      expect(currentExecutionScope()?.tenantSlug).toBe('tenant-a');
+      return { organization_id: 'delivery' };
+    });
     const mod = await import('./stance_switch.js');
     const result = mod.switchStance('fde', { permittedTenants: () => ['tenant-a', 'tenant-b'] });
 
@@ -142,12 +165,50 @@ describe('stance_switch', () => {
     // STANCE_ENV_PATH is fixed at module load; read what was written there.
     expect(mocks.safeWriteFile).toHaveBeenCalledWith(
       result.envPath,
-      'export KYBERION_STANCE=fde\nexport KYBERION_TENANT=tenant-a\nexport KYBERION_ORGANIZATION_ID=delivery\n',
+      expect.stringContaining(
+        'export KYBERION_TENANT=tenant-a\nexport KYBERION_ORGANIZATION_ID=delivery\n'
+      ),
       { encoding: 'utf8' }
     );
+    expect(mocks.resolveOrganizationProfile).toHaveBeenCalledWith('tenant-a', 'delivery', tmpDir);
     expect(mod.formatSwitchedStance(result)[1]).toBe(
       'Acting for tenant tenant-a, organization delivery, as pm'
     );
+  });
+
+  it('refuses a tenant and organization mismatch before replacing the activation profile', async () => {
+    fixture({ acting_for: { tenant_slug: 'tenant-b', organization_id: 'delivery-a' } });
+    mocks.resolveOrganizationProfile.mockReturnValue(null);
+    const { switchStance } = await import('./stance_switch.js');
+    expect(() => switchStance('fde', { permittedTenants: () => ['tenant-b'] })).toThrow(
+      '[STANCE_NOT_PERMITTED]'
+    );
+    expect(mocks.resolveOrganizationProfile).toHaveBeenCalledWith('tenant-b', 'delivery-a', tmpDir);
+    expect(mocks.safeWriteFile).not.toHaveBeenCalled();
+  });
+
+  it('binds a tenant without inheriting an organization or NHI from the previous stance', async () => {
+    fixture({ acting_for: { tenant_slug: 'tenant-b' } });
+    const { switchStance } = await import('./stance_switch.js');
+    switchStance('fde', { permittedTenants: () => ['tenant-b'] });
+    const content = String(mocks.safeWriteFile.mock.lastCall?.[1]);
+    expect(content).toContain("export KYBERION_NHI_ID=''");
+    expect(content).toContain('export KYBERION_TENANT=tenant-b\nunset KYBERION_ORGANIZATION_ID');
+  });
+
+  it('does not switch away from a governed execution tenant', async () => {
+    fixture({ acting_for: { tenant_slug: 'tenant-b' } });
+    const { withExecutionContext } = await import('@agent/core/authority');
+    const { switchStance } = await import('./stance_switch.js');
+    expect(() =>
+      withExecutionContext(
+        'sovereign_concierge',
+        () => switchStance('fde', { permittedTenants: () => ['tenant-a', 'tenant-b'] }),
+        undefined,
+        'tenant-a'
+      )
+    ).toThrow('Selection conflicts with the governed execution scope');
+    expect(mocks.safeWriteFile).not.toHaveBeenCalled();
   });
 
   it('rejects a stance that acts for a tenant the operator is not permitted to serve', async () => {

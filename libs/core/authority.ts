@@ -1100,6 +1100,8 @@ function auditStoreGrantDisclosure(name: string, binding: StoreGrantBinding): vo
     tenantBound: true,
     tenantSlug: undefined,
     tenantCleared: true,
+    organizationId: undefined,
+    executionIdentity: undefined,
   };
   try {
     runInExecutionScope(systemScope, () =>

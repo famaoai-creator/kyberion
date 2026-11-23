@@ -124,6 +124,45 @@ decision floor (ops-gate), and notification (deliver_to + digest). See
    extension and the expiry reminder:
    [tenant-task-credential-binding](../orchestration/tenant-task-credential-binding.ja.md#常駐-dot-の-bindingstanding-lineage).
 
+## Proactive signal alerts
+
+A person can keep one conversational point of contact while work uses the
+[actor and responsibility model](./actor-identity-and-responsibility-model.md)
+and [mission team contracts](./mission-team-composition-model.md). A conversation
+can hand off an intent reference to a Mission. WorkItems and execution attempts
+carry their own admitted scope and recipient-specific Context Packs. Changing
+Stance affects new selections. An existing WorkItem keeps the scope in its
+contract. Approved decisions, evidence, and artifacts retain their owners and
+versions. Display surfaces resolve viewer access again when showing a result.
+
+To notify a person before they ask, a resident Dot can opt into
+`notification.signal_alerts: { max_age_s: 14400 }`. It reuses its measured
+`goal.signal_probes`, with the first alert source limited to file probes for an
+expected state. The eligible files are public knowledge, the Dot's own runtime
+subtree, and tenant or organization knowledge matching the charter. An org-less
+tenant uses its tenant scope. Personal alerts are scoped to the owner's NHI,
+and public alerts use public sources or their own runtime subtree.
+
+Each observation identifies the Dot, scope, signal, probe revision, time, and
+health. The supervisor stores the active episode in the corresponding Dot
+state partition. Probe records for an opted-in charter also use that partition.
+A new unhealthy episode opens a pending alert with a fixed expiry. Publication
+requires another current unhealthy observation if quiet hours deferred the
+first one. The supervisor also re-reads the eligible source immediately before
+enqueue. A healthy observation closes the episode, and an expired episode
+cannot be published. Unavailable observations do not authorize an alert.
+After an interrupted enqueue, a still-fresh pending episode can replay the
+same unhealthy observation. Publication rechecks the source and quiet hours,
+and reuses the original inbox ID.
+
+Before writing an inbox entry the supervisor rereads the active charter and
+checks the tenant's operational status. A scope, role, route policy or probe
+change invalidates a pending observation from the previous configuration.
+The inbox entry retains the source scope and a stable episode ID for retries.
+This path publishes to the scoped local inbox. Inbox readers apply viewer
+authorization, with owner-bound access for personal entries. It runs the
+notification lifecycle separately from external actions and human approvals.
+
 ## Governed proposals (landed MSN-RESIDENT-DOT-AUTONOMY-20261004)
 
 A wake produces **proposals**, not effects: tool-capable backends call

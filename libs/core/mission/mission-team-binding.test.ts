@@ -12,6 +12,7 @@ import {
   repairLegacyMissionExecutionLedger,
 } from './mission-team-binding.js';
 import { provisionMissionEntry } from './mission-orchestration-journal.js';
+import { writeMissionStateAtPath } from './mission-state-reader.js';
 import type {
   MissionTeamOrganizationProfileSummary,
   MissionTeamPlan,
@@ -34,6 +35,7 @@ const SAMPLE_PLAN: MissionTeamPlan = {
   mission_id: MISSION_ID,
   mission_type: 'development',
   tier: 'public',
+  tenant_slug: 'demo-tenant',
   template: 'development',
   organization_profile: SAMPLE_ORG_PROFILE,
   generated_at: '2026-04-19T00:00:00.000Z',
@@ -98,7 +100,7 @@ describe('mission-team-binding', () => {
       `${TEST_IDENTITY_JOURNAL_DIR}/agent-identities-${identityJournalCounter}.jsonl`
     );
     // D3: a mission's organization lives inside its tenant.
-    vi.stubEnv('KYBERION_TENANT', 'demo-tenant');
+    vi.stubEnv('KYBERION_TENANT', 'ambient-tenant');
   });
 
   afterEach(() => {
@@ -131,6 +133,72 @@ describe('mission-team-binding', () => {
     expect(staffing.assignments[0]?.resource.runtime_identity).toBe(
       'kyberion://agent/demo-tenant/demo-org/nerve-agent'
     );
+  });
+
+  it('keeps tenantless staffing independent of the ambient tenant', () => {
+    const plan = { ...SAMPLE_PLAN, tenant_slug: undefined };
+    expect(buildMissionStaffingAssignments(plan).assignments[0]?.resource.runtime_identity).toBe(
+      'kyberion://agent/_/_/nerve-agent'
+    );
+  });
+
+  it('rejects a staffed identity from another tenant', () => {
+    const assignment = {
+      ...SAMPLE_PLAN.assignments[0]!,
+      runtime_identity: 'kyberion://agent/other-tenant/demo-org/nerve-agent',
+    };
+    expect(() =>
+      buildMissionStaffingAssignments({ ...SAMPLE_PLAN, assignments: [assignment] })
+    ).toThrow('MISSION_RUNTIME_IDENTITY_SCOPE_MISMATCH');
+  });
+
+  it('rejects a caller-supplied identity that contradicts the staffing record before append', () => {
+    const paths = initializeMissionTeamBindings(TEST_MISSION_DIR, SAMPLE_PLAN);
+    const before = safeReadFile(paths.executionLedgerPath, { encoding: 'utf8' });
+    expect(() =>
+      appendMissionExecutionLedgerEntry({
+        mission_id: MISSION_ID,
+        mission_path_hint: TEST_MISSION_DIR,
+        event_type: 'task_issued',
+        task_id: 'task-1',
+        team_role: 'owner',
+        actor_id: 'nerve-agent',
+        actor_type: 'agent',
+        runtime_identity: 'kyberion://agent/demo-tenant/demo-org/other-agent',
+      })
+    ).toThrow('MISSION_RUNTIME_IDENTITY_ASSIGNMENT_MISMATCH');
+    expect(safeReadFile(paths.executionLedgerPath, { encoding: 'utf8' })).toEqual(before);
+  });
+
+  it('uses stored mission scope for staffing and for actors absent from the roster', () => {
+    writeMissionStateAtPath(`${TEST_MISSION_DIR}/mission-state.json`, {
+      mission_id: MISSION_ID,
+      tier: 'public',
+      tenant_slug: 'stored-tenant',
+      status: 'active',
+      execution_mode: 'local',
+      org_role: 'worker',
+      priority: 1,
+      confidence_score: 1,
+      git: { branch: 'mission/test', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+      history: [],
+    } as Parameters<typeof writeMissionStateAtPath>[1]);
+    const paths = initializeMissionTeamBindings(TEST_MISSION_DIR, SAMPLE_PLAN);
+    expect(
+      loadMissionStaffingAssignments(MISSION_ID, TEST_MISSION_DIR)?.assignments[0]?.resource
+        .runtime_identity
+    ).toBe('kyberion://agent/stored-tenant/demo-org/nerve-agent');
+    expect(() =>
+      appendMissionExecutionLedgerEntry({
+        mission_id: MISSION_ID,
+        mission_path_hint: TEST_MISSION_DIR,
+        event_type: 'task_issued',
+        actor_id: 'direct-agent',
+        actor_type: 'agent',
+        runtime_identity: 'kyberion://agent/demo-tenant/demo-org/direct-agent',
+      })
+    ).toThrow('MISSION_RUNTIME_IDENTITY_SCOPE_MISMATCH');
+    expect(safeReadFile(paths.executionLedgerPath, { encoding: 'utf8' })).toBe('');
   });
 
   it('provisions a durable AgentIdentity for staffed agents under a governed context (NI-01)', () => {

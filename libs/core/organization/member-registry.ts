@@ -298,7 +298,7 @@ export function writeMemberProfile(
  * `resolveOperatorDisplayName`), with an `owner` membership for every tenant
  * currently in the tenant registry. Idempotent and additive: an existing
  * owner record is never downgraded — this only ever adds a membership for a
- * tenant the owner record does not yet know about.
+ * tenant the active owner record does not yet know about.
  */
 export function ensureOwnerMember(
   options: MemberRegistryPathOptions & TenantRegistryPathOptions = {}
@@ -307,6 +307,7 @@ export function ensureOwnerMember(
   const now = nowIso();
   const existing = readMemberProfile(OWNER_MEMBER_ID, options);
   if (existing) {
+    if (existing.status !== 'active') return existing;
     const missing = tenantSlugs.filter(
       (slug) => !existing.memberships.some((membership) => membership.tenant_slug === slug)
     );

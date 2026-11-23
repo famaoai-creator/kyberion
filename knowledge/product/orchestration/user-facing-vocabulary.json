@@ -8510,6 +8510,11 @@
         "ja": "対象を限定した操作権限を確認し、人間の承認を要求して適用します(preview は計画ファイルか --grant/--grant-field フラグで指定)",
         "qps-ploc": "⟦Řėṽïėẇ, řėɋůėşŧ ȧñḓ ȧṗṗŀẏ ħůɱȧñ-ȧṗṗřőṽėḓ şƈőṗėḓ ȧůŧħőřïŧẏ (ṗřėṽïėẇ ŧȧķėş ȧ ṗŀȧñ ƒïŀė őř --ɠřȧñŧ/--ɠřȧñŧ-ƒïėŀḓ ƒŀȧɠş) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
       },
+      "cli_cmd_script_onboarding_check": {
+        "en": "Inspect personal owner and NHI registration, or repair it from reviewed identity input",
+        "ja": "個人の owner と NHI の登録を確認し、レビュー済みの本人設定から修復します",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ṗėřşőñȧŀ őẇñėř ȧñḓ ÑĦÏ řėɠïşŧřȧŧïőñ, őř řėṗȧïř ïŧ ƒřőɱ řėṽïėẇėḓ ïḓėñŧïŧẏ ïñṗůŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
       "cli_cmd_script_onboarding_nhi_session": {
         "en": "Request, apply, list and revoke human-approved NHI session admissions",
         "ja": "人間が承認した NHI セッション admission の要求・適用・一覧・取り消しを行います",

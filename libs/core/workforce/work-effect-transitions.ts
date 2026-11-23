@@ -47,7 +47,7 @@ export function claimedEffectOwnership(
   actorId: string,
   now: string
 ): WorkEffectOwnership | undefined {
-  return target && typeof current.metadata?.dot_id === 'string'
+  return target
     ? {
         target,
         attempt_id: attemptId,

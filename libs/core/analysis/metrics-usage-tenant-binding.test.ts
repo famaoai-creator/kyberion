@@ -8,7 +8,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import * as pathResolver from '../path-resolver.js';
-import { withStoreGrant } from '../authority.js';
+import { withExecutionContext, withStoreGrant } from '../authority.js';
 
 // Capture the metrics logger only; tier-guard and secure-io stay REAL here.
 const warnings = vi.hoisted(() => [] as string[]);
@@ -123,6 +123,43 @@ describe('resource-usage ledger under a real tenant binding', () => {
     expect(String(safeReadFile(partition, { encoding: 'utf8' }))).toContain(`${RUN}-stamped`);
     expect(safeExistsSync(path.join(usageRoot, 'confidential', 'shared'))).toBe(false);
     expect(warnings).toEqual([]);
+  });
+
+  it('persists omitted usage scope under its execution tenant and rejects a foreign project', () => {
+    const usageRoot = path.join(base, 'usage-ledger');
+    const mc = new MetricsCollector({ metricsDir, resourceUsageRoot: usageRoot });
+    const usage = {
+      usage_id: `${RUN}-lineage`,
+      resource_kind: 'other',
+      quantity: 0,
+      unit: 'task',
+      status: 'estimated',
+      source: 'binding-test',
+    } as const;
+    withExecutionContext(
+      'mission_controller',
+      () => {
+        expect(mc.recordResourceUsage(usage).scope).toMatchObject({
+          tenant_slug: 'tenant-a',
+          organization_id: 'org-a',
+          project_id: 'project-a',
+          mission_id: 'MSN-LINEAGE',
+        });
+        expect(() =>
+          mc.recordResourceUsage({ ...usage, scope: { project_id: 'project-b' } })
+        ).toThrow(/LINEAGE_CONFLICT.*project_id/);
+      },
+      undefined,
+      'tenant-a',
+      'org-a',
+      { projectId: 'project-a', missionId: 'MSN-LINEAGE' }
+    );
+    const file = path.join(usageRoot, 'confidential', 'tenant-a', 'resource-usage.jsonl');
+    const rows = String(safeReadFile(file, { encoding: 'utf8' }))
+      .trim()
+      .split('\n');
+    expect(rows).toHaveLength(1);
+    expect(JSON.parse(rows[0]!).scope.project_id).toBe('project-a');
   });
 
   it('warns in the diagnostic format instead of dropping a row silently', () => {

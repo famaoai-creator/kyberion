@@ -7,6 +7,7 @@ import {
 } from './share-grant-graph.js';
 import { computeLedgerEntryHash, GENESIS_HASH } from './chain-integrity.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { checkFiniteStateSafety } from '../testing/finite-state-checker.js';
 
 const HMAC_KEY = 'os13-share-graph-test-key-123456789';
 
@@ -35,6 +36,129 @@ function createGraph(now = Date.parse('2026-08-09T00:00:00.000Z')) {
 }
 
 describe('ShareGrantGraph', () => {
+  it('keeps delegated access tied to operate across grant order and revocation', () => {
+    const cases = [false, true].flatMap((strictFirst) =>
+      [false, true].flatMap((revokeOperate) =>
+        [false, true].map((tighten) => ({ strictFirst, revokeOperate, tighten }))
+      )
+    );
+    type State =
+      | { stage: 'initial' }
+      | {
+          stage: 'resolved';
+          scenario: (typeof cases)[number];
+          intermediary: ReturnType<ShareGrantGraph['getEffectiveAccess']>;
+          leaf: ReturnType<ShareGrantGraph['getEffectiveAccess']>;
+        };
+    const result = checkFiniteStateSafety<State>({
+      initial: [{ stage: 'initial' }],
+      key: JSON.stringify,
+      next: (state) =>
+        state.stage === 'initial'
+          ? cases.map((scenario) => {
+              let highestTier: 'public' | 'confidential' = 'public';
+              const graph = new ShareGrantGraph({
+                persist: false,
+                authorizeActor: () => undefined,
+                resolveTenant: () => ({ status: 'active' }),
+                resolveProvenance: () => ({
+                  missionId: 'MSN-GRANT',
+                  highestTier,
+                  tenants: ['tenant-a'],
+                  prohibitExternal: false,
+                  observationIds: [],
+                }),
+              });
+              const resourceRef = 'artifact:model';
+              graph.registerResource({
+                resourceRef,
+                tenantSlug: 'tenant-a',
+                ownerPrincipal: 'principal:owner',
+                taint: 'public',
+                provenanceMissionId: 'MSN-GRANT',
+                actor: actor(),
+              });
+              const grant = (role: 'view' | 'operate', audienceFloor: 'public' | 'confidential') =>
+                graph.grantEdge({
+                  resourceRef,
+                  actor: actor(),
+                  grantee: 'principal:manager',
+                  role,
+                  audienceFloor,
+                });
+              if (scenario.strictFirst) grant('view', 'confidential');
+              const operate = grant('operate', 'public');
+              if (!scenario.strictFirst) grant('view', 'confidential');
+              graph.grantEdge({
+                resourceRef,
+                actor: actor('manager'),
+                grantee: 'principal:viewer',
+                role: 'view',
+                audienceFloor: 'confidential',
+              });
+              if (scenario.revokeOperate) graph.revokeEdge(operate.edgeId, actor());
+              if (scenario.tighten) highestTier = 'confidential';
+              return {
+                action: 'resolve',
+                state: {
+                  stage: 'resolved',
+                  scenario,
+                  intermediary: graph.getEffectiveAccess(resourceRef, 'principal:manager'),
+                  leaf: graph.getEffectiveAccess(resourceRef, 'principal:viewer'),
+                },
+              };
+            })
+          : [],
+      invariants: {
+        floorAndDelegation: (state) => {
+          if (state.stage === 'initial') return true;
+          const canOperate = !state.scenario.revokeOperate && !state.scenario.tighten;
+          return (
+            state.intermediary?.audienceFloor === 'confidential' &&
+            state.intermediary.role === (canOperate ? 'operate' : 'view') &&
+            Boolean(state.leaf) === canOperate
+          );
+        },
+      },
+    });
+    expect(result).toMatchObject({ status: 'verified', transitions: 8 });
+  });
+
+  it('reads a revocation written by another persisted graph before accepting a session', () => {
+    const storePath = 'active/shared/tmp/share-grant-cross-instance.jsonl';
+    const options = {
+      storePath,
+      persist: true,
+      hmacKey: HMAC_KEY,
+      authorizeActor: () => undefined,
+      resolveTenant: () => ({ status: 'active' as const }),
+    };
+    const resourceRef = 'artifact:shared-instance';
+    try {
+      const first = new ShareGrantGraph(options);
+      first.registerResource({
+        resourceRef,
+        actor: actor(),
+        tenantSlug: 'tenant-a',
+        taint: 'public',
+      });
+      const delegation = first.grantEdge({
+        resourceRef,
+        actor: actor(),
+        grantee: 'principal:manager',
+        role: 'operate',
+      });
+      const link = first.issueShareLink({ resourceRef, actor: actor('manager'), role: 'view' });
+      const second = new ShareGrantGraph(options);
+      expect(second.isShareLinkActive(resourceRef, link.linkId)).toBe(true);
+      first.revokeEdge(delegation.edgeId, actor());
+      expect(second.isShareLinkActive(resourceRef, link.linkId)).toBe(false);
+      expect(second.resolveShareLink(resourceRef, link.token)).toBeNull();
+    } finally {
+      safeRmSync(storePath, { force: true });
+    }
+  });
+
   it('validates persisted envelope and event shapes before hash verification', () => {
     const envelope = {
       version: 1,

@@ -65,6 +65,7 @@ co-session はその coordination の **same-checkout 面**である。
 3. **`.git` / repo config** は co-session では触らない。commit が要る場合は mission owner へ昇格。
 4. **一時ファイル**は `active/shared/tmp/` または session 配下のみ。
 5. **peer / Mesh の禁止を継承**: co-session → peer の bridge は mission を作らない・承認しない（Mesh ADR）。
+6. **引き継ぎの ACK** は、再試行でも記録された provider・participant の宛先を照合する。正しい宛先への再試行は、既存の ACK を返す。
 
 ## 4. データ配置
 

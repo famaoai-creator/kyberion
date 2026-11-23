@@ -7,6 +7,7 @@ export {
 import { writeMissionNextTasks } from './mission-lifecycle-completion.js';
 import { developmentReviewContentLines } from '../vcs/development-review-content.js';
 import { readMissionTeamSelectionDispatch } from './mission-team-selection.js';
+import { loadMissionStaffingAssignments } from './mission-team-binding.js';
 /**
  * libs/core/mission/mission-workitem-dispatch.ts
  * Mission work item execution dispatch for registered tickets.
@@ -167,6 +168,7 @@ export interface MissionWorkItemDispatchRecord {
   execution_surface_used?: 'cli_subagent' | 'agent_runtime';
   review_execution_surface?: MissionExecutionSurface;
   review_execution_surface_used?: 'cli_subagent' | 'agent_runtime';
+  review_independence?: WorkItemReviewIndependence;
   status: 'created' | 'updated' | 'skipped' | 'failed' | 'deferred';
   work_item_status_before?: WorkItemStatus;
   work_item_status_after?: WorkItemStatus;
@@ -767,6 +769,52 @@ export function isIndependentReviewRequired(item: WorkItem): boolean {
   return metadata.risk === 'approval_required' || metadata.risk === 'high_stakes';
 }
 
+export type WorkItemReviewIndependence = 'self_review' | 'legacy_actor_claim' | 'unverified';
+
+export function classifyWorkItemReview(input: {
+  surface: 'cli_subagent' | 'agent_runtime';
+  implementer?: string;
+  reviewer?: string;
+  implementationRuntime?: string;
+  reviewRuntime?: string;
+}): WorkItemReviewIndependence {
+  if (
+    input.surface === 'cli_subagent' ||
+    (input.implementer && input.implementer === input.reviewer) ||
+    (input.implementationRuntime && input.implementationRuntime === input.reviewRuntime)
+  )
+    return 'self_review';
+  return input.implementer && input.reviewer ? 'legacy_actor_claim' : 'unverified';
+}
+
+export function workItemReviewPasses(
+  approved: boolean,
+  independence: WorkItemReviewIndependence,
+  requireIndependent: boolean
+): boolean {
+  return approved && (!requireIndependent || independence === 'legacy_actor_claim');
+}
+
+export function assertWorkItemReviewScope(
+  implementation: ContextSecurityScope,
+  review: ContextSecurityScope
+): void {
+  const implementationTenant = implementation.tenant_slug ?? implementation.tenant_id;
+  const reviewTenant = review.tenant_slug ?? review.tenant_id;
+  const keys = ['organization_id', 'project_id', 'mission_id', 'task_id', 'session_id'] as const;
+  if (
+    implementationTenant !== reviewTenant ||
+    keys.some((key) => implementation[key] !== review[key]) ||
+    implementation.write_tier !== review.write_tier ||
+    (implementation.external_egress === 'deny' && review.external_egress !== 'deny') ||
+    review.read_tiers.some((tier) => !implementation.read_tiers.includes(tier))
+  ) {
+    throw new Error(
+      '[WORKITEM_REVIEW_SCOPE_MISMATCH] Review context exceeds or differs from the work scope.'
+    );
+  }
+}
+
 export function extractJsonObject(text: string): string | null {
   const trimmed = text.trim();
   const fence =
@@ -870,7 +918,7 @@ export function buildIndependentReviewerPrompt(input: {
         .filter(Boolean)
     : [];
   const lines = [
-    `You are an independent reviewer for mission ${input.missionId}.`,
+    `Evaluate the submitted evidence for mission ${input.missionId} in a fresh review context.`,
     'Your job is to refute the implementation if it misses acceptance criteria, leaks scope, or fails to justify the result.',
     'Return JSON only: {"approved": boolean, "refuted": boolean, "findings": string[], "rationale": string}.',
     '',
@@ -890,7 +938,7 @@ export function buildIndependentReviewerPrompt(input: {
     'Mission context:',
     input.contextPackSummary,
     '',
-    'Implementation response to review:',
+    'Submitted implementation evidence:',
     input.executionResponse.trim(),
   ].filter(Boolean);
   return lines.join('\n');
@@ -926,7 +974,10 @@ export async function runIndependentReviewerReview(input: {
   item: WorkItem;
   teamRole?: string;
   assigneePeerId?: string;
-  executionResponse: string;
+  executionEvidence?: TaskResultBlock;
+  implementationActor?: string;
+  implementationRuntime?: string;
+  implementationScope: ContextSecurityScope;
   taskModelHint: TaskModelHint;
   reviewExecutionSurface?: MissionExecutionSurface;
   adapters: WorkItemDispatchAdapters;
@@ -940,6 +991,7 @@ export async function runIndependentReviewerReview(input: {
   reviewerContextPackPath: string;
   reviewerExecutionSurface: MissionExecutionSurface;
   reviewerExecutionSurfaceUsed: 'cli_subagent' | 'agent_runtime';
+  independence: WorkItemReviewIndependence;
   reviewerAgentId?: string;
   reviewerAttemptId?: string;
   reviewerRuntimeId?: string;
@@ -957,11 +1009,13 @@ export async function runIndependentReviewerReview(input: {
     workItem: input.item,
     projectId: input.missionState.relationships?.project?.project_id,
     trackId: input.missionState.relationships?.track?.track_id,
+    taskSessionId: input.implementationScope.session_id,
     missionState: input.missionState,
   });
   if (!contextPack) {
     throw new Error(`Unable to resolve reviewer context pack for ${input.missionId}`);
   }
+  assertWorkItemReviewScope(input.implementationScope, contextPack.security_scope);
   const contextPackPath = saveMissionContextPack(input.missionPath, contextPack);
   const reviewerTaskModelHint = getTaskModelHint(input.item, 'review');
   const reviewerPrompt = [
@@ -976,7 +1030,16 @@ export async function runIndependentReviewerReview(input: {
       assigneePeerId: input.assigneePeerId,
       contextPackSummary: contextPack.summary,
       taskModelHint: reviewerTaskModelHint,
-      executionResponse: input.executionResponse,
+      executionResponse: JSON.stringify(
+        input.executionEvidence
+          ? {
+              artifacts: input.executionEvidence.artifacts,
+              verification_done: input.executionEvidence.verification_done,
+              gaps: input.executionEvidence.gaps,
+              needs: input.executionEvidence.needs,
+            }
+          : {}
+      ),
     }),
   ].join('\n');
 
@@ -1018,10 +1081,29 @@ export async function runIndependentReviewerReview(input: {
       adapters: input.adapters,
       signal,
       contextMode: 'fresh',
+      reviewOriginActorId: input.implementationActor || input.assigneePeerId,
     })
   );
   const reviewerResponseText = reviewerResponse.responseText;
   const verdict = parseIndependentReviewerVerdict(reviewerResponseText);
+  const implementer = input.implementationActor || input.assigneePeerId;
+  const reviewer = reviewerResponse.executorAgentId;
+  const staffing = loadMissionStaffingAssignments(input.missionId, input.missionPath);
+  const staffingIdentity = (actor: string | undefined, role: string | undefined) =>
+    staffing?.assignments.find(
+      (assignment) =>
+        assignment.actor_id === actor &&
+        assignment.actor_type === 'agent' &&
+        (!role || assignment.team_role === role)
+    )?.resource.runtime_identity || actor;
+  const independence = classifyWorkItemReview({
+    surface: reviewerResponse.executionSurfaceUsed,
+    implementer:
+      implementer === reviewer ? implementer : staffingIdentity(implementer, input.teamRole),
+    reviewer: implementer === reviewer ? reviewer : staffingIdentity(reviewer, 'reviewer'),
+    implementationRuntime: input.implementationRuntime,
+    reviewRuntime: reviewerResponse.runtimeId,
+  });
   const reviewerPath = nodePath.join(
     dispatchRoot(input.missionPath),
     `workitem-review-${input.item.item_id}.json`
@@ -1043,7 +1125,11 @@ export async function runIndependentReviewerReview(input: {
       verdict,
       execution_surface: reviewSurfaceDecision.surface,
       execution_surface_used: reviewerResponse.executionSurfaceUsed,
-      reviewer_agent_id: reviewerAgentId,
+      review_independence: independence,
+      review_scope: contextPack.security_scope,
+      implementation_actor_id: implementer,
+      implementation_runtime_id: input.implementationRuntime,
+      reviewer_agent_id: reviewerResponse.executorAgentId,
       attempt_id: reviewerResponse.attemptId,
       runtime_id: reviewerResponse.runtimeId,
       output_ref: reviewerResponse.outputRef,
@@ -1063,7 +1149,8 @@ export async function runIndependentReviewerReview(input: {
     reviewerContextPackPath: contextPackPath,
     reviewerExecutionSurface: reviewSurfaceDecision.surface,
     reviewerExecutionSurfaceUsed: reviewerResponse.executionSurfaceUsed,
-    reviewerAgentId,
+    independence,
+    reviewerAgentId: reviewerResponse.executorAgentId,
     reviewerAttemptId: reviewerResponse.attemptId,
     reviewerRuntimeId: reviewerResponse.runtimeId,
     reviewerOutputRef: reviewerResponse.outputRef,
@@ -1096,6 +1183,7 @@ export async function routeToAgentOrSubagent(input: {
   adapters: WorkItemDispatchAdapters;
   signal: AbortSignal;
   contextMode: AgentContextMode;
+  reviewOriginActorId?: string;
 }): Promise<
   {
     executionMode: 'agent' | 'subagent';
@@ -1201,7 +1289,7 @@ export async function routeToAgentOrSubagent(input: {
   if (!useRuntime) {
     const execution = await delegateSubagentTask({
       item: input.item,
-      assigneePeerId: input.assigneePeerId,
+      assigneePeerId: input.reviewOriginActorId || input.assigneePeerId,
       prompt,
       routingOptions,
       adapters: input.adapters,
@@ -1452,13 +1540,13 @@ export async function routeToAgentOrSubagent(input: {
     notes.push(`agent dispatch failed: ${error?.message || error}; falling back to subagent`);
     const execution = await delegateSubagentTask({
       item: input.item,
-      assigneePeerId: input.assigneePeerId,
+      assigneePeerId: input.reviewOriginActorId || input.assigneePeerId,
       prompt,
       routingOptions,
       adapters: input.adapters,
       notes,
       signal: input.signal,
-      securityScope: runtimeSecurityScope,
+      securityScope: input.securityScope,
       contextMode: input.contextMode,
       purpose: surfacePurpose,
       capabilityProfile,

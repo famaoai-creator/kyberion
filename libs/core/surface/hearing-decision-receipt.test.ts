@@ -18,6 +18,7 @@ import {
   parseHearingDecisionOperation,
 } from './hearing-runtime.js';
 import { withoutHearingCompletionFields } from './hearing-completion.js';
+import { checkFiniteStateSafety } from '../testing/finite-state-checker.js';
 const fault = vi.hoisted(() => ({ operation: '' }));
 vi.mock('@agent/core/secure-io', async () => {
   const actual =
@@ -71,6 +72,74 @@ afterEach(() => {
     );
 });
 describe('exact durable hearing decision receipts', () => {
+  it('checks replay against current or superseded decisions and matching or mismatched identity', () => {
+    const cases = [false, true].flatMap((superseded) =>
+      [false, true].map((identityMatches) => ({ superseded, identityMatches }))
+    );
+    type State =
+      | { stage: 'initial' }
+      | {
+          stage: 'checked';
+          scenario: (typeof cases)[number];
+          refused: boolean;
+          unchanged: boolean;
+          status?: 'current' | 'superseded';
+        };
+    expect(
+      checkFiniteStateSafety<State>({
+        initial: [{ stage: 'initial' }],
+        key: JSON.stringify,
+        next: (state) =>
+          state.stage === 'initial'
+            ? cases.map((scenario) => {
+                const { session, operation } = seed();
+                decideHearingRecord(namespace, session, operation, identity, actor, now);
+                if (scenario.superseded) {
+                  updateHearingRecord(namespace, session, (record) => ({
+                    ...record!,
+                    requirements: record!.requirements.map((item, index) =>
+                      index === 0 ? { ...item, answer: 'updated answer' } : item
+                    ),
+                  }));
+                }
+                const before = loadHearingRecord(namespace, session);
+                let refused = false;
+                let status: 'current' | 'superseded' | undefined;
+                try {
+                  const caller = scenario.identityMatches
+                    ? identity
+                    : { ...identity, principal_id: 'other' };
+                  decideHearingRecord(namespace, session, operation, caller, actor, now);
+                  status = hearingDecisionReceipt(before, namespace, operation, caller)?.status;
+                } catch {
+                  refused = true;
+                }
+                return {
+                  action: 'replay receipt',
+                  state: {
+                    stage: 'checked',
+                    scenario,
+                    refused,
+                    status,
+                    unchanged:
+                      JSON.stringify(before) ===
+                      JSON.stringify(loadHearingRecord(namespace, session)),
+                  },
+                };
+              })
+            : [],
+        invariants: {
+          exactReplay: (state) =>
+            state.stage === 'initial' ||
+            (state.unchanged &&
+              state.refused === !state.scenario.identityMatches &&
+              (!state.scenario.identityMatches ||
+                state.status === (state.scenario.superseded ? 'superseded' : 'current'))),
+        },
+      })
+    ).toMatchObject({ status: 'verified', transitions: 4 });
+  });
+
   it('commits receipt atomically and exact replay does not rewrite or advance revision', () => {
     const { session, operation } = seed();
     const first = decideHearingRecord(namespace, session, operation, identity, actor, now);

@@ -297,7 +297,6 @@ async function applyIntentTrackGate(
   }
 
   if (input.preflight?.ready === false) return { input, intentTrackGate: null };
-
   const { resolveIntentTrackGate } = await import('@agent/core/intent/intent-track-resolver');
   const result = await resolveIntentTrackGate({
     intentId,
@@ -320,15 +319,48 @@ async function applyIntentTrackGate(
     throw new Error(issue);
   }
 
+  // Keep the project-validated selection after the intent confidence gate.
+  if (input.relationships?.track?.track_id) return { input, intentTrackGate: null };
+  const { loadProjectRecord } = await import('@agent/core/project/project-registry');
+  const { loadProjectTrackRecord } = await import('@agent/core/project/project-track-registry');
+  const { assertManagedProjectTrackScope } =
+    await import('@agent/core/project/project-track-scope');
+  const registeredProject = loadProjectRecord(project.project_id);
+  if (!registeredProject) throw new Error('An intent-created track requires a registered project.');
+  const existing = loadProjectTrackRecord(result.track_record.track_id);
+  if (existing) {
+    assertManagedProjectTrackScope(registeredProject, existing);
+    if (existing.status !== 'active')
+      throw new Error('Intent-created work requires an active track.');
+  }
+  const trackRecord = {
+    ...(existing ?? result.track_record),
+    tier: registeredProject.tier,
+    ...(registeredProject.tenant_slug ? { tenant_slug: registeredProject.tenant_slug } : {}),
+    active_missions: [
+      ...new Set([
+        ...(existing?.active_missions ?? []),
+        ...(result.track_record.active_missions ?? []),
+      ]),
+    ],
+  };
+  const relationship = {
+    track: {
+      ...result.relationship.track,
+      track_name: trackRecord.name,
+      track_type: trackRecord.track_type,
+      lifecycle_model: trackRecord.lifecycle_model,
+    },
+  };
   return {
     input: {
       ...input,
       relationships: {
         ...(input.relationships || {}),
-        track: result.relationship.track,
+        track: relationship.track,
       } as MissionRelationships,
     },
-    intentTrackGate: result,
+    intentTrackGate: { ...result, relationship, track_record: trackRecord },
   };
 }
 
@@ -336,8 +368,25 @@ async function persistIntentTrackGate(
   intentTrackGate: Awaited<ReturnType<typeof resolveIntentTrackGate>> | null
 ): Promise<void> {
   if (intentTrackGate?.status !== 'ready_to_provision') return;
-  const { saveProjectTrackRecord } = await import('@agent/core/project/project-track-registry');
-  saveProjectTrackRecord(intentTrackGate.track_record);
+  const { loadProjectTrackRecord, saveProjectTrackRecord } =
+    await import('@agent/core/project/project-track-registry');
+  const { assertManagedProjectTrackScope } =
+    await import('@agent/core/project/project-track-scope');
+  const record = intentTrackGate.track_record;
+  const existing = loadProjectTrackRecord(record.track_id);
+  if (!existing) {
+    saveProjectTrackRecord(record);
+    return;
+  }
+  assertManagedProjectTrackScope(record, existing);
+  if (existing.status !== 'active')
+    throw new Error('Intent-created work requires an active track.');
+  saveProjectTrackRecord({
+    ...existing,
+    active_missions: [
+      ...new Set([...(existing.active_missions ?? []), ...(record.active_missions ?? [])]),
+    ],
+  });
 }
 
 /**

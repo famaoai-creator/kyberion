@@ -102,6 +102,46 @@ describe('audit-chain — tenant mirror', () => {
     expect(files[0]).toMatch(/audit-\d{4}-\d{2}-\d{2}\.jsonl/);
   });
 
+  it('stamps the execution project and refuses a conflicting audit project', async () => {
+    const { auditChain } = await import('./audit-chain.js');
+    const { registerAssumedRoleValidator, runInExecutionScope } =
+      await import('../foundation/execution-scope.js');
+    const record = {
+      agentId: 'test',
+      action: 'test',
+      operation: 'op',
+      result: 'completed',
+    } as const;
+    registerAssumedRoleValidator((role) => role === 'mission_controller');
+    runInExecutionScope(
+      {
+        assumedRole: 'mission_controller',
+        tenantBound: true,
+        tenantSlug: 'tenant-a',
+        organizationId: 'org-a',
+        executionIdentity: { projectId: 'project-a', missionId: 'MSN-LINEAGE' },
+      },
+      () => {
+        expect(auditChain.record(record).scope).toMatchObject({
+          tenant_slug: 'tenant-a',
+          organization_id: 'org-a',
+          project_id: 'project-a',
+          mission_id: 'MSN-LINEAGE',
+        });
+        expect(() =>
+          auditChain.record({
+            ...record,
+            scope: {
+              tier: 'confidential',
+              scope_kind: 'project',
+              project_id: 'project-b',
+            },
+          })
+        ).toThrow(/LINEAGE_CONFLICT.*project_id/);
+      }
+    );
+  });
+
   it('uses the recorded timestamp date for master and tenant mirror files', async () => {
     const { auditChain } = await loadFreshAuditChain(new Date('2026-07-01T23:59:59.999Z'));
     const recorded = auditChain.record({

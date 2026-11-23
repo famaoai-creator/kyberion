@@ -6,7 +6,7 @@ authority: reference
 phase: [alignment, execution]
 tags: [mission, team-composition, authority-role, team-role, agents]
 owner: ecosystem_architect
-last_updated: 2026-11-12
+last_updated: 2026-11-23
 ---
 
 # Mission Team Composition Model
@@ -91,6 +91,38 @@ To keep planning and execution explicit, mission team data is split into three a
   - append-only record of actual execution events
   - always includes both logical role (`team_role`) and execution actor (`actor_id`)
   - post-verification evidence can be appended with `mission_controller record-evidence <MISSION_ID> <TASK_ID> "<NOTE>" --team-role <ROLE> --actor-id <ACTOR> --evidence <CSV>`
+
+### Relationship to onboarding identities
+
+| Stage            | Record                    | Identity relationship                                                                                                                                                                          |
+| ---------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Onboarding       | Member and Agent Identity | The Member is the accountable human for the installed NHI. This relationship is recorded before a mission is created.                                                                          |
+| Mission creation | `team-composition.json`   | The template supplies Team Roles. Composition selects compatible agent profiles, capabilities, and an Authority Role. The assignment's `agent_id` refers to the selected profile in this path. |
+| Execution        | `execution-ledger.jsonl`  | The ledger records the Team Role, actor ID, and runtime identity when available. The runtime checks applicable to the operation govern whether the actor may execute.                          |
+
+Staffing binds each role to a workforce resource in `staffing-assignments.json`.
+Agent NHI derivation uses the mission tenant and organization context. A
+tenantless mission derives a tenantless NHI. An explicitly supplied agent NHI
+must use the mission tenant. Registry provisioning remains best effort.
+
+When appending execution evidence, a supplied NHI must agree with the matching
+staffing assignment and the stored mission tenant. If a historical assignment
+contains an out-of-scope NHI, an event that omits its NHI can still be recorded
+without copying that attribution. Historical ledger rows retain their evidence.
+
+Mission creation passes mission type, tier, tenant, and organization context
+to the composer. It does not pass the installed personal NHI as a worker
+selection. When reading an assignment, follow its resource's
+`runtime_identity` to the identity registry to determine whether it refers
+to the same registered NHI. A matching conversational name or profile name
+is insufficient. The scoped identity and its accountable Member are defined
+in the [actor identity model](./actor-identity-and-responsibility-model.md).
+
+For example, the installed assistant can help initiate a development mission.
+The mission may staff an implementer and a reviewer from compatible profiles.
+Each assignment records the work role and the staffed resource; the execution
+ledger records who actually acted. The identity registry resolves each
+agent's accountable human, and the review evidence establishes independence.
 
 ## Evaluation Feedback
 

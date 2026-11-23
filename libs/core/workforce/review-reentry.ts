@@ -10,6 +10,7 @@ import { logger } from '../core.js';
 import { persistHints } from '../knowledge/feedback-loop.js';
 import { queueMissionMemoryPromotionCandidate } from '../knowledge/memory-promotion-queue.js';
 import { missionMemoryCaptureScope } from '../knowledge/memory-capture-scope.js';
+import { reviewRejectionGuidance } from '../knowledge/review-rejection-lessons.js';
 import type { RejectionReasonCategory } from '../contracts/rejection-reason.js';
 
 /**
@@ -133,21 +134,33 @@ function persistRejectionLearning(record: ReviewReentryRequest): void {
   ]
     .filter(Boolean)
     .join(' ');
+  let capture: ReturnType<typeof missionMemoryCaptureScope>;
   try {
-    // D8: the hint lands in the rejected mission's own scope partition.
-    const hintCapture = missionMemoryCaptureScope(record.mission_id);
+    capture = missionMemoryCaptureScope(record.mission_id);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    logger.warn(`[review-reentry] failed to resolve rejection learning scope: ${detail}`);
+    return;
+  }
+  try {
     persistHints(
       [
         {
-          topic: `human-rejection:${category}`,
-          hint: summary,
+          topic: `human-rejection:${record.reason_category || 'other'}:${record.request_id}`,
+          hint: reviewRejectionGuidance(record.reason_category),
           source: `review-reentry:${record.request_id}`,
           confidence: 0.8,
           tags: ['human_rejection', record.verdict, category],
+          review_rejection: {
+            mission_id: record.mission_id,
+            organization_id: capture.scope?.organization_id,
+            project_id: capture.scope?.project_id,
+            detail: summary,
+          },
         },
       ],
       'human-rejection',
-      hintCapture.scope ?? { tier: hintCapture.tier }
+      capture.scope ?? { tier: capture.tier }
     );
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
@@ -155,7 +168,6 @@ function persistRejectionLearning(record: ReviewReentryRequest): void {
   }
   try {
     // D8: the lesson carries the rejected mission's own tier and tenant scope.
-    const capture = missionMemoryCaptureScope(record.mission_id);
     queueMissionMemoryPromotionCandidate({
       missionId: record.mission_id,
       tier: capture.tier,

@@ -5,7 +5,16 @@ import type { CliGuardSpec } from '../lib/cli/cli-guard.js';
 export const ONBOARD_CLI: CliGuardSpec = {
   command: 'pnpm onboarding',
   manifestId: 'script.onboarding',
-  subcommands: ['apply', 'reset', 'company', 'first-job', 'llm', 'authority', 'nhi-session'],
+  subcommands: [
+    'apply',
+    'check',
+    'reset',
+    'company',
+    'first-job',
+    'llm',
+    'authority',
+    'nhi-session',
+  ],
   options: [
     { flag: '--express' },
     { flag: '--menu' },

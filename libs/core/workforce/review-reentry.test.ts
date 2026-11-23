@@ -152,11 +152,17 @@ describe('review re-entry queue (LC-11)', () => {
     const allHints = hintFiles.flatMap((file) =>
       JSON.parse(fs.readFileSync(path.join(hintsDir, file), 'utf8'))
     );
-    const rejectionHint = allHints.find(
-      (hint: any) => hint.topic === 'human-rejection:wrong_direction'
+    const rejectionHint = allHints.find((hint: any) =>
+      hint.topic.startsWith('human-rejection:wrong_direction:')
     );
     expect(rejectionHint).toBeDefined();
-    expect(rejectionHint.hint).toContain('summary-doc');
+    expect(rejectionHint.hint).toBe(
+      'Check that the approach directly addresses the requested goal.'
+    );
+    expect(rejectionHint.review_rejection).toMatchObject({
+      mission_id: 'MSN-LC12-DEMO',
+      detail: expect.stringContaining('summary-doc'),
+    });
     expect(rejectionHint.tags).toContain('human_rejection');
   });
 

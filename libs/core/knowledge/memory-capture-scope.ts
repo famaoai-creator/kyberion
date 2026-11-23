@@ -34,6 +34,9 @@ export function missionMemoryCaptureScope(missionId: string): MissionMemoryCaptu
       tenant_slug: state.tenant_slug,
       mission_id: missionId,
       ...(state.organization_id ? { organization_id: state.organization_id } : {}),
+      ...(state.organization_id && state.relationships?.project?.project_id
+        ? { project_id: state.relationships.project.project_id }
+        : {}),
     },
   };
 }

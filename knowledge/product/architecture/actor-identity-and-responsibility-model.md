@@ -1,7 +1,7 @@
 ---
 title: Actor identity and responsibility model
 tags: [architecture, governance, identity, nhi, tenant, organization, delegation, review]
-last_updated: 2026-11-12
+last_updated: 2026-11-23
 concepts: [nhi, conversational-persona, execution-persona, org-role, team-role]
 ---
 
@@ -30,6 +30,33 @@ and `libs/core/authority.ts` is a **legacy execution identity class**, not the
 conversational persona defined here. Likewise, the historical mission
 `--persona` flag selects an Org Role. This model does not rename those runtime
 APIs or change their authorization semantics.
+
+## People and agents in a customer decision
+
+| Record         | Identifier and boundary                                                                                                         | What it records                                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Member         | `member_id`; tenant membership and Member Role are recorded in `MemberProfile`.                                                 | The system member who records or approves an action. A verified external identity can be linked to the member. |
+| Customer Actor | `customer:<slug>` in the tenant's registry for that customer.                                                                   | The customer representative and the Decision levels they are entitled to decide.                               |
+| Agent Identity | `nhi_id` with tenant and optional organization in its canonical name; affiliation and runtime bindings are recorded separately. | The durable identity of the agent that performs work and the human accountable for that identity.              |
+
+Use [ActorRef](../../../libs/core/contracts/actor.ts) to record the actor in an
+operation. A Member is referenced by `user:<member_id>` and an agent by its
+`nhi_id`. Check the operation's applicable grant and scope when authorizing
+work. The agent identity can stay the same across runtime instances.
+
+When a Member records a customer choice, the decision ledger records the
+Member in `decided_by` and the Customer Actor and their approval evidence in
+`decided_by.on_behalf_of`. For agent execution, the optional
+`ActorRef.on_behalf_of` identifies the Member for whom the agent acted.
+These fields record different relationships. The agent's accountable owner
+comes from its identity record, and the customer decision authority comes from
+the [decision ledger policy](../schemas/README-decision-ledger.md).
+
+For example, a customer representative selects an option, an operator records
+the choice with the customer's confirmation, and an agent checks the
+implementation. Trace the choice by tenant, case and Decision ID, preserve the
+operator and customer references in that decision, and record the checking
+agent's NHI in the verification evidence.
 
 ## One conversational window, separate accountable identities
 

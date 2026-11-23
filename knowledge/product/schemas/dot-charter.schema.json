@@ -739,6 +739,15 @@
           "minLength": 9,
           "description": "Optional cron for a periodic digest of what the dot did, is waiting on, and needs."
         },
+        "signal_alerts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["max_age_s"],
+          "properties": {
+            "max_age_s": { "type": "integer", "minimum": 60, "maximum": 86400 }
+          },
+          "description": "Opt into scoped inbox alerts for unresolved file-probe signals, on a fresh observation outside quiet hours."
+        },
         "quiet_hours": {
           "type": "object",
           "additionalProperties": false,

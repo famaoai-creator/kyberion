@@ -20,6 +20,7 @@ import {
 } from './dot-judgment-approval.js';
 import { isDotIntakeAdmission, loadDotExecutionPolicy } from './dot-execution-policy.js';
 import { sendDueDotDigest } from './dot-digest-delivery.js';
+import { publishDotSignalAlerts } from './dot-signal-alert.js';
 export { DOT_DIGEST_LEDGER_PATH } from './dot-digest-delivery.js';
 import type { DotWorkResultRow } from './dot-state-paths.js';
 import {
@@ -1558,6 +1559,7 @@ export async function runDotHousekeeping(
   charter: DotCharter,
   deps: DotDispatchDeps & {
     serviceCall?: Parameters<typeof measureDotSuccessSignals>[1]['serviceCall'];
+    rereadCharter?: () => DotCharter;
   } = {}
 ): Promise<DotHousekeepingResult> {
   const result: DotHousekeepingResult = { settled: [], signals: 0, digest: false, errors: [] };
@@ -1579,13 +1581,24 @@ export async function runDotHousekeeping(
     fail('settle', error);
   }
   try {
-    result.signals = (
-      await measureDotSuccessSignals(charter, {
-        rootDir: deps.rootDir,
-        now: deps.now,
-        serviceCall: deps.serviceCall,
-      })
-    ).length;
+    const observations = await measureDotSuccessSignals(charter, {
+      rootDir: deps.rootDir,
+      now: deps.now,
+      serviceCall: deps.serviceCall,
+    });
+    result.signals = observations.length;
+    if (charter.notification.signal_alerts && deps.rereadCharter && !isOperationsHalted()) {
+      try {
+        publishDotSignalAlerts(charter, observations, {
+          rootDir: deps.rootDir,
+          now: nowOf(deps),
+          quietHours: dotQuietHours(charter),
+          currentCharter: deps.rereadCharter,
+        });
+      } catch (error) {
+        fail('signal_alerts', error);
+      }
+    }
   } catch (error) {
     fail('signals', error);
   }

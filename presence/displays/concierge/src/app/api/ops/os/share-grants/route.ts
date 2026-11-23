@@ -22,7 +22,11 @@ import { readChronosJsonObject } from '../../../../../lib/ops/request-input';
 import { parseShareGrantInput } from './share-grant-input';
 
 const controlPlane = () => getControlPlaneForScope();
-const shareGrantLiveSessions = new ShareGrantLiveSessionRegistry({ persist: true });
+const shareGrantLiveSessions = new ShareGrantLiveSessionRegistry({
+  persist: true,
+  isLinkActive: (resourceRef, linkId): boolean =>
+    shareGrantGraph.isShareLinkActive(resourceRef, linkId),
+});
 
 const shareGrantGraph = new ShareGrantGraph({
   authorizeActor: createShareGrantRegistryAuthorizer(),

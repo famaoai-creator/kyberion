@@ -43,6 +43,11 @@ export async function main(
     await applyOnboardingMain(args.slice(1), print);
     return;
   }
+  if (args[0] === 'check') {
+    const { main: checkMain } = await import('./onboarding/onboarding_identity_check.js');
+    await checkMain(args.slice(1), print);
+    return;
+  }
   if (args[0] === 'reset') {
     await resetOnboardingMain(args.slice(1), print);
     return;

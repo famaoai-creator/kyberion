@@ -635,7 +635,7 @@ export function composeMissionTeamPlan(input: {
     ...(input.selectionSettings ? { selection_settings: input.selectionSettings } : {}),
     mission_type: missionType,
     tier: input.tier,
-    tenant_slug: tenantSlug,
+    ...(input.tenantSlug?.trim() ? { tenant_slug: tenantSlug } : {}),
     ...(providerPreference
       ? {
           provider_selection: {

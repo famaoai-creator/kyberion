@@ -6,6 +6,7 @@ import { isScopeEnvOnly, transportedScopeLineage } from './foundation/scope-reso
 export { withScopeEnvOnly } from './foundation/scope-resolution-mode.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { resolveClaimedNhiId } from './contracts/nhi-id.js';
+import { STANCE_ENV_VAR, STANCE_SCOPE_BOUND_ENV_VAR } from './authn/stance-env.js';
 import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
 import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
@@ -308,6 +309,11 @@ export function resolveScopeResolution(
   if (isScopeEnvOnly()) {
     options = { includePersisted: false, inferFromMission: false, inferFromCwd: false };
     input = { ...transportedScopeLineage(), ...input };
+  }
+  // A sourced stance activation profile replaces the ambient scope. Explicit
+  // new work can still supply lineage; persisted and checkout hints can be stale.
+  if (envText(env, STANCE_ENV_VAR) && envText(env, STANCE_SCOPE_BOUND_ENV_VAR) === '1') {
+    options = { ...options, includePersisted: false, inferFromCwd: false };
   }
   const { values, provenance } = mergeScopeSources(input, env, options);
   const scope = normalizeScopeContext({

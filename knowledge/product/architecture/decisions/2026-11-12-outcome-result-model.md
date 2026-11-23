@@ -38,6 +38,11 @@ that the record still matches the snapshot's original contents before
 rebuilding the outcome projection. If another writer changed it, the caller
 must reload and recompute its update.
 
+Attaching an ArtifactRecord replaces the Task Session's artifact projection.
+An external replacement cannot inherit the previous artifact's local path or
+preview. A record bound to another Task Session, a different tenant, or a
+different project from the session's fixed project is refused before attachment.
+
 Legacy mission and Task Session completion gates remain unchanged. Their reference-presence
 checks and goal-matching `delivered` arrays are not reinterpreted as verification or transport
 receipts. Existing saved sessions remain valid without the new snapshot. Mission summary

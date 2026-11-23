@@ -1762,94 +1762,106 @@ describe('mission work item dispatch', () => {
     expect(response.clarification_packet_path).toBe(clarificationPath);
   });
 
-  it('requires an independent reviewer for high-stakes work and keeps the item in review when refuted', async () => {
-    createWorkItem({
-      title: `${missionId}: Review the high-stakes change`,
-      description:
-        'Implement the high-stakes change with explicit reviewer sign-off and keep the outcome blocked until the reviewer approves.',
-      status: 'ready',
-      source: 'local',
-      sourceRef: `mission:${missionId}:task-high-stakes`,
-      projectId: missionId,
-      assigneePeerId: 'sovereign-brain',
-      labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
-      metadata: {
-        mission_id: missionId,
-        team_role: 'implementer',
-        deliverable: 'deliverables/high-stakes.md',
-        target_path: 'deliverables/high-stakes.md',
-        acceptance_criteria: ['mention the reviewer sign-off'],
-        risk: 'high_stakes',
-        estimated_scope: 'L',
-        reviewer_agent_id: 'reviewer-agent',
-      },
-    });
-
-    const delegateTask = vi.fn(async (_instruction: string, context?: string) => {
-      if (String(context || '').startsWith('workitem-review:')) {
-        return JSON.stringify({
-          approved: false,
-          refuted: true,
-          findings: ['The response does not show an independent reviewer sign-off.'],
-          rationale: 'High-stakes work must stay in review until a separate reviewer approves it.',
-        });
-      }
-      return makeTaskResultText({
-        summary: 'Implemented the high-stakes change, but reviewer sign-off is still missing.',
-        artifacts: [{ path: 'deliverables/high-stakes.md', kind: 'markdown' }],
-        verification_done: ['Produced the requested change artifact.'],
-        gaps: ['Reviewer sign-off is missing.'],
-        needs: [],
-        extraText: 'implementation complete with reviewer sign-off missing',
+  it.each([false, true])(
+    'keeps high-stakes backend self-review in review (verdict approved=%s)',
+    async (approved) => {
+      createWorkItem({
+        title: `${missionId}: Review the high-stakes change`,
+        description:
+          'Implement the high-stakes change with explicit reviewer sign-off and keep the outcome blocked until the reviewer approves.',
+        status: 'ready',
+        source: 'local',
+        sourceRef: `mission:${missionId}:task-high-stakes`,
+        projectId: missionId,
+        assigneePeerId: 'sovereign-brain',
+        labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
+        metadata: {
+          mission_id: missionId,
+          team_role: 'implementer',
+          deliverable: 'deliverables/high-stakes.md',
+          target_path: 'deliverables/high-stakes.md',
+          acceptance_criteria: ['mention the reviewer sign-off'],
+          risk: 'high_stakes',
+          estimated_scope: 'L',
+          reviewer_agent_id: 'reviewer-agent',
+        },
       });
-    });
 
-    const manifest = await dispatchMissionWorkItems(
-      makeMissionState(),
-      {
-        mode: 'subagent',
-        finalStatus: 'done',
-      },
-      {
-        delegateTask,
-      }
-    );
+      const delegateTask = vi.fn(async (_instruction: string, context?: string) => {
+        if (String(context || '').startsWith('workitem-review:')) {
+          return JSON.stringify({
+            approved,
+            refuted: !approved,
+            findings: ['The response does not show an independent reviewer sign-off.'],
+            rationale:
+              'High-stakes work must stay in review until a separate reviewer approves it.',
+          });
+        }
+        return makeTaskResultText({
+          summary: 'Implemented the high-stakes change, but reviewer sign-off is still missing.',
+          artifacts: [{ path: 'deliverables/high-stakes.md', kind: 'markdown' }],
+          verification_done: ['Produced the requested change artifact.'],
+          gaps: ['Reviewer sign-off is missing.'],
+          needs: [],
+          extraText: 'implementation complete with reviewer sign-off missing',
+        });
+      });
 
-    expect(delegateTask).toHaveBeenCalledTimes(2);
-    expect(String(delegateTask.mock.calls[1]?.[1] || '')).toContain('agent=reviewer-agent');
-    expect(manifest.records[0]).toMatchObject({
-      reviewer_status: 'refuted',
-      reflection_status: 'review',
-      work_item_status_after: 'review',
-    });
+      const manifest = await dispatchMissionWorkItems(
+        makeMissionState(),
+        {
+          mode: 'subagent',
+          finalStatus: 'done',
+        },
+        {
+          delegateTask,
+        }
+      );
 
-    const reviewArtifact = JSON.parse(
-      safeReadFile(`${missionPath}/evidence/workitem-review-${manifest.records[0].item_id}.json`, {
-        encoding: 'utf8',
-      }) as string
-    );
-    expect(reviewArtifact).toMatchObject({
-      item_id: manifest.records[0].item_id,
-      verdict: expect.objectContaining({
-        approved: false,
-        refuted: true,
-      }),
-    });
+      expect(delegateTask).toHaveBeenCalledTimes(2);
+      expect(String(delegateTask.mock.calls[1]?.[1] || '')).toContain('agent=sovereign-brain');
+      expect(String(delegateTask.mock.calls[1]?.[0] || '')).not.toContain(
+        'implementation complete with reviewer sign-off missing'
+      );
+      expect(manifest.records[0]).toMatchObject({
+        review_independence: 'self_review',
+        reviewer_status: approved ? 'blocked' : 'refuted',
+        reflection_status: 'review',
+        work_item_status_after: 'review',
+      });
 
-    const responseArtifact = JSON.parse(
-      safeReadFile(
-        `${missionPath}/evidence/workitem-dispatch-${manifest.records[0].item_id}.json`,
-        { encoding: 'utf8' }
-      ) as string
-    );
-    expect(responseArtifact).toMatchObject({
-      reviewer_status: 'refuted',
-    });
-    expect(responseArtifact.prompt).toContain(
-      'Mission context pack (scoped, minimal, role-specific).'
-    );
-    expect(responseArtifact.response_text).toContain('implementation complete');
-  });
+      const reviewArtifact = JSON.parse(
+        safeReadFile(
+          `${missionPath}/evidence/workitem-review-${manifest.records[0].item_id}.json`,
+          {
+            encoding: 'utf8',
+          }
+        ) as string
+      );
+      expect(reviewArtifact).toMatchObject({
+        item_id: manifest.records[0].item_id,
+        review_independence: 'self_review',
+        verdict: expect.objectContaining({
+          approved,
+          refuted: !approved,
+        }),
+      });
+
+      const responseArtifact = JSON.parse(
+        safeReadFile(
+          `${missionPath}/evidence/workitem-dispatch-${manifest.records[0].item_id}.json`,
+          { encoding: 'utf8' }
+        ) as string
+      );
+      expect(responseArtifact).toMatchObject({
+        reviewer_status: approved ? 'blocked' : 'refuted',
+      });
+      expect(responseArtifact.prompt).toContain(
+        'Mission context pack (scoped, minimal, role-specific).'
+      );
+      expect(responseArtifact.response_text).toContain('implementation complete');
+    }
+  );
 
   it('routes implementation and independent review surfaces through agent-runtime when requested', async () => {
     createWorkItem({

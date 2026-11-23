@@ -1,7 +1,7 @@
 ---
 title: オンボーディング標準フロー — 環境 / Identity / Tenant / Activation / First Work
 tags: [governance, onboarding, identity, tenant, organization, activation, first-work]
-last_updated: 2026-11-12
+last_updated: 2026-11-23
 kind: governance
 scope: repository
 authority: standard
@@ -68,6 +68,36 @@ persona が要るのは Step 10 の `pnpm organization` の書き込み系だけ
 ```bash
 export KYBERION_BASE_ROLE=sovereign
 ```
+
+### 主体の登録と有効化
+
+| 遷移                      | 入口と成立条件                                                                                                                            |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Member を確保する         | `pnpm onboarding apply` が確認済みの入力を検証し、有効な owner Member を確保する。                                                        |
+| Agent Identity を登録する | 同じ apply が責任を持つ Member を NHI に紐づける。新規 NHI は `provisioned` で、個人用 NHI は環境のテナントを暗黙に引き継がない。         |
+| NHI を有効化する          | `pnpm kyberion onboarding authority` で対象 NHI の計画をレビューし、人の承認後に適用する。                                                |
+| テナント利用を有効化する  | 会社・既存テナントの経路では `pnpm tenant:activation` が対象コンテキストとプローブ証跡を検査し、受諾後に有効化する。                      |
+| 顧客の選択を確定する      | 顧客案件では `pnpm kyberion customer-decision actor-add` で決裁者を登録する。顧客の選択の確定には、そのアクターの決定権と承認証跡が必要。 |
+
+[主体と責任のデータモデル](../architecture/actor-identity-and-responsibility-model.md#people-and-agents-in-a-customer-decision)
+に識別子と代理関係を示す。[有限状態モデル](../../../libs/core/organization/onboarding-identity.model.test.ts)
+は、各主体と対象テナントが一つの新規セットアップを対象に、責任を持つ Member、
+NHI 有効化の承認、テナント有効化の証跡と受諾、顧客決定の証跡を検査する。
+実装の検証は [identity の統合テスト](../../../scripts/onboarding/onboarding_apply.identity.integration.test.ts)、
+[テナント有効化テスト](../../../libs/core/organization/tenant-activation.test.ts)、
+[決定の確定テスト](../../../libs/core/decision-ledger/promote.test.ts) が担う。
+owner が停止中の場合、オンボーディングは失敗し、所属の自動補完や NHI の登録、
+実行ロールの永続化には進まない。
+
+個人オンボーディングでは、baseline の L3 と `pnpm onboarding check --json` が、
+owner Member とインストール済みプロフィールの NHI 登録を確認する。登録の欠落は、
+正本 checkout の個人 stance で
+`pnpm onboarding check --repair --identity <reviewed-file> --json` を実行して修復する。
+レビュー済み identity と既存プロフィールが整合する場合に本人設定を再適用する。
+新規登録された NHI は `provisioned` になり、利用開始には通常の人間承認が必要。
+停止・廃止や責任者・テナントの不整合は登録欠落と区別する。
+
+複数主体間の証跡の照合や、中断後の再実行は、この有限状態モデルの探索範囲外。
 
 ## 2. 3 つの名前を混同しない
 

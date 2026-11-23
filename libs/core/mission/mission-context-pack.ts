@@ -20,6 +20,7 @@ import {
   loadProjectTrackRecord,
   type ProjectTrackRecord,
 } from '../project/project-track-registry.js';
+import { selectScopedProjectTrack } from '../project/project-track-scope.js';
 import {
   getMissionTeamPlanPath,
   loadMissionTeamPlan,
@@ -57,6 +58,7 @@ import {
   knowledgeHintFragment,
   loadKnowledgeHintsIfPossible,
   organizationIdFromContext,
+  assertContextPackInputLineage,
   resolveScopeBudget,
   workItemProjectId,
 } from './mission-context-pack-knowledge.js';
@@ -603,19 +605,45 @@ function loadProjectStateIfPossible(input: {
   });
 }
 
-function loadTrackStateIfPossible(input: {
+function resolveContextPackTrack(input: {
   trackId?: string;
+  trackRecord?: ProjectTrackRecord | null;
   projectState?: ProjectOperationalState | null;
   missionState: MissionStateSummary;
+  workItem?: WorkItem | null;
+  taskSession?: TaskSession | null;
+  load?: typeof loadProjectTrackRecord;
 }): ProjectTrackRecord | null {
-  const candidate = String(
-    input.trackId ||
-      input.missionState.relationships?.track?.track_id ||
-      input.projectState?.active_track_ids?.[0] ||
-      ''
-  ).trim();
-  if (!candidate) return null;
-  return loadProjectTrackRecord(candidate);
+  const { missionState, projectState, taskSession } = input;
+  const projectId =
+    missionState.relationships?.project?.project_id ||
+    workItemProjectId(input.workItem, missionState.mission_id) ||
+    projectState?.project_id;
+  if (!projectId) return null;
+  const tier = normalizeTier(missionState.tier);
+  const tenant = missionState.tenant_slug;
+  if (
+    projectState &&
+    (projectState.project_id !== projectId ||
+      projectState.tier !== tier ||
+      projectState.tenant_slug !== tenant)
+  )
+    return null;
+  const sessionContext = taskSession?.project_context;
+  const sessionTrack =
+    sessionContext?.project_id === projectId &&
+    (sessionContext.tenant_slug === undefined || sessionContext.tenant_slug === tenant) &&
+    (sessionContext.tier === undefined || sessionContext.tier === tier)
+      ? sessionContext.track_id
+      : undefined;
+  return selectScopedProjectTrack({
+    project: { project_id: projectId, tier, tenant_slug: tenant },
+    boundTrackId: missionState.relationships?.track?.track_id || sessionTrack,
+    selectedTrackId: input.trackId,
+    defaultTrackId: projectState?.active_track_ids?.[0],
+    suppliedTrack: input.trackRecord,
+    load: input.load,
+  });
 }
 
 function loadArtifactHintsIfPossible(input: {
@@ -972,7 +1000,9 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     );
   }
 
+  assertContextPackInputLineage(input);
   const missionTier = normalizeTier(input.missionState.tier);
+  input = { ...input, trackRecord: resolveContextPackTrack(input) };
   const missionPath = safeMissionPath(
     input.missionPath ||
       findMissionPath(input.missionState.mission_id) ||
@@ -986,10 +1016,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     missionState: input.missionState,
     projectState: input.projectState,
   });
-  const trackId =
-    input.trackRecord?.track_id ||
-    input.missionState.relationships?.track?.track_id ||
-    input.projectState?.active_track_ids?.[0];
+  const trackId = input.trackRecord?.track_id;
   const taskSessionId = input.taskSession?.session_id || undefined;
   const workItemId = input.workItem?.item_id || undefined;
   const assignment = input.missionTeamAssignment || null;
@@ -1100,7 +1127,20 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
       ? { confidence_score: input.missionState.confidence_score }
       : {}),
     ...(input.missionState.relationships
-      ? { relationships: input.missionState.relationships }
+      ? {
+          relationships: {
+            ...input.missionState.relationships,
+            track:
+              input.trackRecord && input.missionState.relationships.track?.track_id === trackId
+                ? {
+                    ...input.missionState.relationships.track,
+                    track_name: input.trackRecord.name,
+                    track_type: input.trackRecord.track_type,
+                    lifecycle_model: input.trackRecord.lifecycle_model,
+                  }
+                : undefined,
+          },
+        }
       : {}),
     ...(input.missionState.context ? { context: input.missionState.context } : {}),
     ...(input.missionState.outcome_contract
@@ -1173,6 +1213,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
       }
     : undefined;
 
+  const sessionProject = input.taskSession?.project_context;
   const taskSession = input.taskSession
     ? {
         session_id: input.taskSession.session_id,
@@ -1184,8 +1225,15 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
           summary: input.taskSession.goal.summary,
           success_condition: input.taskSession.goal.success_condition,
         },
-        ...(input.taskSession.project_context
-          ? { project_context: input.taskSession.project_context }
+        ...(sessionProject
+          ? {
+              project_context: {
+                ...sessionProject,
+                track_id: sessionProject.track_id === trackId ? trackId : undefined,
+                track_name:
+                  sessionProject.track_id === trackId ? input.trackRecord?.name : undefined,
+              },
+            }
           : {}),
         ...(input.taskSession.requirements ? { requirements: input.taskSession.requirements } : {}),
         ...(input.taskSession.artifact ? { artifact: input.taskSession.artifact } : {}),
@@ -1385,13 +1433,16 @@ export async function resolveMissionContextPack(
       tier,
       tenantSlug: input.tenantSlug,
     });
-  const trackRecord =
-    input.trackRecord ||
-    loadTrackStateIfPossible({
-      trackId: input.trackId,
-      projectState,
-      missionState,
-    });
+  assertContextPackInputLineage({ missionState, workItem, taskSession, projectState });
+  const trackRecord = resolveContextPackTrack({
+    trackId: input.trackId,
+    trackRecord: input.trackRecord,
+    projectState,
+    missionState,
+    workItem,
+    taskSession,
+    load: loadProjectTrackRecord,
+  });
   const missionTeamPlan = input.teamRole
     ? loadMissionTeamPlan(input.missionId) ||
       resolveMissionTeamPlan({

@@ -61,9 +61,15 @@ Rules (`libs/core/authn/stance-resolver.ts`):
   (`knowledge/personal/tenants/`); for an HTTP surface it is the viewer
   credential's `tenant_slugs`. A stance never declares its own permission.
 - **Switching it switches the data scope.** `pnpm stance:switch <slug>` writes
-  `KYBERION_STANCE`, `KYBERION_TENANT` and `KYBERION_ORGANIZATION_ID` into
-  `active/shared/runtime/stance.env`, so the tenant binding every tier-guard and
-  store check reads follows the stance. On a surface,
+  an activation profile at `active/shared/runtime/stance.env`. Sourcing it
+  selects the stance and replaces shell tenant and organization bindings.
+  A selected organization must be registered under the selected tenant.
+  The profile clears the previous tier, project, mission, task and NHI session
+  and masks any previous NHI claim. Scope resolution skips persisted
+  `scope.env` and checkout inference for this activation. A tenant-only stance
+  leaves organization unset, and an overlay-only stance leaves tenant and
+  organization unset. New work can supply explicit lineage and admit an NHI
+  for its own scope. On a surface,
   `narrowViewerScopeToStance` narrows the `ViewerContext` to that tenant and
   organization, and `stanceResourceBinding` binds a `ResourceAccessScope`
   ceiling to it.

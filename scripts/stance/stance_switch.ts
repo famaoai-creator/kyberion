@@ -10,14 +10,22 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation/json';
+import { currentExecutionScope } from '@agent/core/foundation';
+import { withExecutionContext } from '@agent/core/authority';
+import { currentScopeEnvelope } from '@agent/core/scope-envelope';
 import {
   STANCE_ENV_VAR,
+  STANCE_SCOPE_BOUND_ENV_VAR,
   parseStanceSelection,
   resolveStance,
   stanceDirForSlug,
   type ResolvedStance,
 } from '@agent/core/stance-resolver';
 import { listTenantProfileSlugs, readTenantProfile } from '@agent/core/tenant-registry';
+import {
+  loadOrganizationProfileAtPath,
+  resolveTenantOrganizationProfilePath,
+} from '@agent/core/organization-profile';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 type Print = (value: unknown) => void;
@@ -81,15 +89,55 @@ export function switchStance(
       })
     : undefined;
 
-  const lines = [`export ${STANCE_ENV_VAR}=${slug}`];
-  if (stance) {
-    lines.push(`export KYBERION_TENANT=${stance.selected.tenantSlug}`);
-    lines.push(
-      stance.selected.organizationId
-        ? `export KYBERION_ORGANIZATION_ID=${stance.selected.organizationId}`
-        : 'unset KYBERION_ORGANIZATION_ID'
+  const selected = stance?.selected;
+  const executionScope = currentExecutionScope();
+  const inheritedScope = currentScopeEnvelope()?.identity;
+  if (
+    (executionScope?.tenantBound && executionScope.tenantSlug !== selected?.tenantSlug) ||
+    (inheritedScope && inheritedScope.tenant_slug !== selected?.tenantSlug) ||
+    (executionScope?.organizationId &&
+      executionScope.organizationId !== selected?.organizationId) ||
+    (inheritedScope?.organization_id && inheritedScope.organization_id !== selected?.organizationId)
+  ) {
+    throw new Error(
+      '[STANCE_NOT_PERMITTED] Selection conflicts with the governed execution scope.'
     );
   }
+  const organizationId = selected?.organizationId;
+  if (selected && organizationId) {
+    const organizationMatches = withExecutionContext(
+      'sovereign_concierge',
+      () => {
+        const profile = resolveTenantOrganizationProfilePath(
+          selected.tenantSlug,
+          organizationId,
+          rootDir
+        );
+        return Boolean(
+          profile && loadOrganizationProfileAtPath(profile.path).organization_id === organizationId
+        );
+      },
+      undefined,
+      selected.tenantSlug,
+      organizationId
+    );
+    if (!organizationMatches) {
+      throw new Error(
+        '[STANCE_NOT_PERMITTED] Organization is not registered under the selected tenant.'
+      );
+    }
+  }
+  const lines = [
+    `export ${STANCE_ENV_VAR}=${slug}`,
+    `export ${STANCE_SCOPE_BOUND_ENV_VAR}=1`,
+    'unset KYBERION_TIER KYBERION_PROJECT_ID MISSION_ID KYBERION_TASK_ID KYBERION_NHI_SESSION',
+    // An explicitly empty canonical claim also masks a legacy NHI actor claim.
+    "export KYBERION_NHI_ID=''",
+    selected ? `export KYBERION_TENANT=${selected.tenantSlug}` : 'unset KYBERION_TENANT',
+    selected?.organizationId
+      ? `export KYBERION_ORGANIZATION_ID=${selected.organizationId}`
+      : 'unset KYBERION_ORGANIZATION_ID',
+  ];
   safeMkdir(path.dirname(STANCE_ENV_PATH), { recursive: true });
   safeWriteFile(STANCE_ENV_PATH, `${lines.join('\n')}\n`, { encoding: 'utf8' });
   return { slug, envPath: STANCE_ENV_PATH, ...(stance ? { stance } : {}) };

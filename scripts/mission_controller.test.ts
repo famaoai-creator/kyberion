@@ -1722,9 +1722,65 @@ describe('mission_controller argument parsing', () => {
         expect(payload.input.relationships.track.track_id).toBe('TRK-TEST-INTENT-DRY-DELIVERY');
         expect(payload.intentTrackGate.status).toBe('ready_to_provision');
         expect(payload.intentTrackGate.track_record.project_id).toBe('PRJ-TEST-INTENT-DRY');
+        expect(payload.intentTrackGate.track_record.tier).toBe('public');
         expect(payload.intentTrackGate.policy).toBeUndefined();
         expect(payload.intentTrackGate.effective_policy).toBeUndefined();
         expect(payload.intentTrackGate.track_record.metadata).toBeUndefined();
+      });
+    } finally {
+      process.argv = originalArgv;
+    }
+  });
+
+  it('keeps the project default track when intent routing suggests a new track', async () => {
+    const projectId = 'PRJ-TEST-AUTO-TRACK';
+    const trackId = 'TRK-TEST-AUTO-TRACK';
+    saveProjectRecord({
+      project_id: projectId,
+      name: 'Project',
+      summary: 'Project with a selected lane',
+      status: 'active',
+      tier: 'public',
+      default_track_id: trackId,
+    });
+    saveProjectTrackRecord({
+      project_id: projectId,
+      track_id: trackId,
+      name: 'Operations',
+      summary: 'Existing work',
+      status: 'active',
+      tier: 'public',
+      track_type: 'operations',
+      lifecycle_model: 'continuous_operations',
+    });
+    const output: unknown[] = [];
+    const originalArgv = process.argv;
+    process.argv = [
+      'node',
+      'dist/scripts/mission_controller.js',
+      'create',
+      'MSN-TEST-INTENT-DRY',
+      '--dry-run',
+      '--project-id',
+      projectId,
+      '--project-path',
+      'active/projects/sample',
+      '--project-relationship',
+      'belongs_to',
+      '--intent-id',
+      'request-feature-development',
+      '--intent-confidence',
+      '0.9',
+    ];
+    try {
+      await withProjectMissionControllerAsync(async () => {
+        await main(undefined, (value) => output.push(value));
+        const payload = JSON.parse(String(output[0]));
+        expect(payload.input.relationships.track).toMatchObject({
+          track_id: trackId,
+          track_type: 'operations',
+        });
+        expect(payload.intentTrackGate).toBeNull();
       });
     } finally {
       process.argv = originalArgv;

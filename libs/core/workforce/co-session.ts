@@ -1131,7 +1131,6 @@ export function ackCoSessionHandoff(input: {
     const index = rows.findIndex((row) => row.handoff_id === input.handoff_id);
     if (index < 0) throw new CoSessionError('not_found', `handoff not found: ${input.handoff_id}`);
     const current = rows[index]!;
-    if (current.acked_at) return current;
     if (current.to_participant_id && current.to_participant_id !== participant_id) {
       throw new CoSessionError(
         'handoff_not_for_participant',
@@ -1144,6 +1143,7 @@ export function ackCoSessionHandoff(input: {
         `handoff is addressed to provider ${current.to_provider}, not ${provider}`
       );
     }
+    if (current.acked_at) return current;
     freshlyAcked = true;
     const next: CoSessionHandoff = {
       ...current,

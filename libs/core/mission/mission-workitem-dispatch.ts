@@ -21,7 +21,6 @@ import {
   type WorkItemStatus,
 } from '../workforce/work-coordination.js';
 import { formatCognitiveRouteDecision } from '../provider/cognitive-routing.js';
-import { type TaskModelHint } from '../reasoning/reasoning-model-routing.js';
 import { findMissionPath } from '../path-resolver.js';
 import { deriveAgentNhiId } from '../agent/agent-identity.js';
 import { issueTaskGrantBestEffort } from '../task/task-scoped-grants.js';
@@ -30,7 +29,6 @@ import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-l
 import { evaluatePhaseEntryGate } from './mission-process-planning.js';
 import { unchangedAiDlcContractFailure } from './mission-aidlc-gate-projection.js';
 import { recordTask } from './mission-maintenance.js';
-import { type MissionExecutionSurface } from './mission-execution-surface.js';
 
 export type MissionWorkItemDispatchMode = 'auto' | 'agent' | 'subagent';
 export type MissionWorkItemDispatchFinalStatus = 'review' | 'done' | 'blocked';
@@ -55,6 +53,7 @@ import {
   getTaskModelHintAssisted,
   isIndependentReviewRequired,
   runIndependentReviewerReview,
+  workItemReviewPasses,
   getWorkItemTaskId,
   updateNextTasksReflection,
   reflectTicketOutcome,
@@ -81,7 +80,6 @@ import type {
   MissionWorkItemDispatchRecord,
   MissionWorkItemDispatchManifest,
   WorkItemDispatchAdapters,
-  WorkItemDispatchReviewerVerdict,
 } from './mission-workitem-dispatch-internals.js';
 export type {
   WorkItemExecutionOutcome,
@@ -558,22 +556,8 @@ async function dispatchMissionWorkItemsRound(
       continue;
     }
     const cognitiveRouteSummary = formatCognitiveRouteDecision(dispatchContext.cognitiveRoute);
-    let reviewerResult: {
-      verdict: WorkItemDispatchReviewerVerdict;
-      reviewerPrompt: string;
-      reviewerPath: string;
-      reviewerExcerpt: string;
-      reviewerTaskModelHint: TaskModelHint;
-      reviewerContextPackId: string;
-      reviewerContextPackPath: string;
-      reviewerExecutionSurface: MissionExecutionSurface;
-      reviewerExecutionSurfaceUsed: 'cli_subagent' | 'agent_runtime';
-      reviewerAgentId?: string;
-      reviewerAttemptId?: string;
-      reviewerRuntimeId?: string;
-      reviewerOutputRef?: string;
-      reviewerProvider?: string;
-    } | null = null;
+    let reviewerResult: Awaited<ReturnType<typeof runIndependentReviewerReview>> | null = null;
+    let reviewGatePassed = !independentReviewRequired;
     if (independentReviewRequired) {
       reviewerResult = await runIndependentReviewerReview({
         missionPath,
@@ -582,14 +566,22 @@ async function dispatchMissionWorkItemsRound(
         item,
         teamRole,
         assigneePeerId,
-        executionResponse: response.responseText,
+        executionEvidence: response.taskResult ?? undefined,
+        implementationActor: response.executorAgentId,
+        implementationRuntime: response.runtimeId,
+        implementationScope: dispatchContext.securityScope,
         taskModelHint,
         reviewExecutionSurface: options.reviewExecutionSurface,
         adapters,
       });
+      reviewGatePassed = workItemReviewPasses(
+        reviewerResult.verdict.approved,
+        reviewerResult.independence,
+        independentReviewRequired
+      );
       record.reviewer_path = reviewerResult.reviewerPath;
       record.reviewer_excerpt = reviewerResult.reviewerExcerpt;
-      record.reviewer_status = reviewerResult.verdict.approved
+      record.reviewer_status = reviewGatePassed
         ? 'approved'
         : reviewerResult.verdict.refuted
           ? 'refuted'
@@ -598,16 +590,13 @@ async function dispatchMissionWorkItemsRound(
         ...(reviewerResult.verdict.rationale ? [reviewerResult.verdict.rationale] : []),
         ...reviewerResult.verdict.findings,
       ].filter(Boolean);
-      if (!reviewerResult.verdict.approved) {
+      if (!reviewGatePassed) {
         record.notes.push(
-          `independent reviewer ${record.reviewer_status || 'blocked'}: ${
-            record.reviewer_notes?.join('; ') || 'no findings provided'
-          }`
+          `review gate requires separate reviewer approval (${reviewerResult.independence})`
         );
       }
-      record.notes.push(
-        `independent reviewer context pack: ${reviewerResult.reviewerContextPackId}`
-      );
+      record.notes.push(`review context pack: ${reviewerResult.reviewerContextPackId}`);
+      record.review_independence = reviewerResult.independence;
       record.review_execution_surface = reviewerResult.reviewerExecutionSurface;
       record.review_execution_surface_used = reviewerResult.reviewerExecutionSurfaceUsed;
       record.reviewer_agent_id = reviewerResult.reviewerAgentId;
@@ -664,7 +653,7 @@ async function dispatchMissionWorkItemsRound(
           ? 'review'
           : artifactReviewReceipt && artifactReviewReceipt.receipt.verdict !== 'approved'
             ? 'review'
-            : independentReviewRequired && reviewerResult && !reviewerResult.verdict.approved
+            : !reviewGatePassed
               ? 'review'
               : finalStatus;
     const routingSucceeded =
@@ -674,7 +663,7 @@ async function dispatchMissionWorkItemsRound(
       !response.repairRequiresReview &&
       !driftWatchdog.shouldStop &&
       (!artifactReviewReceipt || artifactReviewReceipt.receipt.verdict === 'approved') &&
-      (!independentReviewRequired || Boolean(reviewerResult?.verdict.approved));
+      reviewGatePassed;
     // A clarification request is a valid model outcome, not evidence that
     // the chosen tier lacked capability. Keep the item blocked for input, but
     // do not spend more compute on a higher tier for the same missing facts.
@@ -878,6 +867,7 @@ async function dispatchMissionWorkItemsRound(
         ...(reviewerResult
           ? {
               last_independent_reviewer_status: record.reviewer_status,
+              last_review_independence: record.review_independence,
               last_independent_reviewer_path: record.reviewer_path,
               last_independent_reviewer_excerpt: record.reviewer_excerpt,
               last_review_execution_surface: record.review_execution_surface,
@@ -921,6 +911,7 @@ async function dispatchMissionWorkItemsRound(
         ? {
             review_execution_surface: record.review_execution_surface,
             review_execution_surface_used: record.review_execution_surface_used,
+            review_independence: record.review_independence,
             reviewer_agent_id: record.reviewer_agent_id,
             review_attempt_id: record.review_attempt_id,
             review_runtime_id: record.review_runtime_id,

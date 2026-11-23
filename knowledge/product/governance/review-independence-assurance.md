@@ -35,6 +35,24 @@ the assurance. Strict failures prevent publication even when the separate missio
 gate is disabled. Other mission callers retain their legacy policy; no new CLI,
 environment variable, tenant policy setting, or persisted receipt field is added.
 
+## WorkItem review trials
+
+WorkItem dispatch requests a fresh reviewer context. The review receives the
+reviewer context pack and structured implementation evidence (artifact references,
+verification, gaps and needs). It checks the review pack against the implementation
+scope, including tenant, organization, project, mission, task, session and data
+tier. An org-less tenant retains its tenant boundary. Personal and tenantless
+public work retain their respective tiers. The system storage partition remains
+separate from tenant and personal evidence.
+
+A backend-only review is recorded as `self_review`, even when the model changes.
+The verdict is kept in the review artifact. Approval from this trial leaves a
+WorkItem that requires a separate reviewer in review. Agent-runtime reviews with
+different recorded actors and no detected runtime match retain
+`legacy_actor_claim` assurance. A fresh context request records the intended
+context boundary; the receipt does not verify provider-side isolation or
+authenticate authorship of the artifact bytes.
+
 ## Why existing records cannot be promoted into proof
 
 - `currentActor()` is an attribution projection, not authentication proof.

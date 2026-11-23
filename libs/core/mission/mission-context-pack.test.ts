@@ -232,7 +232,11 @@ function seedRegistryProject(): void {
   });
 }
 
-function makePack(): MissionContextPack {
+function makePack(
+  trackOverrides: Partial<
+    NonNullable<Parameters<typeof buildMissionContextPack>[0]['trackRecord']>
+  > = {}
+): MissionContextPack {
   seedContextPackArtifacts('PRJ-CONTEXT-PACK-001');
   return buildMissionContextPack({
     contextPackId: 'CPK-MSN-CONTEXT-PACK-TEST-001-IMPLEMENTER-ABC12345',
@@ -341,6 +345,7 @@ function makePack(): MissionContextPack {
       tier: 'public',
       active_mission_ids: [missionId],
       required_artifacts: ['mission-context-pack.schema.json'],
+      ...trackOverrides,
     },
     taskSession: {
       session_id: 'TSK-CONTEXT-PACK-001',
@@ -846,6 +851,25 @@ describe('mission-context-pack', () => {
       'allowed-context-skill',
     ]);
     expect(renderMissionContextPack(pack)).not.toContain('mock-malicious-skill');
+  });
+
+  it.each([
+    { project_id: 'PRJ-OTHER' },
+    { tenant_slug: 'other-tenant' },
+    { tier: 'confidential' as const },
+    { track_id: 'TRK-NEW-SELECTION' },
+  ])('omits a foreign or substituted track from the prompt and its sources (%j)', (override) => {
+    const pack = makePack({
+      ...override,
+      name: 'Foreign track marker',
+      gate_profile_id: 'foreign-gate',
+    });
+    expect(pack.track).toBeUndefined();
+    expect(pack.scope.track_id).toBeUndefined();
+    expect(pack.mission.relationships?.track).toBeUndefined();
+    expect(pack.task_session?.project_context?.track_id).toBeUndefined();
+    expect(pack.sources.some((source) => source.ref.startsWith('track:'))).toBe(false);
+    expect(renderMissionContextPack(pack)).not.toContain('Foreign track marker');
   });
 
   it('builds a scoped role-specific pack with traceable sources', () => {

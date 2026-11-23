@@ -19,13 +19,11 @@ import {
   personalAgentIdentityRevision,
 } from '@agent/core/personal-identity-state';
 import { ensureAgentIdentityProvisioned } from '@agent/core/agent/agent-identity';
-import {
-  ensureOwnerMember,
-  ownerAccountableHumanId,
-  writeMemberProfile,
-} from '@agent/core/organization/member-registry';
+import { parseNhiId } from '@agent/core/contracts/nhi-id';
+import { ensureOwnerMember, writeMemberProfile } from '@agent/core/organization/member-registry';
 import {
   onboardingAgentIdentityParameters,
+  inspectPersonalIdentityRegistration,
   inspectInstalledOnboardingRuntime,
 } from '@agent/core/organization/onboarding-runtime-identity';
 import {
@@ -436,7 +434,7 @@ export async function writeText(filePath: string, content: string, lockName: str
   });
 }
 
-export async function applyIdentity(input: ApplyInput, now: string) {
+export async function applyIdentity(input: ApplyInput, now: string, repairNhiId?: string) {
   const profileDir = profileRoot();
   const agentProfilePath = path.join(profileDir, 'agent-identity.json');
   const agentProfileRevision = withExecutionContext('sovereign_concierge', () =>
@@ -444,20 +442,37 @@ export async function applyIdentity(input: ApplyInput, now: string) {
   );
   const id = input.identity;
   assertInstalledAgentHandle(id.agent_id);
+  const repairIdentity = repairNhiId ? parseNhiId(repairNhiId) : undefined;
+  if (repairNhiId) {
+    const registration = inspectPersonalIdentityRegistration();
+    if (
+      !repairIdentity ||
+      repairIdentity.legacy ||
+      repairIdentity.tenant_slug ||
+      registration.agentId !== repairNhiId ||
+      registration.profileHandle !== id.agent_id ||
+      registration.nhi !== 'missing'
+    ) {
+      throw new Error('The missing personal NHI binding changed or requires migration.');
+    }
+  }
   // Identity setup provisions a reviewed identity; only its separate signed
   // authority plan may activate it. Resolve before overwriting any profile.
   const agent = withExecutionContext('sovereign_concierge', () => {
     const owner = ensureOwnerMember();
     if (owner.status !== 'active') throw new Error('Active accountable owner required.');
-    const parameters = onboardingAgentIdentityParameters(id.agent_id, ownerAccountableHumanId());
+    const accountableHumanId = `user:${owner.member_id}`;
+    const parameters = repairIdentity
+      ? { slug: repairIdentity.slug, personScope: true as const }
+      : onboardingAgentIdentityParameters(id.agent_id, accountableHumanId);
     return withExecutionContext('mission_controller', () => {
       const record = ensureAgentIdentityProvisioned({
         ...parameters,
         displayName: id.name,
-        accountableHumanId: ownerAccountableHumanId(),
+        accountableHumanId,
       });
       if (
-        record.accountable_human_id !== ownerAccountableHumanId() ||
+        record.accountable_human_id !== accountableHumanId ||
         ['suspended', 'retired'].includes(record.lifecycle_status)
       )
         throw new Error(
@@ -724,11 +739,11 @@ export async function applyOnboardingInput(
   setRegisteredEnv('MISSION_ROLE', 'sovereign_concierge');
   setRegisteredEnv('KYBERION_BASE_ROLE', 'sovereign');
   const now = nowIso();
-  const persona = resolveInputPersona(input);
-  const personaEnvPath = persistPersona(persona);
+  const persona = resolveInputPersona(validatedInput);
   setRegisteredEnv('KYBERION_BASE_ROLE', persona);
-  print(`Persisted KYBERION_BASE_ROLE=${persona} to ${personaEnvPath}`);
   await applyIdentity(validatedInput, now);
+  const personaEnvPath = persistPersona(persona);
+  print(`Persisted KYBERION_BASE_ROLE=${persona} to ${personaEnvPath}`);
   const tenantEntries = await applyTenants(validatedInput, now);
   const tutorial = await applyTutorial(validatedInput, now);
   if (validatedInput.reasoning_backend !== undefined) {

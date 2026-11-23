@@ -725,6 +725,11 @@ export class AgentIdentityJournal {
     });
   }
 
+  /** A repair must distinguish a missing identity from a damaged journal. */
+  assertIntegrity(): void {
+    this.readStrictHistory();
+  }
+
   /** Stable per-identity change fence, including lifecycle/accountability ABA changes. */
   revision(nhiId: string): number {
     return this.readJournal().events.reduce((revision, event) => {
@@ -1271,6 +1276,10 @@ export function resetLegacyNhiIdWarningsForTests(): void {
  */
 export function getAgentIdentity(nhiId: string): AgentIdentityRecord | null {
   return lookupIdentity(ensureState(), nhiId);
+}
+
+export function assertAgentIdentityJournalIntegrity(): void {
+  getDefaultJournal().assertIntegrity();
 }
 
 export function getAgentIdentityRevision(nhiId: string): number {

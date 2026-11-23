@@ -178,6 +178,30 @@ describe('project and artifact registries', () => {
     expect(loadArtifactRecord('ART-TEST-DECK')?.work_loop?.resolution.execution_shape).toBe(
       'task_session'
     );
+    expect(() =>
+      attachArtifactRecordToTaskSession('TSK-TEST-ARTIFACT', {
+        ...artifact,
+        task_session_id: 'TSK-OTHER',
+      })
+    ).toThrow('ARTIFACT_SESSION_MISMATCH');
+    expect(() =>
+      attachArtifactRecordToTaskSession('TSK-TEST-ARTIFACT', {
+        ...artifact,
+        tenant_slug: 'other-tenant',
+      })
+    ).toThrow('ARTIFACT_SESSION_SCOPE_MISMATCH');
+    const replacement = attachArtifactRecordToTaskSession('TSK-TEST-ARTIFACT', {
+      ...artifact,
+      artifact_id: 'ART-TEST-LINK',
+      storage_class: 'external_ref',
+      path: undefined,
+      preview_text: undefined,
+      external_ref: 'https://example.test/deck',
+    });
+    expect(replacement?.artifact?.artifact_id).toBe('ART-TEST-LINK');
+    expect(replacement?.artifact?.external_ref).toBe('https://example.test/deck');
+    expect(replacement?.artifact?.output_path).toBeUndefined();
+    expect(replacement?.artifact?.preview_text).toBeUndefined();
   });
 
   it.each([

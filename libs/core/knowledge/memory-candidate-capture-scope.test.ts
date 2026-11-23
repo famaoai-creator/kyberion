@@ -1,6 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { safeAppendFileSync, safeExistsSync, safeMkdir, safeRmSync } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
+import * as missionPaths from '../path-resolver.js';
+import * as missionStateReader from '../mission/mission-state-reader.js';
+import { missionMemoryCaptureScope } from './memory-capture-scope.js';
 import * as path from 'node:path';
 import {
   createMemoryPromotionCandidate,
@@ -46,6 +49,33 @@ describe('memory candidate capture scope (D8)', () => {
       scope: { tier: 'personal' },
     });
     expect(() => enqueueMemoryPromotionCandidate(candidate)).toThrow(/MEMORY_SCOPE_REQUIRED/);
+  });
+
+  it('captures the project relationship from persisted mission state', () => {
+    const missionPath = vi.spyOn(missionPaths, 'findMissionPath').mockReturnValue('mission-dir');
+    const reader = vi.spyOn(missionStateReader, 'loadMissionStateForInference').mockReturnValue({
+      tier: 'confidential',
+      tenant_slug: 'tenant-capture',
+      organization_id: 'org-capture',
+      relationships: {
+        project: { project_id: 'project-capture', relationship_type: 'belongs_to' },
+      },
+    });
+    try {
+      expect(missionMemoryCaptureScope('MSN-CAPTURE-SCOPE')).toEqual({
+        tier: 'confidential',
+        scope: {
+          tier: 'confidential',
+          tenant_slug: 'tenant-capture',
+          organization_id: 'org-capture',
+          project_id: 'project-capture',
+          mission_id: 'MSN-CAPTURE-SCOPE',
+        },
+      });
+    } finally {
+      reader.mockRestore();
+      missionPath.mockRestore();
+    }
   });
 
   it('accepts a tenant-scoped candidate and writes kind and lane at capture', () => {

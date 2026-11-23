@@ -11,6 +11,7 @@ import {
 } from '../agent/agent-identity.js';
 import { parseNhiId } from '../contracts/nhi-id.js';
 import { inspectInstalledPersonalRuntime } from './personal-runtime-identity.js';
+export { inspectPersonalIdentityRegistration } from './personal-runtime-identity.js';
 import {
   resolvePersonaIdentity,
   personaIdentityBindingsSchema,

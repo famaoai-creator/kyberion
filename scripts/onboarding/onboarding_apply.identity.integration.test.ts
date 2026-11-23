@@ -241,6 +241,51 @@ describe('CLI identity provisioning with actual NHI and signed authority stores'
       'user:owner'
     );
   });
+  it('detects and repairs missing owner and NHI registrations without activating the NHI', async () => {
+    const { main } = await import('../onboarding.js');
+    const { safeRmSync } = await import('@agent/core/secure-io');
+    const reviewed = onboarding.parseApplyInput(input('Repair_Identity_Agent'));
+    await onboarding.applyIdentity(reviewed, new Date().toISOString());
+    const installedNhi = 'kyberion://agent/_/_/previously-installed-agent';
+    const profilePath = path.join(f.root, 'knowledge/personal/agent-identity.json');
+    const identityPath = path.join(f.root, 'active/shared/tmp/reviewed-repair-identity.json');
+    const journal = path.join(f.root, 'active/shared/tmp/empty-repair-agent-identities.jsonl');
+    f.run(() => {
+      safeRmSync(path.join(f.root, 'knowledge/personal/members/owner.json'));
+      const current = JSON.parse(String(safeReadFile(profilePath)));
+      safeWriteFile(profilePath, JSON.stringify({ ...current, nhi_id: installedNhi }));
+      f.identities.resetAgentIdentityServiceForTests(journal);
+      safeWriteFile(identityPath, JSON.stringify(reviewed));
+    });
+    const run = async (...args: string[]) => {
+      const output: unknown[] = [];
+      await main(['check', '--json', ...args], (value) => output.push(value));
+      return JSON.parse(String(output[0]));
+    };
+
+    expect(await run()).toMatchObject({
+      status: 'repair_needed',
+      registration: { owner: 'missing', profile: 'installed', nhi: 'missing' },
+    });
+    expect(f.run(() => f.members.readMemberProfile('owner'))).toBeNull();
+    expect(f.identities.getAgentIdentity(installedNhi)).toBeNull();
+    f.run(() => safeWriteFile(journal, '{invalid journal'));
+    await expect(run('--repair', '--identity', identityPath)).rejects.toThrow(
+      'journal history unavailable'
+    );
+    expect(f.run(() => f.members.readMemberProfile('owner'))).toBeNull();
+    f.run(() => safeRmSync(journal));
+    expect(await run('--repair', '--identity', identityPath)).toMatchObject({
+      status: 'repaired',
+      registration: { owner: 'active', profile: 'installed', nhi: 'provisioned' },
+      next: 'pnpm onboarding authority show --scope person --json',
+    });
+    expect(f.run(profile).nhi_id).toBe(installedNhi);
+    expect(f.identities.getAgentIdentity(installedNhi)?.accountable_human_id).toBe('user:owner');
+    expect(await run('--repair', '--identity', identityPath)).toMatchObject({
+      status: 'registered',
+    });
+  });
   it('rejects an invalid installed handle before provisioning or overwriting profiles', async () => {
     const before = f.identities.listAgentIdentities();
     const installed = f.run(profile);
@@ -252,6 +297,27 @@ describe('CLI identity provisioning with actual NHI and signed authority stores'
     ).rejects.toThrow('installed identity schema');
     expect(f.identities.listAgentIdentities()).toEqual(before);
     expect(f.run(profile)).toEqual(installed);
+  });
+  it('leaves membership, NHI and persisted role unchanged when the owner is suspended', async () => {
+    const { readPersistedPersona, persistPersona } =
+      await import('../reasoning/reasoning_backend_selection.js');
+    const owner = f.run(() => f.members.readMemberProfile('owner'));
+    if (!owner) throw new Error('Expected a fixture owner');
+    const suspended = f.run(() =>
+      f.members.writeMemberProfile({ ...owner, status: 'suspended', memberships: [] })
+    );
+    f.run(() => persistPersona('ecosystem_architect'));
+    const installed = f.run(profile);
+    const identities = f.identities.listAgentIdentities();
+
+    await expect(onboarding.applyOnboardingInput(input())).rejects.toThrow(
+      'Active accountable owner required'
+    );
+
+    expect(f.run(() => f.members.readMemberProfile('owner'))).toEqual(suspended);
+    expect(f.run(profile)).toEqual(installed);
+    expect(f.identities.listAgentIdentities()).toEqual(identities);
+    expect(f.run(() => readPersistedPersona())).toBe('ecosystem_architect');
   });
   it('provisions and persists the exact reviewed identity without activating it, idempotently', async () => {
     const raw = onboarding.parseApplyInput(input());

@@ -25,7 +25,8 @@
         "sessionId": { "type": "string", "minLength": 1 },
         "linkId": { "type": "string", "minLength": 1 },
         "resourceRef": { "type": "string", "minLength": 1 },
-        "connectedAt": { "type": "string", "minLength": 1 }
+        "connectedAt": { "type": "string", "minLength": 1 },
+        "expiresAt": { "type": "string", "minLength": 1 }
       }
     }
   }

@@ -5,7 +5,8 @@ import * as path from 'node:path';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import * as pathResolver from '../path-resolver.js';
 import { resolveMissionDir, tryResolveOwnerScope } from '../governance/owner-scope.js';
-import { loadMissionStateAtPath } from './mission-state-reader.js';
+import { readMissionStateAtPath } from './mission-state-reader.js';
+import { buildTenantlessNhiId, NHI_SLUG_PATTERN } from '../contracts/nhi-id.js';
 import {
   deriveAgentNhiId,
   ensureAgentIdentityBestEffort,
@@ -229,16 +230,31 @@ function resolveAgentRuntimeIdentity(
   resourceType: MissionActorType,
   actorId: string,
   explicit: string | null | undefined,
-  organizationId: string | undefined
+  organizationId: string | undefined,
+  tenantSlug: string | undefined
 ): string | null {
-  if (explicit?.trim()) return explicit;
+  if (explicit?.trim()) {
+    if (resourceType === 'agent') assertMissionRuntimeTenant(explicit, tenantSlug);
+    return explicit;
+  }
   if (resourceType !== 'agent') return null;
-  return deriveAgentNhiId(actorId, organizationId);
+  if (tenantSlug) return deriveAgentNhiId(actorId, organizationId, tenantSlug);
+  return NHI_SLUG_PATTERN.test(actorId) ? buildTenantlessNhiId(actorId) : null;
+}
+
+function assertMissionRuntimeTenant(identity: string, tenantSlug: string | undefined): void {
+  const parsed = parseNhiId(identity);
+  if (!parsed || parsed.legacy || (parsed.tenant_slug ?? undefined) !== tenantSlug) {
+    throw new Error(
+      '[MISSION_RUNTIME_IDENTITY_SCOPE_MISMATCH] Expected an NHI in the mission tenant.'
+    );
+  }
 }
 
 function resourceFromLegacyAssignment(
   assignment: MissionTeamPlan['assignments'][number],
   organizationId?: string,
+  tenantSlug?: string,
   loadIndex?: WorkforceLoadIndex
 ): WorkforceResourceRef | null {
   const actorId = assignment.agent_id?.trim();
@@ -266,7 +282,8 @@ function resourceFromLegacyAssignment(
       resourceType,
       actorId,
       assignment.runtime_identity,
-      organizationId
+      organizationId,
+      tenantSlug
     ),
   };
 }
@@ -274,6 +291,7 @@ function resourceFromLegacyAssignment(
 function resolveAssignmentResource(
   assignment: MissionTeamPlan['assignments'][number],
   organizationId?: string,
+  tenantSlug?: string,
   loadIndex?: WorkforceLoadIndex
 ): WorkforceResourceRef | null {
   const resource = assignment.resource;
@@ -288,14 +306,15 @@ function resolveAssignmentResource(
       resource.resource_type,
       resource.resource_id,
       resource.runtime_identity,
-      organizationId
+      organizationId,
+      tenantSlug
     );
     if (runtimeIdentity !== (resource.runtime_identity ?? null)) {
       return { ...resource, runtime_identity: runtimeIdentity };
     }
     return resource;
   }
-  return resourceFromLegacyAssignment(assignment, organizationId, loadIndex);
+  return resourceFromLegacyAssignment(assignment, organizationId, tenantSlug, loadIndex);
 }
 
 /**
@@ -357,11 +376,13 @@ export function buildMissionStaffingAssignments(plan: MissionTeamPlan): MissionS
   const assignments: MissionStaffingAssignment[] = plan.assignments
     .filter((assignment) => assignment.status === 'assigned')
     .flatMap((assignment) => {
-      const resource = resolveAssignmentResource(assignment, organizationId, loadIndex);
+      const resource = resolveAssignmentResource(
+        assignment,
+        organizationId,
+        plan.tenant_slug,
+        loadIndex
+      );
       if (!resource) return [];
-      // NI-01: staffed agents get a durable 'provisioned' identity in the
-      // ledger (resolve-or-issue, best-effort — see helper docs).
-      provisionStaffedAgentIdentity(resource, plan.mission_id);
       const actorId = resource.resource_id;
       return [
         {
@@ -388,6 +409,7 @@ export function buildMissionStaffingAssignments(plan: MissionTeamPlan): MissionS
       ];
     });
 
+  for (const { resource } of assignments) provisionStaffedAgentIdentity(resource, plan.mission_id);
   return {
     version: '1.0.0',
     mission_id: plan.mission_id,
@@ -403,9 +425,12 @@ export function initializeMissionTeamBindings(
 ): MissionBindingPaths {
   const paths = resolveMissionBindingPaths(plan.mission_id, missionPath);
 
-  safeMkdir(paths.missionPath, { recursive: true });
+  const state = readMissionBindingState(paths.missionPath);
   const blueprint = buildMissionTeamBlueprint(plan);
-  const staffingAssignments = buildMissionStaffingAssignments(plan);
+  const staffingAssignments = buildMissionStaffingAssignments(
+    state ? { ...plan, tenant_slug: state.tenant_slug } : plan
+  );
+  safeMkdir(paths.missionPath, { recursive: true });
   writeProvisionedJson({
     missionId: plan.mission_id,
     filePath: paths.teamBlueprintPath,
@@ -638,6 +663,7 @@ export function loadMissionStaffingAssignments(
   > & {
     assignments?: Array<Partial<MissionStaffingAssignment>>;
   };
+  const tenantSlug = readMissionBindingState(paths.missionPath)?.tenant_slug;
   const assignments = (parsed.assignments || []).flatMap((assignment) => {
     const actorId = String(assignment.actor_id || '').trim();
     if (!actorId) return [];
@@ -660,7 +686,8 @@ export function loadMissionStaffingAssignments(
         legacyResourceType,
         actorId,
         null,
-        parsed.organization_profile?.organization_id
+        parsed.organization_profile?.organization_id,
+        tenantSlug
       ),
     };
     return [
@@ -676,26 +703,52 @@ export function loadMissionStaffingAssignments(
 }
 
 /**
- * NI-01: resolve the acting resource's durable identity for a ledger entry
- * when the caller did not supply one: the mission's staffing assignments on
- * disk are the authority (they carry the org-scoped nhi_id stamped at
- * staffing time). Best-effort — attribution must never fail the append.
+ * NI-01: validate supplied identities against the stored assignment and
+ * mission scope. Historical, inferred attribution can be omitted if invalid.
  */
 function resolveLedgerRuntimeIdentity(
   input: AppendMissionExecutionLedgerEntryInput,
-  missionId: string
+  missionId: string,
+  scope: EventScope,
+  hasMissionState: boolean
 ): string | undefined {
-  if (input.runtime_identity) return input.runtime_identity;
-  if (!input.actor_id) return undefined;
+  let match: MissionStaffingAssignment | undefined;
   try {
-    const staffing = loadMissionStaffingAssignments(missionId, input.mission_path_hint);
-    const match = staffing?.assignments.find(
-      (assignment) => assignment.actor_id === input.actor_id
-    );
-    return match?.resource.runtime_identity ?? undefined;
+    if (input.actor_id) {
+      const staffing = loadMissionStaffingAssignments(missionId, input.mission_path_hint);
+      match = staffing?.assignments.find(
+        (assignment) =>
+          assignment.actor_id === input.actor_id &&
+          (!input.team_role || assignment.team_role === input.team_role)
+      );
+    }
   } catch {
-    return undefined;
+    if (input.runtime_identity)
+      throw new Error('Cannot verify the execution identity against staffing.');
   }
+  const staffedIdentity = match?.resource.runtime_identity ?? undefined;
+  const explicit = input.runtime_identity;
+  if (explicit && staffedIdentity && explicit !== staffedIdentity) {
+    throw new Error(
+      '[MISSION_RUNTIME_IDENTITY_ASSIGNMENT_MISMATCH] Execution identity differs from staffing.'
+    );
+  }
+  const identity = explicit || staffedIdentity;
+  if (
+    identity &&
+    (match?.actor_type === 'agent' || input.actor_type === 'agent' || parseNhiId(identity))
+  ) {
+    if (hasMissionState || !staffedIdentity) {
+      try {
+        assertMissionRuntimeTenant(identity, scope.tenant_slug);
+      } catch (error) {
+        if (explicit) throw error;
+        // Do not copy an invalid historical staffing identity into new evidence.
+        return undefined;
+      }
+    }
+  }
+  return identity;
 }
 
 /**
@@ -715,14 +768,17 @@ function resolveLedgerDelegationChain(
   return parseDelegationChain(fromPayload) ?? undefined;
 }
 
+function readMissionBindingState(missionPath: string) {
+  const statePath = path.join(missionPath, 'mission-state.json');
+  const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
+  return safeExistsSync(safeStatePath) ? readMissionStateAtPath(safeStatePath) : null;
+}
+
 function resolveMissionLedgerScope(
   input: AppendMissionExecutionLedgerEntryInput,
   missionId: string,
-  missionPath: string
+  state: ReturnType<typeof readMissionBindingState>
 ): EventScope {
-  const statePath = path.join(missionPath, 'mission-state.json');
-  const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
-  const state = safeExistsSync(safeStatePath) ? loadMissionStateAtPath(safeStatePath) : null;
   const candidate: EventScopeInput = {
     tier: state?.tier || 'public',
     mission_id: missionId,
@@ -769,19 +825,21 @@ export function appendMissionExecutionLedgerEntry(
   const missionId = normalizeMissionId(input.mission_id);
   const missionPathHint = input.mission_path_hint;
   const paths = resolveMissionBindingPaths(missionId, missionPathHint);
+  const state = readMissionBindingState(paths.missionPath);
+  const scope = resolveMissionLedgerScope(input, missionId, state);
   const entryPayload: Omit<MissionExecutionLedgerEntry, 'ts' | 'mission_id'> = {
     event_type: input.event_type,
     task_id: input.task_id,
     team_role: input.team_role,
     actor_id: input.actor_id,
     actor_type: input.actor_type,
-    runtime_identity: resolveLedgerRuntimeIdentity(input, missionId),
+    runtime_identity: resolveLedgerRuntimeIdentity(input, missionId, scope, state !== null),
     delegation_chain: resolveLedgerDelegationChain(input),
     decision: input.decision,
     evidence: input.evidence,
     source_event_id: input.source_event_id,
     payload: input.payload,
-    scope: resolveMissionLedgerScope(input, missionId, paths.missionPath),
+    scope,
   };
   safeMkdir(paths.missionPath, { recursive: true });
   const entry: MissionExecutionLedgerEntry = {
@@ -820,6 +878,7 @@ function validateExecutionLedgerText(
 ): void {
   if (content && !content.endsWith('\n'))
     throw new Error('MISSION_LOG_CORRUPT:ledger_incomplete_line');
+  const state = readMissionBindingState(missionPath);
   for (const line of content.split('\n')) {
     if (!line.trim()) continue;
     const entry = executionLedgerRowSchema.parse(JSON.parse(line));
@@ -829,7 +888,7 @@ function validateExecutionLedgerText(
       const authority = resolveMissionLedgerScope(
         { mission_id: missionId, event_type: entry.event_type, task_id: entry.task_id },
         missionId,
-        missionPath
+        state
       );
       resolveEventScopeAgainstAuthority(authority, parseEventScopeInput(entry.scope));
     }

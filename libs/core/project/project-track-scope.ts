@@ -2,7 +2,7 @@ import type { ProjectRecord } from './project-registry.js';
 import type { ProjectTrackRecord } from './project-track-registry.js';
 
 export function assertManagedProjectTrackScope(
-  project: ProjectRecord,
+  project: Pick<ProjectRecord, 'project_id' | 'tier' | 'tenant_slug'>,
   track: ProjectTrackRecord
 ): void {
   const projectTenant = project.tenant_slug || 'shared';
@@ -19,5 +19,29 @@ export function assertManagedProjectTrackScope(
     throw new Error(
       `Track ${track.track_id} scope (${track.tier}:${track.tenant_slug || 'shared'}) must match project scope (${project.tier}:${projectTenant}).`
     );
+  }
+}
+
+/** A stored work binding wins over the current conversational selection. */
+export function selectScopedProjectTrack(input: {
+  project?: Pick<ProjectRecord, 'project_id' | 'tier' | 'tenant_slug'>;
+  boundTrackId?: string;
+  selectedTrackId?: string;
+  defaultTrackId?: string;
+  suppliedTrack?: ProjectTrackRecord | null;
+  load?: (trackId: string) => ProjectTrackRecord | null;
+}): ProjectTrackRecord | null {
+  const { project, boundTrackId, suppliedTrack } = input;
+  const id =
+    boundTrackId || input.selectedTrackId || suppliedTrack?.track_id || input.defaultTrackId;
+  if (!project || !id) return null;
+  const record = suppliedTrack?.track_id === id ? suppliedTrack : input.load?.(id);
+  if (!record || record.track_id !== id || (!boundTrackId && record.status !== 'active'))
+    return null;
+  try {
+    assertManagedProjectTrackScope(project, record);
+    return record;
+  } catch {
+    return null;
   }
 }

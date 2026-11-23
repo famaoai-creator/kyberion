@@ -5,6 +5,7 @@ import { clamp, readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { readHintsByCategory } from '../knowledge/feedback-loop.js';
 import { missionMemoryCaptureScope } from '../knowledge/memory-capture-scope.js';
+import { selectReviewRejectionLessons } from '../knowledge/review-rejection-lessons.js';
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import {
   classifyQuestionDecision,
@@ -891,10 +892,7 @@ export function buildMissionGoalLines(missionState: Record<string, unknown>): st
 }
 
 /**
- * LC-12 v2: surface the last few human-rejection lessons (persisted by
- * review-reentry) directly in the worker brief, so same-shape work stops
- * repeating a rejection the operator already explained. Ephemeral advisory
- * lines — deliberately outside the context-pack pruning budget.
+ * LC-12: surface relevant lessons from the mission's authorized hint partition.
  */
 export function buildRejectionLessonLines(missionId?: string): string[] {
   try {
@@ -902,9 +900,12 @@ export function buildRejectionLessonLines(missionId?: string): string[] {
     // tenant's). A mission whose scope is undetermined gets none.
     if (!missionId) return [];
     const capture = missionMemoryCaptureScope(missionId);
-    return readHintsByCategory('human-rejection', capture.scope ?? { tier: capture.tier })
-      .slice(-3)
-      .map((hint) => `- ${hint.hint}`);
+    const hints = readHintsByCategory('human-rejection', capture.scope ?? { tier: capture.tier });
+    return selectReviewRejectionLessons(hints, {
+      mission_id: missionId.trim().toUpperCase(),
+      organization_id: capture.scope?.organization_id,
+      project_id: capture.scope?.project_id,
+    }).map((lesson) => `- ${lesson}`);
   } catch {
     return [];
   }

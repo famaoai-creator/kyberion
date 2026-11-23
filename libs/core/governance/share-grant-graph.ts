@@ -98,6 +98,7 @@ export interface ShareGrantLiveSessionRegistration {
   linkId: string;
   resourceRef: string;
   connectedAt: string;
+  expiresAt: string;
 }
 
 export interface ShareGrantLiveSessionSummary extends ShareGrantLiveSessionRegistration {}
@@ -423,13 +424,10 @@ function sameHash(left: string, right: string): boolean {
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-function isActiveAt(timestamp: string | undefined, now: number): boolean {
-  return !timestamp || Date.parse(timestamp) > now;
-}
-
 export class ShareGrantGraph {
   readonly #storePath: string;
   readonly #persist: boolean;
+  #loadedLedgerStamp?: string;
   readonly #now: () => number;
   readonly #hmacKey: string | undefined;
   readonly #auditSink: ShareGrantAuditSink | undefined;
@@ -733,6 +731,7 @@ export class ShareGrantGraph {
       linkId,
       resourceRef: link.resourceRef,
       connectedAt: params.connectedAt,
+      expiresAt: link.expiresAt,
     });
   }
 
@@ -754,6 +753,7 @@ export class ShareGrantGraph {
   }
 
   resolveShareLink(resourceRef: string, token: string): EffectiveShareAccess | null {
+    this.#refreshShareLinkGraph();
     const resource = this.#requireResource(resourceRef);
     const candidate = assertNonEmpty(token, 'token');
     const now = this.#now();
@@ -765,6 +765,26 @@ export class ShareGrantGraph {
         sameHash(item.tokenHash, hashShareToken(candidate, this.#resolveHmacKey()))
     );
     if (!link) return null;
+    return this.#resolveLinkAccess(resource, link);
+  }
+
+  /** Recheck an already authenticated registration without retaining its token. */
+  isShareLinkActive(resourceRef: string, linkId: string): boolean {
+    this.#refreshShareLinkGraph();
+    const link = this.#links.get(linkId);
+    if (!link || link.resourceRef !== resourceRef) return false;
+    try {
+      return this.#resolveLinkAccess(this.#requireResource(resourceRef), link) !== null;
+    } catch (error) {
+      if (error instanceof ShareGrantAuthorizationError) return false;
+      throw error;
+    }
+  }
+
+  #resolveLinkAccess(resource: ShareResource, link: StoredShareLink): EffectiveShareAccess | null {
+    if (link.revokedAt || Date.parse(link.expiresAt) <= this.#now()) return null;
+    if (this.#resolveTenant && this.#resolveTenant(resource.tenantSlug)?.status !== 'active')
+      return null;
     try {
       assertProvenanceShareAllowed({
         provenance: this.#resourceProvenance(resource),
@@ -919,27 +939,44 @@ export class ShareGrantGraph {
   }
 
   #reachable(resource: ShareResource): Map<string, ReachableAccess> {
+    const provenance = this.#resourceProvenance(resource);
+    const usableEdges = [...this.#edges.values()].filter((edge) => {
+      if (
+        edge.resourceRef !== resource.resourceRef ||
+        edge.revokedAt ||
+        TAINT_RANK[edge.audienceFloor] < TAINT_RANK[resource.taint]
+      )
+        return false;
+      try {
+        assertProvenanceShareAllowed({
+          provenance,
+          audienceFloor: edge.audienceFloor,
+          targetTenant: edge.granteeTenantSlug,
+          external: edge.grantee.startsWith(SHARE_LINK_PREFIX),
+        });
+        return true;
+      } catch (error) {
+        if (error instanceof ProvenanceTaintPolicyError) return false;
+        throw error;
+      }
+    });
     const reachable = new Map<string, ReachableAccess>([
       [resource.ownerPrincipal, { role: 'operate', audienceFloor: resource.taint }],
     ]);
     let changed = true;
     while (changed) {
       changed = false;
-      for (const edge of this.#edges.values()) {
-        if (
-          edge.resourceRef !== resource.resourceRef ||
-          edge.revokedAt ||
-          !isActiveAt(edge.revokedAt, this.#now())
-        ) {
-          continue;
-        }
+      for (const edge of usableEdges) {
         const parent = reachable.get(edge.grantor);
-        if (!parent) continue;
-        const next: ReachableAccess = {
-          role: edge.role,
-          audienceFloor: moreRestrictiveTaint(parent.audienceFloor, edge.audienceFloor),
-        };
+        if (parent?.role !== 'operate') continue;
         const previous = reachable.get(edge.grantee);
+        const audienceFloor = moreRestrictiveTaint(parent.audienceFloor, edge.audienceFloor);
+        const next: ReachableAccess = {
+          role: previous?.role === 'operate' ? 'operate' : edge.role,
+          audienceFloor: previous
+            ? moreRestrictiveTaint(previous.audienceFloor, audienceFloor)
+            : audienceFloor,
+        };
         if (
           !previous ||
           ROLE_RANK[next.role] > ROLE_RANK[previous.role] ||
@@ -1010,9 +1047,31 @@ export class ShareGrantGraph {
     });
   }
 
-  #load(): void {
-    if (!safeExistsSync(this.#storePath)) return;
-    assertRegularShareGrantResource(this.#storePath, 'share-grant ledger');
+  #ledgerStamp(): string | undefined {
+    if (!safeExistsSync(this.#storePath)) return undefined;
+    const stat = safeLstat(this.#storePath);
+    if (!stat.isFile())
+      throw new ShareGrantValidationError('share-grant ledger must be a regular file');
+    return [stat.dev, stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs].join(':');
+  }
+
+  #refreshShareLinkGraph(): void {
+    if (!this.#persist || this.#ledgerStamp() === this.#loadedLedgerStamp) return;
+    withLockSync('share-grant-graph', () => {
+      if (this.#ledgerStamp() !== this.#loadedLedgerStamp) this.#load(false);
+    });
+  }
+
+  #load(evictSessions = true): void {
+    const stamp = this.#ledgerStamp();
+    this.#resources.clear();
+    this.#edges.clear();
+    this.#links.clear();
+    if (!stamp) {
+      this.#loadedLedgerStamp = undefined;
+      this.#lastLedgerHash = GENESIS_HASH;
+      return;
+    }
     const raw = readTextFile(this.#storePath);
     let previousHash = GENESIS_HASH;
     for (const line of raw.split('\n')) {
@@ -1023,7 +1082,7 @@ export class ShareGrantGraph {
           parseSafeJsonInput(trimmed, 'share-grant ledger entry')
         );
         this.#verifyEnvelope(envelope, previousHash);
-        this.#apply(envelope.event);
+        this.#apply(envelope.event, evictSessions);
         previousHash = envelope.hash;
       } catch (error) {
         throw new ShareGrantValidationError(
@@ -1034,6 +1093,7 @@ export class ShareGrantGraph {
       }
     }
     this.#lastLedgerHash = previousHash;
+    this.#loadedLedgerStamp = stamp;
   }
 
   #readVerifiedTailHash(): string {
@@ -1073,7 +1133,7 @@ export class ShareGrantGraph {
     }
   }
 
-  #apply(event: PersistedEvent): void {
+  #apply(event: PersistedEvent, evictSessions: boolean): void {
     if (!event || typeof event !== 'object') {
       throw new Error('invalid share-grant ledger event');
     }
@@ -1125,7 +1185,7 @@ export class ShareGrantGraph {
         this.#links.set(event.linkId, revoked);
         // Reconcile an eviction that may have been interrupted after the
         // durable ledger append but before the process exited.
-        this.#evictLiveSessions(revoked, event.revokedAt);
+        if (evictSessions) this.#evictLiveSessions(revoked, event.revokedAt);
         break;
       }
       default:

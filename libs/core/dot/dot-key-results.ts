@@ -263,6 +263,7 @@ function defaultOrgMetric(
 
 interface MeasureTarget {
   dotId?: string;
+  charter?: DotCharter;
   orgScope: OrgMetricScope;
   /** The measuring scope's own dot state subtree (tenant scopes only). */
   stateRoot?: string;
@@ -343,9 +344,10 @@ async function measureSpec(
     }
     case 'signal_ratio': {
       if (!target.dotId) throw new Error('signal_ratio needs a dot scope');
-      const rows = (deps.readSignals ?? ((id) => readDotSignals(id, { rootDir: deps.rootDir })))(
-        target.dotId
-      );
+      const rows = (
+        deps.readSignals ??
+        ((id) => readDotSignals(id, { rootDir: deps.rootDir, charter: target.charter }))
+      )(target.dotId);
       const cutoff =
         now.getTime() - (metric.window_hours ?? DEFAULT_SIGNAL_WINDOW_HOURS) * 3_600_000;
       const inWindow = rows.filter(
@@ -426,6 +428,7 @@ export async function measureDotKeyResults(
   const rows: KrMeasurementRow[] = [];
   const target: MeasureTarget = {
     dotId: c.dot_id,
+    charter: c,
     stateRoot: dotStatePath(c),
     orgScope: {
       organizationId: c.scope.organization_id,

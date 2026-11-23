@@ -158,7 +158,7 @@ function signalReading(
     const value = deps.measureSignal(c, signal);
     return value === undefined ? undefined : { value, at: now.toISOString() };
   }
-  const rows = readDotSignals(c.dot_id, { rootDir: deps.rootDir }).filter(
+  const rows = readDotSignals(c.dot_id, { rootDir: deps.rootDir, charter: c }).filter(
     (row) => row.signal === signal
   );
   const last = rows.sort((a, b) => (a.measured_at < b.measured_at ? -1 : 1)).at(-1);
