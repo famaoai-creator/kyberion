@@ -607,6 +607,7 @@ export function composeMissionTeamPlan(input: {
       routingHint: missionTaskModelHint,
       separation: separationForRole(role),
       organizationId: organizationProfile?.organization_id,
+      tenantSlug: input.tenantSlug?.trim() || null,
       tier: input.tier,
       providerPreference,
       requestedSelection: input.selectionSettings?.[role],
@@ -1057,6 +1058,7 @@ export function extendMissionTeamPlanRoster(
     routingHint: plan.assignments.find((assignment) => assignment.model_hint)?.model_hint,
     separation: { ...(separation || {}), excludeAgents },
     organizationId: plan.organization_profile?.organization_id,
+    tenantSlug: plan.tenant_slug ?? null,
     tier: plan.tier,
     loadIndex: collectWorkforceLoad(),
     requestedSelection: plan.selection_settings?.[teamRole],
@@ -1252,6 +1254,7 @@ export function resolveMissionTeamReceiver(input: {
     requestedSelection,
     tier: plan.tier,
     organizationId: plan.organization_profile?.organization_id,
+    tenantSlug: plan.tenant_slug ?? null,
     separation: { excludeAgents: input.excludedAgentIds },
   });
   if (selected.status !== 'assigned' || !selected.agent_id) return null;

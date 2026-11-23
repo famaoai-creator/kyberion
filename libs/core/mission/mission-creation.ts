@@ -345,7 +345,6 @@ export async function createMission(args: {
     utterance: resolvedVision,
   });
   writeMissionTeamPlan(missionDir, teamPlan);
-  initializeMissionTeamBindings(missionDir, teamPlan);
 
   // MO-01: the policy-driven classification (not the free-string mission_type)
   // is the authoritative record; the selected workflow template drives the
@@ -554,6 +553,8 @@ export async function createMission(args: {
     ],
   };
   await saveState(upperId, initialState);
+  // Staffing binds to the canonical tenant in state, which the template does not carry.
+  initializeMissionTeamBindings(missionDir, teamPlan);
   await emitMissionLifecycleIntentSnapshot({
     missionId: upperId,
     stage: 'intake',

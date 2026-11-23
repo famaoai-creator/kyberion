@@ -111,7 +111,9 @@ contains an out-of-scope NHI, an event that omits its NHI can still be recorded
 without copying that attribution. Historical ledger rows retain their evidence.
 
 Mission creation passes mission type, tier, tenant, and organization context
-to the composer. It does not pass the installed personal NHI as a worker
+to the composer. It saves the canonical mission state before initializing
+staffing, and team selection uses the mission tenant for NHI derivation even
+when the calling process has a different ambient scope. It does not pass the installed personal NHI as a worker
 selection. When reading an assignment, follow its resource's
 `runtime_identity` to the identity registry to determine whether it refers
 to the same registered NHI. A matching conversational name or profile name
