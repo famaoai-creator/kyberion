@@ -408,7 +408,13 @@ export async function narrowKnowledgeHintsWithJudgment(
 export async function loadKnowledgeHintsIfPossible(
   input: LoadKnowledgeHintsInput
 ): Promise<MissionContextPackKnowledgeHint[]> {
-  assertContextPackInputLineage(input);
+  try {
+    assertContextPackInputLineage(input);
+  } catch {
+    // Advisory lookup contributes no knowledge when its inputs disagree.
+    // The pack builder still refuses the same conflict before assembly.
+    return [];
+  }
   const topic = [
     input.missionState.mission_type,
     input.teamRole,

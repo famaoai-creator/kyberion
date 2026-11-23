@@ -279,7 +279,7 @@ describe('DA-07 (1)(2): tenant knowledge reaches the pack; other tenants never d
         missionState,
         workItem: { ...makeWorkItem(), project_id: 'project-y' },
       })
-    ).rejects.toThrow(/CONTEXT_PACK_LINEAGE_CONFLICT.*project_id/);
+    ).resolves.toEqual([]);
     await expect(
       loadKnowledgeHintsIfPossible({
         missionState,
@@ -292,7 +292,7 @@ describe('DA-07 (1)(2): tenant knowledge reaches the pack; other tenants never d
           tenant_slug: 'tenant-x',
         },
       })
-    ).rejects.toThrow(/CONTEXT_PACK_LINEAGE_CONFLICT.*tier/);
+    ).resolves.toEqual([]);
   });
 
   it('delivers knowledge/confidential/tenant-x/ cards for a tenant-x confidential mission', async () => {
