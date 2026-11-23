@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadCodeGraphEnumerationRules } from '@agent/core/source-analysis';
-import { loadGrammar } from './grammar-loader.js';
+import { loadGrammar, withGrammarSession } from './grammar-loader.js';
 
 describe('code-graph enumeration rules contract', () => {
   const rules = loadCodeGraphEnumerationRules();
@@ -29,30 +29,35 @@ describe('code-graph enumeration rules contract', () => {
     }
   });
 
-  it('compiles every route-A query against its grammar', async () => {
-    for (const rule of rules.languages) {
-      const grammar = await loadGrammar(rule.grammar);
-      const tree = grammar.parse('');
-      try {
-        for (const marker of rule.markers) {
-          expect(
-            () => grammar.captures(marker.query, tree, 'marker'),
-            `${rule.id}/${marker.subtype}`
-          ).not.toThrow();
+  it(
+    'compiles every route-A query against its grammar',
+    () =>
+      withGrammarSession(async () => {
+        for (const rule of rules.languages) {
+          const grammar = await loadGrammar(rule.grammar);
+          const tree = grammar.parse('');
+          try {
+            for (const marker of rule.markers) {
+              expect(
+                () => grammar.captures(marker.query, tree, 'marker'),
+                `${rule.id}/${marker.subtype}`
+              ).not.toThrow();
+            }
+            if (rule.imports) {
+              expect(
+                () => grammar.captures(rule.imports!.query, tree, 'source'),
+                `${rule.id}/imports`
+              ).not.toThrow();
+              if (rule.imports.declarations)
+                expect(() =>
+                  grammar.captures(rule.imports!.declarations!, tree, 'namespace')
+                ).not.toThrow();
+            }
+          } finally {
+            grammar.release(tree);
+          }
         }
-        if (rule.imports) {
-          expect(
-            () => grammar.captures(rule.imports!.query, tree, 'source'),
-            `${rule.id}/imports`
-          ).not.toThrow();
-          if (rule.imports.declarations)
-            expect(() =>
-              grammar.captures(rule.imports!.declarations!, tree, 'namespace')
-            ).not.toThrow();
-        }
-      } finally {
-        grammar.release(tree);
-      }
-    }
-  }, 60000);
+      }),
+    60000
+  );
 });

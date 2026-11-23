@@ -256,6 +256,9 @@ export async function createMission(args: {
     resolveEffectiveMissionType({
       missionType,
       utterance: resolvedVisionEarly,
+      // A surface-resolved standard intent (reverse-spec-extraction, …) names
+      // its mission type; the create command itself carries no --mission-type.
+      intentId: intentHandoff?.origin_intent_id,
     }) ?? missionType;
   const templates = loadMissionTemplateCatalog().templates;
   const template =
@@ -353,6 +356,7 @@ export async function createMission(args: {
       missionType: effectiveMissionTypeEarly,
       utterance: resolvedVision,
       matchedClassRuleId: classification?.matched_rules.mission_class_rule_id,
+      intentId: intentHandoff?.origin_intent_id,
     }) ?? effectiveMissionTypeEarly;
   const workflowDesign = classification
     ? resolveMissionWorkflowDesign({

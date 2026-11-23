@@ -1046,6 +1046,7 @@
         "high_stakes_or_dogfood_evidence": true
       },
       "expected": {
+        "intent_id": "reverse-spec-extraction",
         "execution_shape": "mission",
         "mission_class": "code_change",
         "delivery_shape": "single_artifact",
@@ -1079,6 +1080,7 @@
         "high_stakes_or_dogfood_evidence": true
       },
       "expected": {
+        "intent_id": "legacy-migration",
         "execution_shape": "mission",
         "mission_class": "code_change",
         "delivery_shape": "single_artifact",

@@ -691,6 +691,100 @@
       "risk_profile": "review_required"
     },
     {
+      "id": "reverse-spec-extraction",
+      "category": "outcome_execution",
+      "description": "Extract traceable, independently verified specifications from existing source code (Reverse Spec Flow): pinned baseline, code-graph denominator, path:line citations, explicit UNKNOWN instead of guesses, source kept intact. Starts a reverse_spec mission.",
+      "surface_examples": [
+        "既存コードから仕様書を起こしたい",
+        "既存のソースコードから仕様と振る舞いを抽出して",
+        "このリポジトリのリバーススペックを作って",
+        "Extract specifications from the existing code"
+      ],
+      "plan_outline": [
+        "pin the source baseline, purpose and scope",
+        "enumerate the code-graph denominator mechanically",
+        "analyze every node and write cited specs with UNKNOWN where unverifiable",
+        "verify the specs with an independent reviewer and confirm the source stayed intact"
+      ],
+      "intake_requirements": [
+        "source repository or path",
+        "purpose (maintenance / evaluation / rebuild)",
+        "scope and exclusions"
+      ],
+      "outcome_ids": ["execution_result"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "既存コードから仕様",
+        "既存のコードから仕様",
+        "ソースコードから仕様",
+        "レガシーコードから仕様",
+        "仕様を起こ",
+        "仕様書を起こ",
+        "仕様を抽出",
+        "リバーススペック",
+        "reverse spec",
+        "reverse-spec",
+        "specs from existing code"
+      ],
+      "resolution": {
+        "task_kind": "reverse_spec",
+        "result_shape": "execution_result"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "reverse_spec",
+      "execution_shape": "mission",
+      "mission_class": "code_change",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "legacy-migration",
+      "category": "outcome_execution",
+      "description": "Rebuild a legacy system on a new stack from an audited reverse_spec mission: paradigm decision, rule-by-rule MIGRATE/DISCARD/HUMAN dispositions, strategy choice, and parity scenarios that prove behavioral equivalence. Starts a legacy_migration mission.",
+      "surface_examples": [
+        "レガシーシステムを新しいスタックに移行したい",
+        "既存システムの仕様をもとにレガシー移行を進めて",
+        "このレガシーを新しい言語で再構築して",
+        "Migrate the legacy system to a new stack"
+      ],
+      "plan_outline": [
+        "bind the audited rebuild-purpose reverse_spec mission and the target stack",
+        "decide paradigm, per-spec dispositions and migration strategy",
+        "pin legacy behavior as parity scenarios",
+        "implement and prove equivalence; approve every deviation"
+      ],
+      "intake_requirements": ["audited reverse_spec mission id", "target stack", "migration scope"],
+      "outcome_ids": ["execution_result"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "レガシー移行",
+        "レガシーマイグレーション",
+        "レガシーシステムの移行",
+        "レガシーシステムを移行",
+        "レガシーを移行",
+        "レガシーを新しい",
+        "レガシーシステムを新しい",
+        "レガシーの再構築",
+        "legacy migration",
+        "legacy modernization",
+        "migrate the legacy"
+      ],
+      "resolution": {
+        "task_kind": "legacy_migration",
+        "result_shape": "execution_result"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "change",
+      "object": "legacy_system",
+      "execution_shape": "mission",
+      "mission_class": "code_change",
+      "risk_profile": "approval_required"
+    },
+    {
       "id": "contract-review",
       "category": "knowledge_lifecycle",
       "description": "Review a contract, specification, or formal document by converting it to markdown and running adversarial persona critique over legal, operations, and red-team lenses.",

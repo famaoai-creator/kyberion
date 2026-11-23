@@ -318,10 +318,12 @@ export function resolveMissionWorkflowDesign(
     // dedicated task types so their workflows win over code-change-aidlc.
     reverse_spec: {
       missionClass: 'code_change',
+      intentId: 'reverse-spec-extraction',
       taskType: 'reverse_spec',
     },
     legacy_migration: {
       missionClass: 'code_change',
+      intentId: 'legacy-migration',
       taskType: 'legacy_migration',
     },
     customer_onboarding: {

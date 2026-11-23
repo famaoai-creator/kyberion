@@ -21,7 +21,7 @@ import {
   type CodeGraphLanguageRule,
   type CodeGraphMarkerRule,
 } from '@agent/core/source-analysis';
-import { loadGrammar, type LoadedGrammar } from './grammar-loader.js';
+import { loadGrammar, withGrammarSession, type LoadedGrammar } from './grammar-loader.js';
 import { resolveImport, type ImportResolutionContext } from './import-resolution.js';
 
 export type CodeGraphNodeKind = 'module' | 'entrypoint' | 'boundary';
@@ -158,7 +158,12 @@ function runMarkerQueries(
 }
 
 /** Extract the code-graph registry for a workspace source root. Read-only against the source. */
-export async function extractCodeGraph(
+export function extractCodeGraph(options: ExtractCodeGraphOptions): Promise<CodeGraphRegistry> {
+  // Parsers and compiled queries live only for the extraction (see grammar-loader lifetime).
+  return withGrammarSession(() => extractCodeGraphInSession(options));
+}
+
+async function extractCodeGraphInSession(
   options: ExtractCodeGraphOptions
 ): Promise<CodeGraphRegistry> {
   const root = resolveWorkspaceSourceRoot(options.sourceRoot);

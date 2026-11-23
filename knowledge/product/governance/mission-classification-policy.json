@@ -65,6 +65,13 @@
       "mission_class": "code_change"
     },
     {
+      "id": "class-code-change-reverse-spec-intent",
+      "match": {
+        "intent_ids": ["reverse-spec-extraction"]
+      },
+      "mission_class": "code_change"
+    },
+    {
       "id": "class-code-change-reverse-spec-utterance",
       "match": {
         "utterance_patterns": [
@@ -89,6 +96,13 @@
       "id": "class-code-change-legacy-migration-hint",
       "match": {
         "mission_type_hints": ["legacy_migration"]
+      },
+      "mission_class": "code_change"
+    },
+    {
+      "id": "class-code-change-legacy-migration-intent",
+      "match": {
+        "intent_ids": ["legacy-migration"]
       },
       "mission_class": "code_change"
     },

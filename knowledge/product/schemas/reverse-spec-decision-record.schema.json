@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Reverse spec decision record",
+  "description": "Held decision that removes code-graph nodes from a reverse_spec denominator. Referenced by analysis-ledger.json dispositions[].decision_ref and checked by the analysis gate (check_reverse_spec_evidence --stage analysis).",
+  "type": "object",
+  "required": [
+    "decision_id",
+    "decision",
+    "reason",
+    "decided_by",
+    "decided_at",
+    "affected_node_ids"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "decision_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable id, for example DEC-001."
+    },
+    "decision": {
+      "enum": ["out_of_scope", "no_behavior"],
+      "description": "Must equal the disposition status that cites this record."
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decided_by": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Who made the decision (a person or the approving role), not the agent that proposed it."
+    },
+    "decided_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "affected_node_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Code-graph node ids this decision removes; every disposition citing the record must be listed."
+    },
+    "approval_ref": {
+      "type": "string",
+      "description": "Optional pointer to the approval (gate record, approval request id, PR review)."
+    }
+  }
+}

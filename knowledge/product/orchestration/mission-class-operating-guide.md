@@ -51,7 +51,7 @@ classify が決める「ミッションクラス」ごとに、**AI がどう進
 | 不変条件       | 解析対象は参照専用。全記述に `path:line` 根拠、確かめられないことは UNKNOWN   | 入力は監査済み（purpose=rebuild）の reverse_spec。パリティシナリオで旧システムと同等を証明 |
 | チームテンプレ | `development`（alias）                                                        | `development`（alias）                                                                     |
 
-「既存コードから仕様を抽出」「リバーススペック」などの発話は `reverse_spec` に、「レガシー移行」「legacy migration」などは `legacy_migration` に昇格する。両方を含む依頼は、仕様化が先なので `reverse_spec` になる。通常の DB マイグレーションは feature のまま。
+「既存コードから仕様を抽出」「リバーススペック」などの発話は `reverse_spec` に、「レガシー移行」「legacy migration」などは `legacy_migration` に昇格する。両方を含む依頼は、仕様化が先なので `reverse_spec` になる。通常の DB マイグレーションは feature のまま。サーフェスからの依頼は標準インテント `reverse-spec-extraction` / `legacy-migration` に解決され、mission 作成時にインテント ID から同じ mission type へ昇格する（「この仕様書をレビューして」は従来どおり `contract-review`）。
 
 ## 2. 共通原則
 

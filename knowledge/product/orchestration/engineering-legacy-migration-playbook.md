@@ -24,17 +24,22 @@ Reverse Spec Flow (aws-samples/sample-reverse-spec-flow, MIT-0). Checker:
 
 ## Phases and evidence
 
-| Phase                | Deliverable                         | Gate (checker stage)               |
-| -------------------- | ----------------------------------- | ---------------------------------- |
-| `intake_scope`       | `evidence/migration-brief.json`     | `brief` (source spec audit re-run) |
-| `planning`           | `evidence/migration-decisions.json` | `decisions` + human approval       |
-| `contract_authoring` | `evidence/parity-matrix.json`       | `pin`                              |
-| `execution`          | `evidence/migration-report.md`      | `implement`                        |
-| `test`               | `evidence/equivalence-report.json`  | `equivalence`                      |
+| Phase                | Deliverable                         | Gate (checker stage)                                 |
+| -------------------- | ----------------------------------- | ---------------------------------------------------- |
+| `intake_scope`       | `evidence/migration-brief.json`     | `brief` (source spec audit re-run, snapshot current) |
+| `planning`           | `evidence/migration-decisions.json` | `decisions` + human approval                         |
+| `contract_authoring` | `evidence/parity-matrix.json`       | `pin`                                                |
+| `execution`          | `evidence/migration-report.md`      | `implement`                                          |
+| `test`               | `evidence/equivalence-report.json`  | `equivalence`                                        |
 
 1. **Brief.** `source_spec_mission_id`, objective, success metrics, `target_stack` (at least the
    language) and scope (included / excluded). Paradigm and appetite are decided in the next
-   phase, not asked up front.
+   phase, not asked up front. Freeze the source spec with `check_legacy_migration_evidence
+--mission <id> --write-source-snapshot`: it refuses unless the source mission passes its
+   audit, and writes `evidence/source-spec-snapshot.json` (spec ids and layers plus the sha256 of
+   the source spec and verification ledgers). The brief gate fails if the snapshot is missing,
+   stale or edited (it must equal a freshly built one); later stages read spec ids from the snapshot only, so re-opening or archiving the
+   source mission cannot shift the migration contract.
 2. **Decisions.** Record the legacy and target paradigms and the gap between them. Give every
    essence-layer spec a disposition: `migrate`, `discard` (with a reason — a dropped rule
    vanishes), or `human_decision` (open; the gate fails until a person decides). Choose a
