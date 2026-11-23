@@ -135,6 +135,33 @@ Gradients: the old "no gradient backgrounds" rule is revised. Gradients are allo
 
 Selection is not wired into the Surfaces' display preferences yet. Evaluate with the style toggle (or `?style=<id>`) on the presence-studio `/ui-gallery`; it previews only and never writes a shared choice.
 
+## Shared artifact design selection
+
+`resolveCreativeDesign({ surface, designSystemId, profileId, style, tenantSlug })`
+accepts a design system ID or artifact profile alongside the existing style and
+tenant inputs. It returns the selected definition and selection source, the
+applied base `theme_id` and `theme_source`, and the projection for the requested
+surface. `design_style` identifies an applied KDS style and `source` records
+whether a tenant overlay was loaded.
+
+The shared selector uses an explicit system first, then an imported reference
+when the adapter supplies one, then a matching profile, then the catalog
+default. A `kds-<style>` system uses the corresponding KDS style and composition
+mapping. The creative resolver applies the public catalog theme over the brand
+baseline and then applies the KDS style and tenant overlay. Missing public
+themes use the brand baseline. An explicit video `design_profile.design_system_id`
+opts into catalog resolution. Contextual branding and the video's own explicit
+background and CSS overrides retain precedence.
+
+The tenant caller supplies a scoped slug. The shared tenant pack loader honors
+`theme_pack_path` inside that tenant's design directory, with `theme.json` as the
+default. Partial font and typography overrides inherit earlier values per key.
+
+Media-actuator shares catalog loading and system selection. Its runtime and
+personal theme catalogs, legacy theme precedence, imported design
+recommendations and format-specific rendering remain in the adapter.
+The Concierge operations UI continues to use its client-side Web pack.
+
 ## Tenant Branding (DS-02)
 
 Tenant-specific branding overlays the canonical tokens through one shared resolver:

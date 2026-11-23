@@ -3,7 +3,10 @@ import {
   DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK,
   DEFAULT_CHRONOS_WEB_THEME_PACK,
 } from '../design/web-design-system.js';
-import { semanticToken } from '../design/semantic-design-tokens.js';
+import {
+  semanticToken,
+  type ResolveSemanticTokensOptions,
+} from '../design/semantic-design-tokens.js';
 import type { VideoPresentationMode, VideoContentBrief } from './video-content-brief-contract.js';
 
 export interface VideoModeDefaults {
@@ -12,25 +15,28 @@ export interface VideoModeDefaults {
   background_color: string;
 }
 
-export function resolveVideoModeDefaults(mode: VideoPresentationMode): VideoModeDefaults {
+export function resolveVideoModeDefaults(
+  mode: VideoPresentationMode,
+  tokens?: ResolveSemanticTokensOptions
+): VideoModeDefaults {
   if (mode === 'promo') {
     return {
       layout_family: 'promo-spot',
       motion_profile: 'energetic',
-      background_color: semanticToken('video', 'video.mode.promo.background'),
+      background_color: semanticToken('video', 'video.mode.promo.background', tokens),
     };
   }
   if (mode === 'vtuber') {
     return {
       layout_family: 'vtuber-stage',
       motion_profile: 'on-air',
-      background_color: semanticToken('video', 'video.mode.vtuber.background'),
+      background_color: semanticToken('video', 'video.mode.vtuber.background', tokens),
     };
   }
   return {
     layout_family: 'process-flow',
     motion_profile: 'guided-step',
-    background_color: semanticToken('video', 'video.mode.howto.background'),
+    background_color: semanticToken('video', 'video.mode.howto.background', tokens),
   };
 }
 
@@ -39,12 +45,14 @@ export function buildVideoDesignCssVars(input: {
   layoutFamily: string;
   motionProfile: string;
   designSystemRef: VideoContentBrief['design_system_ref'];
+  tokens?: ResolveSemanticTokensOptions;
 }): Record<string, string> {
   const baseVars = composeWebDesignSystem(
     DEFAULT_CHRONOS_WEB_THEME_PACK,
     DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK
   ).css_vars;
-  const palette = derivePalette(input.backgroundColor, input.layoutFamily);
+  const token = (name: string) => semanticToken('video', name, input.tokens);
+  const palette = derivePalette(input.backgroundColor, input.layoutFamily, token);
   return {
     ...baseVars,
     '--kb-bg-main': input.backgroundColor,
@@ -69,19 +77,19 @@ export function buildVideoDesignCssVars(input: {
     '--kb-accent-strong': palette.accentStrong,
     '--kb-accent-muted': palette.accentMuted,
     '--kb-accent-text': palette.accentText,
-    '--kb-accent-blue': semanticToken('video', 'video.accent.blue'),
-    '--kb-accent-blue-soft': semanticToken('video', 'video.accent.blue-soft'),
-    '--kb-accent-blue-strong': semanticToken('video', 'video.accent.blue-strong'),
-    '--kb-accent-blue-muted': semanticToken('video', 'video.accent.blue-muted'),
-    '--kb-accent-blue-text': semanticToken('video', 'video.accent.blue-text'),
-    '--kb-accent-orange': semanticToken('video', 'video.accent.orange'),
-    '--kb-accent-orange-soft': semanticToken('video', 'video.accent.orange-soft'),
-    '--kb-accent-orange-strong': semanticToken('video', 'video.accent.orange-strong'),
-    '--kb-accent-orange-muted': semanticToken('video', 'video.accent.orange-muted'),
-    '--kb-accent-green': semanticToken('video', 'video.accent.green'),
-    '--kb-accent-green-soft': semanticToken('video', 'video.accent.green-soft'),
-    '--kb-accent-green-strong': semanticToken('video', 'video.accent.green-strong'),
-    '--kb-accent-green-muted': semanticToken('video', 'video.accent.green-muted'),
+    '--kb-accent-blue': token('video.accent.blue'),
+    '--kb-accent-blue-soft': token('video.accent.blue-soft'),
+    '--kb-accent-blue-strong': token('video.accent.blue-strong'),
+    '--kb-accent-blue-muted': token('video.accent.blue-muted'),
+    '--kb-accent-blue-text': token('video.accent.blue-text'),
+    '--kb-accent-orange': token('video.accent.orange'),
+    '--kb-accent-orange-soft': token('video.accent.orange-soft'),
+    '--kb-accent-orange-strong': token('video.accent.orange-strong'),
+    '--kb-accent-orange-muted': token('video.accent.orange-muted'),
+    '--kb-accent-green': token('video.accent.green'),
+    '--kb-accent-green-soft': token('video.accent.green-soft'),
+    '--kb-accent-green-strong': token('video.accent.green-strong'),
+    '--kb-accent-green-muted': token('video.accent.green-muted'),
     '--kb-warning': palette.warning,
     '--kb-warning-soft': palette.warningSoft,
     '--kb-success': palette.success,
@@ -111,7 +119,8 @@ export function resolveDefaultVideoBackgroundColor(mode: VideoPresentationMode =
 
 function derivePalette(
   backgroundColor: string,
-  layoutFamily: string
+  layoutFamily: string,
+  readToken: (name: string) => string
 ): {
   bgDeep: string;
   bgInk: string;
@@ -151,7 +160,7 @@ function derivePalette(
 } {
   const family =
     layoutFamily === 'promo-spot' || layoutFamily === 'vtuber-stage' ? layoutFamily : 'default';
-  const token = (key: string): string => semanticToken('video', `video.palette.${family}.${key}`);
+  const token = (key: string): string => readToken(`video.palette.${family}.${key}`);
   return {
     bgDeep: token('bgDeep'),
     bgInk: token('bgInk'),

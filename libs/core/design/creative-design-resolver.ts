@@ -1,8 +1,8 @@
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { loadBrandTokensAtPath, type BrandTokens } from './brand-tokens.js';
-import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
-import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from '../secure-io.js';
 import { DEFAULT_CHRONOS_WEB_THEME_PACK, type WebThemePack } from './web-design-system.js';
 import { deriveAccentPalette, type CeAccentPalette } from '../harnessing/ce-adoption.js';
 import { isValidTenantSlug } from '../entity-scope.js';
@@ -16,13 +16,16 @@ import {
 } from './design-foundation.js';
 import {
   loadTenantDesignOverride,
-  loadTenantDesignThemeOverlay,
+  loadThemeForTenantDesign,
 } from '../organization/tenant-design-override.js';
 import {
   SEMANTIC_ENGINE_COLOR_FORMAT,
   type SemanticColorFormat,
   type SemanticEngine,
 } from './semantic-design-token-fallbacks.js';
+import { isRecord } from '../foundation/primitives.js';
+import { readJson } from '../foundation/json.js';
+import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { createLogger } from '../logger.js';
 
 const designLogger = createLogger('creative-design-resolver');
@@ -145,15 +148,249 @@ export interface PromptStylePack {
   };
 }
 
-interface StylePackConfig {
-  tone_words?: string[];
-  typography_hint?: string;
-  avoid?: string[];
-  music?: PromptStylePack['music'];
+export function cloneJsonValue<T>(value: T): T {
+  if (value === undefined) return value;
+  const serialized = JSON.stringify(value);
+  if (serialized === undefined) throw new Error('Media JSON clone must be serializable');
+  return parseSafeJsonInput(serialized, 'Media JSON clone') as T;
 }
 
-interface MediaDesignSystemsFile {
-  style_pack?: StylePackConfig;
+export function deepMergeCatalog(base: unknown, next: unknown): unknown {
+  if (Array.isArray(base) || Array.isArray(next)) return cloneJsonValue(next);
+  if (!isRecord(base)) return cloneJsonValue(next);
+  if (!isRecord(next)) return cloneJsonValue(next);
+  const merged: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(next)) {
+    if (isRecord(value) && isRecord(merged[key])) {
+      merged[key] = deepMergeCatalog(merged[key], value);
+    } else {
+      merged[key] = cloneJsonValue(value);
+    }
+  }
+  return merged;
+}
+
+export function readJsonFilesRecursively(dirPath: string): unknown[] {
+  const safeDirPath = assertSafeRepositoryPath(dirPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeDirPath) || !safeLstat(safeDirPath).isDirectory()) return [];
+  const entries = safeReaddir(safeDirPath).sort();
+  const docs: unknown[] = [];
+  for (const entry of entries) {
+    const fullPath = path.join(safeDirPath, entry);
+    const stat = safeLstat(fullPath);
+    if (stat.isSymbolicLink()) continue;
+    if (stat.isDirectory()) {
+      docs.push(...readJsonFilesRecursively(fullPath));
+      continue;
+    }
+    if (stat.isFile() && entry.endsWith('.json')) {
+      docs.push(loadJsonValue(fullPath));
+    }
+  }
+  return docs;
+}
+
+export function loadJsonValue(filePath: string): unknown {
+  const safePath = assertSafeRepositoryPath(filePath);
+  if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
+    throw new Error(`Media JSON input must be an existing regular file: ${safePath}`);
+  }
+  return readJson(safePath);
+}
+
+export interface MediaDesignSystemDefinition {
+  theme: string;
+  profiles?: string[];
+  layout_template_id?: string;
+  body_zone_map?: Record<string, string>;
+  slide_layout_overrides?: Record<string, unknown>;
+  semantic_overrides?: Record<string, Record<string, Record<string, unknown>>>;
+  branding?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface MediaDesignSystemsCatalog {
+  version: string;
+  default_system: string;
+  systems: Record<string, MediaDesignSystemDefinition>;
+  style_pack?: {
+    tone_words?: string[];
+    typography_hint?: string;
+    avoid?: string[];
+    music?: {
+      mood: string;
+      bpm_range?: [number, number];
+      instrumentation_hint?: string;
+    };
+  };
+}
+
+export function loadMediaDesignSystemsCatalog(rootDir: string): MediaDesignSystemsCatalog {
+  const aggregationSeed: MediaDesignSystemsCatalog = {
+    version: '1.0.0',
+    default_system: 'executive-standard',
+    systems: {},
+  };
+  const filePath = path.resolve(
+    rootDir,
+    'knowledge/public/design-patterns/media-templates/media-design-systems.json'
+  );
+  const catalog = defineCatalog<MediaDesignSystemsCatalog>({
+    id: 'media-design-systems',
+    path: filePath,
+    schema:
+      rootDir === pathResolver.rootDir()
+        ? pathResolver.knowledge('product/schemas/media-design-systems.schema.json')
+        : path.resolve(rootDir, 'knowledge/product/schemas/media-design-systems.schema.json'),
+  });
+  const directoryPath = path.resolve(
+    rootDir,
+    'knowledge/public/design-patterns/media-templates/media-design-systems'
+  );
+  const docs = readJsonFilesRecursively(directoryPath);
+  if (docs.length === 0) return catalog.load();
+  const merged = docs.reduce(
+    (acc, doc) => deepMergeCatalog(acc, doc),
+    cloneJsonValue(aggregationSeed)
+  );
+  return catalog.validate(merged, directoryPath);
+}
+
+export const KDS_THEME_PREFIX = 'kds:';
+export const KDS_SYSTEM_PREFIX = 'kds-';
+
+/**
+ * Semantic types a KDS style re-lays out. Specialised zones (architecture,
+ * timeline, decision_cta, hero, contents) keep their own geometry; the generic
+ * ones take a composition. `pref` = the style's own first preferred composition.
+ */
+const KDS_SEMANTIC_COMPOSITION: Record<string, string | 'pref'> = {
+  content: 'pref',
+  summary: 'pref',
+  overview: 'bento-4',
+  solution: 'bento-4',
+  problem: 'sidebar-detail',
+  comparison: 'three-up',
+  metrics: 'stat-rail',
+  roi: 'stat-rail',
+};
+
+/** Compositions that carry only text (no image slot), safe for automatic mapping. */
+const KDS_PROSE_COMPOSITIONS = new Set(['spotlight', 'sidebar-detail', 'three-up']);
+
+export function buildKdsDesignSystem(styleId: string): MediaDesignSystemDefinition | null {
+  const style = findDesignStyle(styleId);
+  if (!style) return null;
+  const bodyZoneMap: Record<string, string> = {};
+  for (const [semantic, target] of Object.entries(KDS_SEMANTIC_COMPOSITION)) {
+    const compositionId =
+      target === 'pref'
+        ? (style.preferred_compositions.find((id) => KDS_PROSE_COMPOSITIONS.has(id)) ??
+          'sidebar-detail')
+        : target;
+    if (compositionId) bodyZoneMap[semantic] = `kds-${compositionId}`;
+  }
+  return {
+    theme: `${KDS_THEME_PREFIX}${style.id}`,
+    body_zone_map: bodyZoneMap,
+    metadata: { source_type: 'kds', description: style.description },
+  };
+}
+
+export interface DesignSystemSelection {
+  id: string;
+  system: MediaDesignSystemDefinition;
+  source: 'explicit' | 'reference' | 'profile' | 'default';
+}
+
+function loadOptionalMediaDesignSystemsCatalog(): MediaDesignSystemsCatalog | null {
+  try {
+    return loadMediaDesignSystemsCatalog(pathResolver.rootDir());
+  } catch {
+    return null;
+  }
+}
+
+export interface MediaThemeCatalog<T = MediaThemeRecord> {
+  version: string;
+  default_theme: string;
+  themes: Record<string, T>;
+}
+
+export function loadMediaThemeCatalogScope<T>(
+  rootDir: string,
+  id: string,
+  relativeDirectory: string,
+  optional = false
+): MediaThemeCatalog<T> {
+  const directory = path.resolve(rootDir, relativeDirectory);
+  const seed: MediaThemeCatalog<T> = {
+    version: '1.0.0',
+    default_theme: 'kyberion-standard',
+    themes: {},
+  };
+  const catalog = defineCatalog<MediaThemeCatalog<T>>({
+    id,
+    path: `${directory}.json`,
+    schema:
+      rootDir === pathResolver.rootDir()
+        ? pathResolver.knowledge('product/schemas/media-themes.schema.json')
+        : path.resolve(rootDir, 'knowledge/product/schemas/media-themes.schema.json'),
+    ...(optional ? { fallback: seed } : {}),
+  });
+  const fragments = readJsonFilesRecursively(directory);
+  return fragments.length
+    ? catalog.validate(fragments.reduce(deepMergeCatalog, seed), directory)
+    : catalog.load();
+}
+
+export const PUBLIC_MEDIA_THEMES = 'knowledge/public/design-patterns/media-templates/themes';
+
+function loadPublicMediaTheme(id: string): MediaThemeRecord | undefined {
+  try {
+    const { themes } = loadMediaThemeCatalogScope<MediaThemeRecord>(
+      pathResolver.rootDir(),
+      'media-themes-public',
+      PUBLIC_MEDIA_THEMES
+    );
+    return Object.hasOwn(themes, id) ? themes[id] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function selectDesignSystem(
+  catalog: MediaDesignSystemsCatalog,
+  input: {
+    designSystemId?: string;
+    profileId?: string;
+    resolveReference?: () => string | undefined;
+  }
+): DesignSystemSelection {
+  const lookup = (id: string) =>
+    Object.hasOwn(catalog.systems, id) ? catalog.systems[id] : undefined;
+  const explicit = input.designSystemId?.trim();
+  if (explicit) {
+    const system =
+      lookup(explicit) ??
+      (explicit.startsWith(KDS_SYSTEM_PREFIX)
+        ? buildKdsDesignSystem(explicit.slice(KDS_SYSTEM_PREFIX.length))
+        : null);
+    if (system) return { id: explicit, system, source: 'explicit' };
+  }
+  const reference = input.resolveReference?.();
+  const referenced = reference ? lookup(reference) : undefined;
+  if (reference && referenced) return { id: reference, system: referenced, source: 'reference' };
+  const profile = input.profileId?.trim();
+  if (profile) {
+    const match = Object.entries(catalog.systems).find(([, system]) =>
+      system.profiles?.includes(profile)
+    );
+    if (match) return { id: match[0], system: match[1], source: 'profile' };
+  }
+  const id = catalog.default_system;
+  return { id, system: lookup(id) ?? { theme: 'kyberion-standard' }, source: 'default' };
 }
 
 export type CreativeProjection =
@@ -165,6 +402,10 @@ export type CreativeProjection =
 export interface ResolvedCreativeDesign {
   source: 'brand-default' | 'tenant-override';
   tenant_slug?: string;
+  selection?: DesignSystemSelection;
+  theme_id: string;
+  theme_source: 'brand' | 'catalog';
+  brand_name: string;
   mode: CreativeDesignMode;
   colors: CreativeDesignColors;
   fonts: CreativeDesignFonts;
@@ -186,7 +427,10 @@ export interface ResolvedCreativeDesign {
 
 export interface ResolveCreativeDesignInput {
   surface: CreativeSurface;
+  /** The caller supplies the authorized tenant slug. */
   tenantSlug?: string;
+  designSystemId?: string;
+  profileId?: string;
   /** light/dark override. Defaults: video/prompt → dark, others → light. */
   mode?: CreativeDesignMode;
   /** Optional tenant accent override; tone is deliberately a single bounded value. */
@@ -214,12 +458,6 @@ type CreativeBrandTokens = Omit<BrandTokens, 'tokens'> & {
 };
 
 const BRAND_TOKENS_PATH = 'public/design-patterns/brand-tokens/kyberion.json';
-const MEDIA_DESIGN_SYSTEMS_PATH =
-  'public/design-patterns/media-templates/media-design-systems.json';
-const MEDIA_DESIGN_SYSTEMS_SCHEMA_PATH = pathResolver.rootResolve(
-  'knowledge/product/schemas/media-design-systems.schema.json'
-);
-
 const FALLBACK_COLORS: Record<CreativeDesignMode, CreativeDesignColors> = {
   light: {
     primary: '#0f172a',
@@ -438,22 +676,6 @@ const DEFAULT_STYLE_PACK_BASE = {
   music: { mood: 'focused and forward-moving', bpm_range: [90, 120] as [number, number] },
 };
 
-const mediaDesignSystemsCatalog = defineCatalog<MediaDesignSystemsFile>({
-  id: 'media-design-systems',
-  path: () => pathResolver.knowledge(MEDIA_DESIGN_SYSTEMS_PATH),
-  schema: MEDIA_DESIGN_SYSTEMS_SCHEMA_PATH,
-});
-
-function loadDesignCatalog<T>(catalog: GovernedCatalog<T>): T | null {
-  try {
-    const filePath = assertSafeRepositoryPath(catalog.path(), { allowMissingLeaf: false });
-    if (!safeLstat(filePath).isFile()) return null;
-    return catalog.load();
-  } catch {
-    return null;
-  }
-}
-
 function loadBrandTokens(mode: CreativeDesignMode): {
   colors: CreativeDesignColors;
   fonts: CreativeDesignFonts;
@@ -503,44 +725,22 @@ function loadBrandTokens(mode: CreativeDesignMode): {
   };
 }
 
-function tenantDesignDirCandidates(tenantSlug: string): string[] {
-  return [pathResolver.knowledge(path.join('confidential', tenantSlug, 'design'))];
-}
-
 interface TenantDesignData {
   override: Record<string, any>;
   themePack: Record<string, any> | null;
-  matchedDir: string;
 }
 
 function loadTenantDesign(tenantSlug: string): TenantDesignData | null {
-  for (const candidateDir of tenantDesignDirCandidates(tenantSlug)) {
-    try {
-      const dir = assertSafeRepositoryPath(candidateDir, { allowMissingLeaf: true });
-      const overridePath = assertSafeRepositoryPath(path.join(dir, 'tenant-override.json'), {
-        allowMissingLeaf: true,
-      });
-      const override = loadTenantDesignOverride(
-        pathResolver.rootDir(),
-        overridePath,
-        path.dirname(overridePath)
-      );
-      if (!override) continue;
-      const themePath = assertSafeRepositoryPath(path.join(dir, 'theme.json'), {
-        allowMissingLeaf: true,
-      });
-      const themePack = loadTenantDesignThemeOverlay(
-        pathResolver.rootDir(),
-        themePath,
-        path.dirname(overridePath)
-      );
-      return { override, themePack, matchedDir: dir };
-    } catch {
-      // An invalid or symlinked tenant design overlay is not trusted input.
-      // Continue with the next governed candidate or brand defaults.
-    }
+  try {
+    const directory = pathResolver.knowledge(path.join('confidential', tenantSlug, 'design'));
+    const root = pathResolver.rootDir();
+    const overridePath = path.join(directory, 'tenant-override.json');
+    const override = loadTenantDesignOverride(root, overridePath, directory);
+    if (!override) return null;
+    return { override, themePack: loadThemeForTenantDesign(root, overridePath, override) };
+  } catch {
+    return null;
   }
-  return null;
 }
 
 /**
@@ -620,24 +820,32 @@ function applyTenantFonts(
   base: CreativeDesignFonts,
   tenant: TenantDesignData
 ): CreativeDesignFonts {
-  const source =
-    tenant.themePack?.theme?.fonts ||
-    tenant.override?.theme?.fonts ||
-    tenant.override?.branding?.fonts;
-  if (!source || typeof source !== 'object') return base;
-  const heading = normalizeCssToken(source.heading, base.heading);
-  const body = normalizeCssToken(source.body, base.body);
-  return { ...base, heading, body, sans: body };
+  let { heading, body } = base;
+  for (const source of [
+    tenant.themePack?.theme?.fonts,
+    tenant.override?.theme?.fonts,
+    tenant.override?.branding?.fonts,
+  ]) {
+    heading = normalizeCssToken(source?.heading, heading);
+    body = normalizeCssToken(source?.body, body);
+  }
+  return body === base.body && heading === base.heading
+    ? base
+    : { ...base, heading, body, sans: body };
 }
 
 /** Read a tenant token group from either the theme pack or the override file. */
 function readTenantTokenGroup(
   tenant: TenantDesignData,
   key: 'typography' | 'spacing' | 'constraints'
-): Record<string, any> | null {
-  const source =
-    tenant.themePack?.theme?.[key] || tenant.override?.theme?.[key] || tenant.override?.[key];
-  return source && typeof source === 'object' ? (source as Record<string, any>) : null;
+): Record<string, any> {
+  const sources = [
+    tenant.themePack?.theme?.[key],
+    tenant.override?.theme?.[key],
+    tenant.override?.[key],
+  ].filter(isRecord);
+  const merged = sources.reduce(deepMergeCatalog, {});
+  return isRecord(merged) ? merged : {};
 }
 
 function applyTenantTypography(
@@ -645,13 +853,12 @@ function applyTenantTypography(
   tenant: TenantDesignData
 ): CreativeDesignTypography {
   const source = readTenantTokenGroup(tenant, 'typography');
-  if (!source) return base;
   const roles = { ...base.roles };
   for (const name of Object.keys(roles) as CreativeTypeRoleName[]) {
     const raw = source.roles?.[name];
     if (raw && typeof raw === 'object') roles[name] = { ...roles[name], ...raw };
   }
-  return mergeTypography({ scale_ratio: source.scale_ratio, roles });
+  return mergeTypography({ scale_ratio: source.scale_ratio ?? base.scale_ratio, roles });
 }
 
 function resolveTenantLogo(tenant: TenantDesignData): string | undefined {
@@ -764,18 +971,12 @@ function buildVideoProjection(
   };
 }
 
-function loadStylePackConfig(): StylePackConfig {
-  const parsed = loadDesignCatalog(mediaDesignSystemsCatalog);
-  const stylePack = parsed?.style_pack;
-  return stylePack && typeof stylePack === 'object' ? (stylePack as StylePackConfig) : {};
-}
-
 function buildPromptProjection(
   colors: CreativeDesignColors,
   fonts: CreativeDesignFonts,
-  style?: DesignStyle
+  style?: DesignStyle,
+  config: NonNullable<MediaDesignSystemsCatalog['style_pack']> = {}
 ): CreativeProjection {
-  const config = loadStylePackConfig();
   return {
     surface: 'prompt',
     style_pack: {
@@ -844,6 +1045,17 @@ export function resolveCreativeDesign(input: ResolveCreativeDesignInput): Resolv
   const mode: CreativeDesignMode =
     input.mode ?? (input.surface === 'video' || input.surface === 'prompt' ? 'dark' : 'light');
   const base = loadBrandTokens(mode);
+  const catalog =
+    input.designSystemId || input.profileId || input.surface === 'prompt'
+      ? loadOptionalMediaDesignSystemsCatalog()
+      : null;
+  const selection =
+    catalog && (input.designSystemId || input.profileId)
+      ? selectDesignSystem(catalog, {
+          designSystemId: input.designSystemId,
+          profileId: input.profileId,
+        })
+      : undefined;
 
   let colors = base.colors;
   let fonts = base.fonts;
@@ -855,8 +1067,31 @@ export function resolveCreativeDesign(input: ResolveCreativeDesignInput): Resolv
   let brandName = base.brandName;
   let themeName = mode === 'dark' ? 'kyberion-sovereign' : 'kyberion-standard';
 
-  const foundation = input.style ? loadDesignFoundation() : null;
-  const style = findDesignStyle(input.style, foundation);
+  const selectedThemeId = selection?.system.theme;
+  const styleId =
+    input.style ??
+    (selectedThemeId?.startsWith(KDS_THEME_PREFIX)
+      ? selectedThemeId.slice(KDS_THEME_PREFIX.length)
+      : undefined);
+  const catalogTheme =
+    selectedThemeId && !selectedThemeId.startsWith(KDS_THEME_PREFIX)
+      ? loadPublicMediaTheme(selectedThemeId)
+      : undefined;
+  const themeId = catalogTheme && selectedThemeId ? selectedThemeId : themeName;
+  if (catalogTheme && selection) {
+    const theme = catalogTheme;
+    const layers = { override: {}, themePack: { theme } };
+    colors = applyTenantColors(colors, layers);
+    fonts = applyTenantFonts(fonts, layers);
+    typography = applyTenantTypography(typography, layers);
+    spacing = mergeSpacing({ ...spacing, ...theme.spacing });
+    constraints = mergeConstraints({ ...constraints, ...theme.constraints });
+    logoUrl = resolveTenantLogo(layers);
+    themeName = selection.system.theme;
+  }
+
+  const foundation = styleId ? loadDesignFoundation() : null;
+  const style = findDesignStyle(styleId, foundation);
   let foundationCssVars: Record<string, string> | undefined;
   if (foundation && style) {
     colors = applyStyleColors(colors, style, mode);
@@ -879,18 +1114,22 @@ export function resolveCreativeDesign(input: ResolveCreativeDesignInput): Resolv
       typography = applyTenantTypography(typography, tenant);
       spacing = mergeSpacing({
         ...spacing,
-        ...(readTenantTokenGroup(tenant, 'spacing') || {}),
+        ...readTenantTokenGroup(tenant, 'spacing'),
       });
       constraints = mergeConstraints({
         ...constraints,
-        ...(readTenantTokenGroup(tenant, 'constraints') || {}),
+        ...readTenantTokenGroup(tenant, 'constraints'),
       });
-      logoUrl = resolveTenantLogo(tenant);
+      logoUrl = resolveTenantLogo(tenant) ?? logoUrl;
       source = 'tenant-override';
       brandName = String(
         tenant.override?.branding?.brand_name || tenant.override?.brand_name || brandName
       );
-      themeName = String(tenant.override?.theme || tenant.themePack?.theme?.name || tenantSlug);
+      const overrideTheme = tenant.override?.theme;
+      themeName =
+        typeof overrideTheme === 'string'
+          ? overrideTheme
+          : String(tenant.themePack?.theme?.name || tenantSlug);
     }
   }
 
@@ -938,13 +1177,17 @@ export function resolveCreativeDesign(input: ResolveCreativeDesignInput): Resolv
       }
       break;
     case 'prompt':
-      projection = buildPromptProjection(colors, fonts, style);
+      projection = buildPromptProjection(colors, fonts, style, catalog?.style_pack);
       break;
   }
 
   return {
     source,
     ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+    ...(selection ? { selection } : {}),
+    theme_id: themeId,
+    theme_source: catalogTheme ? 'catalog' : 'brand',
+    brand_name: brandName,
     mode,
     colors,
     fonts,
