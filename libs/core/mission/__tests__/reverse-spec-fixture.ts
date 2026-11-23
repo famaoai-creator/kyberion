@@ -132,11 +132,24 @@ export function reverseSpecFixture(purpose: ReverseSpecPurpose = 'rebuild') {
       entries: [{ claim_id: 'C-001', verdict: 'supported' }],
     } as Record<string, unknown>,
   };
+  /** Actors the mission execution ledger records for the author and verifier tasks. */
+  const ledgerActors = { specify: 'writer-agent', verify: 'verifier-agent' };
   const flush = () => {
+    write(
+      path.join(mission, 'execution-ledger.jsonl'),
+      [
+        ['specify-specify', ledgerActors.specify],
+        ['audit-independent-verify', ledgerActors.verify],
+      ]
+        .map(([taskId, actorId]) =>
+          JSON.stringify({ event_type: 'evidence_recorded', task_id: taskId, actor_id: actorId })
+        )
+        .join('\n') + '\n'
+    );
     for (const [stage, doc] of Object.entries(docs))
       write(path.join(mission, REVERSE_SPEC_EVIDENCE_FILES[stage as keyof typeof docs]), doc);
     write(path.join(mission, 'evidence/specs/ordering.md'), '# Ordering\n');
   };
   flush();
-  return { base, mission, source, docs, flush };
+  return { base, mission, source, docs, flush, ledgerActors };
 }

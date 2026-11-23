@@ -7,6 +7,7 @@ import { writeJson } from '@agent/core/foundation';
 import { handleAction } from '../index.js';
 import { validateReverseSpecEvidenceAt } from '@agent/core/mission';
 import { extractCodeGraph, type CodeGraphRegistry } from './extract-code-graph.js';
+import { cachedGrammarCount } from './grammar-loader.js';
 import { loadCodeGraphEnumerationRules } from '@agent/core/source-analysis';
 
 const ROOT = pathResolver.rootDir();
@@ -230,6 +231,20 @@ describe('modeling:extract_code_graph', () => {
     );
     expect(goOnly.unanalyzed_extensions).not.toHaveProperty('.go');
   });
+
+  it('frees parsers after each extraction and stays correct for concurrent runs', async () => {
+    expect(cachedGrammarCount()).toBe(0);
+    const [first, second] = await Promise.all([
+      extractCodeGraph({ sourceRoot: relativeSource }),
+      extractCodeGraph({ sourceRoot: relativeSource, languages: ['python'] }),
+    ]);
+    expect(cachedGrammarCount()).toBe(0);
+    expect(first.nodes.map((node) => node.id)).toEqual(ids());
+    expect(second.nodes.some((node) => node.language === 'python')).toBe(true);
+    // A later run re-creates what it needs.
+    expect((await extractCodeGraph({ sourceRoot: relativeSource })).edges).toEqual(graph.edges);
+    expect(cachedGrammarCount()).toBe(0);
+  }, 60000);
 
   it('rejects unknown language filters', async () => {
     await expect(

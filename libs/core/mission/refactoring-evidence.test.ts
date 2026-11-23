@@ -66,6 +66,39 @@ describe('refactoring evidence and mission-type promotion', () => {
     ).toBe('development');
   });
 
+  it('promotes a surface-resolved standard intent to its mission type', () => {
+    // The surface create command carries only the intent-goal handoff (origin_intent_id).
+    expect(
+      resolveEffectiveMissionType({
+        missionType: 'development',
+        intentId: 'reverse-spec-extraction',
+      })
+    ).toBe('reverse_spec');
+    expect(
+      resolveEffectiveMissionType({ missionType: 'development', intentId: 'legacy-migration' })
+    ).toBe('legacy_migration');
+    expect(
+      resolveEffectiveMissionType({
+        missionType: 'development',
+        matchedClassRuleId: 'class-code-change-reverse-spec-intent',
+      })
+    ).toBe('reverse_spec');
+    // Other intents and explicit non-default types are left alone.
+    expect(
+      resolveEffectiveMissionType({ missionType: 'development', intentId: 'contract-review' })
+    ).toBe('development');
+    expect(
+      resolveEffectiveMissionType({
+        missionType: 'presentation_production',
+        intentId: 'reverse-spec-extraction',
+      })
+    ).toBe('presentation_production');
+    const intentRule = loadMissionClassificationPolicy().mission_class_rules.find(
+      (rule) => rule.id === 'class-code-change-reverse-spec-intent'
+    );
+    expect(intentRule?.match?.intent_ids).toEqual(['reverse-spec-extraction']);
+  });
+
   it('rejects missing mission evidence without a directory', () => {
     expect(() => assertRefactoringEvidence('MSN-MISSING-REFACTOR', 'audit')).toThrow(
       /Mission directory not found|REFACTOR_EVIDENCE/

@@ -122,6 +122,30 @@ describe('router-contract', () => {
     expect(text.pipelineId).toBe('knowledge/product/pipeline-templates/review-text');
   });
 
+  it('routes spec extraction and legacy migration to code-change missions, not contract review', () => {
+    for (const utterance of [
+      '既存コードから仕様書を起こしたい',
+      '既存のソースコードから仕様と振る舞いを抽出して',
+      'このリポジトリのリバーススペックを作って',
+    ]) {
+      const resolved = resolveSurfaceIntent(utterance);
+      expect(resolved.intentId, utterance).toBe('reverse-spec-extraction');
+      expect(resolved.routeFamily, utterance).toBe('mission');
+      expect(resolved.missionAction, utterance).toBe('create');
+    }
+    for (const utterance of [
+      'レガシーシステムを新しいスタックに移行したい',
+      'このレガシーを新しい言語で再構築して',
+    ]) {
+      const resolved = resolveSurfaceIntent(utterance);
+      expect(resolved.intentId, utterance).toBe('legacy-migration');
+      expect(resolved.routeFamily, utterance).toBe('mission');
+      expect(resolved.missionAction, utterance).toBe('create');
+    }
+    // Reviewing a written spec document stays a document review.
+    expect(resolveSurfaceIntent('この仕様書をレビューして').intentId).toBe('contract-review');
+  });
+
   it('maps environment readiness intents to governed pipeline hints', () => {
     const verify = resolveSurfaceIntent('verify-environment-readiness');
     const inspect = resolveSurfaceIntent('inspect-environment-readiness');

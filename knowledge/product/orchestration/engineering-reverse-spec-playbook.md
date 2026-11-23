@@ -74,9 +74,13 @@ checker exits 0, never when an agent says so.
    Resolve each such difference in `resolution` rather than editing the lists.
 3. **Analysis.** Read every node down to its implementation from the ARCH, REQ, API, DATA,
    BEHAVIOR and NFR viewpoints, and give each analysis item an id `ANA-<CAT>-<n>`. A node leaves
-   the denominator only through a `dispositions` entry with a reason and a `decision_ref` file
-   under the mission (for example `evidence/decisions/ADR-n.md`). Shrinking scope is a decision,
-   not a side effect of autonomy.
+   the denominator only through a `dispositions` entry with a reason and a `decision_ref` to a
+   JSON decision record under the mission (for example `evidence/decisions/DEC-001.json`, shape:
+   `knowledge/product/schemas/reverse-spec-decision-record.schema.json`). The record names
+   `decision_id`, `decision` (equal to the disposition status), `reason`, `decided_by`,
+   `decided_at` (ISO-8601) and the `affected_node_ids` it removes. Shrinking scope is a
+   decision, not a side effect of autonomy. `decided_by` is recorded, not authenticated: put the
+   approval reference in `approval_ref`.
 4. **Specify.** Write specs under `evidence/specs/` and list them in the spec ledger with a
    permanent id `SPEC-<CATEGORY>-<name>-NN` and a layer:
    - `implementation` — the code as it is, technology-specific, kept as evidence;
@@ -90,14 +94,27 @@ checker exits 0, never when an agent says so.
    `universal: true` and declare the population they were counted over. `evaluation` and
    `rebuild` purposes need at least one essence-layer spec.
 
-5. **Audit — independent verification.** An agent other than the spec author (the checker
-   compares `verifier_actor_id` with `author_actor_id`) re-reads each claim against the source
-   and judges whether the cited line actually supports it: `supported`, `partial` (with a note),
-   `unsupported` or `fabricated`. `rebuild` verifies every confirmed and inferred claim;
-   `maintenance` and `evaluation` verify at least `min(confirmed, 30)` confirmed claims and
-   declare the population. No `unsupported` or `fabricated` verdict may stay open — correct or
-   downgrade the claim, then re-verify. The checker recomputes the source fingerprint and fails
-   if the analyzed source changed since the code graph was frozen.
+5. **Audit — independent verification.** An agent other than the spec author re-reads each
+   claim against the source and judges whether the cited line actually supports it:
+   `supported`, `partial` (with a note), `unsupported` or `fabricated`.
+   - **Identity.** `author_actor_id` must be the actor that recorded the `*-specify` task and
+     `verifier_actor_id` the actor that recorded the `*-independent-verify` task in the mission
+     execution ledger (both via `record-evidence … --actor-id`); no actor may have recorded
+     both. Actor ids are declared at `record-evidence`: the gate binds the ledgers to them but
+     cannot tell two ids used by one operator apart.
+   - **Coverage.** `rebuild` verifies every confirmed and inferred claim. `maintenance` and
+     `evaluation` declare the population and verify at least `min(confirmed, 30)` confirmed
+     claims; `sampling.method: full` means every confirmed claim.
+   - **Derived sample.** With `sampling.method: random` the sample is derived, not chosen. The
+     seed is the sha256 of the canonical JSON of `spec-ledger.json` (key order and formatting do
+     not change it); each confirmed claim is ranked by `sha256(seed \0 claim_id)` and the first
+     `max(min(confirmed, 30), sample_size)` must all be verified. Record the seed as
+     `sampling.seed`. `check_reverse_spec_evidence --mission <id> --print-sample` (optionally
+     `--sample-size n`) prints the seed and the claim ids to verify. Editing the spec ledger
+     changes the seed and therefore the sample.
+   - **Closure.** No `unsupported` or `fabricated` verdict may stay open — correct or downgrade
+     the claim, then re-verify. The checker recomputes the source fingerprint and fails if the
+     analyzed source changed since the code graph was frozen.
 
 ## Purpose presets
 

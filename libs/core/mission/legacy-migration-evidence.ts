@@ -6,12 +6,15 @@
  * strategy choice, and parity specs that prove behavioral equivalence — bound
  * to a reverse_spec mission whose audit passed with purpose `rebuild`.
  */
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { isRecord } from '../foundation/primitives.js';
+import { writeJson } from '../foundation/json.js';
 import { findMissionPath } from '../path-resolver.js';
-import { safeExistsSync, safeReadFile, safeStat } from '../secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeStat } from '../secure-io.js';
 import {
+  REVERSE_SPEC_EVIDENCE_FILES,
   readReverseSpecPurpose,
   readReverseSpecSpecIds,
   resolveReverseSpecMissionDir,
@@ -43,6 +46,20 @@ export const LEGACY_MIGRATION_EVIDENCE_FILES = {
   implement: 'evidence/migration-report.md',
   equivalence: 'evidence/equivalence-report.json',
 } as const satisfies Record<LegacyMigrationEvidenceStage, string>;
+
+/**
+ * Source-spec snapshot frozen at the brief. Later stages read the spec ids from it, never from
+ * the live source mission, so a re-opened or archived source mission cannot shift the contract.
+ */
+export const LEGACY_MIGRATION_SOURCE_SNAPSHOT_FILE = 'evidence/source-spec-snapshot.json';
+
+export interface LegacyMigrationSourceSnapshot {
+  kind: 'legacy-migration-source-spec-snapshot';
+  source_spec_mission_id: string;
+  spec_ledger_sha256: string;
+  verification_ledger_sha256: string;
+  specs: { spec_id: string; layer: string }[];
+}
 
 const MAX_LISTED = 12;
 
@@ -120,7 +137,6 @@ function existsUnder(baseDir: string, relative: string): boolean {
 }
 
 interface Brief {
-  sourceMissionDir: string;
   essenceSpecIds: Set<string>;
   allSpecIds: Set<string>;
 }
@@ -130,13 +146,110 @@ export interface LegacyMigrationValidationOptions {
   resolveMissionDir?: (missionId: string) => string;
 }
 
+function sha256Of(dir: string, relative: string): string {
+  return createHash('sha256')
+    .update(String(safeReadFile(path.join(dir, relative), { encoding: 'utf8' })))
+    .digest('hex');
+}
+
+/** Snapshot of an (audited) reverse_spec mission's spec ledger. */
+export function buildLegacyMigrationSourceSnapshot(
+  sourceSpecMissionId: string,
+  sourceMissionDir: string
+): LegacyMigrationSourceSnapshot {
+  return {
+    kind: 'legacy-migration-source-spec-snapshot',
+    source_spec_mission_id: sourceSpecMissionId,
+    spec_ledger_sha256: sha256Of(sourceMissionDir, REVERSE_SPEC_EVIDENCE_FILES.specify),
+    verification_ledger_sha256: sha256Of(sourceMissionDir, REVERSE_SPEC_EVIDENCE_FILES.audit),
+    specs: readReverseSpecSpecIds(sourceMissionDir),
+  };
+}
+
+function readBriefSource(missionDir: string): { brief: Json; problems: string[] } {
+  const brief = readJsonEvidence(missionDir, LEGACY_MIGRATION_EVIDENCE_FILES.brief);
+  const problems: string[] = [];
+  if (!nonEmpty(brief.source_spec_mission_id))
+    problems.push(
+      'source_spec_mission_id required — migration starts from an audited reverse_spec mission'
+    );
+  return { brief, problems };
+}
+
+/** Problems with the source mission as a rebuild seed (audit passes, purpose rebuild). */
+function sourceAuditProblems(sourceSpecMissionId: string, sourceMissionDir: string): string[] {
+  try {
+    validateReverseSpecEvidenceAt(sourceMissionDir, 'audit');
+    // Read through the scope (resolves the live source root): only at the brief, so a legacy
+    // tree retired after cut-over does not break the later gates.
+    const purpose = readReverseSpecPurpose(sourceMissionDir);
+    return purpose === 'rebuild'
+      ? []
+      : [
+          `source reverse_spec mission purpose is ${purpose}; a migration needs purpose rebuild (implementation-depth specs)`,
+        ];
+  } catch (error) {
+    return [
+      `source reverse_spec mission ${sourceSpecMissionId} does not pass its audit: ${nestedProblems(error)} (run check_reverse_spec_evidence --mission ${sourceSpecMissionId} --stage audit for the full list)`,
+    ];
+  }
+}
+
+/**
+ * Freeze the source spec ledger into this migration mission (check_legacy_migration_evidence
+ * --write-source-snapshot). Refuses when the source mission does not pass its audit.
+ */
+export function writeLegacyMigrationSourceSnapshot(
+  missionDir: string,
+  options: LegacyMigrationValidationOptions = {}
+): { path: string; snapshot: LegacyMigrationSourceSnapshot } {
+  const { brief, problems } = readBriefSource(missionDir);
+  if (problems.length)
+    throw new LegacyMigrationEvidenceError(
+      'brief',
+      LEGACY_MIGRATION_EVIDENCE_FILES.brief,
+      problems
+    );
+  const sourceId = String(brief.source_spec_mission_id);
+  const sourceMissionDir = (options.resolveMissionDir ?? resolveReverseSpecMissionDir)(sourceId);
+  const auditProblems = sourceAuditProblems(sourceId, sourceMissionDir);
+  if (auditProblems.length)
+    throw new LegacyMigrationEvidenceError(
+      'brief',
+      LEGACY_MIGRATION_EVIDENCE_FILES.brief,
+      auditProblems
+    );
+  const snapshot = buildLegacyMigrationSourceSnapshot(sourceId, sourceMissionDir);
+  const abs = path.join(missionDir, LEGACY_MIGRATION_SOURCE_SNAPSHOT_FILE);
+  safeMkdir(path.dirname(abs), { recursive: true });
+  writeJson(abs, snapshot);
+  return { path: abs, snapshot };
+}
+
+function readSnapshot(missionDir: string, sourceSpecMissionId: string, problems: string[]) {
+  const next = `run check_legacy_migration_evidence --mission <this mission> --write-source-snapshot`;
+  if (!safeExistsSync(path.join(missionDir, LEGACY_MIGRATION_SOURCE_SNAPSHOT_FILE))) {
+    problems.push(
+      `${LEGACY_MIGRATION_SOURCE_SNAPSHOT_FILE} missing — the source spec must be frozen at the brief | next: ${next}`
+    );
+    return undefined;
+  }
+  const snapshot = readJsonEvidence(missionDir, LEGACY_MIGRATION_SOURCE_SNAPSHOT_FILE);
+  if (snapshot.source_spec_mission_id !== sourceSpecMissionId) {
+    problems.push(
+      `source snapshot is for ${String(snapshot.source_spec_mission_id)}, but the brief names ${sourceSpecMissionId} | next: ${next}`
+    );
+    return undefined;
+  }
+  return snapshot;
+}
+
 function validateBrief(
   missionDir: string,
   options: LegacyMigrationValidationOptions,
   verifySourceAudit: boolean
 ): Brief {
-  const brief = readJsonEvidence(missionDir, LEGACY_MIGRATION_EVIDENCE_FILES.brief);
-  const problems: string[] = [];
+  const { brief, problems } = readBriefSource(missionDir);
   if (!nonEmpty(brief.objective)) problems.push('objective required (why migrate)');
   if (stringList(brief.success_metrics).length < 1)
     problems.push('success_metrics must list at least one metric');
@@ -147,48 +260,50 @@ function validateBrief(
     problems.push('scope.included must list at least one module/area');
   if (!Array.isArray(scope.excluded))
     problems.push('scope.excluded must be an array (may be empty)');
-  if (!nonEmpty(brief.source_spec_mission_id)) {
-    problems.push(
-      'source_spec_mission_id required — migration starts from an audited reverse_spec mission'
-    );
+  if (!nonEmpty(brief.source_spec_mission_id))
     throw new LegacyMigrationEvidenceError(
       'brief',
       LEGACY_MIGRATION_EVIDENCE_FILES.brief,
       problems
     );
-  }
-  let sourceMissionDir = '';
-  try {
-    sourceMissionDir = (options.resolveMissionDir ?? resolveReverseSpecMissionDir)(
-      brief.source_spec_mission_id
-    );
-    // The brief gate re-runs the source mission's audit: a spec that no longer passes cannot seed
-    // a rebuild. Later stages rely on that frozen result — a strangler-fig or in-place rebuild
-    // changes the legacy tree by design, so its fingerprint is not re-checked after the brief.
-    if (verifySourceAudit) {
-      validateReverseSpecEvidenceAt(sourceMissionDir, 'audit');
-      // Read through the scope (resolves the live source root): only at the brief, so a legacy
-      // tree retired after cut-over does not break the later gates.
-      const purpose = readReverseSpecPurpose(sourceMissionDir);
-      if (purpose !== 'rebuild')
-        problems.push(
-          `source reverse_spec mission purpose is ${purpose}; a migration needs purpose rebuild (implementation-depth specs)`
-        );
+  const sourceId = brief.source_spec_mission_id;
+  const snapshot = readSnapshot(missionDir, sourceId, problems);
+  // The brief gate re-runs the source mission's audit and checks the snapshot is current: a spec
+  // that no longer passes cannot seed a rebuild. Later stages rely on the frozen snapshot only — a
+  // strangler-fig or in-place rebuild changes the legacy tree by design, and the source mission
+  // may be re-opened or archived after the brief.
+  if (verifySourceAudit) {
+    try {
+      const sourceMissionDir = (options.resolveMissionDir ?? resolveReverseSpecMissionDir)(
+        sourceId
+      );
+      const auditProblems = sourceAuditProblems(sourceId, sourceMissionDir);
+      problems.push(...auditProblems);
+      if (!auditProblems.length && snapshot) {
+        const fresh = buildLegacyMigrationSourceSnapshot(sourceId, sourceMissionDir);
+        // Compare the whole snapshot: later stages read `specs` from it.
+        if (JSON.stringify(snapshot) !== JSON.stringify(fresh))
+          problems.push(
+            `source snapshot does not match the source mission (stale or edited) — the snapshot must be the unmodified output of --write-source-snapshot | next: re-run --write-source-snapshot and re-review the brief`
+          );
+      }
+    } catch (error) {
+      problems.push(
+        `source reverse_spec mission ${sourceId} not found: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`
+      );
     }
-  } catch (error) {
-    problems.push(
-      `source reverse_spec mission ${brief.source_spec_mission_id} does not pass its audit: ${nestedProblems(error)} (run check_reverse_spec_evidence --mission ${brief.source_spec_mission_id} --stage audit for the full list)`
-    );
   }
-  if (problems.length)
+  if (problems.length || !snapshot)
     throw new LegacyMigrationEvidenceError(
       'brief',
       LEGACY_MIGRATION_EVIDENCE_FILES.brief,
       problems
     );
-  const specs = readReverseSpecSpecIds(sourceMissionDir);
+  const specs = records(snapshot.specs).map((spec) => ({
+    spec_id: String(spec.spec_id ?? ''),
+    layer: String(spec.layer ?? ''),
+  }));
   return {
-    sourceMissionDir,
     essenceSpecIds: new Set(
       specs.filter((spec) => spec.layer === 'essence').map((spec) => spec.spec_id)
     ),
