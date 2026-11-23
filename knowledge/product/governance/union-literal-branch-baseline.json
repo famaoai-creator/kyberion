@@ -4,11 +4,11 @@
   "violations": {
     "libs/core/agent/agent-collaboration-events.ts": ["approval"],
     "libs/core/agent/agent-collaboration-projection.ts": ["task"],
-    "libs/core/contracts/asset-scope.ts": ["tenant"],
     "libs/core/contracts/custody-owner.ts": ["tenant"],
     "libs/core/customer-decision/model.ts": ["approval"],
     "libs/core/discussion/discussion-provider.ts": ["claude", "codex"],
     "libs/core/discussion/discussion-types.ts": ["claude"],
+    "libs/core/foundation/asset-address.ts": ["tenant"],
     "libs/core/foundation/charter-scope.ts": ["organization"],
     "libs/core/foundation/credential-material-capability.ts": ["tenant"],
     "libs/core/foundation/personal-credential-use-capability.ts": ["approval"],

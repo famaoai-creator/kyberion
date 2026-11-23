@@ -6,16 +6,6 @@ export interface AssetCustody {
   readonly ref: string;
 }
 
-export const isTenantAssetCustody = <C extends { readonly kind: string }>(
-  custody: C
-): custody is C & { readonly kind: 'tenant' } => custody.kind === 'tenant';
-export const isPersonAssetCustody = <C extends { readonly kind: string }>(
-  custody: C
-): custody is C & { readonly kind: 'person' } => custody.kind === 'person';
-export const isSystemAssetCustody = <C extends { readonly kind: string }>(
-  custody: C
-): custody is C & { readonly kind: 'system' } => custody.kind === 'system';
-
 /** Structural view of the schema-validated store catalog; no filesystem access. */
 export interface AssetStoreDeclaration {
   readonly id: string;
