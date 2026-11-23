@@ -97,6 +97,7 @@ const APPROVAL_PROPERTIES = {
   reason: { type: 'string' },
   evidence: {},
   severity: { enum: ['low', 'medium', 'high'] },
+  export_as: { type: 'string' },
 } as const;
 
 const APPROVAL_SCHEMA = {

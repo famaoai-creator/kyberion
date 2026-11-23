@@ -1,0 +1,27 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "scratch-aoi-profile",
+  "version": "1.0.0",
+  "name": "BizSim AOI: land organization profile",
+  "description": "SCRATCH — lands the aoi-dynamics org profile via governed write ops. Remove after the simulation.",
+  "context": { "mission_id": "BIZSIM-20261123-AOI", "tenant_slug": "aoi-dynamics" },
+  "steps": [
+    {
+      "id": "read_profile",
+      "role": "source",
+      "op": "system:read_json",
+      "produces": "org_profile_json",
+      "params": { "path": "active/shared/tmp/bizsim-202611-aoi/aoi-organization-profile.json" }
+    },
+    {
+      "id": "write_profile",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "org_profile_json",
+      "params": {
+        "path": "knowledge/confidential/aoi-dynamics/organizations/aoi-dynamics/organization-profile.json",
+        "content": "{{org_profile_json}}"
+      }
+    }
+  ]
+}

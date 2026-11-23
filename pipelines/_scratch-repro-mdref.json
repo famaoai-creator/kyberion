@@ -1,0 +1,28 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "scratch-repro-mdref",
+  "version": "1.0.0",
+  "name": "Repro: markdown_ref to write_file",
+  "description": "SCRATCH reproduction of contract-review step2 failure. Remove after fix.",
+  "context": {
+    "mission_id": "BIZSIM-20261123",
+    "source_document": "active/shared/tmp/bizsim-202611/oita-itaku-henkou-contract.docx",
+    "markdown_output": "active/shared/tmp/bizsim-202611/evidence/repro-contract.md"
+  },
+  "steps": [
+    {
+      "id": "convert_to_markdown",
+      "role": "source",
+      "op": "media:document_digest",
+      "produces": { "channel": "markdown_ref", "type": "MarkdownRef" },
+      "params": { "path": "{{source_document}}" }
+    },
+    {
+      "id": "persist_markdown",
+      "role": "sink",
+      "op": "media:write_file",
+      "consumes": "markdown_ref",
+      "params": { "path": "{{markdown_output}}", "from": "markdown_ref" }
+    }
+  ]
+}

@@ -473,6 +473,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `output_to_virtual_camera`                 | voice                                                                 |
 | `paste_text`                               | system                                                                |
 | `pdf_render`                               | media                                                                 |
+| `pdf_text_edit`                            | media                                                                 |
 | `peer_advice`                              | wisdom                                                                |
 | `perspective_fanout`                       | wisdom                                                                |
 | `pptx_diff`                                | wisdom                                                                |
@@ -504,6 +505,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `record_verify_repair_voice_sample`        | voice                                                                 |
 | `record_voice_sample`                      | voice                                                                 |
 | `refresh`                                  | agent                                                                 |
+| `register_artifact`                        | media                                                                 |
 | `register_passkey`                         | browser                                                               |
 | `register_presentation_preference_profile` | media, wisdom                                                         |
 | `register_voice_profile`                   | voice                                                                 |

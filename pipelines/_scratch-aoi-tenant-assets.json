@@ -1,0 +1,47 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "scratch-aoi-tenant-assets",
+  "version": "1.0.0",
+  "name": "BizSim AOI: land tenant governance assets",
+  "description": "SCRATCH — lands aoi-dynamics tenant decision-rights + financial model via governed write ops. Remove after the simulation.",
+  "context": {
+    "mission_id": "BIZSIM-20261123-AOI",
+    "tenant_slug": "aoi-dynamics"
+  },
+  "steps": [
+    {
+      "id": "read_decision_rights",
+      "role": "source",
+      "op": "system:read_json",
+      "produces": "decision_rights_json",
+      "params": { "path": "active/shared/tmp/bizsim-202611-aoi/aoi-decision-rights.json" }
+    },
+    {
+      "id": "write_decision_rights",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "decision_rights_json",
+      "params": {
+        "path": "knowledge/confidential/aoi-dynamics/governance/decision-rights.json",
+        "content": "{{decision_rights_json}}"
+      }
+    },
+    {
+      "id": "read_financial_model",
+      "role": "source",
+      "op": "system:read_json",
+      "produces": "financial_model_json",
+      "params": { "path": "active/shared/tmp/bizsim-202611-aoi/aoi-financial-model.json" }
+    },
+    {
+      "id": "write_financial_model",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "financial_model_json",
+      "params": {
+        "path": "knowledge/confidential/aoi-dynamics/finance/financial-model.json",
+        "content": "{{financial_model_json}}"
+      }
+    }
+  ]
+}

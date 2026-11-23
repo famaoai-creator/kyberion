@@ -1,0 +1,104 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "scratch-bizsim-decisions",
+  "version": "1.0.0",
+  "name": "BizSim: decision-rights evaluation chain",
+  "description": "SCRATCH simulation (bizsim-202611): evaluate three business decisions through the decision-rights matrix + approval gate. Tenant famao-lab (default matrix — tenant binding not held). Remove after the simulation.",
+  "context": {
+    "sim_id": "BIZSIM-20261123",
+    "tenant_slug": "famao-lab",
+    "out_dir": "active/shared/tmp/bizsim-202611"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/runtime-preflight.json",
+        "context": { "preflight_cmd": "node --version" }
+      }
+    },
+    {
+      "id": "eval_vendor_payment_800k",
+      "role": "sink",
+      "op": "approval:evaluate_decision_rights",
+      "params": {
+        "operation_id": "bizsim:vendor_invoice_payment:outsourcing-nov",
+        "correlation_id": "BIZSIM-20261123:vendor_payment_800k",
+        "decision_type": "vendor_invoice_payment",
+        "caller_role": "finance_controller",
+        "amount": 800000,
+        "mission_id": "{{sim_id}}",
+        "channel": "mission",
+        "title": "Vendor invoice payment: 外注費11月分 ¥800,000",
+        "summary": "月次外注費の支払決裁。閾値 ¥500,000 超過のためエスカレーション期待。"
+      }
+    },
+    {
+      "id": "save_vendor_payment_result",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{out_dir}}/decision-vendor-payment-800k.json",
+        "content": "{{last_transform}}"
+      }
+    },
+    {
+      "id": "eval_expense_50k",
+      "role": "sink",
+      "op": "approval:evaluate_decision_rights",
+      "params": {
+        "operation_id": "bizsim:expense_reimbursement:travel-nov",
+        "correlation_id": "BIZSIM-20261123:expense_50k",
+        "decision_type": "expense_reimbursement",
+        "caller_role": "operator",
+        "amount": 50000,
+        "mission_id": "{{sim_id}}",
+        "channel": "mission",
+        "title": "Expense reimbursement: 交通費 ¥50,000",
+        "summary": "閾値 ¥100,000 未満の経費精算 — ゲート通過(または not_required)期待。"
+      }
+    },
+    {
+      "id": "save_expense_result",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{out_dir}}/decision-expense-50k.json",
+        "content": "{{last_transform}}"
+      }
+    },
+    {
+      "id": "eval_contract_signature",
+      "role": "sink",
+      "op": "approval:evaluate_decision_rights",
+      "params": {
+        "operation_id": "bizsim:contract_signature:ipa-model-dev-contract",
+        "correlation_id": "BIZSIM-20261123:contract_signature",
+        "decision_type": "contract_signature",
+        "caller_role": "legal_strategist",
+        "risk_level": "medium",
+        "mission_id": "{{sim_id}}",
+        "channel": "mission",
+        "title": "Contract signature: IPAモデル開発委託契約(レビュー済みドラフト)",
+        "summary": "risk_level=medium の契約締結 — 人間最終決裁へのエスカレーション期待。"
+      }
+    },
+    {
+      "id": "save_contract_sign_result",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{out_dir}}/decision-contract-signature.json",
+        "content": "{{last_transform}}"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "bizsim decisions written under {{out_dir}}" }
+    }
+  ]
+}

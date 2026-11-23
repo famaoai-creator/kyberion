@@ -10,7 +10,7 @@ import {
   generateNativePptx,
   generateNativeXlsx,
 } from '@agent/shared-media/media-contracts';
-import type { PdfDesignProtocol } from '@agent/core/contracts/pdf-protocol';
+import type { PdfDesignProtocol, PdfPage } from '@agent/core/contracts/pdf-protocol';
 import type { PptxDesignProtocol, PptxSlide } from '@agent/core/contracts/pptx-protocol';
 import type { XlsxDesignProtocol } from '@agent/core/contracts/xlsx-protocol';
 import * as path from 'node:path';
@@ -529,6 +529,348 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     }
   }
 
+  type Rgb = [number, number, number];
+  interface LayoutTextElement {
+    type: 'text' | 'heading';
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    text: string;
+    fontSize: number;
+    color?: Rgb;
+    page: number;
+  }
+  type LayoutVector = {
+    shape:
+      | { kind: 'rect'; x: number; y: number; width: number; height: number }
+      | { kind: 'line'; x1: number; y1: number; x2: number; y2: number };
+    fillColor?: Rgb;
+    strokeColor?: Rgb;
+    lineWidth?: number;
+  };
+  const LAYOUT_TEXT_COLOR: Rgb = [0.12, 0.12, 0.12];
+
+  function wrapByUnits(text: string, maxUnits: number): string[] {
+    if (!text) return [];
+    const out: string[] = [];
+    let cur = '';
+    for (const ch of String(text)) {
+      cur += ch;
+      if ([...cur].length >= maxUnits) {
+        out.push(cur);
+        cur = '';
+      }
+    }
+    if (cur) out.push(cur);
+    return out;
+  }
+
+  /**
+   * Apply a document-layouts template (`blocks`/`labels`/`colors`) to invoice
+   * data: produces positioned text elements and vector shapes for the
+   * aesthetic-elements render path. Sections whose template block or label is
+   * absent are skipped; the plain `source.body` remains the text fallback.
+   */
+  function buildInvoiceLayoutArtifacts(args: {
+    template: any;
+    brief: any;
+    items: any[];
+    grouped: Map<number, { taxableAmount: number; taxAmount: number }>;
+    subtotal: number;
+    totalTax: number;
+    totalAmount: number;
+  }): { elements: LayoutTextElement[]; page: PdfPage } | null {
+    const { template, brief, items, grouped, subtotal, totalTax, totalAmount } = args;
+    const B = template?.blocks;
+    if (!B || typeof B !== 'object') return null;
+    const L = template.labels || {};
+    const colors = template.colors || {};
+    const accent = (colors.accent as Rgb) || LAYOUT_TEXT_COLOR;
+    const light = (colors.light as Rgb) || ([0.96, 0.97, 0.98] as Rgb);
+    const border = (colors.border as Rgb) || ([0.7, 0.75, 0.8] as Rgb);
+    const left = template.page?.left ?? 48;
+    const right = template.page?.right ?? (template.page?.width ?? 595) - 48;
+    const pageW = template.page?.width ?? 595;
+    const pageH = template.page?.height ?? 842;
+
+    const elements: LayoutTextElement[] = [];
+    const vectors: LayoutVector[] = [];
+    const T = (
+      x: number,
+      y: number,
+      text: string,
+      fontSize: number,
+      color: Rgb = LAYOUT_TEXT_COLOR,
+      type: 'text' | 'heading' = 'text'
+    ) =>
+      elements.push({
+        type,
+        x,
+        y,
+        width: text.length * fontSize * 0.55,
+        height: fontSize * 1.3,
+        text,
+        fontSize,
+        color,
+        page: 0,
+      });
+
+    // ── Header: title, meta, divider ──────────────────────────────
+    if (L.title) T(left, 26, L.title, 22, accent, 'heading');
+    const meta: Array<[string, unknown]> = [
+      [L.invoice_number, brief.invoice_number],
+      [L.issue_date, brief.issue_date],
+      [L.due_date, brief.due_date],
+      [L.subject, brief.subject],
+    ];
+    meta.forEach(([k, v], i) => {
+      if (k && v) T(left + (right - left) * 0.58, 24 + i * 14, `${k}: ${v}`, 9);
+    });
+    vectors.push({
+      shape: { kind: 'line', x1: left, y1: 92, x2: right, y2: 92 },
+      strokeColor: accent,
+      lineWidth: 1.6,
+    });
+
+    // ── Recipient / issuer boxes ──────────────────────────────────
+    const box = (blk: any, label: string, name: string, lines: string[]) => {
+      if (!blk || !label) return;
+      T(blk.x, blk.y - 10, label, 9, accent);
+      vectors.push({
+        shape: { kind: 'rect', x: blk.x, y: blk.y, width: blk.width, height: blk.height },
+        fillColor: light,
+        strokeColor: border,
+        lineWidth: 0.8,
+      });
+      if (name) T(blk.x + 8, blk.y + 16, name, blk.name_font_size || 11);
+      let ly = blk.y + 16 + (blk.name_line_height || 15);
+      let count = 0;
+      for (const raw of lines) {
+        if (!raw) continue;
+        for (const w of wrapByUnits(raw, blk.body_max_units || 40)) {
+          if (count >= (blk.body_line_limit ?? 99)) return;
+          T(blk.x + 8, ly, w, blk.body_font_size || 9);
+          ly += blk.body_line_height || 13;
+          count++;
+        }
+      }
+    };
+    box(B.recipient, L.section_recipient, brief.recipient?.name, [
+      brief.recipient?.department,
+      brief.recipient?.contact ? `担当: ${brief.recipient.contact}` : '',
+      brief.recipient?.address || '',
+    ]);
+    box(B.issuer, L.section_issuer, brief.issuer?.name, [
+      brief.issuer?.registration_number ? `登録番号: ${brief.issuer.registration_number}` : '',
+      brief.issuer?.postal_code ? `郵便番号: ${brief.issuer.postal_code}` : '',
+      brief.issuer?.address || '',
+      brief.issuer?.contact ? `担当: ${brief.issuer.contact}` : '',
+      brief.issuer?.phone ? `電話: ${brief.issuer.phone}` : '',
+      brief.issuer?.email ? `メール: ${brief.issuer.email}` : '',
+    ]);
+
+    // ── Amount band ───────────────────────────────────────────────
+    const a = B.amount;
+    if (a) {
+      vectors.push({
+        shape: { kind: 'rect', x: a.x, y: a.y, width: a.width, height: a.height },
+        fillColor: light,
+        strokeColor: accent,
+        lineWidth: 1.2,
+      });
+      if (L.amount_due)
+        T(
+          a.label_x ?? a.x + 8,
+          a.label_y ?? a.y + 20,
+          L.amount_due,
+          a.label_font_size || 12,
+          accent
+        );
+      T(
+        a.value_x ?? a.x + a.width - 140,
+        a.value_y ?? a.y + 22,
+        formatJpy(totalAmount),
+        a.value_font_size || 18,
+        LAYOUT_TEXT_COLOR,
+        'heading'
+      );
+    }
+
+    // ── Items table ───────────────────────────────────────────────
+    const tb = B.table;
+    let cursorY = a ? a.y + a.height + 24 : 320;
+    if (tb) {
+      const cols = [tb.description_x, tb.quantity_x, tb.unit_price_x, tb.tax_rate_x, tb.amount_x];
+      const headers = [
+        L.table_description,
+        L.table_quantity,
+        L.table_unit_price,
+        L.table_tax_rate,
+        L.table_amount,
+      ];
+      const ty = tb.top ?? cursorY;
+      const rowH = tb.row_height || 22;
+      vectors.push({
+        shape: { kind: 'rect', x: left, y: ty, width: right - left, height: rowH },
+        fillColor: accent,
+      });
+      headers.forEach((h, i) => {
+        if (h && cols[i] != null)
+          T(cols[i] + 4, ty + rowH * 0.68, h, tb.header_font_size || 10, [1, 1, 1] as Rgb);
+      });
+      let cy = ty + rowH;
+      for (const it of items) {
+        const desc = `${it.description || ''}${it.reduced_tax_rate ? ' ※' : ''}`;
+        T(
+          cols[0] + 4,
+          cy + rowH * 0.68,
+          wrapByUnits(desc, tb.description_max_units || 28)[0] || '',
+          tb.body_font_size || 9
+        );
+        if (cols[1] != null)
+          T(
+            cols[1] + 4,
+            cy + rowH * 0.68,
+            `${it.quantity ?? ''}${it.unit || ''}`,
+            tb.body_font_size || 9
+          );
+        if (cols[2] != null)
+          T(
+            cols[2] + 4,
+            cy + rowH * 0.68,
+            formatJpy(Number(it.unit_price_ex_tax || 0)),
+            tb.body_font_size || 9
+          );
+        if (cols[3] != null)
+          T(cols[3] + 4, cy + rowH * 0.68, `${it.tax_rate ?? ''}%`, tb.body_font_size || 9);
+        if (cols[4] != null)
+          T(
+            cols[4] + 4,
+            cy + rowH * 0.68,
+            formatJpy(Number(it.quantity || 0) * Number(it.unit_price_ex_tax || 0)),
+            tb.body_font_size || 9
+          );
+        cy += rowH;
+        vectors.push({
+          shape: { kind: 'line', x1: left, y1: cy, x2: right, y2: cy },
+          strokeColor: border,
+          lineWidth: 0.4,
+        });
+      }
+      vectors.push({
+        shape: { kind: 'rect', x: left, y: ty, width: right - left, height: cy - ty },
+        strokeColor: border,
+        lineWidth: 0.8,
+      });
+      const periods = [...new Set(items.map((i: any) => i.service_period).filter(Boolean))].join(
+        '、'
+      );
+      if (periods) T(left + 4, cy + 14, `※ ${periods}`, 8);
+      cursorY = cy + (periods ? 30 : 16);
+    }
+
+    // ── Tax summary + totals (left) / payment (right) ────────────
+    const ts = B.tax_summary;
+    if (ts && L.section_tax_summary) {
+      T(ts.x ?? left, cursorY, L.section_tax_summary, 10, accent);
+      let sy = cursorY + 16;
+      for (const [rate, g] of [...grouped.entries()].sort((x, y) => x[0] - y[0])) {
+        T(
+          (ts.x ?? left) + 4,
+          sy,
+          `${rate}%対象: ${formatJpy(g.taxableAmount)} / 税額: ${formatJpy(g.taxAmount)}`,
+          9
+        );
+        sy += 14;
+      }
+      T((ts.x ?? left) + 4, sy + 4, `小計(税抜): ${formatJpy(subtotal)}`, 9);
+      T((ts.x ?? left) + 4, sy + 18, `消費税額計: ${formatJpy(totalTax)}`, 9);
+      T(
+        (ts.x ?? left) + 4,
+        sy + 34,
+        `${L.section_totals || '合計'}: ${formatJpy(totalAmount)}`,
+        11,
+        accent,
+        'heading'
+      );
+    }
+
+    const pay = B.payment;
+    const paymentLines = brief.payment
+      ? [
+          brief.payment.method ? `方法: ${brief.payment.method}` : '',
+          `${brief.payment.bank_name || ''} ${brief.payment.branch_name || ''}`.trim(),
+          `${brief.payment.account_type || ''} ${brief.payment.account_number || ''}`.trim(),
+          brief.payment.account_name ? `口座名義: ${brief.payment.account_name}` : '',
+          brief.payment.transfer_fee_policy || '',
+        ].filter(Boolean)
+      : [];
+    if (pay && L.section_payment && paymentLines.length) {
+      T(pay.x ?? right - 235, cursorY, L.section_payment, 10, accent);
+      paymentLines.forEach((ln, i) => T((pay.x ?? right - 235) + 4, cursorY + 16 + i * 14, ln, 9));
+    }
+
+    // ── Notes + compliance ────────────────────────────────────────
+    const nb = B.notes;
+    const notesArr = Array.isArray(brief.notes)
+      ? brief.notes
+      : brief.notes
+        ? [String(brief.notes)]
+        : [];
+    let ny = Math.max(
+      cursorY + (ts ? (ts.height ?? 82) : 60),
+      cursorY + 16 + paymentLines.length * 14 + 16
+    );
+    if (notesArr.length && L.section_notes) {
+      T(left, ny, L.section_notes, 10, accent);
+      ny += 16;
+      for (const n of notesArr) {
+        for (const w of wrapByUnits(n, nb?.body_max_units || 48)) {
+          T(left + 4, ny, w, nb?.body_font_size || 9);
+          ny += nb?.body_line_height || 14;
+        }
+      }
+      ny += 10;
+    }
+    const complianceLabel = L.section_compliance || L.invoice_requirements;
+    if (complianceLabel) {
+      T(left, ny, complianceLabel, 10, accent);
+      ny += 16;
+      const complianceText =
+        '発行者の氏名及び登録番号、取引年月日、取引内容、税率ごとの対価の額、税率、消費税額、書類の交付を受ける事業者の氏名。';
+      for (const w of wrapByUnits(complianceText, nb?.body_max_units || 48)) {
+        T(left + 4, ny, w, nb?.body_font_size || 9);
+        ny += nb?.body_line_height || 14;
+      }
+    }
+
+    const page: PdfPage = {
+      pageNumber: 1,
+      width: pageW,
+      height: pageH,
+      text: '',
+      elements: elements.map((el) => ({
+        type: el.type,
+        x: el.x,
+        y: el.y,
+        width: el.width,
+        height: el.height,
+        text: el.text,
+        fontSize: el.fontSize,
+        page: el.page,
+        ...(el.color ? { color: el.color as [number, number, number] } : {}),
+      })),
+      vectors: vectors.map((v) => ({
+        shape: v.shape,
+        fillColor: v.fillColor,
+        strokeColor: v.strokeColor,
+        lineWidth: v.lineWidth,
+      })),
+    };
+    return { elements, page };
+  }
+
   function buildDocumentPdfProtocol(rawBrief: MediaBrief): MediaInvoicePdfProtocol {
     const brief = normalizeInvoiceDocumentBrief(rawBrief);
     if (brief.document_type !== 'invoice') {
@@ -630,6 +972,16 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       .filter(Boolean)
       .join('\n');
 
+    const layoutArtifacts = buildInvoiceLayoutArtifacts({
+      template,
+      brief,
+      items,
+      grouped,
+      subtotal,
+      totalTax,
+      totalAmount,
+    });
+
     return {
       version: '1.0.0',
       generatedAt: nowIso(),
@@ -663,6 +1015,12 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
         linearize: false,
         objectStreams: false,
       },
+      ...(layoutArtifacts
+        ? {
+            content: { text: body, pages: [layoutArtifacts.page] },
+            aesthetic: { elements: layoutArtifacts.elements },
+          }
+        : {}),
     };
   }
 

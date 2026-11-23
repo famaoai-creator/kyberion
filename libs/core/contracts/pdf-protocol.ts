@@ -17,6 +17,8 @@ export interface PdfLayoutElement {
   text?: string;
   fontSize?: number;
   fontName?: string;
+  /** Text fill color [R,G,B] 0-1 (nonstroking `rg` at show-time), when captured. */
+  color?: [number, number, number];
   /** 0-based page index for multi-page documents; omitted = page 0. */
   page?: number;
 }

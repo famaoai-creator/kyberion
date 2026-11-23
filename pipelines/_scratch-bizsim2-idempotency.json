@@ -1,0 +1,47 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "scratch-bizsim2-idempotency",
+  "version": "1.0.0",
+  "name": "BizSim2: register_artifact idempotency probe",
+  "description": "SCRATCH — registers a stable source file twice with if_exists=reuse; second registration must reuse and not append a new index entry.",
+  "context": {
+    "mission_id": "BIZSIM2-IDEMP-AOI",
+    "tenant_slug": "aoi-dynamics",
+    "organization_id": "aoi-dynamics"
+  },
+  "steps": [
+    {
+      "id": "register_brief_1",
+      "role": "sink",
+      "op": "media:register_artifact",
+      "produces": { "channel": "reg1", "type": "ArtifactRegistration" },
+      "params": {
+        "path": "active/shared/tmp/bizsim-202611/invoice-brief-aoi.json",
+        "artifact_class": "report",
+        "name": "invoice-brief-aoi-2026-0007.json",
+        "tenant_slug": "{{tenant_slug}}",
+        "organization_id": "{{organization_id}}",
+        "tier": "confidential",
+        "if_exists": "reuse",
+        "export_as": "reg1",
+        "meta": { "document_type": "invoice", "artifact_kind": "document-brief" }
+      }
+    },
+    {
+      "id": "register_brief_2",
+      "role": "sink",
+      "op": "media:register_artifact",
+      "produces": { "channel": "reg2", "type": "ArtifactRegistration" },
+      "params": {
+        "path": "active/shared/tmp/bizsim-202611/invoice-brief-aoi.json",
+        "artifact_class": "report",
+        "name": "invoice-brief-aoi-2026-0007.json",
+        "tenant_slug": "{{tenant_slug}}",
+        "organization_id": "{{organization_id}}",
+        "tier": "confidential",
+        "if_exists": "reuse",
+        "export_as": "reg2"
+      }
+    }
+  ]
+}

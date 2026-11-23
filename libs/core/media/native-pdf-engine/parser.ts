@@ -1395,21 +1395,35 @@ export class NativePdfParser {
     let currentCtm: AffineMatrix = [...identityMatrix];
     const btCtmMap: AffineMatrix[] = [];
 
+    const btColorMap: Array<[number, number, number] | undefined> = [];
+    let currentFill: [number, number, number] | undefined;
+    const fillStack: Array<[number, number, number] | undefined> = [];
     const ctmTokenRegex =
-      /\bq\b|\bQ\b|(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+cm\b|\bBT\b/g;
+      /\bq\b|\bQ\b|(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+cm\b|\bBT\b|(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+rg\b/g;
     let ctmTokenMatch: RegExpExecArray | null;
     while ((ctmTokenMatch = ctmTokenRegex.exec(content)) !== null) {
       const token = ctmTokenMatch[0].trim();
       if (token === 'q') {
         ctmStack.push([...currentCtm]);
+        fillStack.push(currentFill);
         continue;
       }
       if (token === 'Q') {
         if (ctmStack.length > 0) currentCtm = ctmStack.pop() as AffineMatrix;
+        if (fillStack.length > 0) currentFill = fillStack.pop();
         continue;
       }
       if (token === 'BT') {
         btCtmMap.push([...currentCtm]);
+        btColorMap.push(currentFill);
+        continue;
+      }
+      if (token.endsWith('rg')) {
+        currentFill = [
+          Math.min(1, Math.max(0, parseFloat(ctmTokenMatch[7]) || 0)),
+          Math.min(1, Math.max(0, parseFloat(ctmTokenMatch[8]) || 0)),
+          Math.min(1, Math.max(0, parseFloat(ctmTokenMatch[9]) || 0)),
+        ];
         continue;
       }
       if (token.endsWith('cm')) {
@@ -1436,14 +1450,27 @@ export class NativePdfParser {
         fontName: '',
         fontObjectId: undefined as number | undefined,
         leading: 0,
+        color: btColorMap[i - 1] as [number, number, number] | undefined,
       };
 
       const opRegex =
-        /\/[A-Za-z0-9_.-]+\s+-?\d*\.?\d+\s+Tf|-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+Tm|-?\d*\.?\d+\s+-?\d*\.?\d+\s+TD|-?\d*\.?\d+\s+-?\d*\.?\d+\s+Td|-?\d*\.?\d+\s+TL|T\*|\[(?:.|\r|\n)*?\]\s*TJ|\((?:\\.|[^\\)])*\)\s*Tj|<[0-9A-Fa-f\s]+>\s*Tj/g;
+        /\/[A-Za-z0-9_.-]+\s+-?\d*\.?\d+\s+Tf|-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+Tm|-?\d*\.?\d+\s+-?\d*\.?\d+\s+TD|-?\d*\.?\d+\s+-?\d*\.?\d+\s+Td|-?\d*\.?\d+\s+TL|T\*|-?\d*\.?\d+\s+-?\d*\.?\d+\s+-?\d*\.?\d+\s+rg|\[(?:.|\r|\n)*?\]\s*TJ|\((?:\\.|[^\\)])*\)\s*Tj|<[0-9A-Fa-f\s]+>\s*Tj/g;
       let match: RegExpExecArray | null;
 
       while ((match = opRegex.exec(block)) !== null) {
         const token = match[0].trim();
+
+        if (token.endsWith(' rg')) {
+          const rgMatch = token.match(/^(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+(-?\d*\.?\d+)\s+rg$/);
+          if (rgMatch) {
+            state.color = [
+              Math.min(1, Math.max(0, parseFloat(rgMatch[1]) || 0)),
+              Math.min(1, Math.max(0, parseFloat(rgMatch[2]) || 0)),
+              Math.min(1, Math.max(0, parseFloat(rgMatch[3]) || 0)),
+            ];
+          }
+          continue;
+        }
 
         if (token.endsWith(' Tf')) {
           const tfMatch = token.match(/^\/([A-Za-z0-9_.-]+)\s+(-?\d*\.?\d+)\s+Tf$/);
@@ -1632,7 +1659,13 @@ export class NativePdfParser {
 
   private buildTextElement(
     text: string,
-    state: { x: number; y: number; fontSize: number; fontName: string },
+    state: {
+      x: number;
+      y: number;
+      fontSize: number;
+      fontName: string;
+      color?: [number, number, number];
+    },
     pageHeight: number
   ): PdfLayoutElement {
     const fontSize = Math.max(8, state.fontSize || 12);
@@ -1647,6 +1680,7 @@ export class NativePdfParser {
       text: text.replace(/\s+/g, ' ').trim(),
       fontSize,
       fontName: state.fontName || undefined,
+      ...(state.color ? { color: state.color } : {}),
     };
   }
 
@@ -1917,10 +1951,51 @@ export class NativePdfParser {
 
 // ── Public Extraction API ───────────────────────────────────
 
+function hexColorToRgb(hex?: string): [number, number, number] | undefined {
+  if (!hex || !/^[0-9A-Fa-f]{6}$/.test(hex)) return undefined;
+  return [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
+}
+
+/**
+ * Graphic elements (`rect`/`border`) extracted from content-stream `re`/`S`/`B`/`f`
+ * ops belong on the render path (`page.vectors`) — `buildAestheticContent`
+ * only draws text/heading elements, so leaving them solely in `elements`
+ * silently drops every box, rule and table fill on round-trip. Elements keep
+ * their place in `page.elements`/`aesthetic.elements` for analysis; the
+ * vectors are an additional render-ready projection.
+ */
+function graphicElementsToPageVectors(elements: any[]): any[] {
+  const vectors: any[] = [];
+  for (const el of elements ?? []) {
+    if (el?.type !== 'rect' && el?.type !== 'border') continue;
+    const fillColor = hexColorToRgb(el.fillColor);
+    const strokeColor = hexColorToRgb(el.strokeColor);
+    if (!fillColor && !strokeColor) continue;
+    vectors.push({
+      shape: {
+        kind: 'rect',
+        x: el.x,
+        y: el.y,
+        width: el.width,
+        height: el.height,
+      },
+      ...(fillColor ? { fillColor } : {}),
+      ...(strokeColor ? { strokeColor } : {}),
+      ...(el.lineWidth !== undefined ? { lineWidth: el.lineWidth } : {}),
+      ...(el.opacity !== undefined ? { fillOpacity: el.opacity } : {}),
+    });
+  }
+  return vectors;
+}
+
 export async function distillNativePdfDesign(sourcePath: string): Promise<PdfDesignProtocol> {
   const parser = new NativePdfParser(sourcePath);
   const metadata = parser.extractMetadata();
   const pages = parser.extractPages();
+  for (const page of pages) {
+    const vectors = graphicElementsToPageVectors((page as any).elements);
+    if (vectors.length > 0) (page as any).vectors = vectors;
+  }
   const outlines = parser.extractOutlines();
   const acroForm = parser.extractAcroForm();
   const fullText = pages.map((p) => p.text).join('\n\n');

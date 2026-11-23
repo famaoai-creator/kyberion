@@ -24,6 +24,14 @@ import {
   assertMediaProtocolLayoutReady,
   summarizeMediaPptxLayout,
 } from './media-document-pipeline-helpers.js';
+import {
+  readScopedArtifactIndex,
+  scopedArtifactDir,
+  SCOPED_ARTIFACT_INDEX_FILENAME,
+  writeScopedArtifact,
+  type GovernedArtifactRole,
+  type ScopedArtifactScope,
+} from '@agent/core/workforce/artifact-store';
 import { registerPresentationPreferenceProfileOp } from './presentation-preference-ops.js';
 import {
   assertPptxPackageWrite,
@@ -435,6 +443,113 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const pdfStats = safeStat(pdfOutPath);
       logger.info(`✅ [MEDIA] PDF rendered at: ${pdfOutPath} (${pdfStats.size} bytes).`);
       return ctx;
+    },
+    register_artifact: async () => {
+      const sourcePath = resolveMediaRepositoryPath(
+        rootDir,
+        resolve(params.path) || resolve(params.from) || '',
+        resolve
+      );
+      if (!safeExistsSync(sourcePath))
+        throw new Error(`register_artifact: source file not found: ${sourcePath}`);
+      const scope: ScopedArtifactScope = {};
+      if (params.system === true) scope.system = true;
+      const tenantSlug = resolve(params.tenant_slug) || ctx.tenant_slug;
+      const organizationId = resolve(params.organization_id) || ctx.organization_id;
+      // Mission scope is explicit-only: pipeline context mission ids are often
+      // ad-hoc labels, and writeScopedArtifact rejects unresolvable missions.
+      const missionId = resolve(params.mission_id);
+      if (tenantSlug) scope.tenant = tenantSlug;
+      if (organizationId) scope.organization = organizationId;
+      if (resolve(params.project_id)) scope.project = resolve(params.project_id);
+      if (missionId) scope.mission = missionId;
+      if (resolve(params.task_id)) scope.task = resolve(params.task_id);
+      if (resolve(params.session_id)) scope.session = resolve(params.session_id);
+      if (!Object.keys(scope).length)
+        throw new Error(
+          'register_artifact: a scope is required (tenant_slug, organization_id, mission_id, project_id, task_id, session_id, or system:true)'
+        );
+      const artifactClass = (resolve(params.artifact_class) || 'export') as any;
+      const name = resolve(params.name) || path.basename(sourcePath);
+      const bytes = safeReadFile(sourcePath, { encoding: null }) as Buffer;
+      const role = resolve(params.role) as GovernedArtifactRole | undefined;
+      const tier = (resolve(params.tier) || 'confidential') as any;
+      const ifExists = resolve(params.if_exists) || 'append';
+      if (ifExists === 'reuse') {
+        const { dir, scope_kind } = scopedArtifactDir(scope, artifactClass, tier);
+        const indexPath = path.join(dir, '..', SCOPED_ARTIFACT_INDEX_FILENAME);
+        const target = path.join(dir, ...name.split('/'));
+        if (
+          safeExistsSync(target) &&
+          (safeReadFile(target, { encoding: null }) as Buffer).equals(bytes)
+        ) {
+          const indexed = readScopedArtifactIndex(scope, tier).find(
+            (row) =>
+              row.artifact_class === artifactClass &&
+              row.name === name &&
+              row.scope_kind === scope_kind
+          );
+          if (indexed) {
+            logger.info(
+              `[MEDIA] Artifact reused (identical): ${indexed.path} (class=${artifactClass}, scope_kind=${scope_kind})`
+            );
+            const key = params.export_as || 'registered_artifact';
+            return {
+              ...ctx,
+              [key]: {
+                name,
+                artifact_class: artifactClass,
+                repo_relative_path: indexed.path,
+                index_path: indexPath,
+                scope_kind,
+                scope,
+                reused: true,
+              },
+            };
+          }
+        }
+      }
+      const result = writeScopedArtifact({
+        scope,
+        artifact_class: artifactClass,
+        name,
+        content: bytes,
+        format: 'buffer',
+        tier: resolve(params.tier) || 'confidential',
+        ...(role ? { role } : {}),
+      });
+      let metaEntry: unknown;
+      const meta = params.meta && typeof params.meta === 'object' ? params.meta : null;
+      if (meta) {
+        const metaResult = writeScopedArtifact({
+          scope,
+          artifact_class: 'report',
+          name: `${name}.meta.json`,
+          content: meta,
+          tier: resolve(params.tier) || 'confidential',
+          ...(role ? { role } : {}),
+        });
+        metaEntry = {
+          repo_relative_path: metaResult.repo_relative_path,
+          index_path: metaResult.index_path,
+        };
+      }
+      logger.info(
+        `✅ [MEDIA] Artifact registered: ${result.repo_relative_path} (class=${artifactClass}, scope_kind=${result.scope_kind})`
+      );
+      const key = params.export_as || 'registered_artifact';
+      return {
+        ...ctx,
+        [key]: {
+          name,
+          artifact_class: artifactClass,
+          repo_relative_path: result.repo_relative_path,
+          index_path: result.index_path,
+          scope_kind: result.scope_kind,
+          scope,
+          ...(metaEntry ? { meta: metaEntry } : {}),
+        },
+      };
     },
     generate_document: async () => {
       const fromKey = resolve(params.from) || 'last_json';
