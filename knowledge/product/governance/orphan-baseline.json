@@ -279,16 +279,8 @@
       "reason": "Step of its own examples/ios-runtime-webview-handoff-template.json (own-actuator files do not count) and of mobile-device-pipeline.schema.json; the name is shared with android, so bare literals elsewhere cannot be attributed. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
-      "id": "media:find_slides_by_owner",
-      "reason": "Bare step of knowledge/product/pipeline-templates/pptx-template-inherit.json; the name is shared with the wisdom forwarding alias, so that bare literal cannot be attributed to media. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
-    },
-    {
       "id": "media:log",
       "reason": "Generic pipeline step `log` (also registered by android, browser, code, gemini, ios, modeling, network, system and wisdom) that the media runner accepts inside actuator-scoped ADFs; no ADF or media test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make media ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
-    },
-    {
-      "id": "media:pptx_diff",
-      "reason": "Bare step of knowledge/product/pipeline-templates/pptx-template-inherit.json; the name is shared with the wisdom forwarding alias, so that bare literal cannot be attributed to media. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "media:set",

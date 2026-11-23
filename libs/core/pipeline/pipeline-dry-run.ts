@@ -255,7 +255,7 @@ export function assessPipelineDryRun(
   }
 
   const required = requiredProvider(pipeline, steps);
-  if (required && /\{\{[^}]+\}\}/u.test(required)) {
+  if (required && /\{\{[^{}]+\}\}/u.test(required)) {
     checks.push({
       id: 'provider-placeholder',
       status: 'warning',

@@ -24,7 +24,8 @@ import { assessPipelineDryRun } from '@agent/core/pipeline/pipeline-dry-run';
 import { validatePipelineAdf } from '@agent/core/pipeline/pipeline-contract';
 import { pathResolver } from '@agent/core/path-resolver';
 import { isRecord } from '@agent/core/foundation';
-import { safeExistsSync, safeReaddir, safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import { readSafeJsonFile } from '../lib/json-input.js';
 import { expandPipelineIncludesForDryRun } from '../refactor/adf-input.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
@@ -52,7 +53,7 @@ export function sweepPipelineCatalog(): SweepEntry[] {
       const absolute = pathResolver.rootResolve(repoPath);
       let parsed: unknown;
       try {
-        parsed = JSON.parse(String(safeReadFile(absolute)));
+        parsed = readSafeJsonFile<unknown>(absolute, repoPath);
       } catch (error) {
         entries.push({
           file: repoPath,

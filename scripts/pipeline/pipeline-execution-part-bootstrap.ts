@@ -11,7 +11,7 @@ import {
   type SafeShell,
 } from '@agent/core/secure-io';
 import { retry } from '@agent/core/async-utils';
-import { evaluateCondition, resolveVars } from '@agent/core/pipeline/logic-utils';
+import { resolveVars, runAssertConditions } from '@agent/core/pipeline/logic-utils';
 import { capabilityEntry, pathResolver } from '@agent/core/path-resolver';
 import type { ReasoningCallOptions } from '@agent/core/reasoning/reasoning-backend';
 import { buildWorkingPrinciplesLines } from '@agent/core/working-principles';
@@ -1151,31 +1151,7 @@ export async function runInlineSystemAssert(
   params: Record<string, unknown>,
   ctx: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  const raw = params.conditions;
-  const conditions = Array.isArray(raw) ? raw : raw !== undefined ? [raw] : [];
-  if (conditions.length === 0) {
-    throw new Error('system:assert requires a non-empty params.conditions array');
-  }
-  const failures: string[] = [];
-  for (const condition of conditions) {
-    let passed = false;
-    try {
-      passed = evaluateCondition(condition, ctx);
-    } catch (error) {
-      throw new Error(
-        `system:assert condition is not evaluable: ${JSON.stringify(condition)} — ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-    if (!passed) failures.push(JSON.stringify(condition));
-  }
-  if (failures.length > 0) {
-    const message =
-      typeof params.message === 'string' && params.message.trim()
-        ? params.message.trim()
-        : 'pipeline assertion failed';
-    throw new Error(`[ASSERT_FAILED] ${message} — failed: ${failures.join(', ')}`);
-  }
-  return ctx;
+  return runAssertConditions(params, ctx);
 }
 
 export const DEFAULT_CORE_WAIT_MS = 1000;

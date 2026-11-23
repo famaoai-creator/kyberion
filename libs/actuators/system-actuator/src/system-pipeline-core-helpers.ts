@@ -22,7 +22,11 @@ import {
   safeStat,
 } from '@agent/core/secure-io';
 import { assertVolatileId, pathResolver } from '@agent/core/path-resolver';
-import { resolveVars, evaluateCondition } from '@agent/core/pipeline/logic-utils';
+import {
+  resolveVars,
+  evaluateCondition,
+  runAssertConditions,
+} from '@agent/core/pipeline/logic-utils';
 
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { STORAGE_DATA_TIERS } from '@agent/core/storage-layout';
@@ -1460,6 +1464,9 @@ type SystemControlOpHandler = (
 
 /** Op handlers keyed by op name (RS-07: mechanical replacement of the former switch). */
 export const SYSTEM_CONTROL_OP_HANDLERS: Readonly<Record<string, SystemControlOpHandler>> = {
+  assert: async ({ params, ctx }) => {
+    return runAssertConditions(params, ctx);
+  },
   if: async ({ params, ctx, runNested }) => {
     if (evaluateCondition(params.condition, ctx)) {
       return await runNested(params.then as AdfStep[], ctx);
