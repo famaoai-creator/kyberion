@@ -25,12 +25,18 @@ import {
   applyMissionGateHoldProof,
   missionGateHoldProof,
   missionGateHoldRecordPath,
+  pendingHumanHoldBeforePhase,
   pendingHumanHolds,
   resolveRequiredHumanHolds,
   tasksBehindPendingHumanHolds,
 } from './mission-gate-hold-proof.js';
 import { evaluateMissionFinishExitGate } from './mission-lifecycle.js';
-import { evaluateStoredMissionGate } from './mission-process-planning.js';
+import {
+  advanceCurrentPhase,
+  evaluateStoredMissionGate,
+  markPhaseTasksCompleted,
+} from './mission-process-planning.js';
+import { loadState } from './mission-state.js';
 
 const missionId = 'MSN-GATE-HOLD-TEST';
 const missionPath = pathResolver.missionDir(missionId, 'public');
@@ -180,15 +186,59 @@ describe('required human holds', () => {
     ]);
   });
 
-  it('leave missions of other templates unchanged', async () => {
+  it('leave other gates and templates unchanged', async () => {
     prepareMission('code-change-aidlc');
+    safeRmSync(nodePath.join(missionPath, 'gates/definitions'), { recursive: true, force: true });
+    writeJson(
+      'gates/definitions/PLAIN_HOLD.json',
+      gateDefinition('PLAIN_HOLD', 'ingest', 'evidence/reverse-spec-scope.json')
+    );
     expect(resolveRequiredHumanHolds(missionId)).toEqual([]);
     const stored = await evaluateStoredMissionGate({
       missionId,
-      gateId: SCOPE_GATE,
+      gateId: 'PLAIN_HOLD',
       humanConfirmed: true,
     });
     expect(stored.evaluation?.verdict).toBe('pass');
+  });
+
+  it('stay required when the agent rewrites the template anchor or the stored phase', () => {
+    // workflow_id points elsewhere and mission_type is unset; the catalog gate
+    // ids in gates/definitions still anchor both holds, at the catalog phase.
+    prepareMission('code-change-aidlc');
+    writeJson(`gates/definitions/${SCOPE_GATE}.json`, {
+      ...gateDefinition(SCOPE_GATE, 'nowhere', 'evidence/reverse-spec-scope.json'),
+    });
+    const holds = resolveRequiredHumanHolds(missionId);
+    expect(holds).toContainEqual({ gateId: SCOPE_GATE, phase: 'ingest' });
+    expect(holds).toContainEqual({ gateId: GRAPH_GATE, phase: 'code_graph' });
+    const held = tasksBehindPendingHumanHolds(missionId, missionPath, [
+      { task_id: 'ingest-scope', phase: 'ingest' },
+      { task_id: 'code_graph-code-graph', phase: 'code_graph' },
+      { task_id: 'repair-x', phase: 'unknown-phase' },
+    ]);
+    expect([...held.keys()].sort()).toEqual(['code_graph-code-graph', 'repair-x']);
+  });
+
+  it('refuse phase advance and phase completion behind a pending hold', async () => {
+    prepareMission();
+    writeJson('NEXT_TASKS.json', [
+      {
+        task_id: 'analysis-analyze',
+        phase: 'analysis',
+        status: 'planned',
+        origin: 'process_template',
+      },
+    ]);
+    expect(markPhaseTasksCompleted(missionId, 'analysis')).toBe(0);
+    expect(pendingHumanHoldBeforePhase(missionId, 'analysis')?.gateId).toBe(SCOPE_GATE);
+    await advanceCurrentPhase(missionId, 'code_graph');
+    expect(loadState(missionId)?.process_template?.current_phase).toBeUndefined();
+    approveHold(SCOPE_GATE);
+    approveHold(GRAPH_GATE);
+    expect(markPhaseTasksCompleted(missionId, 'analysis')).toBe(1);
+    await advanceCurrentPhase(missionId, 'code_graph');
+    expect(loadState(missionId)?.process_template?.current_phase).toBe('analysis');
   });
 
   it('hold the tasks of later phases until the person approves', () => {

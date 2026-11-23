@@ -19,9 +19,8 @@
  *     scope or the frozen code graph after approval needs a new decision).
  * Anything else fails closed. Proof readers never throw.
  *
- * Required holds come from the mission's catalog template
- * (`process_template.workflow_id`) united with the stored gate definitions, so
- * editing `gates/definitions/*.json` cannot drop a hold.
+ * Which holds are required is resolved from several anchors at once
+ * ({@link resolveMissionHumanHoldPlan}), so editing one file cannot drop a hold.
  */
 import * as nodePath from 'node:path';
 import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
@@ -85,16 +84,17 @@ export function missionGateHoldRecordPath(missionPath: string, gateId: string): 
   );
 }
 
-function readMissionState(missionPath: string) {
+function readMissionState(missionPath: string): Record<string, any> | null {
   const statePath = nodePath.join(missionPath, 'mission-state.json');
-  return safeExistsSync(statePath) ? loadMissionStateAtPath(statePath) : null;
-}
-
-/** Phase order of the mission's process template (empty when it has none). */
-export function missionProcessPhaseOrder(missionPath: string): string[] {
-  const phases = (readMissionState(missionPath) as Record<string, any> | null)?.process_template
-    ?.phases;
-  return Array.isArray(phases) ? phases.map((phase: unknown) => String(phase)) : [];
+  try {
+    return safeExistsSync(statePath)
+      ? (loadMissionStateAtPath(statePath) as Record<string, any> | null)
+      : null;
+  } catch {
+    // An unreadable state drops only the state-derived anchors; the catalog
+    // gate ids found in the mission's gate definitions still apply.
+    return null;
+  }
 }
 
 export function loadStoredMissionGateDefinitions(
@@ -114,40 +114,135 @@ export function loadStoredMissionGateDefinitions(
         )
       );
     } catch {
-      // An unreadable definition is reported by the gate evaluators.
+      // An unreadable definition is reported by the gate evaluators; its file
+      // name still anchors a catalog hold (storedGateIds).
     }
   }
   return definitions;
 }
 
-/** Required holds of the mission: catalog template ∪ stored definitions. */
+interface CatalogHold extends RequiredHumanHold {
+  position: 'entry' | 'exit';
+  /** Phase order of the template that declares the hold. */
+  phaseOrder: string[];
+}
+
+/**
+ * Every required hold the catalog declares, by gate id (gate ids are unique
+ * across templates), and the templates that declare them.
+ */
+function catalogRequiredHolds(): {
+  byGate: Map<string, CatalogHold>;
+  templates: Array<{ id: string; taskTypes: string[]; phases: string[]; holds: CatalogHold[] }>;
+} {
+  const byGate = new Map<string, CatalogHold>();
+  const templates: Array<{
+    id: string;
+    taskTypes: string[];
+    phases: string[];
+    holds: CatalogHold[];
+  }> = [];
+  for (const template of loadMissionWorkflowCatalog().templates || []) {
+    const { ids, specs } = normalizeWorkflowPhases(template.phases);
+    const holds: CatalogHold[] = [];
+    for (const spec of specs) {
+      for (const [position, gate] of [
+        ['entry', spec.entry_gate],
+        ['exit', spec.exit_gate],
+      ] as const) {
+        if (!gate || !gateHasRequiredHold(gate)) continue;
+        const hold = { gateId: gate.id, phase: spec.id, position, phaseOrder: ids };
+        holds.push(hold);
+        byGate.set(gate.id, hold);
+      }
+    }
+    const taskTypes = (template.match as Record<string, unknown> | undefined)?.task_types;
+    templates.push({
+      id: template.id,
+      taskTypes: Array.isArray(taskTypes) ? taskTypes.map(String) : [],
+      phases: ids,
+      holds,
+    });
+  }
+  return { byGate, templates };
+}
+
+/** Gate ids the mission has a stored definition file for (by file name and by content). */
+function storedGateIds(missionPath: string, missionId: string): Set<string> {
+  const ids = new Set<string>();
+  const dir = nodePath.join(missionPath, 'gates', 'definitions');
+  if (safeExistsSync(dir)) {
+    for (const entry of safeReaddir(dir) as string[]) {
+      if (entry.endsWith('.json')) ids.add(entry.slice(0, -'.json'.length));
+    }
+  }
+  for (const definition of loadStoredMissionGateDefinitions(missionPath, missionId))
+    ids.add(definition.gate.id);
+  return ids;
+}
+
+export interface MissionHumanHoldPlan {
+  /** Each hold with the phase order it is placed in (its catalog template's when declared there). */
+  holds: CatalogHold[];
+}
+
+/**
+ * Required holds of the mission. Mission state and gate definitions are files
+ * the agent can write, so the set is the union of every anchor, and a hold
+ * the catalog declares always keeps the catalog's phase:
+ *   - the holds of the template named by `process_template.workflow_id`;
+ *   - the holds of the templates whose `task_types` match `mission_type`;
+ *   - every catalog hold whose gate id has a stored definition file;
+ *   - stored definitions that carry `require_signature` themselves.
+ * Residual: an agent that rewrites both state fields and deletes the gate
+ * definition files removes the anchors; the mission's own git history still
+ * shows it.
+ */
+export function resolveMissionHumanHoldPlan(
+  missionId: string,
+  missionPath?: string
+): MissionHumanHoldPlan {
+  const upper = missionId.trim().toUpperCase();
+  const dir = missionPath ?? findMissionPath(upper);
+  if (!dir) return { holds: [] };
+  const state = readMissionState(dir);
+  const catalog = catalogRequiredHolds();
+  const holds = new Map<string, CatalogHold>();
+  const workflowId = String(state?.process_template?.workflow_id || '');
+  const missionType = String(state?.mission_type || '');
+  const matched = catalog.templates.filter(
+    (template) =>
+      (workflowId && template.id === workflowId) ||
+      (missionType && template.taskTypes.includes(missionType))
+  );
+  for (const template of matched) for (const hold of template.holds) holds.set(hold.gateId, hold);
+  for (const gateId of storedGateIds(dir, upper)) {
+    const hold = catalog.byGate.get(gateId);
+    if (hold) holds.set(gateId, hold);
+  }
+  const statePhases = state?.process_template?.phases;
+  const stateOrder = Array.isArray(statePhases) ? statePhases.map((phase) => String(phase)) : [];
+  for (const definition of loadStoredMissionGateDefinitions(dir, upper)) {
+    if (!holds.has(definition.gate.id) && gateHasRequiredHold(definition.gate))
+      holds.set(definition.gate.id, {
+        gateId: definition.gate.id,
+        phase: definition.phase,
+        position: definition.position,
+        phaseOrder: stateOrder,
+      });
+  }
+  return { holds: [...holds.values()] };
+}
+
+/** Required holds of the mission (see {@link resolveMissionHumanHoldPlan}). */
 export function resolveRequiredHumanHolds(
   missionId: string,
   missionPath?: string
 ): RequiredHumanHold[] {
-  const upper = missionId.trim().toUpperCase();
-  const dir = missionPath ?? findMissionPath(upper);
-  if (!dir) return [];
-  const holds = new Map<string, RequiredHumanHold>();
-  const workflowId = String(
-    (readMissionState(dir) as Record<string, any> | null)?.process_template?.workflow_id || ''
-  );
-  if (workflowId) {
-    const template = (loadMissionWorkflowCatalog().templates || []).find(
-      (entry) => entry.id === workflowId
-    );
-    for (const spec of template ? normalizeWorkflowPhases(template.phases).specs : []) {
-      for (const gate of [spec.entry_gate, spec.exit_gate]) {
-        if (gate && gateHasRequiredHold(gate))
-          holds.set(gate.id, { gateId: gate.id, phase: spec.id });
-      }
-    }
-  }
-  for (const definition of loadStoredMissionGateDefinitions(dir, upper)) {
-    if (gateHasRequiredHold(definition.gate))
-      holds.set(definition.gate.id, { gateId: definition.gate.id, phase: definition.phase });
-  }
-  return [...holds.values()];
+  return resolveMissionHumanHoldPlan(missionId, missionPath).holds.map(({ gateId, phase }) => ({
+    gateId,
+    phase,
+  }));
 }
 
 /** Fingerprint of the stored gate's declared inputs (what the human approves). */
@@ -217,10 +312,14 @@ export function verifyMissionGateHoldApproval(
 }
 
 /** Is this gate's human hold proven for the mission's current gate inputs? */
-export function missionGateHoldProof(missionId: string, gateId: string): MissionGateHoldProof {
+export function missionGateHoldProof(
+  missionId: string,
+  gateId: string,
+  knownMissionPath?: string
+): MissionGateHoldProof {
   try {
     const upper = missionId.trim().toUpperCase();
-    const missionPath = findMissionPath(upper);
+    const missionPath = knownMissionPath ?? findMissionPath(upper);
     if (!missionPath) return { verified: false, reason: 'mission_not_found' };
     const recordPath = missionGateHoldRecordPath(missionPath, gateId);
     if (!safeExistsSync(recordPath)) return { verified: false, reason: 'not_approved' };
@@ -270,25 +369,60 @@ export function missionGateHoldProof(missionId: string, gateId: string): Mission
   }
 }
 
-export interface PendingHumanHold extends RequiredHumanHold {
+export interface PendingHumanHold extends CatalogHold {
   reason: string;
 }
 
-/** Required holds of the mission whose proof does not verify. */
-export function pendingHumanHolds(missionId: string, missionPath?: string): PendingHumanHold[] {
+function pendingFromPlan(
+  missionId: string,
+  missionPath: string | undefined,
+  plan: MissionHumanHoldPlan
+): PendingHumanHold[] {
   const pending: PendingHumanHold[] = [];
-  for (const hold of resolveRequiredHumanHolds(missionId, missionPath)) {
-    const proof = missionGateHoldProof(missionId, hold.gateId);
+  for (const hold of plan.holds) {
+    const proof = missionGateHoldProof(missionId, hold.gateId, missionPath);
     if ('reason' in proof) pending.push({ ...hold, reason: proof.reason });
   }
   return pending;
 }
 
+/** Required holds of the mission whose proof does not verify. */
+export function pendingHumanHolds(missionId: string, missionPath?: string): PendingHumanHold[] {
+  return pendingFromPlan(
+    missionId,
+    missionPath,
+    resolveMissionHumanHoldPlan(missionId, missionPath)
+  );
+}
+
 /**
- * Task ids that wait for a pending hold: tasks whose phase comes after the
- * phase that owns the hold, in the process template's phase order. Their
- * evidence may be recorded, but they are not completed until the hold is
- * decided.
+ * Is a task of `taskPhase` behind this pending hold? Exit hold: phases after
+ * the hold's phase; entry hold: the hold's phase too. Fails closed: a hold
+ * or task phase outside the phase order counts as behind the hold.
+ */
+function isBehindHold(taskPhase: string, hold: PendingHumanHold): boolean {
+  const order = hold.phaseOrder;
+  const holdIndex = order.indexOf(hold.phase);
+  const taskIndex = order.indexOf(taskPhase);
+  if (holdIndex < 0 || taskIndex < 0) return taskPhase !== hold.phase || hold.position === 'entry';
+  return hold.position === 'entry' ? taskIndex >= holdIndex : taskIndex > holdIndex;
+}
+
+/** The pending hold a phase waits for, if any (phase advance and dispatch guards). */
+export function pendingHumanHoldBeforePhase(
+  missionId: string,
+  phase: string,
+  missionPath?: string
+): PendingHumanHold | undefined {
+  const plan = resolveMissionHumanHoldPlan(missionId, missionPath);
+  if (plan.holds.length === 0) return undefined;
+  return pendingFromPlan(missionId, missionPath, plan).find((hold) => isBehindHold(phase, hold));
+}
+
+/**
+ * Task ids that wait for a pending hold (see {@link isBehindHold}), in the
+ * phase order of the template that declares each hold. Their evidence may be recorded, but they
+ * are not completed until the hold is decided.
  */
 export function tasksBehindPendingHumanHolds(
   missionId: string,
@@ -296,16 +430,13 @@ export function tasksBehindPendingHumanHolds(
   tasks: Array<Record<string, unknown>>
 ): Map<string, PendingHumanHold> {
   const held = new Map<string, PendingHumanHold>();
-  const pending = pendingHumanHolds(missionId, missionPath);
+  const plan = resolveMissionHumanHoldPlan(missionId, missionPath);
+  if (plan.holds.length === 0) return held;
+  const pending = pendingFromPlan(missionId, missionPath, plan);
   if (pending.length === 0) return held;
-  const order = missionProcessPhaseOrder(missionPath);
   for (const task of tasks) {
-    const taskPhase = order.indexOf(String(task.phase || ''));
-    if (taskPhase < 0) continue;
-    const blocking = pending.find((hold) => {
-      const holdPhase = order.indexOf(hold.phase);
-      return holdPhase >= 0 && taskPhase > holdPhase;
-    });
+    const taskPhase = String(task.phase || '');
+    const blocking = pending.find((hold) => isBehindHold(taskPhase, hold));
     if (blocking) held.set(String(task.task_id || ''), blocking);
   }
   return held;

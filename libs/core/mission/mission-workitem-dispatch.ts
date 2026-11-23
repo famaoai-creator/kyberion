@@ -27,6 +27,7 @@ import { issueTaskGrantBestEffort } from '../task/task-scoped-grants.js';
 import type { MissionState } from './mission-types.js';
 import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { evaluatePhaseEntryGate } from './mission-process-planning.js';
+import { pendingHumanHoldBeforePhase } from './mission-gate-hold-proof.js';
 import { unchangedAiDlcContractFailure } from './mission-aidlc-gate-projection.js';
 import { recordTask } from './mission-maintenance.js';
 
@@ -384,6 +385,26 @@ async function dispatchMissionWorkItemsRound(
           team_role: teamRole,
           phase: itemPhase,
           gate_id: failedContract.gateId,
+          notes: record.notes,
+        });
+        continue;
+      }
+      // A phase behind an unapproved human hold is not dispatched (MO-02).
+      const hold = pendingHumanHoldBeforePhase(missionId, itemPhase, missionPath);
+      if (hold) {
+        record.status = 'deferred';
+        record.notes.push(
+          `human hold ${hold.gateId} (phase ${hold.phase}) not approved: ${hold.reason}`
+        );
+        recordRouting({ attempted: false, succeeded: false });
+        records.push(record);
+        appendDispatchEvent(dispatchEventPath(missionPath), {
+          event_type: 'workitem_dispatch_deferred',
+          mission_id: missionId,
+          item_id: item.item_id,
+          team_role: teamRole,
+          phase: itemPhase,
+          gate_id: hold.gateId,
           notes: record.notes,
         });
         continue;

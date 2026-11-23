@@ -41,6 +41,7 @@ import { loadMissionPhaseGateDefinitionAtPath } from './mission-phase-gate-defin
 import { normalizeMissionGateCheckPaths } from './mission-gate-input-fingerprint.js';
 import {
   applyMissionGateHoldProof,
+  pendingHumanHoldBeforePhase,
   type MissionGateHoldRecord,
 } from './mission-gate-hold-proof.js';
 export { fingerprintMissionGateInputs } from './mission-gate-input-fingerprint.js';
@@ -428,6 +429,15 @@ function markPhaseTasksStatus(missionId: string, phase: string, status: string):
   if (!missionDir) return 0;
   const nextTasksPath = safeMissionArtifactPath(missionDir, 'NEXT_TASKS.json');
   if (!safeExistsSync(nextTasksPath)) return 0;
+  // A gate of a phase behind an unapproved human hold never completes its tasks.
+  const hold =
+    status === 'completed' ? pendingHumanHoldBeforePhase(missionId, phase, missionDir) : undefined;
+  if (hold) {
+    logger.warn(
+      `phase ${phase} tasks not completed — the human hold ${hold.gateId} (phase ${hold.phase}) is not approved (${hold.reason}) | next: pnpm mission gate-pass ${missionId.toUpperCase()} ${hold.gateId} --request-approval | mission=${missionId.toUpperCase()}`
+    );
+    return 0;
+  }
   let changed = 0;
   writeMissionNextTasks(missionDir, (tasks) => {
     for (const task of tasks) {
@@ -498,6 +508,13 @@ export async function advanceCurrentPhase(missionId: string, passedPhase: string
   const index = phases.indexOf(passedPhase);
   if (index < 0) return;
   const nextPhase = phases[index + 1];
+  const hold = nextPhase ? pendingHumanHoldBeforePhase(upperId, nextPhase) : undefined;
+  if (hold) {
+    logger.warn(
+      `phase not advanced past ${passedPhase} — the human hold ${hold.gateId} (phase ${hold.phase}) is not approved (${hold.reason}) | next: pnpm mission gate-pass ${upperId} ${hold.gateId} --request-approval | mission=${upperId}`
+    );
+    return;
+  }
   state.process_template.current_phase = nextPhase ?? passedPhase;
   await saveState(upperId, state);
 }

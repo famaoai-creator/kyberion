@@ -241,7 +241,9 @@ export function evaluateMissionFinishExitGate(
 
   // A required human hold must be decided by a person (approval proof), even
   // when every task is closed — e.g. tasks closed before the hold existed.
-  const missionId = path.basename(missionDir).toUpperCase();
+  const missionId = String(
+    (state as { mission_id?: string } | undefined)?.mission_id || path.basename(missionDir)
+  ).toUpperCase();
   const pendingHolds = pendingHumanHolds(missionId, missionDir);
   if (pendingHolds.length > 0) {
     return {

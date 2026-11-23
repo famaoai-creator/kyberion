@@ -1698,7 +1698,7 @@
       "type": "enum",
       "enum": ["warn", "enforce"],
       "required": false,
-      "description": "Human-override signature policy: warn observes missing or invalid gate signatures while enforce rejects them.",
+      "description": "Human-override signature policy: warn observes missing or invalid gate signatures while enforce rejects them. Gates the workflow catalog marks require_signature (required human holds) are enforced in every mode.",
       "documented": true
     },
     {
