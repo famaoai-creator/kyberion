@@ -8,9 +8,9 @@
     "mission_id": "BIZSIM2-DOCLIFE-AOI",
     "tenant_slug": "aoi-dynamics",
     "organization_id": "aoi-dynamics",
-    "out_dir": "active/shared/tmp/bizsim-202611-aoi/v2",
-    "brief_standard": "active/shared/tmp/bizsim-202611/invoice-brief-aoi.json",
-    "brief_compact": "active/shared/tmp/bizsim-202611/invoice-brief-aoi-compact.json"
+    "out_dir": "active/shared/tmp/confidential/shared/bizsim-202611-aoi/v2",
+    "brief_standard": "active/shared/tmp/confidential/shared/bizsim-202611/invoice-brief-aoi.json",
+    "brief_compact": "active/shared/tmp/confidential/shared/bizsim-202611/invoice-brief-aoi-compact.json"
   },
   "steps": [
     {

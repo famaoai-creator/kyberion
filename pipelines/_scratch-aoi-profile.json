@@ -11,7 +11,9 @@
       "role": "source",
       "op": "system:read_json",
       "produces": "org_profile_json",
-      "params": { "path": "active/shared/tmp/bizsim-202611-aoi/aoi-organization-profile.json" }
+      "params": {
+        "path": "active/shared/tmp/confidential/shared/bizsim-202611-aoi/aoi-organization-profile.json"
+      }
     },
     {
       "id": "write_profile",

@@ -30,8 +30,10 @@ import {
   SCOPED_ARTIFACT_INDEX_FILENAME,
   writeScopedArtifact,
   type GovernedArtifactRole,
+  type RetentionArtifactClass,
   type ScopedArtifactScope,
 } from '@agent/core/workforce/artifact-store';
+import type { StorageDataTier } from '@agent/core/storage-layout';
 import { registerPresentationPreferenceProfileOp } from './presentation-preference-ops.js';
 import {
   assertPptxPackageWrite,
@@ -469,11 +471,11 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
         throw new Error(
           'register_artifact: a scope is required (tenant_slug, organization_id, mission_id, project_id, task_id, session_id, or system:true)'
         );
-      const artifactClass = (resolve(params.artifact_class) || 'export') as any;
+      const artifactClass = (resolve(params.artifact_class) || 'export') as RetentionArtifactClass;
       const name = resolve(params.name) || path.basename(sourcePath);
       const bytes = safeReadFile(sourcePath, { encoding: null }) as Buffer;
       const role = resolve(params.role) as GovernedArtifactRole | undefined;
-      const tier = (resolve(params.tier) || 'confidential') as any;
+      const tier = (resolve(params.tier) || 'confidential') as StorageDataTier;
       const ifExists = resolve(params.if_exists) || 'append';
       if (ifExists === 'reuse') {
         const { dir, scope_kind } = scopedArtifactDir(scope, artifactClass, tier);

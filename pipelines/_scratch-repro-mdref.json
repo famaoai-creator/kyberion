@@ -6,8 +6,8 @@
   "description": "SCRATCH reproduction of contract-review step2 failure. Remove after fix.",
   "context": {
     "mission_id": "BIZSIM-20261123",
-    "source_document": "active/shared/tmp/bizsim-202611/oita-itaku-henkou-contract.docx",
-    "markdown_output": "active/shared/tmp/bizsim-202611/evidence/repro-contract.md"
+    "source_document": "active/shared/tmp/confidential/shared/bizsim-202611/oita-itaku-henkou-contract.docx",
+    "markdown_output": "active/shared/tmp/confidential/shared/bizsim-202611/evidence/repro-contract.md"
   },
   "steps": [
     {

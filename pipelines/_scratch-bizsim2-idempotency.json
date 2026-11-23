@@ -16,7 +16,7 @@
       "op": "media:register_artifact",
       "produces": { "channel": "reg1", "type": "ArtifactRegistration" },
       "params": {
-        "path": "active/shared/tmp/bizsim-202611/invoice-brief-aoi.json",
+        "path": "active/shared/tmp/confidential/shared/bizsim-202611/invoice-brief-aoi.json",
         "artifact_class": "report",
         "name": "invoice-brief-aoi-2026-0007.json",
         "tenant_slug": "{{tenant_slug}}",
@@ -33,7 +33,7 @@
       "op": "media:register_artifact",
       "produces": { "channel": "reg2", "type": "ArtifactRegistration" },
       "params": {
-        "path": "active/shared/tmp/bizsim-202611/invoice-brief-aoi.json",
+        "path": "active/shared/tmp/confidential/shared/bizsim-202611/invoice-brief-aoi.json",
         "artifact_class": "report",
         "name": "invoice-brief-aoi-2026-0007.json",
         "tenant_slug": "{{tenant_slug}}",

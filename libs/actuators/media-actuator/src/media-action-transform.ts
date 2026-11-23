@@ -1064,23 +1064,24 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         }
         return out;
       };
-      const next = JSON.parse(JSON.stringify(design)) as any;
+      const next = JSON.parse(JSON.stringify(design)) as PdfDesignProtocol;
       // Aesthetic elements (render path) — text-bearing types only.
       for (const el of next.aesthetic?.elements ?? []) {
         if ((el.type === 'text' || el.type === 'heading') && el.text) {
           const patched = patchText(el.text, el.page ?? 0);
-          if (patched !== el.text) el.text = patched;
+          if (patched !== el.text) el.text = patched as string;
         }
       }
       // Page-scoped elements + plain page text (analysis/fallback paths).
-      (next.content?.pages ?? []).forEach((page: any, pageIdx: number) => {
+      (next.content?.pages ?? []).forEach((page, pageIdx: number) => {
         for (const el of page.elements ?? []) {
           if (el.text) el.text = patchText(el.text, pageIdx) as string;
         }
-        if (typeof page.text === 'string') page.text = patchText(page.text, pageIdx);
+        if (typeof page.text === 'string') page.text = patchText(page.text, pageIdx) as string;
       });
-      if (next.source?.body) next.source.body = patchText(next.source.body);
-      if (typeof next.content?.text === 'string') next.content.text = patchText(next.content.text);
+      if (next.source?.body) next.source.body = patchText(next.source.body) as string;
+      if (typeof next.content?.text === 'string')
+        next.content.text = patchText(next.content.text) as string;
       logger.info(`[MEDIA] pdf_text_edit applied ${applied} replacement(s).`);
       return {
         ...ctx,

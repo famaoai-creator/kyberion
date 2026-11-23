@@ -194,16 +194,17 @@ function participantsFromPersonaLabels(
 
 /** Resolve typed participants, falling back to persona-label synthesis. */
 function resolveParticipantsParam(input: {
-  params: Record<string, any>;
+  params: Record<string, unknown>;
   ctx: Record<string, unknown>;
-  resolved: (key: string) => any;
+  resolved: (key: string) => unknown;
   outputTier: 'personal' | 'confidential' | 'public';
   opName: string;
 }): ReasoningParticipant[] {
   const { params, ctx, resolved, outputTier, opName } = input;
-  const direct = resolved('participants') || ctx[params.participants_from || 'participants'] || [];
+  const direct =
+    resolved('participants') || ctx[String(params.participants_from || 'participants')] || [];
   if (Array.isArray(direct) && direct.length > 0) return direct;
-  const personas = resolved('personas') || ctx[params.personas_from || 'personas'] || [];
+  const personas = resolved('personas') || ctx[String(params.personas_from || 'personas')] || [];
   if (Array.isArray(personas) && personas.length > 0) {
     logger.warn(
       `[WISDOM_PERSONA_COMPAT] ${opName} received unscoped persona labels; pass typed participants via participants/participants_from`

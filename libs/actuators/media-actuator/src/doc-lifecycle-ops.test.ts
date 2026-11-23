@@ -5,14 +5,35 @@
  */
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeWriteFile, safeReadFile } from '@agent/core/secure-io';
+import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import path from 'node:path';
+import type { PdfDesignProtocol } from '@agent/shared-media/media-contracts';
 import { handleAction } from './index.js';
+import type { MediaPipelineStep } from './media-pipeline-helpers.js';
 
-async function runSteps(context: Record<string, unknown>, steps: unknown[]): Promise<any> {
-  const result = await handleAction({ action: 'pipeline', context, steps } as any);
+type TestContext = Record<string, unknown>;
+
+function designAt(ctx: TestContext, key: string): PdfDesignProtocol {
+  return ctx[key] as unknown as PdfDesignProtocol;
+}
+
+function elementTexts(design: PdfDesignProtocol): string {
+  return (design.aesthetic?.elements ?? []).map((e) => e.text ?? '').join('|');
+}
+
+type StepRunResult = { status: string; context?: TestContext };
+
+async function runSteps(context: TestContext, steps: MediaPipelineStep[]): Promise<TestContext> {
+  const result = (await handleAction({ action: 'pipeline', context, steps })) as StepRunResult;
   expect(result.status).toBe('succeeded');
-  return result.context;
+  return (result.context ?? {}) as TestContext;
+}
+
+async function runStepsExpectingFailure(
+  context: TestContext,
+  steps: MediaPipelineStep[]
+): Promise<StepRunResult> {
+  return (await handleAction({ action: 'pipeline', context, steps })) as StepRunResult;
 }
 
 const INVOICE_BRIEF = {
@@ -48,12 +69,12 @@ describe('document_pdf_from_brief — layout application', () => {
         params: { from: 'last_json', export_as: 'design' },
       },
     ]);
-    const design = ctx.design;
+    const design = designAt(ctx, 'design');
     expect(design.aesthetic?.elements?.length).toBeGreaterThan(10);
     const page = design.content?.pages?.[0];
-    expect(page.vectors?.length).toBeGreaterThan(0);
+    expect(page?.vectors?.length).toBeGreaterThan(0);
     // Template labels are consumed (not the hardcoded plain-text path).
-    const texts = design.aesthetic.elements.map((e: any) => e.text).join('|');
+    const texts = elementTexts(design);
     expect(texts).toContain('御請求金額');
     expect(texts).toContain('T-0001');
     expect(texts).toContain('受領者株式会社');
@@ -78,7 +99,7 @@ describe('document_pdf_from_brief — layout application', () => {
         },
       ]
     );
-    const texts = ctx.design.aesthetic.elements.map((e: any) => e.text).join('|');
+    const texts = elementTexts(designAt(ctx, 'design'));
     expect(texts).toContain('今回ご請求額');
     expect(texts).not.toContain('御請求金額');
   });
@@ -105,21 +126,20 @@ describe('pdf_text_edit', () => {
         },
       },
     ]);
-    const texts = ctx.edited.aesthetic.elements.map((e: any) => e.text).join('|');
+    const edited = designAt(ctx, 'edited');
+    const texts = elementTexts(edited);
     expect(texts).toContain('T-0002');
     expect(texts).toContain('変更先株式会社');
     expect(texts).toContain('御請求金額');
     expect(texts).not.toContain('T-0001');
     // Vectors pass through untouched.
-    expect(ctx.edited.content.pages[0].vectors?.length).toBeGreaterThan(0);
+    expect(edited.content?.pages?.[0]?.vectors?.length).toBeGreaterThan(0);
   });
 
   it('fails when edits are missing', async () => {
-    const result: any = await handleAction({
-      action: 'pipeline',
-      context: { design: { aesthetic: { elements: [] } } },
-      steps: [{ type: 'transform', op: 'pdf_text_edit', params: { from: 'design' } }],
-    } as any);
+    const result = await runStepsExpectingFailure({ design: { aesthetic: { elements: [] } } }, [
+      { type: 'transform', op: 'pdf_text_edit', params: { from: 'design' } },
+    ]);
     expect(result.status).toBe('failed');
   });
 });
@@ -138,33 +158,25 @@ describe('register_artifact', () => {
   // end-to-end by the bizsim2 pipelines; here we pin the guard rails.
   it('requires an explicit scope', async () => {
     const filePath = fixtureFile('reg-noscope.txt', 'x');
-    const result: any = await handleAction({
-      action: 'pipeline',
-      context: {},
-      steps: [
-        { type: 'apply', op: 'register_artifact', params: { path: filePath, name: 'noscope.txt' } },
-      ],
-    } as any);
+    const result = await runStepsExpectingFailure({}, [
+      { type: 'apply', op: 'register_artifact', params: { path: filePath, name: 'noscope.txt' } },
+    ]);
     expect(result.status).toBe('failed');
     expect(JSON.stringify(result)).toContain('scope is required');
   });
 
   it('fails clearly when the source file is missing', async () => {
-    const result: any = await handleAction({
-      action: 'pipeline',
-      context: {},
-      steps: [
-        {
-          type: 'apply',
-          op: 'register_artifact',
-          params: {
-            path: path.join(TMP, 'does-not-exist.bin'),
-            name: 'does-not-exist.bin',
-            system: true,
-          },
+    const result = await runStepsExpectingFailure({}, [
+      {
+        type: 'apply',
+        op: 'register_artifact',
+        params: {
+          path: path.join(TMP, 'does-not-exist.bin'),
+          name: 'does-not-exist.bin',
+          system: true,
         },
-      ],
-    } as any);
+      },
+    ]);
     expect(result.status).toBe('failed');
     expect(JSON.stringify(result)).toContain('source file not found');
   });

@@ -541,6 +541,54 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     color?: Rgb;
     page: number;
   }
+  /** document-layouts catalog block geometry + per-section typography hints. */
+  interface InvoiceLayoutBlock {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    name_font_size?: number;
+    name_line_height?: number;
+    body_max_units?: number;
+    body_line_limit?: number;
+    body_font_size?: number;
+    body_line_height?: number;
+    header_height?: number;
+    row_height?: number;
+    columns?: number[];
+    headers?: string[];
+    description_max_units?: number;
+    description_x?: number;
+    quantity_x?: number;
+    unit_price_x?: number;
+    tax_rate_x?: number;
+    top?: number;
+    header_font_size?: number;
+    amount_font_size?: number;
+    label_font_size?: number;
+    label_x?: number;
+    label_y?: number;
+    amount_x?: number;
+    value_x?: number;
+    value_y?: number;
+    value_font_size?: number;
+  }
+  interface InvoiceLayoutTemplate {
+    blocks?: Record<string, InvoiceLayoutBlock | undefined>;
+    labels?: Record<string, string | undefined>;
+    colors?: Record<string, Rgb | undefined>;
+    page?: { left?: number; right?: number; width?: number; height?: number };
+  }
+  interface InvoiceItem {
+    description?: string;
+    quantity?: number;
+    unit?: string;
+    unit_price?: number;
+    unit_price_ex_tax?: number;
+    tax_rate?: number;
+    reduced_tax_rate?: boolean;
+    service_period?: string;
+  }
   type LayoutVector = {
     shape:
       | { kind: 'rect'; x: number; y: number; width: number; height: number }
@@ -573,22 +621,23 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
    * absent are skipped; the plain `source.body` remains the text fallback.
    */
   function buildInvoiceLayoutArtifacts(args: {
-    template: any;
-    brief: any;
-    items: any[];
+    template: InvoiceLayoutTemplate;
+    brief: MediaBrief;
+    items: InvoiceItem[];
     grouped: Map<number, { taxableAmount: number; taxAmount: number }>;
     subtotal: number;
     totalTax: number;
     totalAmount: number;
   }): { elements: LayoutTextElement[]; page: PdfPage } | null {
     const { template, brief, items, grouped, subtotal, totalTax, totalAmount } = args;
-    const B = template?.blocks;
+    const B = template.blocks;
     if (!B || typeof B !== 'object') return null;
+    const str = (v: unknown): string => (typeof v === 'string' ? v : '');
     const L = template.labels || {};
     const colors = template.colors || {};
-    const accent = (colors.accent as Rgb) || LAYOUT_TEXT_COLOR;
-    const light = (colors.light as Rgb) || ([0.96, 0.97, 0.98] as Rgb);
-    const border = (colors.border as Rgb) || ([0.7, 0.75, 0.8] as Rgb);
+    const accent = colors.accent || LAYOUT_TEXT_COLOR;
+    const light = colors.light || ([0.96, 0.97, 0.98] as Rgb);
+    const border = colors.border || ([0.7, 0.75, 0.8] as Rgb);
     const left = template.page?.left ?? 48;
     const right = template.page?.right ?? (template.page?.width ?? 595) - 48;
     const pageW = template.page?.width ?? 595;
@@ -618,7 +667,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
 
     // ── Header: title, meta, divider ──────────────────────────────
     if (L.title) T(left, 26, L.title, 22, accent, 'heading');
-    const meta: Array<[string, unknown]> = [
+    const meta: Array<[string | undefined, unknown]> = [
       [L.invoice_number, brief.invoice_number],
       [L.issue_date, brief.issue_date],
       [L.due_date, brief.due_date],
@@ -634,7 +683,12 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     });
 
     // ── Recipient / issuer boxes ──────────────────────────────────
-    const box = (blk: any, label: string, name: string, lines: string[]) => {
+    const box = (
+      blk: InvoiceLayoutBlock | undefined,
+      label: string | undefined,
+      name: string,
+      lines: string[]
+    ) => {
       if (!blk || !label) return;
       T(blk.x, blk.y - 10, label, 9, accent);
       vectors.push({
@@ -656,17 +710,18 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
         }
       }
     };
-    box(B.recipient, L.section_recipient, brief.recipient?.name, [
-      brief.recipient?.department,
+    box(B.recipient, L.section_recipient, str(brief.recipient?.name), [
+      str(brief.recipient?.department),
       brief.recipient?.contact ? `担当: ${brief.recipient.contact}` : '',
-      brief.recipient?.address || '',
+      str(brief.recipient?.address),
     ]);
-    box(B.issuer, L.section_issuer, brief.issuer?.name, [
+    box(B.issuer, L.section_issuer, str(brief.issuer?.name), [
       brief.issuer?.registration_number ? `登録番号: ${brief.issuer.registration_number}` : '',
       brief.issuer?.postal_code ? `郵便番号: ${brief.issuer.postal_code}` : '',
-      brief.issuer?.address || '',
+      str(brief.issuer?.address),
       brief.issuer?.contact ? `担当: ${brief.issuer.contact}` : '',
       brief.issuer?.phone ? `電話: ${brief.issuer.phone}` : '',
+      // i18n-exempt: JP qualified-invoice document content, not UI copy
       brief.issuer?.email ? `メール: ${brief.issuer.email}` : '',
     ]);
 
@@ -716,14 +771,15 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
         fillColor: accent,
       });
       headers.forEach((h, i) => {
-        if (h && cols[i] != null)
-          T(cols[i] + 4, ty + rowH * 0.68, h, tb.header_font_size || 10, [1, 1, 1] as Rgb);
+        const col = cols[i];
+        if (h && col != null)
+          T(col + 4, ty + rowH * 0.68, h, tb.header_font_size || 10, [1, 1, 1] as Rgb);
       });
       let cy = ty + rowH;
       for (const it of items) {
         const desc = `${it.description || ''}${it.reduced_tax_rate ? ' ※' : ''}`;
         T(
-          cols[0] + 4,
+          (cols[0] ?? left) + 4,
           cy + rowH * 0.68,
           wrapByUnits(desc, tb.description_max_units || 28)[0] || '',
           tb.body_font_size || 9
@@ -763,9 +819,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
         strokeColor: border,
         lineWidth: 0.8,
       });
-      const periods = [...new Set(items.map((i: any) => i.service_period).filter(Boolean))].join(
-        '、'
-      );
+      const periods = [...new Set(items.map((i) => i.service_period).filter(Boolean))].join('、');
       if (periods) T(left + 4, cy + 14, `※ ${periods}`, 8);
       cursorY = cy + (periods ? 30 : 16);
     }
@@ -797,13 +851,14 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     }
 
     const pay = B.payment;
-    const paymentLines = brief.payment
+    const payment = (brief.payment ?? null) as Record<string, unknown> | null;
+    const paymentLines = payment
       ? [
-          brief.payment.method ? `方法: ${brief.payment.method}` : '',
-          `${brief.payment.bank_name || ''} ${brief.payment.branch_name || ''}`.trim(),
-          `${brief.payment.account_type || ''} ${brief.payment.account_number || ''}`.trim(),
-          brief.payment.account_name ? `口座名義: ${brief.payment.account_name}` : '',
-          brief.payment.transfer_fee_policy || '',
+          payment.method ? `方法: ${payment.method}` : '',
+          `${payment.bank_name || ''} ${payment.branch_name || ''}`.trim(),
+          `${payment.account_type || ''} ${payment.account_number || ''}`.trim(),
+          payment.account_name ? `口座名義: ${payment.account_name}` : '',
+          str(payment.transfer_fee_policy),
         ].filter(Boolean)
       : [];
     if (pay && L.section_payment && paymentLines.length) {
@@ -813,8 +868,8 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
 
     // ── Notes + compliance ────────────────────────────────────────
     const nb = B.notes;
-    const notesArr = Array.isArray(brief.notes)
-      ? brief.notes
+    const notesArr: string[] = Array.isArray(brief.notes)
+      ? brief.notes.map(String)
       : brief.notes
         ? [String(brief.notes)]
         : [];
@@ -838,6 +893,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       T(left, ny, complianceLabel, 10, accent);
       ny += 16;
       const complianceText =
+        // i18n-exempt: statutory JP qualified-invoice clause rendered into the document
         '発行者の氏名及び登録番号、取引年月日、取引内容、税率ごとの対価の額、税率、消費税額、書類の交付を受ける事業者の氏名。';
       for (const w of wrapByUnits(complianceText, nb?.body_max_units || 48)) {
         T(left + 4, ny, w, nb?.body_font_size || 9);
@@ -973,7 +1029,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       .join('\n');
 
     const layoutArtifacts = buildInvoiceLayoutArtifacts({
-      template,
+      template: template as unknown as InvoiceLayoutTemplate,
       brief,
       items,
       grouped,

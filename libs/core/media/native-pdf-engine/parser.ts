@@ -1,16 +1,10 @@
 import * as path from 'node:path';
 import * as zlib from 'node:zlib';
 import { createHash } from 'node:crypto';
-import { nowIso } from '../../foundation/time.js';
 import { pathResolver } from '../../path-resolver.js';
 import { safeMkdir, safeReadFile, safeWriteFile } from '../../secure-io.js';
 import { decodeEntities } from '../../foundation/text-escaping.js';
-import type {
-  PdfDesignProtocol,
-  PdfLayoutElement,
-  PdfPage,
-  PdfImageElement,
-} from '../../contracts/pdf-protocol.js';
+import type { PdfLayoutElement, PdfPage, PdfImageElement } from '../../contracts/pdf-protocol.js';
 import { clamp } from '../../foundation/text.js';
 import { decodeFilterChain, parseDecodeParms, parseFilterNames } from './filters.js';
 import * as pdfStructure from './structure.js';
@@ -1950,84 +1944,5 @@ export class NativePdfParser {
 }
 
 // ── Public Extraction API ───────────────────────────────────
-
-function hexColorToRgb(hex?: string): [number, number, number] | undefined {
-  if (!hex || !/^[0-9A-Fa-f]{6}$/.test(hex)) return undefined;
-  return [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
-}
-
-/**
- * Graphic elements (`rect`/`border`) extracted from content-stream `re`/`S`/`B`/`f`
- * ops belong on the render path (`page.vectors`) — `buildAestheticContent`
- * only draws text/heading elements, so leaving them solely in `elements`
- * silently drops every box, rule and table fill on round-trip. Elements keep
- * their place in `page.elements`/`aesthetic.elements` for analysis; the
- * vectors are an additional render-ready projection.
- */
-function graphicElementsToPageVectors(elements: any[]): any[] {
-  const vectors: any[] = [];
-  for (const el of elements ?? []) {
-    if (el?.type !== 'rect' && el?.type !== 'border') continue;
-    const fillColor = hexColorToRgb(el.fillColor);
-    const strokeColor = hexColorToRgb(el.strokeColor);
-    if (!fillColor && !strokeColor) continue;
-    vectors.push({
-      shape: {
-        kind: 'rect',
-        x: el.x,
-        y: el.y,
-        width: el.width,
-        height: el.height,
-      },
-      ...(fillColor ? { fillColor } : {}),
-      ...(strokeColor ? { strokeColor } : {}),
-      ...(el.lineWidth !== undefined ? { lineWidth: el.lineWidth } : {}),
-      ...(el.opacity !== undefined ? { fillOpacity: el.opacity } : {}),
-    });
-  }
-  return vectors;
-}
-
-export async function distillNativePdfDesign(sourcePath: string): Promise<PdfDesignProtocol> {
-  const parser = new NativePdfParser(sourcePath);
-  const metadata = parser.extractMetadata();
-  const pages = parser.extractPages();
-  for (const page of pages) {
-    const vectors = graphicElementsToPageVectors((page as any).elements);
-    if (vectors.length > 0) (page as any).vectors = vectors;
-  }
-  const outlines = parser.extractOutlines();
-  const acroForm = parser.extractAcroForm();
-  const fullText = pages.map((p) => p.text).join('\n\n');
-  const elements = pages.flatMap((page) => [
-    ...(page.elements || []),
-    ...(page.images || []).map((image) => ({
-      type: 'image' as const,
-      x: image.x,
-      y: image.y,
-      width: image.width,
-      height: image.height,
-    })),
-  ]);
-  const fonts = Array.from(
-    new Set(
-      elements
-        .filter((element): element is PdfLayoutElement => element.type !== 'image')
-        .map((element) => element.fontName)
-        .filter(Boolean)
-    )
-  ) as string[];
-  const xBuckets = Array.from(new Set(elements.map((element) => Math.round(element.x / 40))));
-  const layout = xBuckets.length >= 2 ? 'multi-column' : 'single-column';
-
-  return {
-    version: '4.0.0',
-    generatedAt: nowIso(),
-    source: { format: 'markdown' as any, body: fullText, title: metadata.title },
-    content: { text: fullText, pages },
-    metadata: { ...metadata, pageCount: pages.length },
-    outlines,
-    acroForm,
-    aesthetic: { layout, elements, fonts },
-  };
-}
+// `distillNativePdfDesign` lives in ./parser-distill.js (design-protocol
+// projection, kept separate to stay under the source-size ratchet).

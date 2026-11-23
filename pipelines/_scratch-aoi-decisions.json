@@ -7,7 +7,7 @@
   "context": {
     "sim_id": "BIZSIM-20261123-AOI",
     "tenant_slug": "aoi-dynamics",
-    "out_dir": "active/shared/tmp/bizsim-202611-aoi"
+    "out_dir": "active/shared/tmp/confidential/shared/bizsim-202611-aoi"
   },
   "steps": [
     {

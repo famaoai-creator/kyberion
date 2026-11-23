@@ -198,6 +198,7 @@ const MEDIA_EXTRA_OPS = [
   'pptx_patch_paragraphs',
   'pptx_render',
   'pptx_replace_slides',
+  'register_artifact',
   'register_presentation_preference_profile',
   'save_brand_to_confidential',
   'write_file',
@@ -235,6 +236,15 @@ const MEDIA_REQUIRED_INPUTS: Record<string, string[]> = {
 const MEDIA_ANY_OF_INPUTS: Record<string, string[]> = {
   deck_from_html: ['html', 'path', 'from'],
   document_digest: ['path', 'from'],
+  register_artifact: [
+    'tenant_slug',
+    'organization_id',
+    'mission_id',
+    'project_id',
+    'task_id',
+    'session_id',
+    'system',
+  ],
 };
 /** Ops needing fixed keys AND at least one of several alternatives. */
 const MEDIA_REQUIRED_AND_ANY_OF: Record<string, { required: string[]; anyOf: string[] }> = {
@@ -329,6 +339,14 @@ const MEDIA_EXTRA_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
       replace_index: 2,
       subtitle_shape: 'Subtitle 2',
       slides: [{ subtitle: 'Where we are', blocks: [{ type: 'lead', text: 'One message' }] }],
+    },
+  ],
+  register_artifact: [
+    {
+      path: 'active/shared/tmp/system/document.pdf',
+      name: 'document.pdf',
+      artifact_class: 'export',
+      organization_id: 'example-org',
     },
   ],
   register_presentation_preference_profile: [{ profile: {} }],

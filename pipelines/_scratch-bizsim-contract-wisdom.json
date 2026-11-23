@@ -6,9 +6,9 @@
   "description": "SCRATCH continuation of contract-review — typed participants passed explicitly (template's personas_from is stale). Remove after the simulation.",
   "context": {
     "mission_id": "BIZSIM-20261123",
-    "hypotheses_output": "active/shared/tmp/bizsim-202611/evidence/contract-risks-raw.json",
-    "critique_output": "active/shared/tmp/bizsim-202611/evidence/contract-risks.json",
-    "dissent_output": "active/shared/tmp/bizsim-202611/evidence/dissent-log.json",
+    "hypotheses_output": "active/shared/tmp/confidential/shared/bizsim-202611/evidence/contract-risks-raw.json",
+    "critique_output": "active/shared/tmp/confidential/shared/bizsim-202611/evidence/contract-risks.json",
+    "dissent_output": "active/shared/tmp/confidential/shared/bizsim-202611/evidence/dissent-log.json",
     "participants": [
       {
         "participant_id": "legal-conservative",
@@ -71,7 +71,7 @@
       "params": {
         "participants_from": "participants",
         "min_hypotheses_per_participant": 2,
-        "topic": "Identify material risks in the contract at active/shared/tmp/bizsim-202611/evidence/contract.md (IPA model development subcontract contract, second edition)",
+        "topic": "Identify material risks in the contract at active/shared/tmp/confidential/shared/bizsim-202611/evidence/contract.md (IPA model development subcontract contract, second edition)",
         "output_path": "{{hypotheses_output}}",
         "output_tier": "public"
       }

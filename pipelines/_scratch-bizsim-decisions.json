@@ -7,7 +7,7 @@
   "context": {
     "sim_id": "BIZSIM-20261123",
     "tenant_slug": "famao-lab",
-    "out_dir": "active/shared/tmp/bizsim-202611"
+    "out_dir": "active/shared/tmp/confidential/shared/bizsim-202611"
   },
   "steps": [
     {

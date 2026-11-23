@@ -14,7 +14,9 @@
       "role": "source",
       "op": "system:read_json",
       "produces": "decision_rights_json",
-      "params": { "path": "active/shared/tmp/bizsim-202611-aoi/aoi-decision-rights.json" }
+      "params": {
+        "path": "active/shared/tmp/confidential/shared/bizsim-202611-aoi/aoi-decision-rights.json"
+      }
     },
     {
       "id": "write_decision_rights",
@@ -31,7 +33,9 @@
       "role": "source",
       "op": "system:read_json",
       "produces": "financial_model_json",
-      "params": { "path": "active/shared/tmp/bizsim-202611-aoi/aoi-financial-model.json" }
+      "params": {
+        "path": "active/shared/tmp/confidential/shared/bizsim-202611-aoi/aoi-financial-model.json"
+      }
     },
     {
       "id": "write_financial_model",
