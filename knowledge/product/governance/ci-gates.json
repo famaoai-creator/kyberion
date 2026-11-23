@@ -352,6 +352,14 @@
       "rationale": "Checks every schema-bound pipeline invocation after template resolution and keeps inferred legacy operations open during migration."
     },
     {
+      "id": "pipeline-dry-run",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check/check_pipeline_dry_run.ts"],
+      "owner": "quality",
+      "rationale": "Sweeps every catalog pipeline/template through the same dry-run verdicts users see at dispatch and fails on blocked/invalid files; files that intentionally claim no executability must carry _execution_status 'reference' plus an explanatory _execution_note."
+    },
+    {
       "id": "extension-order",
       "scope": "pr",
       "executable": "node",

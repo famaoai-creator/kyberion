@@ -152,6 +152,29 @@ export function expandPipelineIncludesForGuardrails<T extends { steps?: unknown[
   pipeline: T,
   options: AdfInputOptions = {}
 ): T {
+  return expandPipelineIncludesInternal(pipeline, options, false);
+}
+
+/**
+ * Dry-run variant of the guardrail expansion. Inlining a `core:include` step
+ * drops its declared `produces` channel (and `export_as`), even though at
+ * runtime the include writes its result into context under that name. To keep
+ * the static flow check honest — fragment ops are verified AND downstream
+ * consumers of the include result still resolve — an include that declares a
+ * channel keeps a lightweight marker step that re-declares it.
+ */
+export function expandPipelineIncludesForDryRun<T extends { steps?: unknown[] }>(
+  pipeline: T,
+  options: AdfInputOptions = {}
+): T {
+  return expandPipelineIncludesInternal(pipeline, options, true);
+}
+
+function expandPipelineIncludesInternal<T extends { steps?: unknown[] }>(
+  pipeline: T,
+  options: AdfInputOptions = {},
+  preserveIncludeProduces = false
+): T {
   const expandSteps = (steps: unknown[], includeStack: ReadonlySet<string>): unknown[] =>
     steps.flatMap((rawStep) => {
       if (!rawStep || typeof rawStep !== 'object') return [rawStep];
@@ -174,7 +197,23 @@ export function expandPipelineIncludesForGuardrails<T extends { steps?: unknown[
         if (!Array.isArray(fragment?.steps)) {
           throw new Error(`core:include: fragment ${ref} must contain a steps array`);
         }
-        return expandSteps(fragment.steps, new Set([...includeStack, fragmentPath]));
+        const expanded = expandSteps(fragment.steps, new Set([...includeStack, fragmentPath]));
+        // The marker re-declares the include's `produces` for the static flow
+        // check; it intentionally does not re-declare `consumes` (no catalog
+        // include declares one today — if that changes, forward it here too).
+        if (preserveIncludeProduces && step.produces) {
+          return [
+            ...expanded,
+            {
+              id: `${step.id || 'include'}__include_result`,
+              role: 'source',
+              op: 'system:log',
+              produces: step.produces,
+              params: {},
+            },
+          ];
+        }
+        return expanded;
       }
 
       const expandedParams = { ...params };

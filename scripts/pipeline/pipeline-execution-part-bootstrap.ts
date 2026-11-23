@@ -11,7 +11,7 @@ import {
   type SafeShell,
 } from '@agent/core/secure-io';
 import { retry } from '@agent/core/async-utils';
-import { resolveVars } from '@agent/core/pipeline/logic-utils';
+import { evaluateCondition, resolveVars } from '@agent/core/pipeline/logic-utils';
 import { capabilityEntry, pathResolver } from '@agent/core/path-resolver';
 import type { ReasoningCallOptions } from '@agent/core/reasoning/reasoning-backend';
 import { buildWorkingPrinciplesLines } from '@agent/core/working-principles';
@@ -868,46 +868,7 @@ export async function loadActuatorDispatch(
 /** Reasoning leaf ops served directly by the reasoning backend. */
 const REASONING_LEAF_OPS = new Set(['analyze', 'transform', 'synthesize']);
 
-/** Qualified op aliases: legacy `domain:action` spellings → canonical op. */
-const QUALIFIED_OP_ALIASES: Record<string, string> = {
-  'mission:list': 'system:list_missions',
-  'project:list': 'system:list_projects',
-  'knowledge:list': 'system:list_knowledge',
-  'capability:list': 'system:list_capabilities',
-  'agent:list-manifests': 'agent:list_manifests',
-  'agent:list_manifests': 'agent:list_manifests',
-  'agent:list-runtimes': 'agent:list_runtimes',
-  'agent:list_runtimes': 'agent:list_runtimes',
-};
-
-/** Bare control-flow aliases → canonical core:* ops. */
-const BARE_OP_ALIASES: Record<string, string> = {
-  if: 'core:if',
-  while: 'core:while',
-  loop_until: 'core:while',
-  retry_until_quality: 'core:retry_until_quality',
-  parallel_foreach: 'core:parallel_foreach',
-  team_lead: 'core:team_lead',
-  parallel_calls: 'core:parallel_calls',
-  accumulate: 'core:accumulate',
-  judge_route: 'core:judge_route',
-  await_decision: 'core:await_decision',
-  await_state: 'core:await_state',
-};
-
-export function normalizePipelineOp(op: string): string {
-  if (op.includes(':')) {
-    const [domain, action] = op.split(':');
-    const alias = QUALIFIED_OP_ALIASES[op];
-    if (alias) return alias;
-
-    if (domain === 'mission') return `system:${action}`;
-    return op;
-  }
-  const alias = BARE_OP_ALIASES[op];
-  if (alias) return alias;
-  return `system:${op}`;
-}
+export { normalizePipelineOp } from '@agent/core/pipeline/pipeline-op-aliases';
 
 export function validatePipelineOpInput(
   domain: string,
@@ -1174,6 +1135,45 @@ export async function runInlineSystemShell(
     } else if (cmd.includes('reset_routing')) {
       markRouterInactive();
     }
+  }
+  return ctx;
+}
+
+/**
+ * `system:assert` — fail-fast input/precondition gate for config and operator
+ * flows. Conditions use the governed structured-condition contract evaluated
+ * by evaluateCondition (the same evaluator `when` edges use): each entry is
+ * either a structured condition object ({from, operator, value?}) or a bare
+ * context-path string meaning "truthy". String expression syntax ("a != b")
+ * is rejected by that evaluator on purpose — conditions must be structured.
+ */
+export async function runInlineSystemAssert(
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const raw = params.conditions;
+  const conditions = Array.isArray(raw) ? raw : raw !== undefined ? [raw] : [];
+  if (conditions.length === 0) {
+    throw new Error('system:assert requires a non-empty params.conditions array');
+  }
+  const failures: string[] = [];
+  for (const condition of conditions) {
+    let passed = false;
+    try {
+      passed = evaluateCondition(condition, ctx);
+    } catch (error) {
+      throw new Error(
+        `system:assert condition is not evaluable: ${JSON.stringify(condition)} — ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    if (!passed) failures.push(JSON.stringify(condition));
+  }
+  if (failures.length > 0) {
+    const message =
+      typeof params.message === 'string' && params.message.trim()
+        ? params.message.trim()
+        : 'pipeline assertion failed';
+    throw new Error(`[ASSERT_FAILED] ${message} — failed: ${failures.join(', ')}`);
   }
   return ctx;
 }

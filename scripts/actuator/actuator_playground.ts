@@ -634,6 +634,12 @@ export function buildSessionAdf(
   if (session.steps.some((step) => step.domain === 'browser')) {
     adf.session_id = session.session;
   }
+  // Persist the verification gap inside the draft itself — the stdout warning
+  // disappears once the session ends, but anyone opening this file later (or
+  // promoting it) should still see which ops never proved dispatchable.
+  if (unverified.size > 0) {
+    adf._unverified_ops = [...unverified];
+  }
   if (placeholders.size > 0) {
     adf.parameters = Object.fromEntries(
       [...placeholders.keys()].map((key) => [

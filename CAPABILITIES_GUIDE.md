@@ -594,6 +594,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 
 | Op                             | Actuators                                              |
 | :----------------------------- | :----------------------------------------------------- |
+| `assert`                       | system                                                 |
 | `close_session`                | browser                                                |
 | `if`                           | browser, code, file, modeling, network, system, wisdom |
 | `open_tab`                     | browser                                                |

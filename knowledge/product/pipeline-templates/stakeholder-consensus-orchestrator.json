@@ -33,7 +33,7 @@
           {
             "id": "pick",
             "role": "transform",
-            "op": "core:json_query",
+            "op": "system:json_query",
             "produces": { "channel": "current_visit", "type": "VisitNode" },
             "params": {
               "from": "ordered_visits",
@@ -43,7 +43,7 @@
           {
             "id": "run_session",
             "role": "sink",
-            "op": "meeting:conduct_1on1",
+            "op": "meeting:conduct_1on_1",
             "consumes": "current_visit",
             "params": {
               "counterparty_ref": "{{current_visit.person_slug}}",

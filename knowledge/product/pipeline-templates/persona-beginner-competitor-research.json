@@ -13,21 +13,22 @@
   },
   "steps": [
     {
+      "id": "search-competitor-goto",
+      "role": "sink",
+      "op": "browser:goto",
+      "params": { "url": "https://www.google.com/search?q={{target_name}}+特徴+強み+価格" }
+    },
+    {
       "id": "search-competitor",
       "role": "source",
-      "op": "browser:pipeline",
+      "op": "browser:content",
       "produces": { "channel": "search_results", "type": "BrowserContent" },
-      "params": {
-        "steps": [
-          { "type": "apply", "op": "goto", "params": { "url": "https://www.google.com/search?q={{target_name}}+特徴+強み+価格" } },
-          { "type": "capture", "op": "content", "params": { "export_as": "search_results" } }
-        ]
-      }
+      "params": { "export_as": "search_results" }
     },
     {
       "id": "synthesize-report",
       "role": "transform",
-      "op": "wisdom:synthesize",
+      "op": "reasoning:synthesize",
       "consumes": "search_results",
       "produces": { "channel": "competitor_brief", "type": "CompetitorBrief" },
       "params": {

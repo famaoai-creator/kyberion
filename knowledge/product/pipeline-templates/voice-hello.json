@@ -3,11 +3,16 @@
   "version": "2.0.0",
   "description": "Phase A-5 first-win pipeline (tier 0, zero external deps): browser-side Web Speech API for input + OS native TTS for output. The 'Hello Kyberion' demo.",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "_execution_status": "reference",
+  "_execution_note": "Aspirational interactive voice loop — `wait_for` (spoken-intent), `wisdom:resolve_intent`, and `ref` (pipeline dispatch) are not registered ops. The working voice smoke is `pipelines/voice-hello.json` (system:check_native_tts -> system:native_tts_speak); intent capture and dispatch belong to the surface/intent layer, not a static ADF.",
   "action": "pipeline",
   "labels": ["first-win", "voice", "tier-0", "demo"],
   "inputs": {
     "USER_NAME": { "required": false, "default": "there" },
-    "INTENT": { "required": false, "description": "Optional pre-set intent. When omitted, the pipeline opens the presence surface and waits for spoken input." }
+    "INTENT": {
+      "required": false,
+      "description": "Optional pre-set intent. When omitted, the pipeline opens the presence surface and waits for spoken input."
+    }
   },
   "expected_outcome": "User hears 'Hello, <name>. What would you like me to do?' from OS TTS, speaks an intent in the browser surface, Kyberion runs it and reads back a result in <= 60s.",
   "steps": [

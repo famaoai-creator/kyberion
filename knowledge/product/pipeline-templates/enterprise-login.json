@@ -22,7 +22,7 @@
     {
       "id": "goto-login",
       "role": "sink",
-      "op": "goto",
+      "op": "browser:goto",
       "params": {
         "url": "{{LOGIN_URL}}"
       }
@@ -30,7 +30,7 @@
     {
       "id": "instructions",
       "role": "sink",
-      "op": "log",
+      "op": "system:log",
       "params": {
         "message": "Browser opened with persisted profile. Complete the login (device passkey / SMS / SSO) in the visible window. Cookies and storage are saved to active/browser-session/enterprise-sync. Run verify-session.json afterward to confirm."
       }

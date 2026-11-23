@@ -13,21 +13,22 @@
   },
   "steps": [
     {
+      "id": "search-news-goto",
+      "role": "sink",
+      "op": "browser:goto",
+      "params": { "url": "https://news.google.com/search?q={{keyword}}&hl=ja&gl=JP" }
+    },
+    {
       "id": "search-news",
       "role": "source",
-      "op": "browser:pipeline",
+      "op": "browser:content",
       "produces": { "channel": "news_content", "type": "BrowserContent" },
-      "params": {
-        "steps": [
-          { "type": "apply", "op": "goto", "params": { "url": "https://news.google.com/search?q={{keyword}}&hl=ja&gl=JP" } },
-          { "type": "capture", "op": "content", "params": { "export_as": "news_content" } }
-        ]
-      }
+      "params": { "export_as": "news_content" }
     },
     {
       "id": "summarize-news",
       "role": "transform",
-      "op": "wisdom:synthesize",
+      "op": "reasoning:synthesize",
       "consumes": "news_content",
       "produces": { "channel": "news_brief", "type": "NewsBrief" },
       "params": {

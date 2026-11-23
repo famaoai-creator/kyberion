@@ -69,6 +69,7 @@ import {
   resolveLogMessage,
   assertPipelineStepCapabilityAvailable,
   shouldUseSubagentForReasoningStep,
+  runInlineSystemAssert,
   runInlineSystemExec,
   runInlineSystemWriteFile,
   runInlineSystemShell,
@@ -839,6 +840,11 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
 
     logger.info(resolveLogMessage(params, ctx));
     return ctx;
+  },
+  'system:assert': async (dctx) => {
+    const { params, ctx } = dctx;
+
+    return runInlineSystemAssert(params, ctx);
   },
   'system:exec': async (dctx) => {
     const { params, ctx, rootDir } = dctx;
