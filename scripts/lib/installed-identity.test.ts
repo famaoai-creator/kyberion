@@ -4,7 +4,11 @@ const s = vi.hoisted(() => ({
   scoped: false,
   fail: false,
   local: false,
-  response: { ready: true, missing_files: [] as string[] },
+  response: {
+    ready: true,
+    missing_files: [] as string[],
+    personal_registration: undefined as { owner: string; profile: string; nhi: string } | undefined,
+  },
   readDenied: false,
   rootLookups: 0,
   env: {} as Record<string, string>,
@@ -68,6 +72,9 @@ vi.mock('@agent/core/governance/external-operation', () => ({
 vi.mock('@agent/core/organization/tenant-governance', () => ({
   shellQuoteArg: (value: string) => `'${value}'`,
 }));
+vi.mock('@agent/core/organization/onboarding-runtime-identity', () => ({
+  inspectPersonalIdentityRegistration: () => s.response.personal_registration,
+}));
 import {
   inspectInstalledIdentity,
   inspectMissionPrerequisiteIdentity,
@@ -79,7 +86,7 @@ describe('installation identity metadata', () => {
     s.scoped = false;
     s.fail = false;
     s.local = false;
-    s.response = { ready: true, missing_files: [] };
+    s.response = { ready: true, missing_files: [], personal_registration: undefined };
     s.readDenied = false;
     s.rootLookups = 0;
     s.calls = [];
@@ -95,14 +102,14 @@ describe('installation identity metadata', () => {
     expect(JSON.parse(s.calls[0].input).scope).toEqual(s.scope);
   });
   it('does not accept a partial primary identity or malformed metadata', () => {
-    s.response = { ready: false, missing_files: ['my-vision.md'] };
+    s.response = { ...s.response, ready: false, missing_files: ['my-vision.md'] };
     expect(inspectMissionPrerequisiteIdentity()).toMatchObject({
       ready: false,
       missing_files: ['my-vision.md'],
     });
-    s.response = { ready: true, missing_files: ['my-vision.md'] };
+    s.response = { ...s.response, ready: true, missing_files: ['my-vision.md'] };
     expect(inspectMissionPrerequisiteIdentity().ready).toBe(false);
-    s.response = { ready: false, missing_files: ['secret.json'] };
+    s.response = { ...s.response, ready: false, missing_files: ['secret.json'] };
     expect(inspectMissionPrerequisiteIdentity().ready).toBe(false);
   });
   it('refuses scoped mission probes and foreign installation roots', () => {
@@ -128,6 +135,16 @@ describe('installation identity metadata', () => {
       KYBERION_STANCE: 'customer-a',
     });
     expect(JSON.parse(s.calls[0].input).scope).toEqual(s.scope);
+  });
+  it('reports missing registrations even when all installation profile files exist', () => {
+    s.response.personal_registration = { owner: 'missing', profile: 'installed', nhi: 'missing' };
+    expect(inspectInstalledIdentity()).toMatchObject({
+      ready: false,
+      source: 'installation',
+      personal_registration: s.response.personal_registration,
+      next: expect.stringContaining('pnpm onboarding check --json'),
+    });
+    expect(JSON.parse(s.calls[0].input).checkPersonalRegistration).toBe(true);
   });
   it('reports restricted absence as unavailable without probing installation or advising onboarding', () => {
     s.scoped = true;

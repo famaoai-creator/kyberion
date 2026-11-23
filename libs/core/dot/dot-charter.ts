@@ -235,6 +235,8 @@ export interface DotCharter {
       template?: string;
     };
     digest_cron?: string;
+    /** Publish an unresolved signal episode to the scoped inbox after quiet hours. */
+    signal_alerts?: { max_age_s: number };
     quiet_hours?: { start?: string; end?: string; timezone?: string };
     /** `inbox` (default) keeps every send in the local inbox; `live` uses deliver_to. */
     delivery_mode?: 'inbox' | 'live';
@@ -401,6 +403,13 @@ export function validateDotCharter(value: unknown, sourcePath = '<inline>'): Dot
     throw new Error(`Invalid dot charter at ${sourcePath}: ${errors}`);
   }
   const bound = normalizeDeprecatedCharterKeys(candidate as DotCharter, sourcePath);
+  if (bound.notification.signal_alerts) {
+    const signals = (bound.goal.signal_probes ?? []).map(({ signal }) => signal);
+    if (signals.length !== new Set(signals).size)
+      throw new Error(
+        `Invalid dot charter at ${sourcePath}: signal alerts require unique signal names`
+      );
+  }
   isFrontDeskDiagnosticDot(bound);
   if (isInternalDotStoreRole(bound.authority.authority_role))
     throw new Error(

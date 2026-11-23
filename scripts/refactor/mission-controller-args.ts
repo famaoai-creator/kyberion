@@ -289,6 +289,30 @@ export function validateMissionStartCreateInput(
         project: { ...state.relationships.project },
       };
     }
+    if (state) {
+      const boundTrack = state.relationships?.track;
+      const boundProject = state.relationships?.project;
+      const requestedTrack = input.relationships?.track?.track_id;
+      if (hasCliFlag(argv, '--track-id') && requestedTrack !== boundTrack?.track_id) {
+        throw new Error(
+          'The existing Mission keeps its recorded Track. Use governed Project reassignment to change it.'
+        );
+      }
+      if (boundTrack?.track_id && boundProject?.project_id) {
+        if (
+          input.relationships?.project?.project_id &&
+          input.relationships.project.project_id !== boundProject.project_id
+        )
+          throw new Error('The existing Mission Track belongs to its recorded Project.');
+        input.relationships = {
+          ...input.relationships,
+          project: { ...boundProject, ...input.relationships?.project },
+          track: { ...boundTrack },
+        };
+      } else if (input.relationships?.track) {
+        delete input.relationships.track;
+      }
+    }
     return validateResolvedMissionStartCreateInput(
       actionName,
       missionId,
@@ -368,6 +392,8 @@ function validateResolvedMissionStartCreateInput(
         throw new Error(`${actionName} ${missionId}: project track not found: ${track.track_id}`);
       }
       assertManagedProjectTrackScope(projectRecord, trackRecord);
+      if (!state && trackRecord.status !== 'active')
+        throw new Error(`New Mission work requires an active Track: ${trackRecord.track_id}`);
     }
     if (projectScope) {
       // Inherit the project's scope so the mission state carries it (a

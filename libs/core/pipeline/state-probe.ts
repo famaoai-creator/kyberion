@@ -60,6 +60,8 @@ export interface StateProbeResult {
 
 export interface StateProbeDeps {
   rootDir?: string;
+  /** Distinguish unreadable data from a confirmed absent source. */
+  strictFileRead?: boolean;
   /** Injectable service-preset port; absent → service probes fail closed. */
   serviceCall?: (input: {
     service_id: string;
@@ -97,7 +99,7 @@ function safeResolve(rel: string, rootDir: string | undefined): string {
   });
 }
 
-function evaluateFileProbe(
+export function evaluateFileStateProbe(
   spec: Extract<StateProbeSpec, { type: 'file' }>,
   deps: StateProbeDeps
 ): StateProbeResult {
@@ -106,7 +108,8 @@ function evaluateFileProbe(
   try {
     const s = safeLstat(filePath);
     stat = { mtimeMs: s.mtimeMs, size: s.size };
-  } catch {
+  } catch (error) {
+    if (deps.strictFileRead && (error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error;
     stat = null;
   }
   const fingerprint = stat ? probeValueFingerprint(stat) : 'absent';
@@ -196,7 +199,7 @@ export async function evaluateStateProbe(
   if (!spec || typeof spec !== 'object') throw new Error('[PROBE] spec is required');
   switch (spec.type) {
     case 'file':
-      return evaluateFileProbe(spec, deps);
+      return evaluateFileStateProbe(spec, deps);
     case 'service_preset':
       return evaluateServicePresetProbe(spec, deps);
     default:

@@ -17,6 +17,7 @@ import * as pathResolver from '../path-resolver.js';
  */
 
 export const STANCE_ENV_VAR = 'KYBERION_STANCE';
+export const STANCE_SCOPE_BOUND_ENV_VAR = 'KYBERION_STANCE_SCOPE_BOUND';
 /** @deprecated retired by Concept Model v2 D4; read only as a one-release migration aid. */
 export const LEGACY_STANCE_ENV_VAR = 'KYBERION_CUSTOMER';
 /** Repository-relative directory that holds one subdirectory per stance. */

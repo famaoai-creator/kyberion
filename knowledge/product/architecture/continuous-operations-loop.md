@@ -81,6 +81,11 @@ owner は各副作用の前に元の承認 hash・scope・charter・claim・leas
 
 定期観測（Outer Loop）と起票済み作業を進める lifecycle owner（Inner Loop）は、同じ supervisor 内で別々の circuit を持つ。owner の連続障害で circuit が開いている間も、チャーターのスコープと予算の範囲で定期観測を続ける。owner の障害調査には `dot-continuous-owner`、観測側の障害調査には `dot-continuous-cadence` の運用アラートを使う。
 
+常駐 Dot の通知を有効にした場合、supervisor は housekeeping で観測結果を扱う。
+通知直前にチャーターと対象テナントを再確認し、解決済み・期限切れを除いて、
+元のスコープのインボックスに公開する。
+詳細は [Resident Dot の通知モデル](./resident-dot-model.md#proactive-signal-alerts) を参照。
+
 周期の checkpoint には直近の開始時刻（`last_run_at`）と、完了まで到達した直近の周期の開始時刻（`last_success_at`）を保持する。開始だけが更新されている場合は、その周期が進行中か、失敗・中断した可能性がある。旧形式の checkpoint から読み込んだ直後は完了時刻が不明で、次の正常な周期で記録する。個々の起票や成果の成否は周期レポートで確認する。
 
 再観測対象の admission がない周期では、観測・閾値判定までを行い、実行履歴と成果物レジストリの参照を省く。既存 episode に admission がある場合は、指標が正常化した周期も成果を確認する。

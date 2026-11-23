@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { checkFiniteStateSafety } from '../testing/finite-state-checker.js';
 
 /**
  * Separation of duties is driven by the real `approval-policy.json` loader:
@@ -258,6 +259,56 @@ describe('approval separation of duties', () => {
         metadata: expect.objectContaining({ stage: 'use:apply_claim' }),
       })
     );
+  });
+
+  it('checks approved effect usability across policy changes and revocation', () => {
+    setSeparationOfDuties(false);
+    const approved = [false, true].map((self) => ({
+      self,
+      record: decide(track(request({ requestedBy: 'alice' })), self ? 'alice' : 'bob'),
+    }));
+    const cases = approved.flatMap(({ self, record }) =>
+      [false, true].flatMap((enabled) =>
+        [false, true].map((revoked) => ({ self, record, enabled, revoked }))
+      )
+    );
+    type State =
+      | { stage: 'initial' }
+      | {
+          stage: 'checked';
+          self: boolean;
+          enabled: boolean;
+          revoked: boolean;
+          usable: boolean;
+        };
+    expect(
+      checkFiniteStateSafety<State>({
+        initial: [{ stage: 'initial' }],
+        key: JSON.stringify,
+        next: (state) =>
+          state.stage === 'initial'
+            ? cases.map(({ record, ...scenario }) => {
+                setSeparationOfDuties(scenario.enabled);
+                const revocation = scenario.revoked
+                  ? { revokedBy: 'user:bob', revokedAt: '2026-10-09T00:00:00.000Z' }
+                  : undefined;
+                return {
+                  action: 'evaluate approved effect',
+                  state: {
+                    stage: 'checked',
+                    ...scenario,
+                    usable: evaluateApprovalUsability({ ...record, revocation }) === null,
+                  },
+                };
+              })
+            : [],
+        invariants: {
+          currentPolicy: (state) =>
+            state.stage === 'initial' ||
+            state.usable === (!state.revoked && (!state.enabled || !state.self)),
+        },
+      })
+    ).toMatchObject({ status: 'verified', transitions: 8 });
   });
 
   it('ON: placeholder deciders count as no decider', () => {

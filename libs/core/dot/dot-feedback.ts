@@ -28,7 +28,9 @@ import {
   maintainStoreAfterAppend,
   type AppendOnlyStorePolicy,
 } from '../storage/append-only-store.js';
-import { evaluateStateProbe, type StateProbeDeps } from '../pipeline/state-probe.js';
+import { evaluateStateProbe, probeSpecId, type StateProbeDeps } from '../pipeline/state-probe.js';
+import { dotStatePath } from './dot-state-paths.js';
+import { dotAdmissionScopeHash } from './dot-admission-identity.js';
 import { VETO_WINDOW_DECIDER } from '../governance/approval-veto-window.js';
 import type { DotCharter } from './dot-charter.js';
 import type { DotDecisionLevel } from './dot-proposals.js';
@@ -128,6 +130,15 @@ export interface DotSignalEntry {
   healthy: boolean;
   detail?: string;
   measured_at: string;
+  probe_id?: string;
+  scope_hash?: string;
+  unavailable?: true;
+}
+
+function dotSignalLedgerPath(charter?: DotCharter): string {
+  return charter?.notification?.signal_alerts
+    ? dotStatePath(charter, 'signal-ledger.jsonl')
+    : DOT_SIGNAL_LEDGER_PATH;
 }
 
 export interface DotFeedbackDeps {
@@ -284,13 +295,21 @@ export function dotFeedbackPromptLines(
  * write-time window bounds what it returns); KR `signal_ratio` needs the
  * history inside its window, not just the latest row per signal.
  */
-export function readDotSignals(dotId: string, deps: { rootDir?: string } = {}): DotSignalEntry[] {
+export function readDotSignals(
+  dotId: string,
+  deps: { rootDir?: string; charter?: DotCharter } = {}
+): DotSignalEntry[] {
   const rows: DotSignalEntry[] = [];
+  const scopeHash = deps.charter?.notification?.signal_alerts
+    ? dotAdmissionScopeHash(deps.charter)
+    : undefined;
   for (const row of streamJsonLines<DotSignalEntry>(
-    runtimeFile(deps.rootDir, DOT_SIGNAL_LEDGER_PATH),
+    runtimeFile(deps.rootDir, dotSignalLedgerPath(deps.charter)),
     { onMalformed: 'skip', chunkBytes: storeTuning.chunkBytes }
   )) {
-    if (row?.dot_id === dotId && typeof row.signal === 'string') rows.push(row);
+    if (row?.dot_id === dotId && typeof row.signal === 'string' && row.scope_hash === scopeHash) {
+      rows.push(row);
+    }
   }
   return rows;
 }
@@ -300,10 +319,11 @@ export function latestDotSignals(
   charter: DotCharter,
   deps: { rootDir?: string } = {}
 ): Array<{ signal: string; latest?: DotSignalEntry }> {
-  const rows = readDotSignals(charter.dot_id, deps);
-  return (charter.goal.signal_probes ?? []).map(({ signal }) => {
+  const rows = readDotSignals(charter.dot_id, { ...deps, charter });
+  return (charter.goal.signal_probes ?? []).map(({ signal, probe }) => {
     let latest: DotSignalEntry | undefined;
-    for (const row of rows) if (row.signal === signal) latest = row;
+    const probeId = charter.notification?.signal_alerts ? probeSpecId(probe) : undefined;
+    for (const row of rows) if (row.signal === signal && row.probe_id === probeId) latest = row;
     return { signal, ...(latest ? { latest } : {}) };
   });
 }
@@ -333,6 +353,7 @@ export async function measureDotSuccessSignals(
       const result = await evaluateStateProbe(spec.probe, {
         rootDir: deps.rootDir,
         serviceCall: deps.serviceCall,
+        strictFileRead: Boolean(charter.notification?.signal_alerts),
       });
       entry = {
         dot_id: charter.dot_id,
@@ -340,6 +361,7 @@ export async function measureDotSuccessSignals(
         healthy: result.matched,
         ...(result.detail ? { detail: String(result.detail).slice(0, 300) } : {}),
         measured_at: now.toISOString(),
+        ...(result.fingerprint === 'unavailable' ? { unavailable: true } : {}),
       };
     } catch (error) {
       entry = {
@@ -352,9 +374,14 @@ export async function measureDotSuccessSignals(
             300
           ),
         measured_at: now.toISOString(),
+        unavailable: true,
       };
     }
-    appendRow(DOT_SIGNAL_LEDGER_PATH, entry, deps.rootDir, signalPolicy, now);
+    if (charter.notification?.signal_alerts) {
+      entry.probe_id = probeSpecId(spec.probe);
+      entry.scope_hash = dotAdmissionScopeHash(charter);
+    }
+    appendRow(dotSignalLedgerPath(charter), entry, deps.rootDir, signalPolicy, now);
     measured.push(entry);
   }
   return measured;

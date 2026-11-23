@@ -90,6 +90,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion kyberion`               | `pnpm kyberion`           | The kyberion CLI itself                                                                                              |
 | `pnpm kyberion onboarding`             | `pnpm onboarding`         | Run the onboarding wizard (identity, services, tenant)                                                               |
 | `pnpm kyberion onboarding authority`   |                           | Review, request and apply human-approved scoped authority (preview takes a plan file or --grant/--grant-field flags) |
+| `pnpm kyberion onboarding check`       |                           | Inspect personal owner and NHI registration, or repair it from reviewed identity input                               |
 | `pnpm kyberion onboarding context`     | `pnpm onboarding:context` | Resolve tenant and organization context for onboarding                                                               |
 | `pnpm kyberion onboarding nhi-session` |                           | Request, apply, list and revoke human-approved NHI session admissions                                                |
 | `pnpm kyberion provider-cli setup`     | `pnpm provider-cli:setup` | Install or inspect managed provider CLIs                                                                             |

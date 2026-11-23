@@ -9,6 +9,7 @@ import { nowIso } from '../foundation/time.js';
 import { createLogger } from '../logger.js';
 import * as pathResolver from '../path-resolver.js';
 import { hintPartitionDir, legacyHintsDir } from './hint-store.js';
+import { sharedReviewRejectionGuidance } from './review-rejection-lessons.js';
 import {
   safeExistsSync,
   safeReaddir,
@@ -71,6 +72,12 @@ export interface KnowledgeHint {
   source_sha256?: string;
   learning_candidate_id?: string;
   confidence: number;
+  review_rejection?: {
+    mission_id: string;
+    organization_id?: string;
+    project_id?: string;
+    detail: string;
+  };
   tags?: string[];
   tier?: StorageDataTier | 'product';
   customerId?: string;
@@ -1006,8 +1013,13 @@ function _loadJsonHints(
       for (const entry of entries) {
         const parsedHint = parseKnowledgeHint(entry);
         if (parsedHint) {
+          const hint = parsedHint.topic.startsWith('human-rejection:')
+            ? sharedReviewRejectionGuidance(parsedHint.topic)
+            : parsedHint.hint;
+          if (!hint) continue;
           hints.push({
             ...parsedHint,
+            hint,
             source_sha256: createHash('sha256').update(sourceText).digest('hex'),
             source: relSource,
             tier,

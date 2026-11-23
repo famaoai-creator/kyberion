@@ -15,12 +15,14 @@ import { hasDelegatedExecutionContext } from '@agent/core/governance/delegated-e
 import { hasHumanExecutionContext } from '@agent/core/governance/human-execution';
 import { hasExternalOperationAuthority } from '@agent/core/governance/external-operation';
 import { shellQuoteArg } from '@agent/core/organization/tenant-governance';
+import { inspectPersonalIdentityRegistration } from '@agent/core/organization/onboarding-runtime-identity';
 
 export interface InstalledIdentityReadiness {
   ready: boolean;
   governance_root: string;
   source: 'local' | 'installation' | 'unavailable';
   next?: string;
+  personal_registration?: { owner: string; profile: string; nhi: string };
 }
 const requiredIdentityFiles = ['my-identity.json', 'my-vision.md', 'agent-identity.json'];
 const prefix = 'KYBERION_IDENTITY_READINESS:';
@@ -40,26 +42,57 @@ resolvePromotionTargetRoot(input.sourceRoot);
 const allowed = ['my-identity.json', 'my-vision.md', 'agent-identity.json'];
 const requiredFiles = input.requiredFiles ?? ['my-identity.json'];
 if (!Array.isArray(requiredFiles) || requiredFiles.some(name => !allowed.includes(name))) throw new Error('Invalid identity metadata request');
-const missing_files = withScopeEnvOnly(() => {
+const snapshot = withScopeEnvOnly(() => {
   if (JSON.stringify(resolveScopeContext()) !== JSON.stringify(input.scope)) throw new Error('Identity scope mismatch');
-  return requiredFiles.filter(name => !safeExistsSync(path.join(resolveActiveProfileRoot(), name)));
+  const profileRoot = resolveActiveProfileRoot();
+  return { profileRoot, missing_files: requiredFiles.filter(name => !safeExistsSync(path.join(profileRoot, name))) };
 }, input.scope);
-process.stdout.write('\\n${prefix}' + JSON.stringify({ ready: missing_files.length === 0, missing_files }) + '\\n');
+let personal_registration;
+if (input.checkPersonalRegistration && snapshot.profileRoot === pathResolver.rootResolve('knowledge/personal')) {
+  const { inspectPersonalIdentityRegistration } = await import(input.coreUrl + 'organization/onboarding-runtime-identity.js');
+  const { owner, profile, nhi } = withScopeEnvOnly(() => inspectPersonalIdentityRegistration(), input.scope);
+  personal_registration = { owner, profile, nhi };
+}
+const registered = !personal_registration || (personal_registration.owner === 'active' && ['active', 'provisioned'].includes(personal_registration.nhi));
+process.stdout.write('\\n${prefix}' + JSON.stringify({ ready: snapshot.missing_files.length === 0 && registered, missing_files: snapshot.missing_files, personal_registration }) + '\\n');
 `;
 
 function inspectIdentity(
-  requiredFiles: string[]
+  requiredFiles: string[],
+  checkPersonalRegistration = false
 ): InstalledIdentityReadiness & { missing_files?: string[] } {
   const currentRoot = pathResolver.rootDir();
   const local = () => {
+    const profileRoot = resolveActiveProfileRoot();
     const missing_files = requiredFiles.filter(
-      (name) => !safeExistsSync(path.join(resolveActiveProfileRoot(), name))
+      (name) => !safeExistsSync(path.join(profileRoot, name))
     );
+    const registration =
+      checkPersonalRegistration && profileRoot === pathResolver.rootResolve('knowledge/personal')
+        ? inspectPersonalIdentityRegistration()
+        : undefined;
+    const registrationReady =
+      !registration ||
+      (registration.owner === 'active' && ['active', 'provisioned'].includes(registration.nhi));
     return {
-      ready: missing_files.length === 0,
+      ready: missing_files.length === 0 && registrationReady,
       missing_files,
       governance_root: currentRoot,
       source: 'local' as const,
+      ...(registration
+        ? {
+            personal_registration: {
+              owner: registration.owner,
+              profile: registration.profile,
+              nhi: registration.nhi,
+            },
+          }
+        : {}),
+      ...(!registrationReady
+        ? {
+            next: 'Run pnpm onboarding check --json to inspect or repair the owner and NHI registration.',
+          }
+        : {}),
     };
   };
   // Scoped worker/plugin callers must keep the authority of their own process.
@@ -77,7 +110,7 @@ function inspectIdentity(
   ) {
     try {
       const readiness = local();
-      if (readiness.ready) return readiness;
+      if (readiness.ready || readiness.personal_registration) return readiness;
     } catch {
       // Denied local metadata and an absent worktree profile cannot prove installation absence.
     }
@@ -117,6 +150,7 @@ function inspectIdentity(
           root,
           sourceRoot: currentRoot,
           requiredFiles,
+          ...(checkPersonalRegistration ? { checkPersonalRegistration: true } : {}),
           scope,
           coreUrl: `${pathToFileURL(pathResolver.rootResolve('libs/core/dist')).href}/`,
         }),
@@ -130,7 +164,7 @@ function inspectIdentity(
     const response = parseSafeJsonInput(
       line.slice(prefix.length),
       'Installed identity readiness'
-    ) as { ready?: unknown; missing_files?: unknown };
+    ) as { ready?: unknown; missing_files?: unknown; personal_registration?: unknown };
     if (typeof response.ready !== 'boolean') throw new Error('Invalid identity readiness response');
     if (
       requiredFiles.length > 1 &&
@@ -141,16 +175,51 @@ function inspectIdentity(
         response.ready !== (response.missing_files.length === 0))
     )
       throw new Error('Invalid identity file metadata');
+    const registration =
+      response.personal_registration as InstalledIdentityReadiness['personal_registration'];
+    if (
+      registration !== undefined &&
+      (!checkPersonalRegistration ||
+        !registration ||
+        !['missing', 'active', 'suspended'].includes(registration.owner) ||
+        !['missing', 'installed'].includes(registration.profile) ||
+        ![
+          'missing',
+          'unresolved',
+          'provisioned',
+          'active',
+          'suspended',
+          'retired',
+          'conflict',
+        ].includes(registration.nhi))
+    ) {
+      throw new Error('Invalid personal registration metadata');
+    }
+    const ready =
+      response.ready &&
+      (!registration ||
+        (registration.owner === 'active' && ['provisioned', 'active'].includes(registration.nhi)));
     return {
-      ready: response.ready,
+      ready,
       ...(Array.isArray(response.missing_files)
         ? { missing_files: response.missing_files as string[] }
         : {}),
       governance_root: root,
       source: 'installation',
-      ...(!response.ready
+      ...(registration
         ? {
-            next: `Complete reviewed identity onboarding in the installed repository at ${root}, with the same explicit tenant and customer stance.`,
+            personal_registration: {
+              owner: registration.owner,
+              profile: registration.profile,
+              nhi: registration.nhi,
+            },
+          }
+        : {}),
+      ...(!ready
+        ? {
+            next: registration
+              ? `Run pnpm onboarding check --json in the installed repository at ${root}.`
+              : `Complete reviewed identity onboarding in the installed repository at ${root}, with the same explicit tenant and customer stance.`,
           }
         : {}),
     };
@@ -165,7 +234,7 @@ function inspectIdentity(
 }
 
 export function inspectInstalledIdentity(): InstalledIdentityReadiness {
-  const { missing_files: _missing, ...readiness } = inspectIdentity(['my-identity.json']);
+  const { missing_files: _missing, ...readiness } = inspectIdentity(['my-identity.json'], true);
   return readiness;
 }
 

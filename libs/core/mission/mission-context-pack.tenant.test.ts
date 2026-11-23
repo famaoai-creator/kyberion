@@ -20,9 +20,11 @@ import {
 } from '../secure-io.js';
 import { evaluateContextFragment } from '../governance/context-security-scope.js';
 import {
+  assertContextPackInputLineage,
   commonKnowledgeGrantTenant,
   knowledgeHintFragment,
 } from './mission-context-pack-knowledge.js';
+import { checkFiniteStateSafety } from '../testing/finite-state-checker.js';
 import {
   deriveGovernancePhaseFromMissionState,
   loadKnowledgeHintsIfPossible,
@@ -215,6 +217,84 @@ afterEach(() => {
 });
 
 describe('DA-07 (1)(2): tenant knowledge reaches the pack; other tenants never do', () => {
+  it('does not let a WorkItem fixture replace the mission lineage', async () => {
+    const missionState = makeMissionState({
+      tenant_slug: 'tenant-x',
+      organization_id: 'org-x',
+      relationships: { project: { project_id: 'project-x' } },
+    });
+    const cases = ['tenant-x', 'tenant-y'].flatMap((tenant_slug) =>
+      ['org-x', 'org-y'].flatMap((organization_id) =>
+        ['project-x', 'project-y'].flatMap((project_id) =>
+          [missionState.mission_id, 'MSN-OTHER'].map((mission_id) => ({
+            tenant_slug,
+            organization_id,
+            project_id,
+            mission_id,
+          }))
+        )
+      )
+    );
+    type State =
+      | { stage: 'initial' }
+      | {
+          stage: 'resolved';
+          context: (typeof cases)[number];
+          accepted: boolean;
+        };
+    const checked = checkFiniteStateSafety<State>({
+      initial: [{ stage: 'initial' }],
+      key: JSON.stringify,
+      next: (state) =>
+        state.stage === 'initial'
+          ? cases.map((context) => {
+              let accepted = true;
+              try {
+                assertContextPackInputLineage({
+                  missionState,
+                  workItem: { ...makeWorkItem(), project_id: context.project_id, context },
+                });
+              } catch {
+                accepted = false;
+              }
+              return {
+                action: 'attach work item',
+                state: { stage: 'resolved', context, accepted },
+              };
+            })
+          : [],
+      invariants: {
+        sameLineage: (state) =>
+          state.stage === 'initial' ||
+          state.accepted ===
+            (state.context.tenant_slug === 'tenant-x' &&
+              state.context.organization_id === 'org-x' &&
+              state.context.project_id === 'project-x' &&
+              state.context.mission_id === missionState.mission_id),
+      },
+    });
+    expect(checked).toMatchObject({ status: 'verified', transitions: 16 });
+    await expect(
+      loadKnowledgeHintsIfPossible({
+        missionState,
+        workItem: { ...makeWorkItem(), project_id: 'project-y' },
+      })
+    ).resolves.toEqual([]);
+    await expect(
+      loadKnowledgeHintsIfPossible({
+        missionState,
+        projectState: {
+          project_id: 'project-x',
+          name: 'Personal fixture',
+          summary: 'Higher tier content',
+          status: 'active',
+          tier: 'personal',
+          tenant_slug: 'tenant-x',
+        },
+      })
+    ).resolves.toEqual([]);
+  });
+
   it('delivers knowledge/confidential/tenant-x/ cards for a tenant-x confidential mission', async () => {
     const hints = await loadKnowledgeHintsIfPossible({
       missionState: makeMissionState({ tenant_slug: 'tenant-x' }),

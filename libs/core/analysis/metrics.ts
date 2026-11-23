@@ -13,6 +13,7 @@ import chalk from 'chalk';
 import { createLogger } from '../logger.js';
 import {
   normalizeEventScope,
+  bindEventScopeToExecution,
   type EventScope,
   type EventScopeInput,
 } from '../event/event-scope.js';
@@ -624,10 +625,12 @@ export class MetricsCollector {
       cost_usd: cost,
       ...(explicitUnknown ? { cost_status: 'unknown' } : {}),
     });
-    const missionId = input.mission_id || getRegisteredEnvText('MISSION_ID') || undefined;
     // An invalid scope throws to the caller (its contract: e.g. direct-CLI
     // usage warns and records nothing rather than downgrading a tier).
-    const scope = input.scope ? normalizeEventScope(withBoundTenant(input.scope)) : undefined;
+    const scopeInput = bindMetricsScope(input.scope, input.mission_id);
+    const scope = scopeInput ? normalizeEventScope(withBoundTenant(scopeInput)) : undefined;
+    const missionId =
+      scope?.mission_id || input.mission_id || getRegisteredEnvText('MISSION_ID') || undefined;
     const record: ResourceUsageRecord = {
       type: 'resource_usage',
       usage_id:
@@ -656,6 +659,7 @@ export class MetricsCollector {
 
   record(componentName: string, durationMs: number, status: 'success' | 'error', extra: any = {}) {
     extra = { ...extra };
+    const scope = executionRowScope(extra.scope, extra.mission_id);
     const mem = process.memoryUsage();
     const memory = {
       heapUsedMB: Math.round((mem.heapUsed / 1024 / 1024) * 100) / 100,
@@ -798,8 +802,11 @@ export class MetricsCollector {
       agg.cacheIntegrityFailures += extra.cacheStats.integrityFailures || 0;
     }
 
-    const missionId = extra.mission_id || getRegisteredEnvText('MISSION_ID') || undefined;
-    const scope = executionRowScope(extra.scope);
+    const missionId =
+      (scope as EventScopeInput | undefined)?.mission_id ||
+      extra.mission_id ||
+      getRegisteredEnvText('MISSION_ID') ||
+      undefined;
     const persistedExtra = {
       ...extra,
       cause: normalizeUsageCause(extra.cause),
@@ -1325,15 +1332,29 @@ const REGRESSION_MIN_SAMPLES = 5;
  * bound tenant stamped on (as for usage rows); anything else is kept as given
  * and validated when the row is placed.
  */
-function executionRowScope(scope: unknown): unknown {
-  if (!scope || typeof scope !== 'object') return scope;
-  const stamped = withBoundTenant(scope as EventScopeInput);
+function executionRowScope(scope: unknown, missionId?: string): unknown {
+  if (scope !== undefined && (!scope || typeof scope !== 'object')) return scope;
+  const bound = bindMetricsScope(scope as EventScopeInput | undefined, missionId);
+  if (!bound) return scope;
+  const stamped = withBoundTenant(bound);
   if (stamped === scope) return scope;
   try {
     return normalizeEventScope(stamped);
   } catch {
     return stamped;
   }
+}
+
+function bindMetricsScope(scope: EventScopeInput | undefined, missionId?: string) {
+  const tenant = resolvePolicyIdentityContext().tenantSlug;
+  const tier = getRegisteredEnvText('KYBERION_TIER') as EventScopeInput['tier'];
+  const bound = bindEventScopeToExecution(scope, tier || (tenant ? 'confidential' : 'public'));
+  const resolved =
+    bound ?? (tenant ? { tier: tier || 'confidential', tenant_slug: tenant } : undefined);
+  if (resolved?.mission_id && missionId && resolved.mission_id !== missionId) {
+    throw new Error('[EVENT_SCOPE_LINEAGE_CONFLICT] mission_id conflicts with the recorded scope');
+  }
+  return resolved;
 }
 
 function ensureRegularFile(filePath: string): void {

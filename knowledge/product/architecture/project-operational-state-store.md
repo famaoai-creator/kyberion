@@ -174,7 +174,45 @@ Name, summary, and other descriptive fields can be edited while the project
 remains archived. `paused` stays available while work is live — it is the
 reversible wind-down hold; only `archived` requires settled work.
 
-Track creation and mutation belong to the same project facade:
+### Track in conversational and resident work
+
+A Track is a project-owned execution lane. It carries the lifecycle model,
+status, and optional gate profile, release, and required artifacts for a stream
+of related work. A project can run delivery, release, and operations tracks in
+parallel. A Track can span several missions. A mission or a bounded task session
+can carry an optional track reference to explain which stream it serves.
+A WorkItem retains its own execution and lease contracts.
+
+Stance selects the acting-for context when a person speaks to the conversational
+agent. Project and Track identify where that request belongs. The intent router
+can suggest a Track. Once work is admitted, use the work's recorded project and
+track to present progress and choose lifecycle guidance. An open work item or
+mission remains associated with its admitted work context if the conversation
+moves to a different Track.
+
+The tenant, organization, project, and tier continue to govern data access.
+Track selection organizes artifacts and work, and may narrow which context is
+relevant. It carries no standalone Grant. When resolving a Track reference for
+delegation or notifications, check its project, tenant, and tier against the
+admitted work. Validate a candidate before showing its summary or using its gate
+profile. A notice about a release can link to its Track while retaining the
+original observation scope and the existing viewer authorization checks.
+
+Context Pack selection gives a Mission's recorded Track precedence, followed
+by a Task Session's Track in the same project scope. Unbound work may select an
+active Track or take the operational project's first active Track as context.
+An unreadable or mismatched binding leaves the pack without Track guidance.
+This also excludes the Track's source and artifact hints, so a missing binding
+cannot silently pick up the project's current default.
+
+Mission CLI intent routing runs the confidence gate before preserving an
+already selected Track. When the intent provisions a Track, it uses the
+registered project's tier and tenant. Reusing the generated ID requires an
+active Track in that same project scope.
+
+### Track lifecycle commands
+
+Track creation and mutation belong to the same project facade.
 
 - `pnpm project track update --track-id <TRACK_ID> --name <NAME> --summary <TEXT>`
   edits descriptive fields. Release id, required artifacts, lifecycle model,
@@ -185,7 +223,7 @@ Track creation and mutation belong to the same project facade:
   become paused, completed or archived. A paused track may become active,
   completed or archived. A completed track may be archived. Archived tracks are
   terminal.
-- Moving a track out of active state requires closing its live missions first.
+- Moving a track out of active state requires closing its live missions and task sessions first.
   When a track changes status, mutation reconciles active track membership and
   selects an active replacement for the default track, or clears the default
   when none remains. Descriptive updates do not reselect the default track.

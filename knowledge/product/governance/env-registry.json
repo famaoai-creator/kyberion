@@ -4243,6 +4243,15 @@
       "subsystem": "tenancy"
     },
     {
+      "name": "KYBERION_STANCE_SCOPE_BOUND",
+      "category": "runtime",
+      "type": "boolean",
+      "required": false,
+      "description": "Set by the sourced stance activation profile to omit persisted and checkout-derived scope hints from the previous context.",
+      "documented": true,
+      "subsystem": "tenancy"
+    },
+    {
       "name": "KYBERION_STREAMING_STT_BRIDGE",
       "category": "runtime",
       "type": "string",

@@ -317,6 +317,41 @@ describe('scope-context', () => {
     ).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
+  it('does not restore previous scope or NHI claims after stance activation', () => {
+    const env = { KYBERION_SCOPE_ENV_PATH: 'active/shared/tmp/scope-context-stance.env' };
+    writeScopeEnv(
+      {
+        tier: 'confidential',
+        tenant_slug: 'tenant-a',
+        organization_id: 'org-a',
+        project_id: 'project-a',
+      },
+      env
+    );
+    try {
+      const activated = {
+        ...env,
+        KYBERION_STANCE: 'selected',
+        KYBERION_STANCE_SCOPE_BOUND: '1',
+        KYBERION_NHI_ID: '',
+        KYBERION_NHI_ACTOR: 'kyberion://agent/tenant-a/org-a/worker',
+      };
+      expect(resolveScopeResolution({}, activated).scope).toEqual({
+        tier: 'public',
+        customer_stance: 'selected',
+      });
+      expect(
+        resolveScopeResolution({}, { ...activated, KYBERION_TENANT: 'tenant-b' }).scope
+      ).toEqual({
+        tier: 'public',
+        customer_stance: 'selected',
+        tenant_slug: 'tenant-b',
+      });
+    } finally {
+      clearScopeEnv(env);
+    }
+  });
+
   it('pushes and pops the persisted scope', () => {
     const env = { KYBERION_SCOPE_ENV_PATH: 'active/shared/tmp/scope-push-pop-test.env' };
     clearScopeEnv(env);

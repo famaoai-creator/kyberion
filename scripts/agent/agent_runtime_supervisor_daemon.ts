@@ -38,6 +38,7 @@ import { continuousOperationsInFlight } from '../dot/dot_continuous_operations_s
 import { createTriggerRunner, resolveCurrentTriggerAuthority } from '@agent/core/trigger-runner';
 import {
   listDotCharters,
+  rereadOwnDotCharter,
   type DotCharter,
   type DotCharterLoadError,
   type LoadedDotCharter,
@@ -75,6 +76,7 @@ import { runDotHousekeeping } from '@agent/core/dot/dot-dispatch';
 import '@agent/core/dot/dot-extension-bootstrap';
 import { dotBudgetThrottle, type DotBudgetThrottle } from '@agent/core/dot/dot-budget';
 import { runAsDotCharter } from '@agent/core/dot/dot-key-results';
+import { resolveTenant } from '@agent/core/tenant-registry';
 import { notifyDotBudgetStopOnce } from '../dot/dot_budget_alert.js';
 import { tickVetoWindows } from '@agent/core/governance/approval-veto-window';
 import { getOperationsHaltState } from '@agent/core/governance/operations-halt';
@@ -454,6 +456,13 @@ async function runDotSweepWithStableOutputs(now: Date, deps: DotSweepDeps): Prom
       const housekeeping = await runAsDotCharter(loaded.charter, () =>
         runDotHousekeeping(loaded.charter, {
           now: () => now,
+          rereadCharter: () => {
+            const current = rereadOwnDotCharter(loaded);
+            if (current.scope.tenant_slug) {
+              resolveTenant(current.scope.tenant_slug);
+            }
+            return current;
+          },
           serviceCall: (input) =>
             executeServicePreset(
               input.service_id,

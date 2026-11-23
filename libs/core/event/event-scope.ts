@@ -6,6 +6,7 @@ import {
 import { isValidTenantSlug } from '../entity-scope.js';
 import type { TierLevel } from '../types.js';
 import { STORAGE_DATA_TIERS } from '../storage-layout.js';
+import { currentExecutionScope } from '../foundation/execution-scope.js';
 
 /** The deepest entity boundary carried by an event or ledger record. */
 export type EventScopeKind =
@@ -190,6 +191,38 @@ export function normalizeEventScope(input: EventScopeInput): EventScope {
     throw new Error(`[EVENT_SCOPE_INVALID] tenant_slug '${context.tenant_slug}' is not a tenant`);
   }
   return { ...context, scope_kind: scopeKind };
+}
+
+/** Stamp the entity bindings held by the current authority before recording evidence. */
+export function bindEventScopeToExecution(
+  supplied: EventScopeInput | undefined,
+  fallbackTier: TierLevel
+): EventScopeInput | undefined {
+  const execution = currentExecutionScope();
+  if (!execution) return supplied;
+  const bindings = {
+    tenant_slug: execution.tenantBound ? execution.tenantSlug : undefined,
+    organization_id: execution.organizationId,
+    project_id: execution.executionIdentity?.projectId,
+    mission_id: execution.executionIdentity?.missionId,
+    task_id: execution.executionIdentity?.taskId,
+  };
+  const entries = Object.entries(bindings) as [keyof typeof bindings, string | null | undefined][];
+  if (!entries.some(([, value]) => value != null) && !supplied) return undefined;
+
+  const resolved: EventScopeInput = { ...supplied, tier: supplied?.tier ?? fallbackTier };
+  for (const [key, value] of entries) {
+    if (value === undefined) continue;
+    const requested =
+      key === 'tenant_slug' ? (supplied?.tenant_slug ?? supplied?.tenant_id) : supplied?.[key];
+    if (requested !== undefined && (typeof requested !== 'string' || requested.trim() !== value)) {
+      throw new Error(
+        `[EVENT_SCOPE_LINEAGE_CONFLICT] ${key} conflicts with the active execution scope`
+      );
+    }
+    if (value !== null) resolved[key] = value;
+  }
+  return resolved;
 }
 
 /**

@@ -24,6 +24,7 @@ import { selectRelevantKnowledge } from '../knowledge/knowledge-relevance-judgme
 import { judgmentAssistReady } from '../reasoning/judgment-provider-bootstrap.js';
 import { loadProjectRecord } from '../project/project-registry.js';
 import { pathResolver } from '../path-resolver.js';
+import { KNOWLEDGE_TIER_RANK } from '../foundation/knowledge-tier.js';
 import { readTextFile } from '../foundation/text.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import type { ScopeContext } from '../scope-context.js';
@@ -185,8 +186,59 @@ export function workItemProjectId(
   workItem: WorkItem | null | undefined,
   missionId: string
 ): string | undefined {
-  const value = String(workItem?.project_id || '').trim();
+  const value = String(workItem?.context?.project_id || workItem?.project_id || '').trim();
   return value && value !== missionId ? value : undefined;
+}
+
+/** Check the supplied records before using their content as retrieval or prompt input. */
+export function assertContextPackInputLineage(
+  input: Pick<LoadKnowledgeHintsInput, 'missionState' | 'projectState' | 'workItem' | 'taskSession'>
+): void {
+  const { missionState, projectState, workItem, taskSession } = input;
+  const missionProject = missionState.relationships?.project;
+  const work = workItem?.context;
+  const session = taskSession?.project_context;
+  const flatWorkProject =
+    workItem?.project_id === missionState.mission_id ? undefined : workItem?.project_id;
+  const bindings = {
+    tenant_slug: [
+      missionState.tenant_slug ?? missionState.tenant_id,
+      projectState?.tenant_slug,
+      work?.tenant_slug,
+      session?.tenant_slug,
+    ],
+    organization_id: [
+      missionState.organization_id,
+      missionProject?.organization_id,
+      projectState?.metadata?.organization_id,
+      work?.organization_id,
+    ],
+    project_id: [
+      missionProject?.project_id,
+      projectState?.project_id,
+      work?.project_id,
+      flatWorkProject,
+      session?.project_id,
+    ],
+    mission_id: [missionState.mission_id, work?.mission_id],
+  };
+  for (const [key, values] of Object.entries(bindings)) {
+    const known = new Set<string>();
+    for (const value of values) {
+      if (typeof value === 'string' && value.trim()) known.add(value.trim());
+    }
+    if (known.size > 1) {
+      throw new Error(`[CONTEXT_PACK_LINEAGE_CONFLICT] ${key} differs across source records`);
+    }
+  }
+  const missionTier = KNOWLEDGE_TIER_RANK[missionState.tier];
+  if (
+    [projectState?.tier, session?.tier].some(
+      (tier) => tier && KNOWLEDGE_TIER_RANK[tier] > missionTier
+    )
+  ) {
+    throw new Error('[CONTEXT_PACK_LINEAGE_CONFLICT] a source tier exceeds the mission tier');
+  }
 }
 
 function tenantSlugFromContext(input: {
@@ -356,6 +408,13 @@ export async function narrowKnowledgeHintsWithJudgment(
 export async function loadKnowledgeHintsIfPossible(
   input: LoadKnowledgeHintsInput
 ): Promise<MissionContextPackKnowledgeHint[]> {
+  try {
+    assertContextPackInputLineage(input);
+  } catch {
+    // Advisory lookup contributes no knowledge when its inputs disagree.
+    // The pack builder still refuses the same conflict before assembly.
+    return [];
+  }
   const topic = [
     input.missionState.mission_type,
     input.teamRole,

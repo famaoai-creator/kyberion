@@ -1,6 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import { normalizeEventScope } from '../event/event-scope.js';
+import { checkFiniteStateSafety } from '../testing/finite-state-checker.js';
 const fixture = vi.hoisted(() => ({ approval: null as ApprovalRequestRecord | null }));
 vi.mock('../governance/approval-store-reader.js', () => ({
   loadApprovalRequest: () => fixture.approval,
@@ -48,6 +49,80 @@ const claim = (id: string) =>
     requireNewLease: true,
   });
 describe('durable effect ownership mutations', () => {
+  it('fences a declared target independent of Dot identity and lease expiry', () => {
+    const scenarios = [false, true].flatMap((isDot) =>
+      (['live', 'expired', 'completed'] as const).map((phase) => ({ phase, isDot }))
+    );
+    type State =
+      | { stage: 'initial' }
+      | {
+          stage: 'checked';
+          phase: string;
+          isDot: boolean;
+          held: boolean;
+          rivalClaimed: boolean;
+        };
+    const result = checkFiniteStateSafety<State>({
+      initial: [{ stage: 'initial' }],
+      key: JSON.stringify,
+      next: (state) =>
+        state.stage === 'initial'
+          ? scenarios.map(({ phase, isDot }) => {
+              clearWorkCoordinationStore();
+              createWorkItem({
+                itemId: 'owner',
+                title: 'External action',
+                description: 'Test',
+                status: 'ready',
+                metadata: { target: 'service:shared', ...(isDot ? { dot_id: 'owner' } : {}) },
+              });
+              create('rival');
+              const owned = claimWorkItem({
+                itemId: 'owner',
+                actorPeerId: 'worker-a',
+                purpose: 'test',
+              });
+              if (phase === 'completed') {
+                releaseWorkItem({
+                  itemId: 'owner',
+                  leaseId: owned.lease.lease_id,
+                  actorPeerId: 'worker-a',
+                  effectDisposition: 'completed',
+                  nextStatus: 'done',
+                });
+              } else if (phase === 'expired') {
+                reapExpiredWorkLeases({
+                  now: new Date(Date.parse(owned.lease.expires_at) + 1).toISOString(),
+                });
+              }
+              let rivalClaimed = false;
+              try {
+                claim('rival');
+                rivalClaimed = true;
+              } catch (error) {
+                expect(String(error)).toContain('ownership');
+              }
+              return {
+                action: phase,
+                state: {
+                  stage: 'checked',
+                  phase,
+                  isDot,
+                  rivalClaimed,
+                  held: getWorkItem('owner')?.effect_ownership?.state === 'held',
+                },
+              };
+            })
+          : [],
+      invariants: {
+        onlySettlementReleases: (state) =>
+          state.stage === 'initial' ||
+          (state.held === (state.phase !== 'completed') && state.rivalClaimed === !state.held),
+      },
+    });
+    expect(result).toMatchObject({ status: 'verified', transitions: 6 });
+  });
+
   it.each([false, true])(
     'keeps an uncertain external target fenced through reaping unless completion evidence is present (%s)',
     (hasEvidence) => {

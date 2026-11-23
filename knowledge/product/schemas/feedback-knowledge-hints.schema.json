@@ -13,6 +13,17 @@
       "hint": { "type": "string", "minLength": 1 },
       "source": { "type": "string", "minLength": 1 },
       "confidence": { "type": "number" },
+      "review_rejection": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["mission_id", "detail"],
+        "properties": {
+          "mission_id": { "type": "string", "minLength": 1 },
+          "organization_id": { "type": "string", "minLength": 1 },
+          "project_id": { "type": "string", "minLength": 1 },
+          "detail": { "type": "string", "minLength": 1 }
+        }
+      },
       "tags": { "type": "array", "items": { "type": "string", "minLength": 1 } },
       "tier": {
         "type": "string",

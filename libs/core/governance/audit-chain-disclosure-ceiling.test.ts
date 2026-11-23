@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { withStoreGrant } from '../authority.js';
+import { withExecutionContext, withStoreGrant } from '../authority.js';
 import { scopedAssumedRole } from '../foundation/execution-scope.js';
 import {
   currentResourceAccessScope,
@@ -102,7 +102,21 @@ describe('store grant disclosure record inside an exact resource ceiling', () =>
         withStoreGrant('concierge_management_reader', read, { tenantSlug: 'acme-corp' })
       )
     ).toBe('read');
-    expect(appends).toHaveLength(1);
+    expect(
+      withExecutionContext(
+        'surface_runtime',
+        () =>
+          runInResourceAccessScope(CEILING, () =>
+            withStoreGrant('concierge_management_reader', read, { tenantSlug: 'acme-corp' })
+          ),
+        undefined,
+        'ambient-co',
+        'org-ambient',
+        { projectId: 'project-ambient' }
+      )
+    ).toBe('read');
+    expect(appends).toHaveLength(2);
+    expect(JSON.parse(appends[1]!.content.trim()).scope).toMatchObject({ scope_kind: 'system' });
     expect(appends[0]!.file).toContain(path.join('shared', 'logs', 'audit'));
     const entry = JSON.parse(appends[0]!.content.trim());
     expect(entry.tenantSlug).toBeUndefined();

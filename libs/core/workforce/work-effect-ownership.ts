@@ -61,7 +61,7 @@ export function declaredWorkTarget(item: WorkItem): string | undefined {
   return target;
 }
 
-/** Conservatively adopt legacy targeted dot attempts, before any mutable metadata can replace them. */
+/** Conservatively adopt legacy targeted attempts before mutable metadata can replace them. */
 export function workEffectOwnership(item: WorkItem): WorkEffectOwnership | undefined {
   if (item.effect_ownership !== undefined) {
     const hold = item.effect_ownership;
@@ -101,7 +101,6 @@ export function workEffectOwnership(item: WorkItem): WorkEffectOwnership | undef
       );
     return hold;
   }
-  if (typeof item.metadata?.dot_id !== 'string') return undefined;
   const target = declaredWorkTarget(item);
   if (!target) return undefined;
   const executor = item.metadata?.dot_executor as Record<string, unknown> | undefined;
@@ -119,7 +118,12 @@ export function workEffectOwnership(item: WorkItem): WorkEffectOwnership | undef
   return {
     target,
     attempt_id: item.current_attempt_id ?? attempt?.run_id ?? `legacy:${item.item_id}`,
-    actor_id: attempt?.actor_peer_id ?? `dot:${item.metadata.handoff_to ?? item.metadata.dot_id}`,
+    actor_id:
+      attempt?.actor_peer_id ??
+      item.claimed_by_peer_id ??
+      (typeof item.metadata?.dot_id === 'string'
+        ? `dot:${item.metadata.handoff_to ?? item.metadata.dot_id}`
+        : `legacy:${item.item_id}`),
     ...(item.context?.tenant_slug ? { tenant_slug: item.context.tenant_slug } : {}),
     state: 'held',
     acquired_at: attempt?.started_at ?? item.updated_at,

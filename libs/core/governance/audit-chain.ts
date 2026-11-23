@@ -23,11 +23,13 @@ import {
 } from './chain-integrity.js';
 export { registerChainIntegrityIo } from './chain-integrity.js';
 import {
+  bindEventScopeToExecution,
   eventScopeMatches,
   normalizeEventScope,
   parseEventScopeFromRecord,
   type EventScope,
   type EventScopeFilter,
+  type EventScopeInput,
 } from '../event/event-scope.js';
 import { parseActorRef, type ActorRef } from '../contracts/actor.js';
 import {
@@ -645,8 +647,9 @@ class AuditChainImpl {
     const requestedTenant = entry.tenantSlug ?? entry.scope?.tenant_slug ?? activeTenantSlug;
     const requestedTenantSlug =
       requestedTenant && isValidTenantSlug(requestedTenant) ? requestedTenant : undefined;
-    const scope = resolveAuditScope(entry.scope, requestedTenantSlug, fallbackTier);
-    if (entry.scope && !scope) {
+    const boundScope = bindEventScopeToExecution(entry.scope, fallbackTier);
+    const scope = resolveAuditScope(boundScope, requestedTenantSlug, fallbackTier);
+    if (boundScope && !scope) {
       throw new Error('[AUDIT_SCOPE_INVALID] explicit audit scope failed validation');
     }
     return {
@@ -1254,7 +1257,7 @@ class AuditChainImpl {
 }
 
 function resolveAuditScope(
-  scope: EventScope | undefined,
+  scope: EventScopeInput | undefined,
   tenantSlug: string | undefined,
   fallbackTier: EventScope['tier'] = (getRegisteredEnvText(
     'KYBERION_TIER'

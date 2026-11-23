@@ -107,6 +107,10 @@ Mission state
                   -> distill back into knowledge
 ```
 
+Assembly and knowledge retrieval check the tenant, organization, project and
+mission IDs carried by the source records before using their content. Explicit
+conflicts and source tiers more restrictive than the mission tier stop assembly.
+
 ## Storage path
 
 Mission context packs are mission-local artifacts and should be written under:

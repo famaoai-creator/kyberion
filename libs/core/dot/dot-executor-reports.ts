@@ -200,7 +200,7 @@ export function readDotSignalSnapshot(
 ): Record<string, 0 | 1> | undefined {
   let rows: ReturnType<typeof readDotSignals>;
   try {
-    rows = readDotSignals(c.dot_id, { rootDir: deps.rootDir });
+    rows = readDotSignals(c.dot_id, { rootDir: deps.rootDir, charter: c });
   } catch {
     return undefined;
   }

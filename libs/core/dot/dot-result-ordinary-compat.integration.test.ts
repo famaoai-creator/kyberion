@@ -169,6 +169,51 @@ function fixture(role: 'ecosystem_architect' | 'infrastructure_sentinel' = 'ecos
   return { id, charter, charterFile, action, file, deps, item, ordinary, row };
 }
 describe('ordinary confidential result authority compatibility', () => {
+  it('places a fresh signal alert in the exact project inbox via resident housekeeping', async () => {
+    const f = fixture();
+    const { runAsDotCharter } = await import('./dot-key-results.js');
+    const { listInboxEntries } = await import('../task/deliverable-inbox.js');
+    const { rereadOwnDotCharter } = await import('./dot-charter.js');
+    const source = state.dotStatePath(f.charter, 'meeting-material.txt');
+    io.safeWriteFile(path.join(root, source), 'unfinished', { mkdir: true });
+    const charter: DotCharter = {
+      ...f.charter,
+      goal: {
+        ...f.charter.goal,
+        signal_probes: [
+          {
+            signal: 'meeting material',
+            probe: { type: 'file', path: source, expect: 'matches', regex: '^ready$' },
+          },
+        ],
+      },
+      notification: { ...f.charter.notification, signal_alerts: { max_age_s: 3600 } },
+    };
+    io.safeWriteFile(f.charterFile, JSON.stringify(charter));
+    const result = await runAsDotCharter(charter, () =>
+      dispatch.runDotHousekeeping(charter, {
+        rootDir: root,
+        now: () => new Date('2026-11-24T09:00:00Z'),
+        rereadCharter: () =>
+          rereadOwnDotCharter({
+            path: f.charterFile,
+            charter,
+            tenant_slug: charter.scope.tenant_slug,
+          }),
+      })
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.signals).toBe(1);
+    expect(listInboxEntries({ scope: charter.scope })).toEqual([
+      expect.objectContaining({
+        kind: 'operator_notification',
+        tier: 'confidential',
+        tenant_slug: charter.scope.tenant_slug,
+        project_id: charter.scope.project_id,
+      }),
+    ]);
+  });
+
   it('records the actual continuation entrypoint with a real claim and retains its full terminal evidence', () => {
     const f = fixture();
     const before = f.item();

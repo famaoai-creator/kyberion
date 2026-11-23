@@ -129,6 +129,26 @@ describe('knowledge-index', () => {
       expect(browserHint!.tags).toEqual(['browser']);
     });
 
+    it('indexes review guidance without indexing legacy case details', async () => {
+      fs.writeFileSync(
+        path.join(HINTS_DIR, 'human-rejection.json'),
+        JSON.stringify([
+          {
+            topic: 'human-rejection:scope',
+            hint: 'An old artifact ID and reviewer comment',
+            confidence: 0.8,
+          },
+        ])
+      );
+      const index = await buildKnowledgeIndex(TEST_ROOT);
+      expect(index.hints).toContainEqual(
+        expect.objectContaining({
+          topic: 'human-rejection:scope',
+          hint: 'Check that the deliverable covers the requested scope and avoids unrelated work.',
+        })
+      );
+    });
+
     it('skips unsafe or malformed persisted hint records', async () => {
       fs.writeFileSync(
         path.join(HINTS_DIR, 'unsafe-hints.json'),

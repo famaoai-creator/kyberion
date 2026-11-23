@@ -3473,6 +3473,16 @@
       "group": "start"
     },
     {
+      "id": "script.onboarding.check",
+      "module": "scripts/onboarding/onboarding_identity_check.ts",
+      "command": "onboarding check",
+      "noun": "onboarding",
+      "verb": "check",
+      "audience": "operator",
+      "description": "cli_cmd_script_onboarding_check",
+      "group": "start"
+    },
+    {
       "id": "script.onboarding.context",
       "script": "onboarding:context",
       "command": "onboarding context",

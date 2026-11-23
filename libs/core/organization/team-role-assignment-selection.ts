@@ -244,6 +244,8 @@ export interface SelectAgentForTeamRoleInput {
   separation?: RoleSeparationConstraints;
   /** NI-01: org segment for the derived nhi_id; defaults to the active organization profile. */
   organizationId?: string;
+  /** Null explicitly selects tenantless staffing. */
+  tenantSlug?: string | null;
   tier?: string;
   providerPreference?: TeamProviderPreference;
   requestedSelection?: MissionTeamRoleSelection;
@@ -565,7 +567,10 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
       // NI-01: canonical durable-identity name for the selected agent
       // (kyberion://agent/<tenant>/<org|_>/<slug>). Pure derivation — the provisioned
       // ledger record is ensured downstream at staffing/spawn time.
-      runtime_identity: deriveAgentNhiId(winner.agentId, organizationId),
+      runtime_identity:
+        input.tenantSlug === null
+          ? null
+          : deriveAgentNhiId(winner.agentId, organizationId, input.tenantSlug),
       authority_role: winner.authorityRole,
       delegation_contract: {
         ownership_scope: teamRoleRecord.ownership_scope,

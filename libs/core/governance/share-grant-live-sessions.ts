@@ -18,6 +18,8 @@ export const SHARE_GRANT_LIVE_SESSIONS_PATH = pathResolver.shared(
 export interface ShareGrantLiveSessionRegistryOptions {
   storePath?: string;
   persist?: boolean;
+  now?: () => number;
+  isLinkActive?: (resourceRef: string, linkId: string) => boolean;
 }
 
 interface PersistedLiveSessionState {
@@ -51,7 +53,13 @@ function requiredTimestamp(value: unknown, label: string): string {
 }
 
 const LIVE_SESSION_STATE_FIELDS = ['version', 'sessions', 'revokedScopes'] as const;
-const LIVE_SESSION_FIELDS = ['sessionId', 'linkId', 'resourceRef', 'connectedAt'] as const;
+const LIVE_SESSION_FIELDS = [
+  'sessionId',
+  'linkId',
+  'resourceRef',
+  'connectedAt',
+  'expiresAt',
+] as const;
 const LIVE_SESSION_STATE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/share-grant-live-session-state.schema.json'
 );
@@ -104,7 +112,7 @@ function parsePersistedLiveSessionState(value: unknown): PersistedLiveSessionSta
   });
 
   const sessionIds = new Set<string>();
-  const sessions = root.sessions.map((candidate, index) => {
+  const sessions = root.sessions.flatMap((candidate, index) => {
     const record = parseSafeJsonObjectValue(candidate, `live-session state sessions[${index}]`);
     const allowedSessionFields = new Set<string>(LIVE_SESSION_FIELDS);
     if (Object.keys(record).some((key) => !allowedSessionFields.has(key))) {
@@ -120,7 +128,11 @@ function parsePersistedLiveSessionState(value: unknown): PersistedLiveSessionSta
       throw new ShareGrantLiveSessionValidationError(`session[${index}].sessionId is duplicated`);
     }
     sessionIds.add(session.sessionId);
-    return session;
+    // Legacy registrations must reconnect to bind the current link expiry.
+    if (record.expiresAt === undefined) return [];
+    return [
+      { ...session, expiresAt: requiredTimestamp(record.expiresAt, `session[${index}].expiresAt`) },
+    ];
   });
 
   return { version: 1, sessions, revokedScopes };
@@ -136,12 +148,16 @@ function parsePersistedLiveSessionState(value: unknown): PersistedLiveSessionSta
 export class ShareGrantLiveSessionRegistry implements ShareGrantLiveSessionEvictor {
   readonly #storePath: string;
   readonly #persist: boolean;
+  readonly #now: () => number;
+  readonly #isLinkActive?: ShareGrantLiveSessionRegistryOptions['isLinkActive'];
   readonly #sessions = new Map<string, ShareGrantLiveSessionRegistration>();
   readonly #revokedScopes = new Set<string>();
 
   constructor(options: ShareGrantLiveSessionRegistryOptions = {}) {
     this.#storePath = options.storePath ?? SHARE_GRANT_LIVE_SESSIONS_PATH;
     this.#persist = options.persist ?? false;
+    this.#now = options.now ?? Date.now;
+    this.#isLinkActive = options.isLinkActive;
     if (this.#persist) this.#load();
   }
 
@@ -151,8 +167,15 @@ export class ShareGrantLiveSessionRegistry implements ShareGrantLiveSessionEvict
       linkId: required(input.linkId, 'linkId'),
       resourceRef: required(input.resourceRef, 'resourceRef'),
       connectedAt: requiredTimestamp(input.connectedAt, 'connectedAt'),
+      expiresAt: requiredTimestamp(input.expiresAt, 'expiresAt'),
     };
     return this.#mutate(() => {
+      if (
+        Date.parse(session.expiresAt) <= this.#now() ||
+        Date.parse(session.connectedAt) >= Date.parse(session.expiresAt)
+      ) {
+        throw new ShareGrantLiveSessionValidationError('share-link session has expired');
+      }
       if (this.#revokedScopes.has(scopeKey(session.linkId, session.resourceRef))) {
         throw new ShareGrantLiveSessionValidationError(
           `share-link ${session.linkId} has already been revoked`
@@ -177,15 +200,18 @@ export class ShareGrantLiveSessionRegistry implements ShareGrantLiveSessionEvict
   listActive(input?: { linkId?: string; resourceRef?: string }): ShareGrantLiveSessionSummary[] {
     const linkId = input?.linkId?.trim();
     const resourceRef = input?.resourceRef?.trim();
-    return this.#read(() =>
-      [...this.#sessions.values()]
+    return this.#read(() => {
+      const now = this.#now();
+      return [...this.#sessions.values()]
         .filter(
           (session) =>
+            Date.parse(session.expiresAt) > now &&
             (!linkId || session.linkId === linkId) &&
-            (!resourceRef || session.resourceRef === resourceRef)
+            (!resourceRef || session.resourceRef === resourceRef) &&
+            (this.#isLinkActive?.(session.resourceRef, session.linkId) ?? true)
         )
-        .map((session) => ({ ...session }))
-    );
+        .map((session) => ({ ...session }));
+    });
   }
 
   evictShareLinkSessions(
@@ -243,6 +269,7 @@ export class ShareGrantLiveSessionRegistry implements ShareGrantLiveSessionEvict
         linkId: session.linkId,
         resourceRef: session.resourceRef,
         connectedAt: session.connectedAt,
+        expiresAt: session.expiresAt,
       };
       if (revokedScopes.has(scopeKey(normalized.linkId, normalized.resourceRef))) {
         continue;

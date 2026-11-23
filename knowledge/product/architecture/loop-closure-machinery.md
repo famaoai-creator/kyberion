@@ -71,8 +71,9 @@ L4 人間フィードバック 却下 → ask-why 1問(5カテゴリ) → イベ
           - `L2_requirement_process`(`scope`): `product_strategist` 仕様更新 → 依存 `implementer` → `reviewer`
           - `L3_implementation_model`(`incorrect_content`/`quality`/`other`): 有界 `implementer` 修正 → `reviewer`
       → 上限 KYBERION_GOAL_LOOP_MAX_ROUNDS(既定2)、超過は operator エスカレーション
-  → [学習] human-rejection:<category> の KnowledgeHint を persist
-      (knowledge index に自動取り込み → 次回同型作業の検索に乗る)
+  → [学習] human-rejection:<category>:<request-id> の KnowledgeHint を保存
+      (テナント内で共有。ナレッジ検索にはカテゴリ別の教訓を取り込む)
+      (ワーカーには同じ Mission、同じ Project の順で具体例を優先し、別 Project は教訓のみ)
       + KM-03 promotion queue に memory candidate(統治付き、直接 HINTS.md は書かない)
 ```
 

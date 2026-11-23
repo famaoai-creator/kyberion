@@ -195,7 +195,7 @@ export async function delegateSubagentTask(input: {
 
   const wantsFiles = workItemExpectsFiles(input.item);
   const previousTools = getRegisteredEnvText('KYBERION_CLAUDE_AGENT_TOOLS');
-  if (wantsFiles && previousTools === undefined) {
+  if (input.purpose !== 'review' && wantsFiles && previousTools === undefined) {
     setRegisteredEnv('KYBERION_CLAUDE_AGENT_TOOLS', '1');
     input.notes.push('agentic tools auto-enabled (work item expects file output)');
   }

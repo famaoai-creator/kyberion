@@ -182,7 +182,13 @@ This stage binds:
 - role boundaries
 - risk controls
 
+Effective share grants are recalculated from active edges and current resource provenance. A downstream grant requires a reachable grantor with operate access. Parallel grant paths retain the strongest reachable role and the strictest audience floor, independent of record order.
+
+Live share-link registrations copy the link's expiry from the graph and leave the active registry view at that boundary. The Concierge registry rechecks current provenance, tenant status and grant reachability on active reads. A persisted graph reloads changed, verified ledger state before serving share-link access, including revocations issued in another process. Explicit revocation evicts matching registrations and prevents re-registration. Legacy registrations without a recorded expiry require reconnection.
+
 ### 4.8 Execution
+
+A WorkItem that declares an external effect target acquires effect ownership when claimed. Scheduling lease expiry does not settle that ownership. Conflicting work waits for the original attempt's completion evidence or its governed settlement.
 
 The actual work:
 

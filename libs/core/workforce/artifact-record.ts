@@ -177,39 +177,52 @@ export function attachArtifactRecordToTaskSession(
   sessionId: string,
   record: ArtifactRecord
 ): TaskSession | null {
-  appendArtifactOwnershipRecord(
-    createArtifactOwnershipRecord({
-      artifact_id: record.artifact_id,
-      tenant_slug: record.tenant_slug,
-      organization_id: record.organization_id,
-      project_id: record.project_id,
-      mission_id: record.mission_id,
-      task_session_id: record.task_session_id || sessionId,
-      kind: record.kind,
-      storage_class: record.storage_class,
-      path: record.path,
-      external_ref: record.external_ref,
-      ...(record.metadata ? { metadata: record.metadata } : {}),
-      evidence_refs: Array.isArray((record.metadata as any)?.evidence_refs)
-        ? ((record.metadata as any).evidence_refs as string[])
-        : [],
-    }),
-    { for_delivery: true }
-  );
-  return updateTaskSession(sessionId, (session) => ({
-    artifact: {
-      ...(session.artifact || {}),
-      kind: record.kind,
-      output_path: record.path || session.artifact?.output_path,
-      preview_text: record.preview_text || session.artifact?.preview_text,
-      artifact_id: record.artifact_id,
-      project_id: record.project_id,
-      track_id: record.track_id,
-      track_name: record.track_name,
-      mission_id: record.mission_id,
-      storage_class: record.storage_class,
-      external_ref: record.external_ref,
-    },
-    ...(record.work_loop ? { work_loop: record.work_loop } : {}),
-  }));
+  if (record.task_session_id && record.task_session_id !== sessionId) {
+    throw new Error('[ARTIFACT_SESSION_MISMATCH] Artifact belongs to a different task session');
+  }
+  return updateTaskSession(sessionId, (session) => {
+    const context = session.project_context;
+    if (
+      context?.tenant_slug !== record.tenant_slug ||
+      (context?.project_id && context.project_id !== record.project_id)
+    ) {
+      throw new Error(
+        '[ARTIFACT_SESSION_SCOPE_MISMATCH] Artifact is outside the task session scope'
+      );
+    }
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        artifact_id: record.artifact_id,
+        tenant_slug: record.tenant_slug,
+        organization_id: record.organization_id,
+        project_id: record.project_id,
+        mission_id: record.mission_id,
+        task_session_id: record.task_session_id || sessionId,
+        kind: record.kind,
+        storage_class: record.storage_class,
+        path: record.path,
+        external_ref: record.external_ref,
+        ...(record.metadata ? { metadata: record.metadata } : {}),
+        evidence_refs: Array.isArray((record.metadata as any)?.evidence_refs)
+          ? ((record.metadata as any).evidence_refs as string[])
+          : [],
+      }),
+      { for_delivery: true }
+    );
+    return {
+      artifact: {
+        kind: record.kind,
+        output_path: record.path,
+        preview_text: record.preview_text,
+        artifact_id: record.artifact_id,
+        project_id: record.project_id,
+        track_id: record.track_id,
+        track_name: record.track_name,
+        mission_id: record.mission_id,
+        storage_class: record.storage_class,
+        external_ref: record.external_ref,
+      },
+      ...(record.work_loop ? { work_loop: record.work_loop } : {}),
+    };
+  });
 }

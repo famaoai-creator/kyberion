@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { checkFiniteStateSafety } from '../testing/finite-state-checker.js';
 import {
   acquireCoSessionLease,
   ackCoSessionHandoff,
@@ -339,6 +340,49 @@ describe('co-session', () => {
       participant_id: 'claude-b',
     });
     expect(acked.acked_by_participant_id).toBe('claude-b');
+    type State =
+      | { stage: 'initial' }
+      | {
+          stage: 'replayed';
+          provider: string;
+          participant_id: string;
+          returned: boolean;
+        };
+    expect(
+      checkFiniteStateSafety<State>({
+        initial: [{ stage: 'initial' }],
+        key: JSON.stringify,
+        next: (state) =>
+          state.stage === 'initial'
+            ? ['claude', 'codex'].flatMap((provider) =>
+                ['claude-a', 'claude-b'].map((participant_id) => {
+                  let returned = false;
+                  try {
+                    const receipt = ackCoSessionHandoff({
+                      session_id: 'cos-twin',
+                      handoff_id: handoff.handoff_id,
+                      provider,
+                      participant_id,
+                    });
+                    expect(receipt).toEqual(acked);
+                    returned = true;
+                  } catch (error) {
+                    if (!(error instanceof CoSessionError)) throw error;
+                  }
+                  return {
+                    action: 'replay ACK',
+                    state: { stage: 'replayed', provider, participant_id, returned },
+                  };
+                })
+              )
+            : [],
+        invariants: {
+          onlyRecipient: (state) =>
+            state.stage === 'initial' ||
+            state.returned === (state.provider === 'claude' && state.participant_id === 'claude-b'),
+        },
+      })
+    ).toMatchObject({ status: 'verified', transitions: 4 });
   });
 
   it('appends blackboard notes and leaves releasing own leases', () => {

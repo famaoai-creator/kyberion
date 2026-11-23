@@ -6,6 +6,7 @@ import { isValidTenantSlug } from '../foundation/scope.js';
 import {
   LEGACY_STANCE_ENV_VAR,
   STANCE_ENV_VAR,
+  STANCE_SCOPE_BOUND_ENV_VAR,
   STANCE_SLUG_PATTERN,
   STANCES_DIR,
   __stanceEnvTest__,
@@ -34,7 +35,7 @@ import {
  * and customer records under `knowledge/confidential/{tenant}/`.
  */
 
-export { LEGACY_STANCE_ENV_VAR, STANCE_ENV_VAR, STANCES_DIR };
+export { LEGACY_STANCE_ENV_VAR, STANCE_ENV_VAR, STANCE_SCOPE_BOUND_ENV_VAR, STANCES_DIR };
 const SLUG_PATTERN = STANCE_SLUG_PATTERN;
 /** Organization ids follow the Chronos scope id grammar. */
 const ORGANIZATION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
