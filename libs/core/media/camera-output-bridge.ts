@@ -87,9 +87,10 @@ export function listCameraOutputBridges(): CameraOutputBridge[] {
 
 /**
  * Resolve a backend by explicit id, or the first probed-available
- * backend in registration order for `auto`. Never silently falls
- * back to a stub — when nothing usable is probed the error lists
- * every backend's reason so the operator knows what to install.
+ * backend in id order for `auto` (the seam lists providers sorted by
+ * id, not in registration order). Never silently falls back to a stub —
+ * when nothing usable is probed the error lists every backend's reason
+ * so the operator knows what to install.
  */
 export async function resolveCameraOutputBridge(preference?: string): Promise<CameraOutputBridge> {
   const bridges = listCameraOutputBridges();

@@ -65,6 +65,9 @@ export class BoundedVideoQueue {
     }
     if (this.policy.overflow === 'fail') {
       const error = new Error('video queue overflow');
+      // The rejected incoming frame is a drop too — keep the metrics
+      // consistent with drop_newest before poisoning the queue.
+      this.recordDrop(durationMs);
       this.failure = error;
       this.close(error);
       throw error;
