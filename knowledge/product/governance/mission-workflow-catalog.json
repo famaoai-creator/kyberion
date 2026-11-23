@@ -10678,7 +10678,7 @@
       "id": "gate-review-session",
       "playbook_ref": "knowledge/product/orchestration/mission-playbooks/it-delivery-operations-governance.md",
       "pattern": "stage_gated_delivery",
-      "description": "ゲーティング会議体(会議体)を開催して判定を記録する汎用セレモニー。準備(gate-review-packet 作成) → 判定会(Go/Conditional Go/No-Go) → 議事録記録。どのゲート(gate-profiles)・どの会議体(governance-body-registry)にも適用でき、他のデリバリ/インシデントワークフローのゲートを正式な判断会議として運用するために用いる。",
+      "description": "ゲーティング会議体(会議体)を開催して判定を記録する汎用セレモニー。AI評価(gate-ai-assessment: 推奨判定・確信度・基準別スコア) → 準備(gate-review-packet 作成) → 判定会(人間が Go/Conditional Go/No-Go を最終決裁) → 議事録記録。どのゲート(gate-profiles)・どの会議体(governance-body-registry)にも適用でき、他のデリバリ/インシデントワークフローのゲートを正式な判断会議として運用するために用いる。AI評価が低確信・必須基準未充足・必須成果物欠落・証跡陳腐化の場合は PACKET_READY ゲートが開催をブロックする(人間オーバーライド可)。",
       "match": {
         "mission_classes": [
           "strategy_and_governance",
@@ -10691,16 +10691,32 @@
       "phases": [
         {
           "id": "prepare",
-          "title": "判定資料準備",
+          "title": "AI評価・判定資料準備",
           "kind": "judgment",
           "default_tasks": [
             {
+              "task_id_suffix": "ai-assessment",
+              "team_role": "reviewer",
+              "description": "対象ゲート(gate-profiles)の exit_criteria・required_artifacts・preconditions と利用可能な証跡をAIが評価し、推奨判定(go/conditional_go/no_go/hold)・確信度・基準別 status/score・リスク・不足証跡・評価した証跡の sha256 を evidence/gate-ai-assessment.json に記録する(契約: knowledge/product/schemas/gate-ai-assessment.schema.json)。AI評価は助言であり、最終決裁は会議体が行う",
+              "deliverable": "evidence/gate-ai-assessment.json",
+              "acceptance_criteria": [
+                "gate_id と recommended_verdict・confidence が記録されている",
+                "対象ゲートの exit_criteria ごとに status と根拠がある",
+                "required_artifacts の充足状態(present/missing/insufficient)がある",
+                "評価に用いた証跡の evaluated_evidence sha256 が記録されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "medium"
+            },
+            {
               "task_id_suffix": "packet",
               "team_role": "planner",
-              "description": "対象ゲートの gate-review-packet(サマリ・準備状況・exit基準チェック・リスク/課題・判定案・条件)を evidence/gate-review-packet.md に作成する。会議体の開催事前条件(preconditions)を満たすこと",
+              "description": "対象ゲートの gate-review-packet(サマリ・準備状況・exit基準チェック・リスク/課題・判定案・条件)を evidence/gate-review-packet.md に作成する。gate-ai-assessment.json の推奨判定・確信度・未充足基準・条件案を packet に取り込み、会議体の開催事前条件(preconditions)を満たすこと",
               "deliverable": "evidence/gate-review-packet.md",
               "acceptance_criteria": [
                 "決裁者・必要成果物・exit基準が明示されている",
+                "AI評価の推奨判定・確信度・未充足項目が packet に反映されている",
                 "会議体の開催事前条件が満たされている"
               ],
               "expected_output_format": "files",
@@ -10717,6 +10733,29 @@
                 "params": {
                   "path": "evidence/gate-review-packet.md"
                 }
+              },
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/gate-ai-assessment.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check/check_gate_ai_assessment.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "assessment"
+                  ],
+                  "cwd": "{REPO_ROOT}",
+                  "timeoutMs": 120000
+                }
               }
             ]
           }
@@ -10729,10 +10768,11 @@
             {
               "task_id_suffix": "decision",
               "team_role": "reviewer",
-              "description": "アジェンダに沿って会議体を開催し、定足数のもとで Go / Conditional Go / No-Go を判定し evidence/gate-decision-record.json に決裁者・判定・条件・期限を記録する",
+              "description": "アジェンダに沿って会議体を開催し、定足数のもとで人間が Go / Conditional Go / No-Go / Hold を最終決裁し evidence/gate-decision-record.json に decision・decider・decided_at・条件・期限と、判定の根拠となった AI 評価への束縛(ai_assessment_ref・ai_assessment_sha256)を記録する",
               "deliverable": "evidence/gate-decision-record.json",
               "acceptance_criteria": [
                 "定足数を満たし決裁者が判定している",
+                "ai_assessment_sha256 が判定時にレビューした評価の sha256 と一致している",
                 "Conditional Go の場合は条件に担当と期限がある"
               ],
               "expected_output_format": "structured",
@@ -10747,6 +10787,23 @@
                 "kind": "evidence_exists",
                 "params": {
                   "path": "evidence/gate-decision-record.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check/check_gate_ai_assessment.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "decision"
+                  ],
+                  "cwd": "{REPO_ROOT}",
+                  "timeoutMs": 120000
                 }
               },
               {

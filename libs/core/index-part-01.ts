@@ -349,6 +349,8 @@ export * from './pipeline/op-vocabulary.js';
 
 export * from './mission/mission-gate-engine.js';
 
+export * from './mission/gate-ai-assessment.js';
+
 export * from './mission/mission-process-task-expansion.js';
 
 export * from './mesh/handoff-packet.js';

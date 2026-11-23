@@ -70,6 +70,10 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   // scope-derivation
   // Production approvals derive their authorization scope from canonical mission state.
   'scripts/lib/video-production-evidence.ts': 'scope-derivation',
+  // Gate AI assessment binding reads canonical mission state to locate the
+  // mission's evidence dir; hidden/ambiguous owners must throw, never resolve
+  // to a looser location.
+  'scripts/lib/gate-ai-assessment.ts': 'scope-derivation',
   // Attributes a legacy shared delegation record / notification row to its
   // mission's tenant; a hidden/ambiguous mission must leave it unattributed
   // (hidden from tenants).

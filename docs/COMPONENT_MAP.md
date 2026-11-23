@@ -132,6 +132,7 @@ This path establishes identity files under `knowledge/personal/` and prepares th
 - `libs/core/organization/continuous-operations.ts` owns observation-to-admission episodes. The resident cadence and organization CLI share the same checkpoint interpretation in `scripts/continuous/continuous_operations_cadence.ts`.
 - `libs/core/mission/mission-orchestration-events.ts`
 - `libs/core/mission/mission-orchestration-worker.ts`
+- `libs/core/mission/gate-ai-assessment.ts` (AI gate evaluation contract + convening policy; enforced via `scripts/check/check_gate_ai_assessment.ts` on `gate-review-session` — human decision stays authoritative)
 - `libs/core/agent/agent-runtime-supervisor.ts`
 - `libs/core/mesh/a2a-bridge.ts`
 - `docs/developer/AGENT_COMMS.md`

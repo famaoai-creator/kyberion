@@ -97,7 +97,16 @@ workflow_ids: [feature-expansion-delivery, incident-response, gate-review-sessio
 
 登録済み会議体: 企画審査会 / 要件定義レビュー会 / 設計審査会 / 変更諮問会議(CAB) / 検証判定会 / リリース判定会議 / クローズレビュー / インシデント対応会議 / ポストインシデントレビュー / ステアリングコミッティ。
 
-`gate-review-session` ワークフロー: 判定資料準備(`gate-review-packet` 作成、開催事前条件の確認) → 判定会(定足数のもと Go/No-Go を判定・記録) → 議事録記録。どのゲート・どの会議体にも適用でき、A/B のワークフローのゲートを正式な判断会議として運用する。
+`gate-review-session` ワークフロー: AI評価(`gate-ai-assessment.json` 作成) → 判定資料準備(`gate-review-packet` 作成、開催事前条件の確認) → 判定会(定足数のもと人間が Go/No-Go を判定・記録) → 議事録記録。どのゲート・どの会議体にも適用でき、A/B のワークフローのゲートを正式な判断会議として運用する。
+
+#### AI評価と人間決裁の分離(2026-11)
+
+ゲート判定は「AIが評価・スコアを生成し、人間が最終承認する」構成を標準とする。
+
+- **AI評価**(`evidence/gate-ai-assessment.json`,契約: `schemas/gate-ai-assessment.schema.json`): 対象ゲートの exit_criteria ごとの status/score、required_artifacts の充足状態、推奨判定(go/conditional_go/no_go/hold)と確信度(0..1)、評価に用いた証跡の sha256(evaluated_evidence)を記録する。**助言であり権限ではない** — 最終決裁は会議体(人間)が行う。
+- **開催ブロック(条件付き)**: `PACKET_READY` ゲートの `command_succeeds` が `check_gate_ai_assessment.ts --stage assessment` を実行し、推奨判定が no_go、確信度が閾値未満(既定 0.5、`--min-confidence` で調整)、unmet/unknown の必須基準あり(`--max-unmet`)、必須成果物の missing/insufficient あり、評価対象証跡の sha256 が現ファイルと不一致(陳腐化)、または判定と基準状態が不整合(go なのに未充足あり 等)のとき開催をブロックする。人間は gate-pass のオーバーライド記録で迂回できる(記録は残る)。チェックには 120 秒のタイムアウトを設定。
+- **判定の束縛**: `GATE_DECISION` ゲートの `--stage decision` が `gate-decision-record.json` の `ai_assessment_sha256` が現行評価の digest と一致することを検証する。人間がレビューした評価そのものに判定が束縛され、評価の差し替え後に古い判定を再利用できない(hash-bound approval、video の playback approval が eval report digest を持つのと同型)。
+- 会議体の packet には AI評価の推奨判定・確信度・未充足項目・条件案を必ず反映する(packet タスクの責務)。
 
 ---
 
@@ -116,6 +125,18 @@ node dist/scripts/mission_controller.js dispatch-workitems MSN-FEAT-<slug>
 # 各判定会(会議体)で gate-pass:
 node dist/scripts/mission_controller.js gate-pass MSN-FEAT-<slug> REQUIREMENTS_BASELINE --note "要件定義レビュー会: 顧客合意"
 node dist/scripts/mission_controller.js gate-pass MSN-FEAT-<slug> RELEASE_READINESS --note "リリース判定会議: GO"
+
+# 例: ゲーティング会議体(任意のゲートの正式な判定会)
+node dist/scripts/mission_controller.js create MSN-GATE-<slug> \
+  --tier confidential --tenant-slug <tenant> \
+  --mission-type gate-review-session --intent-id gate-review-session \
+  --track-type delivery --lifecycle-model default-sdlc
+# prepare: evidence/gate-ai-assessment.json(AI評価) + evidence/gate-review-packet.md を作成
+#   - PACKET_READY は check_gate_ai_assessment --stage assessment が機械検証
+#   - 低確信/未充足時はブロック。人間が開催を判断する場合はオーバーライド記録を残す
+node dist/scripts/check/check_gate_ai_assessment.js --mission MSN-GATE-<slug> --stage assessment
+# review: 会議体が evidence/gate-decision-record.json に判定 + ai_assessment_sha256 を記録
+node dist/scripts/mission_controller.js gate-pass MSN-GATE-<slug> GATE_DECISION --note "リリース判定会議: GO"
 
 # 例: インシデント(track-type incident / lifecycle incident-response)
 node dist/scripts/mission_controller.js create MSN-INC-<slug> --tier confidential \
