@@ -878,13 +878,14 @@ function validateExecutionLedgerText(
 ): void {
   if (content && !content.endsWith('\n'))
     throw new Error('MISSION_LOG_CORRUPT:ledger_incomplete_line');
-  const state = readMissionBindingState(missionPath);
+  let state: ReturnType<typeof readMissionBindingState> | undefined;
   for (const line of content.split('\n')) {
     if (!line.trim()) continue;
     const entry = executionLedgerRowSchema.parse(JSON.parse(line));
     if (entry.mission_id !== missionId)
       throw new Error('MISSION_LOG_CORRUPT:ledger_mission_mismatch');
     if (entry.scope !== undefined) {
+      if (state === undefined) state = readMissionBindingState(missionPath);
       const authority = resolveMissionLedgerScope(
         { mission_id: missionId, event_type: entry.event_type, task_id: entry.task_id },
         missionId,
