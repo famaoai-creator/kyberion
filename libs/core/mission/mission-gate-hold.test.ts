@@ -374,15 +374,14 @@ describe('required human holds', () => {
   it('keep the mission worker from dispatching tasks behind the hold', async () => {
     prepareMission();
     const { dispatchMissionNextTasksCore } = await import('./mission-orchestration-dispatch.js');
-    const restore = vi.fn();
-    const deps = new Proxy(
+    // All planned tasks held: nothing is dispatched (early return).
+    const allHeld = new Proxy(
       {
         ensureWorkerBackendsInstalled: () => undefined,
         loadAllNextTasks: () => [
           { task_id: 'code_graph-code-graph', phase: 'code_graph', status: 'planned' },
           { task_id: 'analysis-analyze', phase: 'analysis', status: 'planned' },
         ],
-        restoreMissionGraphRunTaskSnapshots: restore,
       } as Record<string, unknown>,
       {
         get: (target, key: string) =>
@@ -393,8 +392,22 @@ describe('required human holds', () => {
               },
       }
     );
-    await expect(dispatchMissionNextTasksCore(deps as never, missionId)).resolves.toEqual([]);
-    expect(restore).not.toHaveBeenCalled();
+    await expect(dispatchMissionNextTasksCore(allHeld as never, missionId)).resolves.toEqual([]);
+
+    // The exported entry points refuse a held task themselves (any caller).
+    const { dispatchPlannedMissionTask, dispatchGoalDrivenMissionTask } =
+      await import('./mission-orchestration-worker-part-dispatch.js');
+    const task = { task_id: 'analysis-analyze', phase: 'analysis', status: 'planned' };
+    const input = { missionId, task, teamRole: 'implementer', assignment: { agent_id: 'a1' } };
+    for (const outcome of [
+      await dispatchPlannedMissionTask(input as never),
+      await dispatchGoalDrivenMissionTask(input as never, undefined as never),
+    ]) {
+      expect(outcome).toMatchObject({
+        dispatched: false,
+        dispatch_error: expect.stringContaining('human hold REVERSE_SPEC_SCOPE_CONFIRMED'),
+      });
+    }
   });
 
   it('refuses to file a request for a gate without a stored definition', () => {

@@ -112,6 +112,7 @@ export async function dispatchMissionNextTasksCore(
   plannedTasks = allTasks.filter((task) => {
     const status = String(task.status || 'planned');
     if (status !== 'planned' && status !== 'rework') return false;
+    if (heldByHumanHold.has(task.task_id)) return false;
     return !resumeGoalDriven || deps.isGoalDrivenTaskResumable(missionId, task);
   });
   if (plannedTasks.length === 0) {
