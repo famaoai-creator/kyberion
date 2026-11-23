@@ -15,7 +15,13 @@ import { z } from 'zod';
 
 import { createLogger } from '../logger.js';
 import { readJsonIfPresent } from '../foundation/json.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from '../secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReadFileRange,
+  safeStat,
+} from '../secure-io.js';
 
 const logger = createLogger('gate-ai-assessment');
 
@@ -211,12 +217,36 @@ export function evaluateGateAiAssessmentPolicy(
       );
     }
   }
+  // An AI no_go blocks convening independently of the criterion thresholds:
+  // the assessor judged the gate not ready, so a human must either improve
+  // the evidence or record an explicit override.
+  if (assessment.recommended_verdict === 'no_go') {
+    reasons.push('recommended verdict is no_go — remediate or record a human override');
+  }
   reasons.push(...consistencyReasons(assessment));
   return { passed: reasons.length === 0, reasons };
 }
 
+const DIGEST_CHUNK_SIZE = 1024 * 1024;
+
+/**
+ * Chunked digest (1MB windows) with a size/mtime re-check so a file changed
+ * mid-read cannot produce a plausible-looking hash — same discipline as
+ * videoArtifactDigest.
+ */
 export function sha256FileDigest(filePath: string): string {
-  return createHash('sha256').update(safeReadFile(filePath)).digest('hex');
+  const before = safeStat(filePath);
+  const hash = createHash('sha256');
+  for (let offset = 0; offset < before.size; offset += DIGEST_CHUNK_SIZE) {
+    hash.update(
+      safeReadFileRange(filePath, offset, Math.min(DIGEST_CHUNK_SIZE, before.size - offset))
+    );
+  }
+  const after = safeStat(filePath);
+  if (before.size !== after.size || before.mtimeMs !== after.mtimeMs) {
+    throw new Error(`file changed during digest: ${filePath}`);
+  }
+  return hash.digest('hex');
 }
 
 function resolveAssessmentEvidencePath(entryPath: string, missionDir: string): string | undefined {
@@ -286,7 +316,7 @@ export function verifyGateDecisionBinding(input: {
   return { passed: reasons.length === 0, reasons };
 }
 
-function firstReadFailure(paths: string[]): string | undefined {
+function firstReadablePath(paths: string[]): string | undefined {
   for (const candidate of paths) {
     try {
       const resolved = assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
@@ -306,7 +336,7 @@ export function loadGateAiAssessment(
   const candidates = path.isAbsolute(relativePath)
     ? [relativePath]
     : [path.join(missionDir, relativePath), path.join(missionDir, 'evidence', relativePath)];
-  const file = firstReadFailure(candidates);
+  const file = firstReadablePath(candidates);
   if (!file) return { error: `assessment file not found: ${relativePath}` };
   const raw = readJsonIfPresent<unknown>(file);
   if (raw === null) return { error: `assessment file is unreadable: ${file}` };
@@ -328,7 +358,7 @@ export function loadGateDecisionRecord(
   const candidates = path.isAbsolute(relativePath)
     ? [relativePath]
     : [path.join(missionDir, relativePath), path.join(missionDir, 'evidence', relativePath)];
-  const file = firstReadFailure(candidates);
+  const file = firstReadablePath(candidates);
   if (!file) return { error: `decision record not found: ${relativePath}` };
   const raw = readJsonIfPresent<unknown>(file);
   if (raw === null) return { error: `decision record is unreadable: ${file}` };

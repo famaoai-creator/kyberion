@@ -104,7 +104,7 @@ workflow_ids: [feature-expansion-delivery, incident-response, gate-review-sessio
 ゲート判定は「AIが評価・スコアを生成し、人間が最終承認する」構成を標準とする。
 
 - **AI評価**(`evidence/gate-ai-assessment.json`,契約: `schemas/gate-ai-assessment.schema.json`): 対象ゲートの exit_criteria ごとの status/score、required_artifacts の充足状態、推奨判定(go/conditional_go/no_go/hold)と確信度(0..1)、評価に用いた証跡の sha256(evaluated_evidence)を記録する。**助言であり権限ではない** — 最終決裁は会議体(人間)が行う。
-- **開催ブロック(条件付き)**: `PACKET_READY` ゲートの `command_succeeds` が `check_gate_ai_assessment.ts --stage assessment` を実行し、確信度が閾値未満(既定 0.5、`--min-confidence` で調整)、unmet/unknown の必須基準あり(`--max-unmet`)、必須成果物の missing/insufficient あり、評価対象証跡の sha256 が現ファイルと不一致(陳腐化)、または判定と基準状態が不整合(go なのに未充足あり 等)のとき開催をブロックする。人間は gate-pass のオーバーライド記録で迂回できる(記録は残る)。
+- **開催ブロック(条件付き)**: `PACKET_READY` ゲートの `command_succeeds` が `check_gate_ai_assessment.ts --stage assessment` を実行し、推奨判定が no_go、確信度が閾値未満(既定 0.5、`--min-confidence` で調整)、unmet/unknown の必須基準あり(`--max-unmet`)、必須成果物の missing/insufficient あり、評価対象証跡の sha256 が現ファイルと不一致(陳腐化)、または判定と基準状態が不整合(go なのに未充足あり 等)のとき開催をブロックする。人間は gate-pass のオーバーライド記録で迂回できる(記録は残る)。チェックには 120 秒のタイムアウトを設定。
 - **判定の束縛**: `GATE_DECISION` ゲートの `--stage decision` が `gate-decision-record.json` の `ai_assessment_sha256` が現行評価の digest と一致することを検証する。人間がレビューした評価そのものに判定が束縛され、評価の差し替え後に古い判定を再利用できない(hash-bound approval、video の playback approval が eval report digest を持つのと同型)。
 - 会議体の packet には AI評価の推奨判定・確信度・未充足項目・条件案を必ず反映する(packet タスクの責務)。
 

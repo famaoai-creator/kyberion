@@ -10753,7 +10753,8 @@
                     "--stage",
                     "assessment"
                   ],
-                  "cwd": "{REPO_ROOT}"
+                  "cwd": "{REPO_ROOT}",
+                  "timeoutMs": 120000
                 }
               }
             ]
@@ -10801,7 +10802,8 @@
                     "--stage",
                     "decision"
                   ],
-                  "cwd": "{REPO_ROOT}"
+                  "cwd": "{REPO_ROOT}",
+                  "timeoutMs": 120000
                 }
               },
               {

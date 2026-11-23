@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+let fileContent = Buffer.from('file-bytes');
+
 vi.mock('../secure-io.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../secure-io.js')>();
   return {
@@ -7,7 +9,10 @@ vi.mock('../secure-io.js', async (importOriginal) => {
     assertSafeRepositoryPath: vi.fn((p: string) => p),
     safeExistsSync: vi.fn(() => true),
     safeLstat: vi.fn(() => ({ isFile: () => true })),
-    safeReadFile: vi.fn(() => Buffer.from('file-bytes')),
+    safeReadFileRange: vi.fn((_p: string, position: number, length: number) =>
+      fileContent.subarray(position, position + length)
+    ),
+    safeStat: vi.fn(() => ({ size: fileContent.length, mtimeMs: 1 }) as never),
   };
 });
 
@@ -28,7 +33,7 @@ import {
   verifyGateDecisionBinding,
   type GateAiAssessment,
 } from './gate-ai-assessment.js';
-import { safeExistsSync, safeReadFile } from '../secure-io.js';
+import { safeExistsSync, safeStat } from '../secure-io.js';
 import { readJsonIfPresent } from '../foundation/json.js';
 import { createHash } from 'node:crypto';
 
@@ -135,12 +140,28 @@ describe('evaluateGateAiAssessmentPolicy', () => {
     expect(result.passed).toBe(false);
     expect(result.reasons.join(' ')).toContain('inconsistent');
   });
+  it('blocks a coherent "no_go" recommendation even within max_unmet', () => {
+    const result = evaluateGateAiAssessmentPolicy(
+      {
+        ...baseAssessment,
+        recommended_verdict: 'no_go',
+        criteria: [
+          { criterion: 'rollback plan exists', status: 'unmet' },
+          { criterion: 'runbook ready', status: 'met' },
+        ],
+      },
+      { max_unmet: 5 }
+    );
+    expect(result.passed).toBe(false);
+    expect(result.reasons.join(' ')).toContain('no_go');
+  });
   it('flags a "no_go" verdict with nothing unmet', () => {
     const result = evaluateGateAiAssessmentPolicy({
       ...baseAssessment,
       recommended_verdict: 'no_go',
     });
     expect(result.passed).toBe(false);
+    expect(result.reasons.join(' ')).toContain('no_go');
     expect(result.reasons.join(' ')).toContain('inconsistent');
   });
   it('flags conditional_go without conditions', () => {
@@ -155,10 +176,13 @@ describe('evaluateGateAiAssessmentPolicy', () => {
 
 describe('verifyGateAiAssessmentFreshness', () => {
   beforeEach(() => {
-    vi.mocked(safeReadFile).mockReturnValue(Buffer.from('file-bytes'));
+    fileContent = Buffer.from('file-bytes');
+    vi.mocked(safeStat).mockImplementation(
+      () => ({ size: fileContent.length, mtimeMs: 1 }) as never
+    );
     vi.mocked(safeExistsSync).mockReturnValue(true);
   });
-  const digest = (s: string) => createHash('sha256').update(s).digest('hex');
+  const digest = (s: string | Buffer) => createHash('sha256').update(s).digest('hex');
   it('passes when digests match', () => {
     const assessment: GateAiAssessment = {
       ...baseAssessment,
@@ -182,6 +206,24 @@ describe('verifyGateAiAssessmentFreshness', () => {
       evaluated_evidence: [{ path: 'evidence/checklist.md', sha256: digest('file-bytes') }],
     };
     expect(verifyGateAiAssessmentFreshness(assessment, '/m/M').passed).toBe(false);
+  });
+  it('digests content larger than one chunk', () => {
+    fileContent = Buffer.alloc(1024 * 1024 + 7, 0x61);
+    const assessment: GateAiAssessment = {
+      ...baseAssessment,
+      evaluated_evidence: [{ path: 'evidence/big.bin', sha256: digest(fileContent) }],
+    };
+    expect(verifyGateAiAssessmentFreshness(assessment, '/m/M').passed).toBe(true);
+  });
+  it('throws when the file changes mid-read', () => {
+    vi.mocked(safeStat)
+      .mockImplementationOnce(() => ({ size: fileContent.length, mtimeMs: 1 }) as never)
+      .mockImplementationOnce(() => ({ size: fileContent.length + 1, mtimeMs: 1 }) as never);
+    const assessment: GateAiAssessment = {
+      ...baseAssessment,
+      evaluated_evidence: [{ path: 'evidence/checklist.md', sha256: digest('file-bytes') }],
+    };
+    expect(() => verifyGateAiAssessmentFreshness(assessment, '/m/M')).toThrow('changed during');
   });
 });
 

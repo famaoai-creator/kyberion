@@ -77,7 +77,7 @@ export function checkGateAiAssessment(
   const reasons = [...policyResult.reasons, ...freshnessResult.reasons];
   requireCondition(
     reasons.length === 0,
-    `gate AI assessment does not clear the convening policy:\n - ${reasons.join('\n - ')}`
+    `gate AI assessment does not clear the convening policy:\n - ${reasons.join('\n - ')}\nnext: fix the evidence/assessment, or record a human override on the gate`
   );
   return { stage: 'assessment', passed: true };
 }
@@ -101,15 +101,19 @@ export function checkGateDecisionRecord(
     record.record && record.path,
     record.error ?? 'gate decision record could not be loaded'
   );
+  // Normalize the expected ref to the mission-relative path actually loaded,
+  // so `--assessment gate-ai-assessment.json` and
+  // `--assessment evidence/gate-ai-assessment.json` bind identically.
+  const assessmentRef = path.relative(mission.dir, assessment.path).split(path.sep).join('/');
   const binding = verifyGateDecisionBinding({
     record: record.record,
     assessmentFileDigest: sha256FileDigest(assessment.path),
-    assessmentRef: options.assessmentPath ?? GATE_AI_ASSESSMENT_FILE,
+    assessmentRef,
   });
   logAssessmentCheckResult('decision', binding);
   requireCondition(
     binding.passed,
-    `gate decision record is not bound to the current AI assessment:\n - ${binding.reasons.join('\n - ')}`
+    `gate decision record is not bound to the current AI assessment:\n - ${binding.reasons.join('\n - ')}\nnext: re-run the assessment or re-record the decision against the current assessment`
   );
   return { stage: 'decision', passed: true };
 }
