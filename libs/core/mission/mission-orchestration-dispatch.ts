@@ -14,6 +14,7 @@ import { resolveTaskModelHint } from '../reasoning/reasoning-model-routing.js';
 import { type TaskModelPhaseKind } from '../reasoning/reasoning-level-policy.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
+import { tasksBehindPendingHumanHolds } from './mission-gate-hold-proof.js';
 import { inferTaskTargetPath, validateDelegatedTaskPreflight } from './delegation-preflight.js';
 import { resolveMissionRelativeTargetPath } from './mission-orchestration-planning.js';
 import {
@@ -79,6 +80,26 @@ export async function dispatchMissionNextTasksCore(
     if (status !== 'planned' && status !== 'rework') return false;
     return !resumeGoalDriven || deps.isGoalDrivenTaskResumable(missionId, task);
   });
+  // MO-02: tasks behind an unapproved required human hold stay planned.
+  const heldByHumanHold = tasksBehindPendingHumanHolds(
+    missionId,
+    resolvedMissionPath,
+    plannedTasks as unknown as Array<Record<string, unknown>>
+  );
+  if (heldByHumanHold.size > 0) {
+    plannedTasks = plannedTasks.filter((task) => !heldByHumanHold.has(task.task_id));
+    const gates = [...new Set([...heldByHumanHold.values()].map((hold) => hold.gateId))];
+    const summary = `${heldByHumanHold.size} task(s) wait for the human hold ${gates.join(', ')}; approve it with gate-pass --request-approval, then --approval-request-id.`;
+    logger.warn(`[worker] ${summary}`);
+    emitMissionOrchestrationObservation({
+      event_type: 'mission_owner_notified',
+      decision: 'mission_owner_notified',
+      mission_id: missionId,
+      reason: 'human_hold_pending',
+      gate_reasons: [summary],
+      payload: { held_task_ids: [...heldByHumanHold.keys()], gate_ids: gates },
+    });
+  }
   if (plannedTasks.length === 0) return [];
 
   const runId = graphRunId?.trim() || `manual-${Date.now()}`;

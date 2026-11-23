@@ -250,7 +250,11 @@ export function evaluateMissionFinishExitGate(
       ok: false,
       reason:
         `Human holds not approved: ${pendingHolds
-          .map((hold) => `${hold.gateId} (${hold.reason})`)
+          .map((hold) =>
+            hold.reason === 'gate_definition_missing'
+              ? `${hold.gateId} (its gate definition is missing — run \`pnpm mission plan-tasks ${missionId}\` to restore the workflow's gates)`
+              : `${hold.gateId} (${hold.reason})`
+          )
           .join(', ')}. ` +
         `Run \`pnpm mission gate-pass ${missionId} <GATE_ID> --request-approval\`, have the person ` +
         'approve it with `pnpm kyberion approvals --approve <id>`, then pass the gate with ' +

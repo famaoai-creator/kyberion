@@ -371,6 +371,32 @@ describe('required human holds', () => {
     expect(forge(approved).verified).toBe(true);
   });
 
+  it('keep the mission worker from dispatching tasks behind the hold', async () => {
+    prepareMission();
+    const { dispatchMissionNextTasksCore } = await import('./mission-orchestration-dispatch.js');
+    const restore = vi.fn();
+    const deps = new Proxy(
+      {
+        ensureWorkerBackendsInstalled: () => undefined,
+        loadAllNextTasks: () => [
+          { task_id: 'code_graph-code-graph', phase: 'code_graph', status: 'planned' },
+          { task_id: 'analysis-analyze', phase: 'analysis', status: 'planned' },
+        ],
+        restoreMissionGraphRunTaskSnapshots: restore,
+      } as Record<string, unknown>,
+      {
+        get: (target, key: string) =>
+          key in target
+            ? target[key]
+            : () => {
+                throw new Error(`unexpected dispatch step: ${key}`);
+              },
+      }
+    );
+    await expect(dispatchMissionNextTasksCore(deps as never, missionId)).resolves.toEqual([]);
+    expect(restore).not.toHaveBeenCalled();
+  });
+
   it('refuses to file a request for a gate without a stored definition', () => {
     prepareMission();
     expect(() =>

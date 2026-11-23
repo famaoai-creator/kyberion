@@ -221,7 +221,25 @@ export async function gatePass(
       });
       pendingHoldRecord = prepared.record;
       holdMissionPath = prepared.missionPath;
-    } else if (resolveRequiredHumanHolds(missionId).some((entry) => entry.gateId === hold)) {
+    }
+    // A gate whose phase waits for an earlier pending hold cannot advance the
+    // mission; refuse instead of reporting a pass that changes nothing.
+    const holdPhase = readStoredMissionGate(missionId.toUpperCase(), hold)?.definition.phase;
+    const earlier = holdPhase
+      ? holdApproval.pendingHumanHoldBeforePhase(missionId, holdPhase)
+      : undefined;
+    if (earlier && earlier.gateId !== hold) {
+      throw new DiagnosticError({
+        code: 'HUMAN_HOLD_PENDING',
+        what: `${hold} (phase ${holdPhase}) comes after the human hold ${earlier.gateId}, which is not approved (${earlier.reason})`,
+        why: 'phases behind an unapproved human hold neither advance nor complete their tasks',
+        next: `pnpm mission gate-pass ${missionId.toUpperCase()} ${earlier.gateId} --request-approval, have the person approve it, pass it with --approval-request-id <id>, then re-run this gate-pass`,
+      });
+    }
+    if (
+      !pendingHoldRecord &&
+      resolveRequiredHumanHolds(missionId).some((entry) => entry.gateId === hold)
+    ) {
       throw new DiagnosticError({
         code: 'HUMAN_HOLD_APPROVAL_REQUIRED',
         what: `${hold} is a human hold of ${missionId.toUpperCase()} — a person must approve it`,
