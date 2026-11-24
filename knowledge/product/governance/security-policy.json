@@ -1214,6 +1214,13 @@
         "active/shared/runtime/audit-mirror/confidential/${KYBERION_TENANT}/"
       ]
     },
+    "audit_mirror_reader": {
+      "description": "Read-side counterpart of audit_mirror_writer for the audit chain's per-tenant mirror (active/shared/runtime/audit-mirror/confidential/<tenant>/). libs/core/authority.ts registers it as the audit chain's tenant mirror reader context, and verifyTenantMirrors binds it to each tenant the chained master entries name, so mirror verification never runs under (or borrows) the caller's own grants. It is tenant-bound (the bound tenant must be explicit and equal the caller's active tenant when one exists): a caller bound to another tenant cannot bind it, and verifyTenantMirrors counts such partitions as withheld rather than reading them — the same D9 semantics as tenant_ledger_store. Its only grant is that tenant-parameterised read (no write, no knowledge, mission, or customer/ grant). Like every narrow store grant it runs with persona worker, so it keeps the paths every worker identity has (security-policy default_allow); it adds nothing else.",
+      "allow_read": [
+        "active/shared/runtime/audit-mirror/confidential/${KYBERION_TENANT}/"
+      ],
+      "allow_write": []
+    },
     "ops_alert_store": {
       "description": "Operational alert store: libs/core/foundation/operational-store-policy.ts (seam registered by authority.ts) reads and writes the ops alert ledger, its dedupe index and the scheduler alert-day state only.",
       "allow_read": [

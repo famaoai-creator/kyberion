@@ -3571,6 +3571,24 @@ When adding a service operation, validate the shipped discovery count and servic
 
 A rejected write must remain rejected and its required policy-violation record must reach the canonical audit store. Capture caller tenant, actor and normalized scope/tier before entering the audit-owned persistence context. Keep resource-access ceilings intact, use the same key/persistence boundary for preflight, direct and already-held append, and publish forwarders outside that context. Never fix this by granting the application store audit keys or master read/append privileges, clearing resource ceilings, adding a best-effort queue, or forcing process exit. Enforcing regression: `libs/core/governance/audit-chain-policy-denial.test.ts` uses fresh production adapters and a synthetic policy denial; verify denied target absence, exactly-once master and tenant mirror, original deferred attribution, no foreign mirror and continued resource-ceiling refusal. The existing `audit_mirror_writer` role grants remain unchanged; its legacy bootstrap seam also serves audit-owned master persistence through existing common defaults.
 
+## Governed-store verification must not borrow the caller's grants
+
+When a module verifies its own governed store, both directions of the store
+boundary need their own declared grant: a write-path grant does not cover the
+read path. Verify under the store's own tenant-bound reader grant, registered
+through the same authority seam as the writer — never under the caller's
+identity. A caller bound to another tenant cannot bind that partition's
+grant (`[ROLE_TENANT_SCOPE_MISMATCH]`); count it as `withheld`, never read it,
+and never name it in findings or logs. An unbound caller verifies every
+partition. Do not fix this by widening the caller's role, giving the writer
+grant read access, or catching `[ROLE_VIOLATION]` as a skip — each leaks the
+verify into whatever grants the caller happens to hold. The enforcing gate is
+the executable model: `libs/core/governance/audit-chain-mirror.model.test.ts`
+verifies the bind/withhold lattice for every caller binding and mirror state,
+then drives the production `verifyTenantMirrors` under the real
+`audit_mirror_reader` grant and asserts no I/O ever touches an unbindable
+partition.
+
 ## Validation resource isolation and combined profiles
 
 Keep each gate's deadline and checks unchanged when isolating resource-intensive work. `ci-gates.json` may mark a gate `exclusive`: all earlier selected work drains, that gate runs alone, and subsequent gates resume the requested concurrency. Golden baseline compiler scans use this isolation; a measured standalone run took 62 seconds and exited naturally. A buffered success line alone does not prove a retained handle or the exact failed-runner cause. Record gate execution time separately from package-manager queue wait, and observe child exit/close when investigating a deadline.

@@ -1589,6 +1589,27 @@ try {
 }
 
 /**
+ * Read-side counterpart of the mirror writer seam (D9 symmetry with
+ * tenant_ledger_store): verifyTenantMirrors reads each tenant's mirror
+ * partition as audit_mirror_reader bound to that tenant — never under the
+ * caller's identity. The grant is tenant-bound, so a caller bound to another
+ * tenant gets [ROLE_TENANT_SCOPE_MISMATCH] and the verifier withholds the
+ * partition instead of reading it.
+ */
+const TENANT_AUDIT_MIRROR_READER_ROLE = 'audit_mirror_reader';
+try {
+  const register = (auditChainModule as unknown as Record<string, unknown>)
+    .registerTenantMirrorReaderContext;
+  if (typeof register === 'function') {
+    (register as typeof auditChainModule.registerTenantMirrorReaderContext)((tenantSlug, fn) =>
+      withStoreGrant(TENANT_AUDIT_MIRROR_READER_ROLE, fn, { tenantSlug: tenantSlug })
+    );
+  }
+} catch {
+  // A reduced adapter simply has no tenant mirror seam.
+}
+
+/**
  * Checks if the current context has a specific authority.
  */
 export function hasAuthority(authority: Authority): boolean {
