@@ -67,7 +67,7 @@ phase_affinity: [alignment, execution]
 | メッセージを送る                 | チャネル接頭辞付きの `presence:dispatch`（`slack:`、`telegram:` …）                                                                                                                                                                                                                  |
 | 声に出す / 音声ファイルを作る    | `pnpm kyberion speak "<text>" [--out <file>]`。逐次テキストは `--stream --segment "..."`（`--segment` は複数指定可）、出力先は `--device "<正確なデバイス名>"`。出力先が1つなら自動選択し、複数なら `--device` が必要。パイプラインでは `voice:generate_voice` / `voice:speak_local` |
 
-通常の音声再生では、実行中のエージェントと出力先に有効な委任があれば、その範囲で実行します。人の承認が必要な場合は、表示された承認 ID を `pnpm kyberion approvals --approve <承認ID>` で承認し、同じ引数に表示された `--invocation-id <ID>` を添えて再実行します。承認は対象の操作と内容に結びつきます。音声の再生成でデータが変わった場合は、新しい承認が必要です。
+通常の音声再生では、実行中のエージェントと出力先に有効な委任があれば、その範囲で実行します。人の承認が必要な場合は、表示された承認 ID を `pnpm kyberion approvals --approve <承認ID>` で承認し、同じ引数に表示された `--invocation-id <ID>` を添えて再実行します。ローカル音声の承認状態は Concierge の「設定 → 権限と承認」で申請 ID を指定して確認できます。同じ ID で、実行直前の権限確認と結果を監査ログから照合できます。承認は対象の操作と内容に結びつきます。音声の再生成でデータが変わった場合は、新しい承認が必要です。
 
 日本語の2セグメントを、指定した出力先へストリーミング再生する例:
 

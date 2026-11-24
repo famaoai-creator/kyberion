@@ -31,6 +31,7 @@ import {
 } from '../src/app/settings/settings-api';
 import { IntroduceSecretPanel } from '../src/app/settings/sections/IntroduceSecretPanel';
 import { VoicePriorityEditor } from '../src/app/settings/sections/VoicePriorityEditor';
+import { VoiceApprovalStatus } from '../src/app/settings/sections/VoiceApprovalStatus';
 import { VoiceSection, VOICE_SAMPLE_ACCEPT } from '../src/app/settings/sections/VoiceSection';
 import { AvatarGenerationPanel } from '../src/app/settings/sections/AvatarGenerationPanel';
 import { SettingsReadiness } from '../src/app/settings/settings-readiness';
@@ -436,6 +437,23 @@ describe('settings interaction', () => {
     click('Move down');
     click('Save priority');
     expect(save).toHaveBeenCalledWith(['second', 'first']);
+    m.unmount();
+  });
+
+  it('shows an approved local voice decision with guidance for uncertain playback', async () => {
+    const id = '7397aef8-815e-4e9a-8e32-ac7836985d73';
+    mockFetch(() => ({ ok: true, id, status: 'approved' }));
+    const m = mount(createElement(VoiceApprovalStatus, { t }));
+    const input = m.q('input[name="authority.voice_approval_id"]');
+    act(() => {
+      Object.assign(input, { value: id });
+      fireEvent(input, 'input');
+    });
+    await act(async () => {
+      fireEvent(m.q('button'), 'click');
+    });
+    expect(m.q('[role="status"]').textContent).toContain('Approved.');
+    expect(m.q('[role="status"]').textContent).toContain('Check the execution record');
     m.unmount();
   });
 

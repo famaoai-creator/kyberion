@@ -205,6 +205,41 @@ describe('mission-workflow-catalog', () => {
       'report_delivery',
     ]);
     expect(workflow.phase_specs?.[5]?.exit_gate?.id).toBe('INCIDENT_REPORT_SIGNOFF');
+    expect(
+      workflow.phase_specs?.find((phase) => phase.id === 'root_cause_analysis')?.default_tasks?.[0]
+        ?.acceptance_criteria
+    ).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('事実・仮説・不明点'),
+        expect.stringContaining('担当・期限・検証条件'),
+        expect.stringContaining('コード実行境界'),
+      ])
+    );
+    expect(
+      workflow.phase_specs?.find((phase) => phase.id === 'report_delivery')?.default_tasks?.[0]
+        ?.acceptance_criteria
+    ).toEqual(expect.arrayContaining([expect.stringContaining('WorkItem')]));
+  });
+
+  it('requires an evidence index and timeline for the incident response postmortem', () => {
+    const workflow = resolveMissionWorkflowDesign({
+      missionClass: 'operations_and_release',
+      deliveryShape: 'cross_system_change',
+      riskProfile: 'review_required',
+      stage: 'planning',
+      executionShape: 'mission',
+      intentId: 'incident-response',
+    });
+    expect(workflow.workflow_id).toBe('incident-response');
+    expect(
+      workflow.phase_specs?.find((phase) => phase.id === 'postmortem')?.exit_gate?.checks
+    ).toEqual(
+      [
+        'evidence/evidence-index.json',
+        'evidence/incident-timeline.md',
+        'evidence/post-mortem.md',
+      ].map((path) => ({ kind: 'evidence_exists', params: { path } }))
+    );
   });
 
   it('selects distinct phase sequences per mission class (MO-01)', () => {

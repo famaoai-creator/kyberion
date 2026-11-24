@@ -1,8 +1,10 @@
 import {
   ExternalOperationApprovalRequired,
+  ExternalOperationOutcomeUnverified,
   hasExternalOperationAuthority,
   withExplicitExternalApprovalRequests,
   withExternalOperationAuthority,
+  withExternalOperationApprovalObserver,
 } from '@agent/core/governance/external-operation';
 import { computeApprovalPayloadHash } from '@agent/core/governance/approval-presentation';
 import { withInstalledOnboardingAuthority } from '@agent/core/organization/onboarding-authority-runtime';
@@ -60,39 +62,62 @@ export async function runAudibleSpeak<T>(
       return [artifact.repo_relative_path];
     },
   });
+  let unverified: string | undefined;
   try {
-    return await withExplicitExternalApprovalRequests(
-      [request('voice:speak'), request('voice:playback')],
+    const result = await withExternalOperationApprovalObserver(
+      ({ approval, executionUnverified }) => {
+        if (executionUnverified) unverified = approval.message;
+      },
       () =>
-        withInstalledOnboardingAuthority(
-          runId,
-          () => {
-            if (hasExternalOperationAuthority()) return execute();
-            return withExternalOperationAuthority((facts) => {
-              if (facts.operationId !== 'voice:speak' && facts.operationId !== 'voice:playback')
-                return undefined;
-              return {
-                agentId: 'voice-speak-cli',
-                invocationId: computeApprovalPayloadHash({
-                  runId,
-                  operation: facts.operationId,
-                  effect: facts.effect,
-                }),
-                ...(scope.tenant_slug ? { tenantSlug: scope.tenant_slug } : {}),
-                standingScope,
-                hasHuman: false,
-              };
-            }, execute);
-          },
-          { bindEffectIdentity: true }
+        withExplicitExternalApprovalRequests(
+          [request('voice:speak'), request('voice:playback')],
+          () =>
+            withInstalledOnboardingAuthority(
+              runId,
+              () => {
+                if (hasExternalOperationAuthority()) return execute();
+                return withExternalOperationAuthority((facts) => {
+                  if (facts.operationId !== 'voice:speak' && facts.operationId !== 'voice:playback')
+                    return undefined;
+                  return {
+                    agentId: 'voice-speak-cli',
+                    invocationId: computeApprovalPayloadHash({
+                      runId,
+                      operation: facts.operationId,
+                      effect: facts.effect,
+                    }),
+                    ...(scope.tenant_slug ? { tenantSlug: scope.tenant_slug } : {}),
+                    standingScope,
+                    hasHuman: false,
+                  };
+                }, execute);
+              },
+              { bindEffectIdentity: true }
+            )
         )
     );
+    if (unverified) throw new Error(unverified);
+    return result;
   } catch (error) {
-    if (error instanceof ExternalOperationApprovalRequired && error.approval.requestId) {
+    if (unverified || error instanceof ExternalOperationOutcomeUnverified) {
       throw new Error(
-        `${error.message}\nAfter approval, rerun the same speak command with --invocation-id ${invocation}.`,
-        { cause: error }
+        `${unverified || (error instanceof Error ? error.message : String(error))}\nNext: verify the previous playback result before retrying.`,
+        {
+          cause: error,
+        }
       );
+    }
+    if (error instanceof ExternalOperationApprovalRequired) {
+      const { requestId, requestStatus } = error.approval;
+      const next =
+        requestId && (!requestStatus || requestStatus === 'created' || requestStatus === 'pending')
+          ? `Review approval ${requestId}. After approval, rerun the same speak command with --invocation-id ${invocation}.`
+          : requestStatus === 'expired' ||
+              requestStatus === 'rejected' ||
+              requestStatus === 'effect_mismatch'
+            ? 'Review the previous decision before starting a new invocation.'
+            : undefined;
+      if (next) throw new Error(`${error.message}\nNext: ${next}`, { cause: error });
     }
     throw error;
   }
