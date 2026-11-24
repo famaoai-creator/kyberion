@@ -69,6 +69,49 @@ export async function gatePass(
     requireMissionGateActivation,
   } = await import('@agent/core/mission/mission-process-planning');
   const { activateMissionOnGateProgress } = await import('@agent/core/mission/mission-creation');
+  // Human holds (MO-02) for one gate-pass: refuse when an earlier hold is
+  // pending or this gate is a required hold passed without its approval.
+  const assertNoHumanHoldRefusal = (
+    rawMissionId: string,
+    gateId: string,
+    approvalApplied: boolean,
+    holdApproval: typeof import('@agent/core/mission/mission-gate-hold-approval')
+  ): void => {
+    const upper = rawMissionId.toUpperCase();
+    const storedDefinition = readStoredMissionGate(upper, gateId)?.definition;
+    const gatePhase = storedDefinition?.phase;
+    let refusal: ReturnType<typeof holdApproval.humanHoldGatePassRefusal>;
+    try {
+      refusal = holdApproval.humanHoldGatePassRefusal(upper, gateId, gatePhase, {
+        approvalApplied,
+        gatePosition: storedDefinition?.position,
+      });
+    } catch (error) {
+      throw new DiagnosticError({
+        code: 'HUMAN_HOLD_UNVERIFIABLE',
+        what: `the human holds of ${upper} could not be checked before passing ${gateId}`,
+        why: `the audit chain that anchors them is unreadable (${error instanceof Error ? error.message : String(error)})`,
+        next: 'run pnpm audit:verify (or check the access scope of this session), then re-run gate-pass',
+      });
+    }
+    if (refusal?.code === 'HUMAN_HOLD_PENDING') {
+      const earlier = refusal.hold;
+      throw new DiagnosticError({
+        code: 'HUMAN_HOLD_PENDING',
+        what: `${gateId} (phase ${gatePhase ?? 'unknown'}) comes after the human hold ${earlier.gateId}, which is not approved (${earlier.reason})`,
+        why: 'phases behind an unapproved human hold neither advance nor complete their tasks',
+        next: `pnpm mission gate-pass ${upper} ${earlier.gateId} --request-approval, have the person approve it, pass it with --approval-request-id <id>, then re-run this gate-pass`,
+      });
+    }
+    if (refusal?.code === 'HUMAN_HOLD_APPROVAL_REQUIRED') {
+      throw new DiagnosticError({
+        code: 'HUMAN_HOLD_APPROVAL_REQUIRED',
+        what: `${gateId} is a human hold of ${upper} — a person must approve it`,
+        why: 'the workflow marks this gate require_signature; gate-pass alone does not pass it',
+        next: `pnpm mission gate-pass ${upper} ${gateId} --request-approval, then the person runs pnpm kyberion approvals --approve <id>, then gate-pass ... --approval-request-id <id>`,
+      });
+    }
+  };
   const dryRun = hasCliFlag(argv, '--dry-run');
   const machineOnly = hasCliFlag(argv, '--machine-only');
   const requireGateScope = () => {
@@ -148,11 +191,15 @@ export async function gatePass(
     return;
   }
   if (machineOnly) {
+    const machineHoldApproval = await import('@agent/core/mission/mission-gate-hold-approval');
     await runMachineOnlyMissionGate(
       { missionId: missionId || '', gateId: gateFile },
       {
         evaluateStored: (args) => {
           inspectStoredGate(args.missionId, args.gateId);
+          // A machine-only pass never passes or skips a human hold, including
+          // holds known only from the audit-chain anchor.
+          assertNoHumanHoldRefusal(args.missionId, args.gateId, false, machineHoldApproval);
           return evaluateStoredMissionGate({ ...args, blocking: true });
         },
         advance: advanceCurrentPhase,
@@ -195,7 +242,6 @@ export async function gatePass(
   let holdMissionPath = '';
   if (hold) {
     const holdApproval = await import('@agent/core/mission/mission-gate-hold-approval');
-    const { resolveRequiredHumanHolds } = holdApproval;
     if (hasCliFlag(argv, '--request-approval')) {
       inspectActivation(hold);
       const { missionControllerRequester } = await import('../lib/cli/cli-approval-requester.js');
@@ -223,30 +269,9 @@ export async function gatePass(
       holdMissionPath = prepared.missionPath;
     }
     // A gate whose phase waits for an earlier pending hold cannot advance the
-    // mission; refuse instead of reporting a pass that changes nothing.
-    const holdPhase = readStoredMissionGate(missionId.toUpperCase(), hold)?.definition.phase;
-    const earlier = holdPhase
-      ? holdApproval.pendingHumanHoldBeforePhase(missionId, holdPhase)
-      : undefined;
-    if (earlier && earlier.gateId !== hold) {
-      throw new DiagnosticError({
-        code: 'HUMAN_HOLD_PENDING',
-        what: `${hold} (phase ${holdPhase}) comes after the human hold ${earlier.gateId}, which is not approved (${earlier.reason})`,
-        why: 'phases behind an unapproved human hold neither advance nor complete their tasks',
-        next: `pnpm mission gate-pass ${missionId.toUpperCase()} ${earlier.gateId} --request-approval, have the person approve it, pass it with --approval-request-id <id>, then re-run this gate-pass`,
-      });
-    }
-    if (
-      !pendingHoldRecord &&
-      resolveRequiredHumanHolds(missionId).some((entry) => entry.gateId === hold)
-    ) {
-      throw new DiagnosticError({
-        code: 'HUMAN_HOLD_APPROVAL_REQUIRED',
-        what: `${hold} is a human hold of ${missionId.toUpperCase()} — a person must approve it`,
-        why: 'the workflow marks this gate require_signature; gate-pass alone does not pass it',
-        next: `pnpm mission gate-pass ${missionId.toUpperCase()} ${hold} --request-approval, then the person runs pnpm kyberion approvals --approve <id>, then gate-pass ... --approval-request-id <id>`,
-      });
-    }
+    // mission, and a required hold needs its approval. The hold set includes
+    // the audit-chain anchor recorded at planning.
+    assertNoHumanHoldRefusal(missionId, hold, Boolean(pendingHoldRecord), holdApproval);
   }
   // Process-template gates (MO-01/MO-02): when a stored gate definition
   // exists, machine-evaluate its checks instead of recording a bare override.

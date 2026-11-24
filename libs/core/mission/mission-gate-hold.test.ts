@@ -14,7 +14,9 @@ import {
 } from '../governance/approval-store.js';
 import * as pathResolver from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { auditChain, type AuditEntry } from '../governance/audit-chain.js';
 import { signHumanOverride } from './mission-gate-engine.js';
+import { MISSION_HUMAN_HOLDS_ANCHOR_ACTION } from './mission-gate-hold-anchor.js';
 import {
   createMissionGateHoldApprovalRequest,
   prepareMissionGateHoldRecord,
@@ -291,6 +293,31 @@ describe('required human holds', () => {
 
     approveHold(GRAPH_GATE);
     expect(evaluateMissionFinishExitGate(missionPath).reason ?? '').not.toMatch(/Human holds/u);
+  });
+
+  it('finish passes once every anchored hold is approved', () => {
+    prepareMission();
+    const loadAll = vi.spyOn(auditChain, 'loadAll').mockReturnValue([
+      {
+        action: MISSION_HUMAN_HOLDS_ANCHOR_ACTION,
+        metadata: {
+          mission_id: missionId,
+          holds: [
+            { gate_id: SCOPE_GATE, phase: 'ingest', position: 'exit', phase_order: PHASES },
+            { gate_id: GRAPH_GATE, phase: 'code_graph', position: 'exit', phase_order: PHASES },
+          ],
+        },
+      } as unknown as AuditEntry,
+    ]);
+    try {
+      expect(evaluateMissionFinishExitGate(missionPath).reason).toMatch(/Human holds/u);
+      approveHold(SCOPE_GATE);
+      approveHold(GRAPH_GATE);
+      expect(evaluateMissionFinishExitGate(missionPath).reason ?? '').not.toMatch(/Human holds/u);
+      expect(loadAll).toHaveBeenCalled();
+    } finally {
+      loadAll.mockRestore();
+    }
   });
 
   it('needs a new approval when the gate inputs change after approval', () => {

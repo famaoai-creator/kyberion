@@ -50,6 +50,7 @@ import {
 
 // The CLI entry point (gate-pass) reaches the proof reader through this module.
 export {
+  humanHoldGatePassRefusal,
   pendingHumanHoldBeforePhase,
   resolveRequiredHumanHolds,
   type MissionGateHoldRecord,

@@ -181,7 +181,8 @@ export function reconcileLifecycleClosureCriteria(
 
 export function evaluateMissionFinishExitGate(
   missionDir: string,
-  state?: { status?: string; history?: Array<{ event?: string }> }
+  state?: { status?: string; history?: Array<{ event?: string }> },
+  trustedMissionId?: string
 ): {
   ok: boolean;
   reason?: string;
@@ -241,10 +242,24 @@ export function evaluateMissionFinishExitGate(
 
   // A required human hold must be decided by a person (approval proof), even
   // when every task is closed — e.g. tasks closed before the hold existed.
-  const missionId = String(
-    (state as { mission_id?: string } | undefined)?.mission_id || path.basename(missionDir)
-  ).toUpperCase();
-  const pendingHolds = pendingHumanHolds(missionId, missionDir);
+  // The anchor is keyed by the mission id: take it from the caller (the
+  // resolved mission) or the mission directory, never from mission-state.json,
+  // which the agent can rewrite.
+  const missionId = (trustedMissionId || path.basename(missionDir)).trim().toUpperCase();
+  // The audit-chain anchor (recorded at planning) holds the mission even when
+  // its local anchors were rewritten; an unreadable chain fails closed.
+  let pendingHolds: ReturnType<typeof pendingHumanHolds>;
+  try {
+    pendingHolds = pendingHumanHolds(missionId, missionDir, { auditAnchor: true });
+  } catch (error) {
+    return {
+      ok: false,
+      reason:
+        `The required human holds of ${missionId} could not be checked: the audit chain is unreadable ` +
+        `(${error instanceof Error ? error.message : String(error)}). Run \`pnpm audit:verify\` and repair the chain (or, when the error is a scope denial, run finish with an identity allowed to read the audit chain), then re-run finish.`,
+      pendingTasks,
+    };
+  }
   if (pendingHolds.length > 0) {
     return {
       ok: false,
@@ -252,7 +267,7 @@ export function evaluateMissionFinishExitGate(
         `Human holds not approved: ${pendingHolds
           .map((hold) =>
             hold.reason === 'gate_definition_missing'
-              ? `${hold.gateId} (its gate definition is missing — run \`pnpm mission plan-tasks ${missionId}\` to restore the workflow's gates)`
+              ? `${hold.gateId} (its gate definition is missing — run \`pnpm mission plan-tasks ${missionId}\` to restore the workflow's gates; if mission-state.json no longer names the workflow, restore it from the mission's git history first)`
               : `${hold.gateId} (${hold.reason})`
           )
           .join(', ')}. ` +
@@ -907,7 +922,7 @@ export async function finishMission(
     },
   });
 
-  const exitGate = evaluateMissionFinishExitGate(missionDir, preState);
+  const exitGate = evaluateMissionFinishExitGate(missionDir, preState, upperId);
   if (!exitGate.ok) {
     logger.error(`❌ [EXIT_GATE] Mission ${upperId} blocked: ${exitGate.reason}`);
     const state = loadState(upperId);
