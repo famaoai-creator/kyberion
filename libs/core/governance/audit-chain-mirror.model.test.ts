@@ -17,6 +17,8 @@ import { withStoreGrant } from '../authority.js';
 // knowledge/product/architecture/executable-safety-models.md):
 //   - a tenant mirror partition is read only under the tenant-bound
 //     audit_mirror_reader grant — never under the caller's identity
+//   - an unregistered reader seam is fail-closed: the partition is
+//     withheld, never read under a caller-identity fallback
 //   - a caller bound to another tenant never reads (or names) that
 //     tenant's partition: it is counted as withheld
 //   - an unbound caller verifies every partition the master names
@@ -321,9 +323,11 @@ function specOutcome(scenario: FixtureScenario): {
 }
 
 describe('verifyTenantMirrors conformance under the real reader grant', () => {
-  registerTenantMirrorReaderContext((tenantSlug, fn) =>
-    withStoreGrant('audit_mirror_reader', fn, { tenantSlug })
-  );
+  const registerReader = () =>
+    registerTenantMirrorReaderContext((tenantSlug, fn) =>
+      withStoreGrant('audit_mirror_reader', fn, { tenantSlug })
+    );
+  let restoreReader = registerReader();
 
   const savedEnv = new Map<string, string | undefined>();
   afterEach(() => {
@@ -377,4 +381,30 @@ describe('verifyTenantMirrors conformance under the real reader grant', () => {
       }
     }
   }
+
+  it('withholds every partition when the reader seam is unregistered (fail-closed)', () => {
+    for (const key of ['KYBERION_TENANT', 'SYSTEM_ROLE']) {
+      if (!savedEnv.has(key)) savedEnv.set(key, process.env[key]);
+    }
+    delete process.env.KYBERION_TENANT;
+    delete process.env.SYSTEM_ROLE;
+    const { io, accessed } = fixtureIo({
+      callerTenant: undefined,
+      mirrorA: 'intact',
+      mirrorB: 'intact',
+    });
+    const restore = registerAuditChainIo(io);
+    // authority.ts registers the real seam on import, so restoring is not
+    // enough — explicitly clear it.
+    const restoreUnregistered = registerTenantMirrorReaderContext(undefined);
+    try {
+      const report = auditChain.verifyTenantMirrors();
+      expect(report.findings).toEqual([]);
+      expect(report.withheld).toBe(TENANTS.length);
+      expect(accessed.size).toBe(0);
+    } finally {
+      restore();
+      restoreUnregistered();
+    }
+  });
 });

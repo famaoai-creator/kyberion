@@ -497,25 +497,43 @@ function asAuditStoreWriter<T>(tenantSlug: string, fn: () => T): T {
 export type TenantMirrorReaderContext = <T>(tenantSlug: string, fn: () => T) => T;
 let tenantMirrorReaderContext: TenantMirrorReaderContext | undefined;
 
-export function registerTenantMirrorReaderContext(context: TenantMirrorReaderContext): void {
+/**
+ * Registers the reader seam and returns a restore function. An unregistered
+ * seam is fail-closed: `asAuditStoreReader` refuses rather than falling back
+ * to the caller's identity — a mirror verify must never borrow whatever
+ * grants the caller happens to hold.
+ */
+export function registerTenantMirrorReaderContext(
+  context: TenantMirrorReaderContext | undefined
+): () => void {
+  const previous = tenantMirrorReaderContext;
   tenantMirrorReaderContext = context;
+  return () => {
+    tenantMirrorReaderContext = previous;
+  };
 }
 
 function asAuditStoreReader<T>(tenantSlug: string, fn: () => T): T {
-  return tenantMirrorReaderContext ? tenantMirrorReaderContext(tenantSlug, fn) : fn();
+  if (!tenantMirrorReaderContext) {
+    throw new Error(
+      '[TENANT_MIRROR_READER_UNAVAILABLE] tenant mirror reader seam is not registered — this build cannot bind the audit_mirror_reader grant'
+    );
+  }
+  return tenantMirrorReaderContext(tenantSlug, fn);
 }
 
 /**
  * A mirror-verify error that means "this process may not verify that
  * partition": the tenant binding was refused (bound caller, another tenant),
- * or the process may not issue the reader grant. Inside the reader grant the
- * reads are always authorized, so any other error is a real fault and
- * propagates. The partition is counted as withheld and never read, like the
- * D9 tenant-ledger semantics.
+ * the process may not issue the reader grant, or this build never registered
+ * the reader seam (fail-closed — never read under the caller's identity).
+ * Inside the reader grant the reads are always authorized, so any other
+ * error is a real fault and propagates. The partition is counted as withheld
+ * and never read, like the D9 tenant-ledger semantics.
  */
 function isMirrorVerifyScopeError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /ROLE_TENANT_SCOPE_(MISMATCH|REQUIRED)|ROLE_ASSUMPTION_DENIED|STORE_GRANT_UNKNOWN/u.test(
+  return /ROLE_TENANT_SCOPE_(MISMATCH|REQUIRED)|ROLE_ASSUMPTION_DENIED|STORE_GRANT_UNKNOWN|TENANT_MIRROR_READER_UNAVAILABLE/u.test(
     message
   );
 }

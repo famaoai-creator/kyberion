@@ -3580,7 +3580,9 @@ through the same authority seam as the writer — never under the caller's
 identity. A caller bound to another tenant cannot bind that partition's
 grant (`[ROLE_TENANT_SCOPE_MISMATCH]`); count it as `withheld`, never read it,
 and never name it in findings or logs. An unbound caller verifies every
-partition. Do not fix this by widening the caller's role, giving the writer
+partition. A build that never registered the reader seam is fail-closed —
+partitions withhold rather than fall back to the caller's identity. Do not
+fix this by widening the caller's role, giving the writer
 grant read access, or catching `[ROLE_VIOLATION]` as a skip — each leaks the
 verify into whatever grants the caller happens to hold. The enforcing gate is
 the executable model: `libs/core/governance/audit-chain-mirror.model.test.ts`
