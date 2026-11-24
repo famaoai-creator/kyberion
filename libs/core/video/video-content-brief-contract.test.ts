@@ -40,6 +40,7 @@ describe('video content brief contract', () => {
           name: slug,
           colors: { primary: '#123456', accent: '#abcdef', background: '#111111', text: '#eeeeee' },
           fonts: { heading: 'E2E Sans', body: 'E2E Sans' },
+          semantic_tokens: { video: { 'video.accent.blue': '#224466' } },
         },
       })
     );
@@ -67,6 +68,8 @@ describe('video content brief contract', () => {
       });
 
       expect(storyboard.design_system_ref.background_color).toBe('#111111');
+      expect(storyboard.design_system_ref.brand_name).toBe('E2E02 Corp');
+      expect(storyboard.design_system_ref.css_vars?.['--kb-accent-blue']).toBe('#224466');
       expect(storyboard.design_system_ref.css_vars?.['--kb-accent']).toBe('#abcdef');
       expect(storyboard.design_system_ref.css_vars?.['--kb-primary']).toBe('#123456');
     } finally {
@@ -183,7 +186,7 @@ describe('video content brief contract', () => {
           tenant_id: 'video-tenant-fixture',
           brand_name: 'Video Tenant',
           matchers: ['video tenant'],
-          design_system_id: 'video-tenant-fixture',
+          design_system_id: 'executive-standard',
           branding: {
             brand_name: 'Video Tenant',
             logo_url: 'knowledge/confidential/video-tenant-fixture/design/assets/logo.png',
@@ -203,7 +206,7 @@ describe('video content brief contract', () => {
           theme_id: 'video-tenant-fixture',
           brand_name: 'Video Tenant',
           tenant_slug: 'video-tenant-fixture',
-          design_system_id: 'video-tenant-fixture',
+          design_system_id: 'executive-standard',
           theme: {
             name: 'Video Tenant',
             colors: {
@@ -224,7 +227,7 @@ describe('video content brief contract', () => {
       )
     );
 
-    const storyboard = compileVideoContentBriefToStoryboard({
+    const brief = {
       kind: 'video-content-brief',
       version: '1.0.0',
       audience: 'operators',
@@ -240,11 +243,16 @@ describe('video content brief contract', () => {
         root_dir: tenantRoot,
         customer_id: 'video-tenant-fixture',
         brand_name: 'Video Tenant',
-        design_system_id: 'video-tenant-fixture',
+        design_system_id: 'executive-standard',
       },
       design_system_ref: {
         system_id: 'video-tenant-fixture',
       },
+    } as const;
+    const storyboard = compileVideoContentBriefToStoryboard({
+      ...brief,
+      constraints: [...brief.constraints],
+      proof_points: [...brief.proof_points],
     });
 
     expect(storyboard.design_system_ref?.brand_name).toBe('Video Tenant');
@@ -254,6 +262,16 @@ describe('video content brief contract', () => {
     );
     expect(storyboard.design_system_ref?.css_vars?.['--kb-bg-main']).toBe('#EEF2FF');
     expect(storyboard.design_system_ref?.css_vars?.['--kb-accent']).toBe('#D97706');
+    const scopedStoryboard = compileVideoContentBriefToStoryboard({
+      ...brief,
+      constraints: [...brief.constraints],
+      proof_points: [...brief.proof_points],
+      design_profile: { ...brief.design_profile, tenant_slug: 'video-tenant-fixture' },
+    });
+    expect(scopedStoryboard.design_system_ref.logo_path).toBe(
+      storyboard.design_system_ref.logo_path
+    );
+    expect(scopedStoryboard.design_system_ref.css_vars?.['--kb-accent']).toBe('#D97706');
   });
 
   it('keeps tenant A and tenant B design profiles isolated', () => {

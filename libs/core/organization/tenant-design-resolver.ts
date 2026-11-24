@@ -8,10 +8,7 @@ import {
   safeReaddir,
   safeStat,
 } from '../secure-io.js';
-import {
-  loadTenantDesignOverride,
-  loadTenantDesignThemeOverlay,
-} from './tenant-design-override.js';
+import { loadTenantDesignOverride, loadThemeForTenantDesign } from './tenant-design-override.js';
 
 /** Canonical repo-relative path of the tenant design override index. */
 export const TENANT_DESIGN_INDEX_RELATIVE_PATH = 'knowledge/confidential/tenants/index.json';
@@ -224,16 +221,6 @@ function matchesOverride(
   return brandingName !== '' && (key.includes(brandingName) || brandingName.includes(key));
 }
 
-function deriveThemePackPath(overridePath: string, override: Record<string, any>): string | null {
-  if (typeof override.theme_pack_path === 'string' && override.theme_pack_path.trim()) {
-    return override.theme_pack_path.trim();
-  }
-  if (overridePath.includes('/design/tenant-override.json')) {
-    return overridePath.replace(/\/design\/tenant-override\.json$/, '/design/theme.json');
-  }
-  return null;
-}
-
 function deriveLayoutCatalogPath(
   overridePath: string,
   override: Record<string, any>,
@@ -331,11 +318,7 @@ export function resolveTenantDesign(input: ResolveTenantDesignInput): TenantDesi
     const override = loadTenantDesignOverride(rootDir, candidate, path.dirname(candidate));
     if (!override) continue;
     if (!matchesOverride(override, input.brandName, input.designSystemId)) continue;
-    const themePackPath = deriveThemePackPath(candidate, override);
-    const themePackAbsolute = themePackPath ? path.resolve(rootDir, themePackPath) : null;
-    const themePack = themePackAbsolute
-      ? loadTenantDesignThemeOverlay(rootDir, themePackAbsolute, path.dirname(candidate))
-      : null;
+    const themePack = loadThemeForTenantDesign(rootDir, candidate, override);
     const layoutCatalogCandidate = deriveLayoutCatalogPath(candidate, override, themePack);
     const layoutCatalog = layoutCatalogCandidate
       ? isSafeTenantDesignPath(

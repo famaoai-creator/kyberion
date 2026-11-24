@@ -86,6 +86,7 @@ vi.mock('../secure-io.js', async () => {
     assertSafeRepositoryPath,
     safeLstat: (p: string) => actual.lstatSync(p),
     safeExistsSync: (p: string) => actual.existsSync(p),
+    safeReaddir: (p: string) => actual.readdirSync(p),
     // Tenant overlays are only loaded once the leaf proves to be a regular
     // file; without this export the check throws into a silent catch and every
     // tenant override degrades to brand defaults.
@@ -103,7 +104,12 @@ vi.mock('../secure-io.js', async () => {
   };
 });
 
-import { resolveCreativeDesign, renderPromptStyleBlock } from './creative-design-resolver.js';
+import {
+  resolveCreativeDesign,
+  renderPromptStyleBlock,
+  selectDesignSystem,
+  readTenantSemanticTokens,
+} from './creative-design-resolver.js';
 
 const BRAND_TOKENS = {
   version: '1.1.0',
@@ -210,6 +216,57 @@ describe('creative-design-resolver', () => {
     expect(resolved.projection.style_pack.typography_hint).toBe('humanist sans');
   });
 
+  it('selects explicit, reference, profile, and default systems in order', () => {
+    const catalog = {
+      version: '1.0.0',
+      default_system: 'standard',
+      systems: {
+        standard: { theme: 'standard' },
+        report: { theme: 'report', profiles: ['summary'] },
+        imported: { theme: 'imported' },
+      },
+    };
+    const resolveReference = vi.fn(() => 'imported');
+    expect(
+      selectDesignSystem(catalog, {
+        designSystemId: 'standard',
+        profileId: 'summary',
+        resolveReference,
+      })
+    ).toMatchObject({ id: 'standard', source: 'explicit' });
+    expect(resolveReference).not.toHaveBeenCalled();
+    expect(
+      selectDesignSystem(catalog, {
+        designSystemId: 'constructor',
+        profileId: 'summary',
+        resolveReference,
+      })
+    ).toMatchObject({ id: 'imported', source: 'reference' });
+    expect(selectDesignSystem(catalog, { profileId: 'summary' })).toMatchObject({
+      id: 'report',
+      source: 'profile',
+    });
+    expect(selectDesignSystem(catalog, {})).toMatchObject({ id: 'standard', source: 'default' });
+  });
+
+  it('projects a profile-selected public theme consistently across formats', () => {
+    const root = 'knowledge/public/design-patterns/media-templates';
+    write(`${root}/media-design-systems/systems.json`, {
+      systems: { report: { theme: 'report-theme', profiles: ['summary'] } },
+    });
+    write(`${root}/themes/themes.json`, {
+      themes: { 'report-theme': { colors: { accent: '#116644' } } },
+    });
+
+    for (const surface of ['web', 'pptx', 'doc', 'xlsx', 'video'] as const) {
+      const resolved = resolveCreativeDesign({ surface, profileId: 'summary' });
+      expect(resolved.selection).toMatchObject({ id: 'report', source: 'profile' });
+      expect(resolved.theme_id).toBe('report-theme');
+      expect(resolved.colors.accent).toBe('#116644');
+      expect(resolved.projection.surface).toBe(surface);
+    }
+  });
+
   it('falls back when the brand token catalog violates its schema', () => {
     write('knowledge/public/design-patterns/brand-tokens/kyberion.json', {
       version: '1.1.0',
@@ -272,6 +329,50 @@ describe('creative-design-resolver', () => {
     if (prompt.projection.surface === 'prompt') {
       expect(prompt.projection.style_pack.palette_hex).toContain('#123456');
     }
+  });
+
+  it('honors an in-scope registered theme pack for both visual and semantic tokens', () => {
+    const root = 'knowledge/confidential/client-a/design';
+    write(`${root}/tenant-override.json`, { theme_pack_path: `${root}/custom.json` });
+    write(`${root}/custom.json`, {
+      theme: {
+        colors: { accent: '#116644' },
+        semantic_tokens: { video: { 'video.accent.blue': '#224466' } },
+      },
+    });
+    expect(resolveCreativeDesign({ surface: 'video', tenantSlug: 'client-a' }).colors.accent).toBe(
+      '#116644'
+    );
+    expect(readTenantSemanticTokens('client-a', 'video')).toEqual({
+      'video.accent.blue': '#224466',
+    });
+    write(`${root}/tenant-override.json`, {
+      theme_pack_path: 'knowledge/confidential/client-b/design/custom.json',
+    });
+    write('knowledge/confidential/client-b/design/custom.json', {
+      theme: { colors: { accent: '#ff0000' } },
+    });
+    expect(
+      resolveCreativeDesign({ surface: 'video', tenantSlug: 'client-a' }).colors.accent
+    ).not.toBe('#ff0000');
+  });
+
+  it('merges partial font and type overrides per field', () => {
+    const root = 'knowledge/confidential/client-a/design';
+    write(`${root}/theme.json`, {
+      theme: {
+        fonts: { heading: 'Base Serif', body: 'Base Sans' },
+        typography: { roles: { body: { size_pt: 15, weight: 500 } } },
+      },
+    });
+    write(`${root}/tenant-override.json`, {
+      theme: { fonts: { heading: 'Override Serif' } },
+      typography: { roles: { body: { size_pt: 16 } } },
+    });
+    const result = resolveCreativeDesign({ surface: 'web', tenantSlug: 'client-a' });
+    expect(result.fonts).toMatchObject({ heading: 'Override Serif', body: 'Base Sans' });
+    expect(result.typography.roles.body).toMatchObject({ size_pt: 16, weight: 500 });
+    expect(result.theme_id).toBe('kyberion-standard');
   });
 
   it('falls back to brand defaults for unknown tenants', () => {

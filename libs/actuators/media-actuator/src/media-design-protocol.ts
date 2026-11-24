@@ -1,3 +1,9 @@
+import {
+  loadMediaThemeCatalogScope,
+  PUBLIC_MEDIA_THEMES,
+  selectDesignSystem,
+  type MediaThemeCatalog,
+} from '@agent/core/creative-design-resolver';
 import { logger } from '@agent/core/core';
 import { assertSafeRepositoryPath, safeMkdir, safeExistsSync } from '@agent/core/secure-io';
 import { currentScope } from '@agent/core/scope-context';
@@ -53,7 +59,7 @@ import {
 import * as path from 'node:path';
 import { resolveEastAsianFontFamily } from '@agent/core/design-fonts';
 import { findDesignStyle } from '@agent/core/design-foundation';
-import { KDS_THEME_PREFIX, buildKdsDesignSystem, resolveKdsTheme } from './media-kds.js';
+import { KDS_THEME_PREFIX, resolveKdsTheme } from './media-kds.js';
 import {
   loadSemanticRenderTokenCatalog as loadValidatedSemanticRenderTokenCatalog,
   resolveSemanticRenderTokens as resolveValidatedSemanticRenderTokens,
@@ -90,12 +96,6 @@ type ArtifactLibraryCatalog = {
     }
   >;
 };
-
-interface MediaThemeCatalog {
-  version: string;
-  default_theme: string;
-  themes: Record<string, MediaTheme>;
-}
 
 function loadArtifactLibraryCatalog(rootDir: string): ArtifactLibraryCatalog {
   const dirPath = path.resolve(
@@ -155,44 +155,22 @@ function loadDocumentCompositionCatalog(rootDir: string): MediaDocumentCompositi
   );
 }
 
-function loadThemeCatalog(rootDir: string): MediaThemeCatalog {
-  const emptyScope: MediaThemeCatalog = {
+function loadThemeCatalog(rootDir: string): MediaThemeCatalog<MediaTheme> {
+  const emptyScope: MediaThemeCatalog<MediaTheme> = {
     version: '1.0.0',
     default_theme: 'kyberion-standard',
     themes: {},
   };
   const schemaPath = path.resolve(rootDir, 'knowledge/product/schemas/media-themes.schema.json');
-  const loadScope = (
-    id: string,
-    directoryPath: string,
-    filePath: string,
-    optional = false
-  ): MediaThemeCatalog => {
-    const catalog = defineCatalog<MediaThemeCatalog>({
-      id,
-      path: path.resolve(rootDir, filePath),
-      schema: schemaPath,
-      ...(optional ? { fallback: emptyScope } : {}),
-    });
-    const directory = path.resolve(rootDir, directoryPath);
-    const docs = readJsonFilesRecursively(directory);
-    if (docs.length === 0) return catalog.load();
-    const merged = docs.reduce(
-      (acc, doc) => deepMergeCatalog(acc, doc),
-      cloneJsonValue(emptyScope)
-    );
-    return catalog.validate(merged, directory);
-  };
-
-  const publicCatalog = loadScope(
+  const publicCatalog = loadMediaThemeCatalogScope<MediaTheme>(
+    rootDir,
     'media-themes-public',
-    'knowledge/public/design-patterns/media-templates/themes',
-    'knowledge/public/design-patterns/media-templates/themes.json'
+    PUBLIC_MEDIA_THEMES
   );
-  const runtimeCatalog = loadScope(
+  const runtimeCatalog = loadMediaThemeCatalogScope<MediaTheme>(
+    rootDir,
     'media-themes-runtime',
     'active/shared/runtime/design-patterns/media-templates/themes',
-    'active/shared/runtime/design-patterns/media-templates/themes.json',
     true
   );
   const scope = currentScope();
@@ -201,15 +179,15 @@ function loadThemeCatalog(rootDir: string): MediaThemeCatalog {
     : 'knowledge/personal';
   const personalCatalog =
     scope.tier === 'personal' && (!scope.tenant_slug || isValidTenantSlug(scope.tenant_slug))
-      ? loadScope(
+      ? loadMediaThemeCatalogScope<MediaTheme>(
+          rootDir,
           'media-themes-personal',
           `${personalRoot}/design-patterns/media-templates/themes`,
-          `${personalRoot}/design-patterns/media-templates/themes.json`,
           true
         )
       : emptyScope;
   const merged = deepMergeCatalog(deepMergeCatalog(publicCatalog, runtimeCatalog), personalCatalog);
-  return defineCatalog<MediaThemeCatalog>({
+  return defineCatalog<MediaThemeCatalog<MediaTheme>>({
     id: 'media-themes',
     path: path.resolve(rootDir, 'knowledge/public/design-patterns/media-templates/themes.json'),
     schema: schemaPath,
@@ -646,33 +624,22 @@ function resolveMediaDesignSystem(
           : null,
     };
   };
-  if (explicit && catalog.systems?.[explicit]) {
-    return buildResult(explicit, catalog.systems[explicit]);
-  }
-  // KDS v2: `kds-<style>` is an implicit design system — theme from the style,
-  // body zones from the style's preferred compositions.
-  const kdsSystem = explicit.startsWith('kds-') ? buildKdsDesignSystem(explicit.slice(4)) : null;
-  if (kdsSystem) return buildResult(explicit, kdsSystem);
-  const imported = resolveImportedDesignReference(rootDir, {
-    ...bindingHints,
-    client: brief?.client || brief?.payload?.client,
-    project_name:
-      brief?.project_name || brief?.payload?.project_name || brief?.name || brief?.payload?.name,
-    project_id: brief?.project_id || brief?.payload?.project_id,
+  const selection = selectDesignSystem(catalog, {
+    designSystemId: explicit,
+    profileId: typeof brief?.document_profile === 'string' ? brief.document_profile : undefined,
+    resolveReference: () =>
+      resolveImportedDesignReference(rootDir, {
+        ...bindingHints,
+        client: brief?.client || brief?.payload?.client,
+        project_name:
+          brief?.project_name ||
+          brief?.payload?.project_name ||
+          brief?.name ||
+          brief?.payload?.name,
+        project_id: brief?.project_id || brief?.payload?.project_id,
+      })?.design_system_id,
   });
-  if (imported?.design_system_id && catalog.systems?.[imported.design_system_id]) {
-    return buildResult(imported.design_system_id, catalog.systems[imported.design_system_id]);
-  }
-  const profileId = String(brief?.document_profile || '').trim();
-  const matched = Object.entries(catalog.systems || {}).find(
-    ([, system]: [string, MediaDesignSystemDefinition]) =>
-      Array.isArray(system?.profiles) && system.profiles.includes(profileId)
-  );
-  if (matched) {
-    return buildResult(matched[0], matched[1]);
-  }
-  const fallbackId = String(catalog.default_system || 'executive-standard');
-  return buildResult(fallbackId, catalog.systems?.[fallbackId] || { theme: 'kyberion-standard' });
+  return buildResult(selection.id, selection.system);
 }
 
 function loadSemanticRenderTokenCatalog(rootDir: string): SemanticRenderTokenCatalog {

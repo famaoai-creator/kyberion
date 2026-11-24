@@ -161,25 +161,34 @@ export function compileVideoContentBriefToStoryboard(brief: VideoContentBrief): 
     // The narration cue is what the viewer actually has to keep up with.
     beatPlan.map((entry) => estimateReadingTimeSec(entry.voCue(brief) || entry.message(brief)))
   );
-  const tenantDesign = resolveVideoTenantDesign(brief);
+  const tenantSlug = brief.design_profile?.tenant_slug;
+  const profile = brief.design_profile;
+  const tenantDesign =
+    !tenantSlug || profile?.customer_id || profile?.brand_name
+      ? resolveVideoTenantDesign(brief)
+      : null;
   const tenantThemePack = tenantDesign?.themePack;
-  const brandName =
-    brief.design_system_ref.brand_name || tenantDesign?.tokens.brand_name || 'Kyberion';
-  // VDS-07 (E2E-02): tenant_slug selects the theme pack directly through the
-  // single creative-design resolver; explicit brief css_vars still win below.
-  const creativeTenantVars = (() => {
-    const tenantSlug = brief.design_profile?.tenant_slug;
-    if (!tenantSlug) return {};
-    const resolved = resolveCreativeDesign({ surface: 'video', tenantSlug });
-    return resolved.source === 'tenant-override' && resolved.projection.surface === 'video'
-      ? resolved.projection.css_vars
+  const designSystemId = profile?.design_system_id;
+  const design = resolveCreativeDesign({ surface: 'video', tenantSlug, designSystemId });
+  const useCreativeProjection =
+    design.source === 'tenant-override' ||
+    (!tenantDesign?.matchedPath &&
+      design.selection?.source === 'explicit' &&
+      (design.theme_source === 'catalog' || Boolean(design.design_style)));
+  const creativeVars =
+    useCreativeProjection && design.projection.surface === 'video'
+      ? design.projection.css_vars
       : {};
-  })();
-  const modeDefaults = resolveVideoModeDefaults(presentationMode);
+  const brandName =
+    brief.design_system_ref.brand_name ||
+    (design.source === 'tenant-override' ? design.brand_name : tenantDesign?.tokens.brand_name) ||
+    design.brand_name;
+  const tokens = tenantSlug ? { tenantSlug } : undefined;
+  const modeDefaults = resolveVideoModeDefaults(presentationMode, tokens);
   const background =
     brief.design_system_ref.background_color ||
+    creativeVars['--kb-bg-main'] ||
     (isWebThemePack(tenantThemePack) ? tenantThemePack.theme.colors.background : undefined) ||
-    creativeTenantVars['--kb-bg-main'] ||
     modeDefaults.background_color;
   const layoutFamily = brief.design_system_ref.layout_family || modeDefaults.layout_family;
   const motionProfile = brief.design_system_ref.motion_profile || modeDefaults.motion_profile;
@@ -247,6 +256,7 @@ export function compileVideoContentBriefToStoryboard(brief: VideoContentBrief): 
         backgroundColor: background,
         layoutFamily,
         motionProfile,
+        tokens,
         designSystemRef: {
           ...brief.design_system_ref,
           brand_name: brandName,
@@ -254,7 +264,8 @@ export function compileVideoContentBriefToStoryboard(brief: VideoContentBrief): 
           logo_path: logoPath,
           css_vars: {
             ...tenantCssVars,
-            ...creativeTenantVars,
+            ...creativeVars,
+            '--kb-bg-main': background,
             ...brief.design_system_ref.css_vars,
           },
         },
@@ -817,7 +828,7 @@ function resolveVideoTenantDesign(brief: VideoContentBrief) {
   if (!profile) return null;
   return resolveTenantDesign({
     rootDir: profile.root_dir,
-    customerId: profile.customer_id,
+    customerId: profile.tenant_slug ?? profile.customer_id,
     brandName: profile.brand_name,
     designSystemId: profile.design_system_id,
   });

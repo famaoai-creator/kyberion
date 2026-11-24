@@ -1,72 +1,21 @@
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeReaddir,
-} from '@agent/core/secure-io';
+import { loadJsonValue } from '@agent/core/creative-design-resolver';
+export {
+  cloneJsonValue,
+  deepMergeCatalog,
+  readJsonFilesRecursively,
+  loadJsonValue,
+  loadMediaDesignSystemsCatalog,
+  type MediaDesignSystemDefinition,
+  type MediaDesignSystemsCatalog,
+} from '@agent/core/creative-design-resolver';
+import { assertSafeRepositoryPath, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { loadTenantDesignOverrideIndex } from '@agent/core/organization/tenant-design-resolver';
 import {
   loadTenantDesignOverride,
   type TenantDesignOverride,
 } from '@agent/core/organization/tenant-design-override';
-import {
-  defineCatalog,
-  isRecord,
-  parseSafeJsonInput,
-  parseSafeJsonObjectValue,
-  readJson,
-} from '@agent/core/foundation';
+import { defineCatalog, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import * as path from 'node:path';
-
-export function cloneJsonValue<T>(value: T): T {
-  if (value === undefined) return value;
-  const serialized = JSON.stringify(value);
-  if (serialized === undefined) throw new Error('Media JSON clone must be serializable');
-  return parseSafeJsonInput(serialized, 'Media JSON clone') as T;
-}
-
-export function deepMergeCatalog(base: unknown, next: unknown): unknown {
-  if (Array.isArray(base) || Array.isArray(next)) return cloneJsonValue(next);
-  if (!isRecord(base)) return cloneJsonValue(next);
-  if (!isRecord(next)) return cloneJsonValue(next);
-  const merged: Record<string, unknown> = { ...base };
-  for (const [key, value] of Object.entries(next)) {
-    if (isRecord(value) && isRecord(merged[key])) {
-      merged[key] = deepMergeCatalog(merged[key], value);
-    } else {
-      merged[key] = cloneJsonValue(value);
-    }
-  }
-  return merged;
-}
-
-export function readJsonFilesRecursively(dirPath: string): unknown[] {
-  const safeDirPath = assertSafeRepositoryPath(dirPath, { allowMissingLeaf: true });
-  if (!safeExistsSync(safeDirPath) || !safeLstat(safeDirPath).isDirectory()) return [];
-  const entries = safeReaddir(safeDirPath).sort();
-  const docs: unknown[] = [];
-  for (const entry of entries) {
-    const fullPath = path.join(safeDirPath, entry);
-    const stat = safeLstat(fullPath);
-    if (stat.isSymbolicLink()) continue;
-    if (stat.isDirectory()) {
-      docs.push(...readJsonFilesRecursively(fullPath));
-      continue;
-    }
-    if (stat.isFile() && entry.endsWith('.json')) {
-      docs.push(loadJsonValue(fullPath));
-    }
-  }
-  return docs;
-}
-
-export function loadJsonValue(filePath: string): unknown {
-  const safePath = assertSafeRepositoryPath(filePath);
-  if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
-    throw new Error(`Media JSON input must be an existing regular file: ${safePath}`);
-  }
-  return readJson(safePath);
-}
 
 export interface ConfidentialThemePack {
   kind: 'pptx-theme-pack' | 'web-theme-pack';
@@ -226,60 +175,4 @@ export function resolveConfidentialTenantOverride(
     // A missing tenant registry must not break rendering.
   }
   return null;
-}
-
-export interface MediaDesignSystemDefinition {
-  theme: string;
-  profiles?: string[];
-  layout_template_id?: string;
-  body_zone_map?: Record<string, string>;
-  slide_layout_overrides?: Record<string, unknown>;
-  semantic_overrides?: Record<string, Record<string, Record<string, unknown>>>;
-  branding?: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
-  [key: string]: unknown;
-}
-
-export interface MediaDesignSystemsCatalog {
-  version: string;
-  default_system: string;
-  systems: Record<string, MediaDesignSystemDefinition>;
-  style_pack?: {
-    tone_words?: string[];
-    typography_hint?: string;
-    avoid?: string[];
-    music?: {
-      mood: string;
-      bpm_range?: [number, number];
-      instrumentation_hint?: string;
-    };
-  };
-}
-
-export function loadMediaDesignSystemsCatalog(rootDir: string): MediaDesignSystemsCatalog {
-  const aggregationSeed: MediaDesignSystemsCatalog = {
-    version: '1.0.0',
-    default_system: 'executive-standard',
-    systems: {},
-  };
-  const filePath = path.resolve(
-    rootDir,
-    'knowledge/public/design-patterns/media-templates/media-design-systems.json'
-  );
-  const catalog = defineCatalog<MediaDesignSystemsCatalog>({
-    id: 'media-design-systems',
-    path: filePath,
-    schema: path.resolve(rootDir, 'knowledge/product/schemas/media-design-systems.schema.json'),
-  });
-  const directoryPath = path.resolve(
-    rootDir,
-    'knowledge/public/design-patterns/media-templates/media-design-systems'
-  );
-  const docs = readJsonFilesRecursively(directoryPath);
-  if (docs.length === 0) return catalog.load();
-  const merged = docs.reduce(
-    (acc, doc) => deepMergeCatalog(acc, doc),
-    cloneJsonValue(aggregationSeed)
-  );
-  return catalog.validate(merged, directoryPath);
 }

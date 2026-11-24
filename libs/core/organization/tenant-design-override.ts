@@ -85,3 +85,17 @@ export function loadTenantDesignThemeOverlay(
     return null;
   }
 }
+
+/** Load the registered theme pack for an already scoped tenant override. */
+export function loadThemeForTenantDesign(
+  rootDir: string,
+  overridePath: string,
+  override: TenantDesignOverride
+): TenantDesignThemeOverlay | null {
+  const directory = path.dirname(overridePath);
+  const configuredPath = override.theme_pack_path?.trim();
+  const filePath = configuredPath
+    ? path.resolve(rootDir, configuredPath)
+    : path.join(directory, 'theme.json');
+  return loadTenantDesignThemeOverlay(rootDir, filePath, directory);
+}

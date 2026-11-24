@@ -60,16 +60,13 @@ describe('media catalog loaders', () => {
 
   it('validates the merged media design systems envelope through the catalog boundary', () => {
     const source = String(
-      safeReadFile(
-        pathResolver.rootResolve('libs/actuators/media-actuator/src/media-catalog-loaders.ts'),
-        { encoding: 'utf8' }
-      )
+      safeReadFile(pathResolver.rootResolve('libs/core/design/creative-design-resolver.ts'), {
+        encoding: 'utf8',
+      })
     );
 
     expect(source).toContain("id: 'media-design-systems'");
-    expect(source).toContain(
-      "schema: path.resolve(rootDir, 'knowledge/product/schemas/media-design-systems.schema.json')"
-    );
+    expect(source).toContain('knowledge/product/schemas/media-design-systems.schema.json');
     expect(source).not.toContain('fallbackOnInvalid: true');
     expect(source).toContain('return catalog.validate(merged, directoryPath);');
 
