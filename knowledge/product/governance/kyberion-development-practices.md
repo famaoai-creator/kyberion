@@ -491,7 +491,9 @@ CI be the first place a gate sees the change:
      imported by package name → `libs/core/package.json` exports +
      `check_package_export_surface.baseline.json`; new authority role →
      `authority-roles/<role>.json` card + re-record
-     `org-role-default-grant-equivalence.json` fixture; generated value
+     `org-role-default-grant-equivalence.json` fixture; new declared store
+     grant → same fixture, since S4 reserves every grant name as a role id
+     (the name joins `existing_role_ids`); generated value
      (qps-ploc, indexes, CLI_REFERENCE) → run its generator, never hand-write.
 3. **Run the PR gate set locally:** `pnpm check -- --scope pr`, plus
    `pnpm exec prettier --check` on changed `.json` sources, the focused
