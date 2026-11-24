@@ -47,7 +47,7 @@ phase_affinity: [alignment, execution]
 | 同じことをパイプライン内で       | `media:document_digest`, `vision:ocr_image`, `voice:transcribe`                                    |
 | 議事録（話者・アクション）       | `pnpm minutes:record`（マイク実時間）/ `ingest:meeting_digest`（meeting-operations-playbook 参照） |
 | テナントのナレッジとして取り込む | `pnpm knowledge:ingest --tenant <slug> --file <file> [--ocr]`（文書・html・md）                    |
-| Web ページ（URL）                | 外部通信が統制された `network:fetch` で保存し、保存したファイルを `read`                           |
+| Web ページ（URL）                | `pnpm kyberion read <url>` — `read` が外部通信統制下の `secureFetch` で取得（GET のみ）            |
 
 ## 3. 実行方法
 
@@ -57,6 +57,7 @@ pnpm kyberion see    active/shared/tmp/<job>/screenshot.png --lang ja
 pnpm kyberion listen active/shared/tmp/<job>/call.m4a --timestamps
 pnpm kyberion watch  active/shared/tmp/<job>/demo.mp4 --every 5 --frames active/shared/tmp/<job>/frames
 pnpm kyberion read   active/shared/tmp/<job>/page.html
+pnpm kyberion read   https://example.com/articles/7/        # http(s) URL — secureFetch 経由で取得
 ```
 
 警告は本文の後に `> [<command>] …` 行で出る。「何も出ない＝何もない」と扱わず、警告（文字起こしなし、コマの省略など）に対処する。
@@ -72,10 +73,9 @@ pnpm kyberion read   active/shared/tmp/<job>/page.html
 
 ## 5. 対象外（現時点）
 
-- **URL** — `read` は意図的に拒否する。リモートの内容は外部通信が統制された `network:fetch` を通す。
 - **音楽・音声以外の音** — 解析エンジンはない（音楽生成のみ）。
 - **行為側**（会話する・手を動かす・移動する） — [action-playbook.ja.md](./action-playbook.ja.md) を参照。
-- **URL・いまの画面・作る側（`read` の逆）・記憶の軸** — どれに動詞があり、どれにないかは [capability-verb-inventory.ja.md](./capability-verb-inventory.ja.md) で管理する。
+- **いまの画面・作る側（`read` の逆）・記憶の軸** — どれに動詞があり、どれにないかは [capability-verb-inventory.ja.md](./capability-verb-inventory.ja.md) で管理する。
 
 ## Grounded perception extensions
 

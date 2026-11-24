@@ -102,13 +102,14 @@ with no unifier to hide the choice.
 
 ## 3. Inputs that are not files
 
-The sense verbs all take a path inside the repository. The two most common real-world
-inputs are therefore not reachable by a verb:
+The sense verbs take a path inside the repository — except `read`, which also
+takes an `http(s)` URL and fetches it through the egress-governed `secureFetch`
+(GET only; deny/warn/allow policy + audit; localhost and private-network hosts
+refused). The most common real-world input still not reachable by a verb:
 
-| Input              | Today                                                                                                        | Why it is not a verb yet                                                                                                          |
-| ------------------ | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| URL / web page     | `network:fetch` (egress-governed) → save → `read` the saved file                                             | `read` refuses URLs by design (`document-reader.ts`); folding fetch into it would move an egress decision under a perception verb |
-| The current screen | `media-generation:capture_screen` / `capture_focused_window`, `system:list_displays`, `system:record_screen` | capture applies screen-frame redaction and lives on the action side; `see` only reads files                                       |
+| Input              | Today                                                                                                        | Why it is not a verb yet                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| The current screen | `media-generation:capture_screen` / `capture_focused_window`, `system:list_displays`, `system:record_screen` | capture applies screen-frame redaction and lives on the action side; `see` only reads files |
 
 Resolved 2026-09-27 (MSN-CAPTURE-RECORD-20260927): capture is now two verbs —
 `pnpm kyberion capture [--screen|--window|--camera]` (still, via
@@ -116,13 +117,16 @@ Resolved 2026-09-27 (MSN-CAPTURE-RECORD-20260927): capture is now two verbs —
 `pnpm kyberion record screen|audio|camera` (time-series, via
 `system:record_screen` / `system:record_audio` / `system:record_camera`).
 The redaction gate stays in the actuator; the verbs own only arg parsing and
-repo-boundary checks. `see` remains file-only by design. Not folded: `read
-<url>` (egress gate still open), explicit `browser:record` (needs session
-lifecycle — deferred by design), mobile video (no device bridge).
+repo-boundary checks. `see` remains file-only by design. Not folded: explicit
+`browser:record` (needs session lifecycle — deferred by design), mobile video
+(no device bridge).
 
-Both are two-step today, and both are cheap to fold into one verb (`read <url>`,
-`see --screen`) — the open question is where the egress and redaction gate is
-evaluated, not whether the engine exists.
+Resolved 2026-11-25 (MSN-READ-URL-20261125): `read <url>` is folded — the CLI
+fetches through `secureFetch` (the same egress gate as `network:fetch`) and
+hands the bytes to the shared document reader, so the egress decision stayed in
+the network layer rather than moving under the perception verb. Folding
+`see --screen` is still open — the remaining question is where the redaction
+gate is evaluated, not whether the engine exists.
 
 ## 4. Batch, streaming playback, and live dialogue
 

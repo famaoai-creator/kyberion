@@ -11,7 +11,7 @@ phase_affinity: [alignment, execution]
 
 # ドキュメントファイル読み取りプレイブック
 
-エージェントが Office 文書や PDF を**読む**とき（質問に答える・要約する・`knowledge/` に取り込む）に、どのエンジンを使うか。そして誤った手段を選んだときに時間を失う罠をまとめる。`read` は `.html` / `.htm` / `.md` / `.txt` / `.csv` / `.tsv` / `.json` / `.yaml` / `.yml` も読む（URL は拒否。先に `network:fetch` で保存する）。テキスト由来の形式は読みやすいテキストのまま扱う（md/txt/yaml はそのまま、JSON は妥当なら整形、小さな csv/tsv は Markdown 表、大きいものは原文＋警告）。画像・音声・動画には専用コマンド（`see` / `listen` / `watch`）がある — [perception-playbook.ja.md](./perception-playbook.ja.md) を参照。正本は英語版 [document-file-reading-playbook.md](./document-file-reading-playbook.md)。
+エージェントが Office 文書や PDF を**読む**とき（質問に答える・要約する・`knowledge/` に取り込む）に、どのエンジンを使うか。そして誤った手段を選んだときに時間を失う罠をまとめる。`read` は `.html` / `.htm` / `.md` / `.txt` / `.csv` / `.tsv` / `.json` / `.yaml` / `.yml` も読み、`http(s)` URL も受け付ける（外部通信統制下の `secureFetch` で GET 取得。localhost・プライベートアドレスは拒否）。テキスト由来の形式は読みやすいテキストのまま扱う（md/txt/yaml はそのまま、JSON は妥当なら整形、小さな csv/tsv は Markdown 表、大きいものは原文＋警告）。画像・音声・動画には専用コマンド（`see` / `listen` / `watch`）がある — [perception-playbook.ja.md](./perception-playbook.ja.md) を参照。正本は英語版 [document-file-reading-playbook.md](./document-file-reading-playbook.md)。
 
 ## 1. まず目的を決める
 

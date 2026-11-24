@@ -50,13 +50,13 @@ Detailed document rules (engines per format, ingest, OCR traps):
 
 ## 2. Decide the goal first
 
-| Goal                                 | Use                                                                                          |
-| ------------------------------------ | -------------------------------------------------------------------------------------------- |
-| Understand it now, nothing persisted | the sense command above                                                                      |
-| Same inside a pipeline               | `media:document_digest`, `vision:ocr_image`, `voice:transcribe`                              |
-| Meeting minutes (speaker, actions)   | `pnpm minutes:record` (live mic) / `ingest:meeting_digest` — see meeting-operations-playbook |
-| Land it as tenant knowledge          | `pnpm knowledge:ingest --tenant <slug> --file <file> [--ocr]` (documents, html, md)          |
-| Web page (URL)                       | `network:fetch` (egress-governed) to save it, then `read` the saved file                     |
+| Goal                                 | Use                                                                                                 |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Understand it now, nothing persisted | the sense command above                                                                             |
+| Same inside a pipeline               | `media:document_digest`, `vision:ocr_image`, `voice:transcribe`                                     |
+| Meeting minutes (speaker, actions)   | `pnpm minutes:record` (live mic) / `ingest:meeting_digest` — see meeting-operations-playbook        |
+| Land it as tenant knowledge          | `pnpm knowledge:ingest --tenant <slug> --file <file> [--ocr]` (documents, html, md)                 |
+| Web page (URL)                       | `pnpm kyberion read <url>` — `read` fetches it through the egress-governed `secureFetch` (GET only) |
 
 ## 3. How to run
 
@@ -66,6 +66,7 @@ pnpm kyberion see    active/shared/tmp/<job>/screenshot.png --lang ja
 pnpm kyberion listen active/shared/tmp/<job>/call.m4a --timestamps
 pnpm kyberion watch  active/shared/tmp/<job>/demo.mp4 --every 5 --frames active/shared/tmp/<job>/frames
 pnpm kyberion read   active/shared/tmp/<job>/page.html
+pnpm kyberion read   https://example.com/articles/7/        # http(s) URL — fetched via secureFetch
 ```
 
 Warnings are printed as `> [<command>] …` lines after the content — act on them
@@ -95,12 +96,10 @@ Warnings are printed as `> [<command>] …` lines after the content — act on t
 
 ## 5. Not covered (yet)
 
-- **URLs** — `read` refuses them on purpose; remote content goes through the
-  egress-governed `network:fetch` op.
 - **Music / non-speech audio** — no analysis engine exists (only music generation).
 - **Action side** (converse, hands, move) — see
   [action-playbook.md](./action-playbook.md).
-- **URLs, the live screen, authoring (the inverse of `read`) and the memory axis** —
+- **The live screen, authoring (the inverse of `read`) and the memory axis** —
   which of those have a verb and which do not is tracked in
   [capability-verb-inventory.md](./capability-verb-inventory.md).
 
