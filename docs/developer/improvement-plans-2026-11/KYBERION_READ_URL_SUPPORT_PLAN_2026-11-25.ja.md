@@ -1,7 +1,7 @@
 ---
 title: kyberion read の URL 直接読み取り対応計画
 kind: plan
-status: draft
+status: completed
 last_updated: 2026-11-25
 tags: [plan, cli, read, network-fetch, egress, perception, url]
 importance: 7
