@@ -21,9 +21,9 @@
       "op": "system:assert",
       "params": {
         "conditions": [
-          "{{input.engine_id}} != ''",
-          "{{input.engine_kind}} != ''",
-          "{{input.tenant}} != ''"
+          { "from": "input.engine_id", "operator": "not_empty" },
+          { "from": "input.engine_kind", "operator": "not_empty" },
+          { "from": "input.tenant", "operator": "not_empty" }
         ],
         "message": "engine_id, engine_kind, and tenant are required"
       }

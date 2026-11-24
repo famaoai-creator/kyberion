@@ -199,6 +199,45 @@ export function evaluateCondition(cond: any, ctx: any): boolean {
   }
 }
 
+/**
+ * `system:assert` shared core — fail-fast input/precondition gate. Conditions
+ * use the governed structured-condition contract evaluated by
+ * evaluateCondition (the same evaluator `when` edges use): each entry is either
+ * a structured condition object ({from, operator, value?}) or a bare
+ * context-path string meaning "truthy". String expression syntax ("a != b") is
+ * rejected by that evaluator on purpose — conditions must be structured.
+ */
+export function runAssertConditions(
+  params: { conditions?: unknown; message?: unknown },
+  ctx: Record<string, unknown>
+): Record<string, unknown> {
+  const raw = params.conditions;
+  const conditions = Array.isArray(raw) ? raw : raw !== undefined ? [raw] : [];
+  if (conditions.length === 0) {
+    throw new Error('system:assert requires a non-empty params.conditions array');
+  }
+  const failures: string[] = [];
+  for (const condition of conditions) {
+    let passed = false;
+    try {
+      passed = evaluateCondition(condition, ctx);
+    } catch (error) {
+      throw new Error(
+        `system:assert condition is not evaluable: ${JSON.stringify(condition)} — ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+    if (!passed) failures.push(JSON.stringify(condition));
+  }
+  if (failures.length > 0) {
+    const message =
+      typeof params.message === 'string' && params.message.trim()
+        ? params.message.trim()
+        : 'pipeline assertion failed';
+    throw new Error(`[ASSERT_FAILED] ${message} — failed: ${failures.join(', ')}`);
+  }
+  return ctx;
+}
+
 export function resolveWriteArtifactSpec(
   params: any,
   ctx: any,

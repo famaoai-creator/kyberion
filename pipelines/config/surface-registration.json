@@ -10,9 +10,9 @@
       "op": "system:assert",
       "params": {
         "conditions": [
-          "{{input.surface_id}} != ''",
-          "{{input.kind}} != ''",
-          "{{input.command}} != ''"
+          { "from": "input.surface_id", "operator": "not_empty" },
+          { "from": "input.kind", "operator": "not_empty" },
+          { "from": "input.command", "operator": "not_empty" }
         ],
         "message": "surface_id, kind, and command are required"
       }

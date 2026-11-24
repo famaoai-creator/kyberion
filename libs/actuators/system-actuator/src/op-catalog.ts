@@ -103,7 +103,7 @@ export const SYSTEM_ACTUATOR_TRANSFORM_OPS = [
   'llm_decide',
 ] as const;
 
-export const SYSTEM_ACTUATOR_CONTROL_OPS = ['if', 'while'] as const;
+export const SYSTEM_ACTUATOR_CONTROL_OPS = ['assert', 'if', 'while'] as const;
 
 export interface SystemOpSpec {
   op: string;

@@ -1,6 +1,11 @@
 import type { PipelineAdf, PipelineAdfStep } from './pipeline-contract.js';
+import { normalizePipelineOp } from './pipeline-op-aliases.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { determineActuatorStepType } from '../actuator/actuator-op-registry.js';
+import {
+  determineActuatorStepType,
+  listRegisteredDomainOps,
+  loadActuatorOpRegistry,
+} from '../actuator/actuator-op-registry.js';
 import {
   peekProviderCapabilityRegistry,
   type ProviderCapability,
@@ -33,26 +38,33 @@ export interface PipelineDryRunOptions {
 
 type PipelineWithId = PipelineAdf & { pipeline_id?: string };
 
+// Engine-handled ops that never route through the actuator registry. Kept in
+// sync with CONTROL_ACTIONS (pipeline-execution-part-bootstrap) + inline
+// handlers: steps normalize through normalizePipelineOp first, so the
+// qualified core:* spellings are what this set must contain.
 const CONTROL_OPS = new Set([
   'if',
   'while',
   'core:if',
+  'core:switch',
   'core:while',
+  'core:loop_until',
+  'core:retry_until_quality',
   'core:foreach',
-  'core:parallel',
   'core:parallel_foreach',
   'parallel_foreach',
   'core:team_lead',
   'team_lead',
+  'core:parallel_calls',
   'core:accumulate',
   'core:include',
-  'core:llm_decide',
   'judge_route',
   'core:judge_route',
   'await_decision',
   'core:await_decision',
   'await_state',
   'core:await_state',
+  'system:assert',
 ]);
 
 function collectSteps(steps: PipelineAdfStep[], output: PipelineAdfStep[] = []): PipelineAdfStep[] {
@@ -93,7 +105,7 @@ function requiredProvider(pipeline: PipelineAdf, steps: PipelineAdfStep[]): stri
   const stepProvider = steps.map(providerForStep).find(Boolean);
   if (stepProvider) return stepProvider;
 
-  if (steps.some((step) => step.op.startsWith('reasoning:'))) {
+  if (steps.some((step) => normalizePipelineOp(step.op).startsWith('reasoning:'))) {
     const configured = getRegisteredEnvText('KYBERION_REASONING_BACKEND')?.trim();
     if (configured) return configured.replace(/-cli$/u, '');
   }
@@ -183,8 +195,9 @@ export function assessPipelineDryRun(
   const steps = collectSteps(pipeline.steps);
 
   for (const step of steps) {
-    if (CONTROL_OPS.has(step.op)) continue;
-    const separator = step.op.indexOf(':');
+    const normalizedOp = normalizePipelineOp(step.op);
+    if (CONTROL_OPS.has(normalizedOp)) continue;
+    const separator = normalizedOp.indexOf(':');
     if (separator < 1) {
       checks.push({
         id: 'capability-resolution',
@@ -195,16 +208,41 @@ export function assessPipelineDryRun(
       addAction(actions, `Replace '${step.op}' with a registered actuator operation.`);
       continue;
     }
-    const domain = step.op.slice(0, separator);
-    const action = step.op.slice(separator + 1);
+    const domain = normalizedOp.slice(0, separator);
+    const action = normalizedOp.slice(separator + 1);
     try {
       determineActuatorStepType(domain, action);
+      // determineActuatorStepType is intentionally lenient: it also resolves
+      // via the shared_* pools, which are union lists across domains — but at
+      // dispatch time `resolveActuatorOperation` routes to `${domain}-actuator`,
+      // which only serves ops the domain itself declares. A shared-pool-only
+      // resolution therefore fails at the actuator boundary at run time, so it
+      // must not report a clean pass here.
+      const declared = loadActuatorOpRegistry().domains[domain] || {};
+      const merged = listRegisteredDomainOps(domain); // adds plugin-contributed ops
+      const isDeclared = [
+        declared.capture,
+        declared.transform,
+        declared.apply,
+        declared.control,
+        merged.capture,
+        merged.transform,
+        merged.apply,
+      ].some((list) => list?.includes(action));
       checks.push({
         id: 'capability-resolution',
-        status: 'pass',
-        message: `Operation '${step.op}' is registered.`,
+        status: isDeclared ? 'pass' : 'warning',
+        message: isDeclared
+          ? `Operation '${normalizedOp}' is registered.`
+          : `Operation '${normalizedOp}' resolves via the shared op pool but is not declared by the '${domain}' domain — verify ${domain}-actuator serves it.`,
         step_id: step.id || step.op,
       });
+      if (!isDeclared) {
+        addAction(
+          actions,
+          `Declare '${normalizedOp}' on the '${domain}' domain or qualify the op with the actuator that actually serves '${action}'.`
+        );
+      }
     } catch (error) {
       checks.push({
         id: 'capability-resolution',
@@ -217,7 +255,13 @@ export function assessPipelineDryRun(
   }
 
   const required = requiredProvider(pipeline, steps);
-  if (required) {
+  if (required && /\{\{[^{}]+\}\}/u.test(required)) {
+    checks.push({
+      id: 'provider-placeholder',
+      status: 'warning',
+      message: `Provider '${required}' is a template placeholder — resolved when the template is instantiated.`,
+    });
+  } else if (required) {
     evaluateProvider(
       required,
       options.providerSnapshot === undefined
@@ -228,7 +272,7 @@ export function assessPipelineDryRun(
       checks,
       actions
     );
-  } else if (steps.some((step) => step.op.startsWith('reasoning:'))) {
+  } else if (steps.some((step) => normalizePipelineOp(step.op).startsWith('reasoning:'))) {
     checks.push({
       id: 'provider-selection',
       status: 'warning',

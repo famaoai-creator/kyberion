@@ -15,7 +15,7 @@
     {
       "id": "create-brief",
       "role": "source",
-      "op": "wisdom:synthesize",
+      "op": "reasoning:synthesize",
       "produces": { "channel": "product_brief", "type": "ProductBrief" },
       "params": {
         "instruction": "テーマ「{{topic}}」に基づき、商品のキャッチコピー、ターゲット層、主要機能をまとめた企画ブリーフを作成してください。また、画像生成用のプロンプトと音楽生成用のスタイル指定も含めてください。"

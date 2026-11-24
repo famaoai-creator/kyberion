@@ -10,9 +10,9 @@
       "op": "system:assert",
       "params": {
         "conditions": [
-          "{{input.tenant}} != ''",
-          "{{input.display_name}} != ''",
-          "{{input.owner_email}} != ''"
+          { "from": "input.tenant", "operator": "not_empty" },
+          { "from": "input.display_name", "operator": "not_empty" },
+          { "from": "input.owner_email", "operator": "not_empty" }
         ],
         "message": "tenant, display_name, and owner_email are required"
       }

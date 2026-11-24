@@ -4480,6 +4480,10 @@
       "types": "./dist/pipeline/pipeline-input-contract.d.ts",
       "default": "./dist/pipeline/pipeline-input-contract.js"
     },
+    "./pipeline/pipeline-op-aliases": {
+      "types": "./dist/pipeline/pipeline-op-aliases.d.ts",
+      "default": "./dist/pipeline/pipeline-op-aliases.js"
+    },
     "./pipeline/pipeline-preview": {
       "types": "./dist/pipeline/pipeline-preview.d.ts",
       "default": "./dist/pipeline/pipeline-preview.js"

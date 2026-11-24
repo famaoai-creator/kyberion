@@ -2,7 +2,7 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { assessPipelineDryRun } from '@agent/core/pipeline/pipeline-dry-run';
 import { pathResolver } from '@agent/core/path-resolver';
 import { isBuiltinPipelineResource } from '@agent/core/trust-requiring-resources';
-import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
+import { expandPipelineIncludesForDryRun, readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import {
   currentProcessArgv,
   defineScript,
@@ -24,7 +24,16 @@ export async function runPipelineDryRun(
       trustResolved,
       projectTrustApprovalId,
     });
-    return assessPipelineDryRun(pipeline as Parameters<typeof assessPipelineDryRun>[0]);
+    // Static includes are resolved exactly like the guardrail preflight sees
+    // them — fragment ops get capability checks — while each include's
+    // declared produces/export_as channel stays visible to the flow check
+    // (runtime writes the include result into context under that name).
+    // Dynamic ({{placeholder}}) refs stay for runtime, matching execution.
+    const expanded = expandPipelineIncludesForDryRun(pipeline, {
+      trustResolved,
+      projectTrustApprovalId,
+    });
+    return assessPipelineDryRun(expanded as Parameters<typeof assessPipelineDryRun>[0]);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
@@ -51,9 +60,30 @@ export async function runPipelineDryRun(
 export function formatPipelineDryRunReport(
   report: Awaited<ReturnType<typeof runPipelineDryRun>>
 ): string[] {
+  // Repeated identical pass lines (e.g. 15× "system:log is registered") hide
+  // the signal — collapse them to one line per distinct check message while
+  // warnings and blocks always stay per-step.
+  const counts = new Map<string, number>();
+  const lines: string[] = [];
+  for (const check of report.checks) {
+    if (check.status !== 'pass') {
+      lines.push(`- ${check.status}: ${check.message}`);
+      continue;
+    }
+    const key = check.message;
+    const seen = counts.get(key) ?? 0;
+    counts.set(key, seen + 1);
+    if (seen === 0) lines.push(`- ${check.status}: ${check.message}`);
+  }
+  for (const [message, count] of counts) {
+    if (count > 1) {
+      const index = lines.indexOf(`- pass: ${message}`);
+      lines[index] = `- pass: ${message} (×${count})`;
+    }
+  }
   return [
     `[pipeline-dry-run] ${report.verdict}: ${report.pipeline_id}`,
-    ...report.checks.map((check) => `- ${check.status}: ${check.message}`),
+    ...lines,
     ...report.next_actions.map((action) => `next: ${action}`),
   ];
 }

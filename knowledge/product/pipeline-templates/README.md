@@ -2,6 +2,26 @@
 
 Canonical user-facing pipeline patterns live here.
 
+## Execution status
+
+A template file in this directory is **schema-valid**, not execution-verified.
+The `pipeline-dry-run` CI gate (`scripts/check/check_pipeline_dry_run.ts`) sweeps
+this directory together with `pipelines/` and `pipelines/config/` and fails on
+any `blocked` verdict, so every template here is statically dispatchable — but
+dry-run readiness is not a record of a successful run. Promotion to a reusable
+catalog entry with `verified_source` status still requires exact run evidence
+(`pnpm pipeline:promote` enforces it).
+
+Two statuses a template may declare:
+
+- **executable** (default): no marker needed. Must keep the preflight gate and
+  pass the catalog dry-run.
+- **reference**: declares `"_execution_status": "reference"` plus a non-empty
+  `"_execution_note"` explaining why it is intentionally not runnable and which
+  governed route covers the same goal. The gate lists these but exempts them —
+  use this for design sketches that name future/unimplemented ops rather than
+  silently breaking the sweep.
+
 ## Preflight Rule
 
 Every executable template must include a preflight gate before the first side-effecting step.

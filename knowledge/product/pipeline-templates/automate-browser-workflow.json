@@ -3,6 +3,8 @@
   "version": "2.0.0",
   "description": "Execute a browser task while recording, then distill the recorded trace into a reusable automation pipeline (ADF).",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "_execution_status": "reference",
+  "_execution_note": "Design reference only — executing a caller-supplied dynamic step list ({{interaction_steps}}) is intentionally not expressible as an ADF op. The governed route for record-and-reuse browser automation is: record a session with `pnpm playground -- --record <name> --actuator browser-actuator --op <op>`, `--emit-adf`, then `pnpm pipeline:promote`; for human-driven flows use the promote-procedure pipeline (ProcedureCatalog).",
   "action": "pipeline",
   "steps": [
     {

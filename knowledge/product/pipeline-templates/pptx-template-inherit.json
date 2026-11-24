@@ -15,7 +15,7 @@
     {
       "id": "inspect_source",
       "role": "source",
-      "op": "pptx_slide_text",
+      "op": "media:pptx_slide_text",
       "produces": { "channel": "source_slides", "type": "PptxSlides" },
       "params": {
         "path": "{{source_pptx}}"
@@ -24,11 +24,11 @@
     {
       "id": "find_owner_slides",
       "role": "transform",
-      "op": "find_slides_by_owner",
+      "op": "media:find_slides_by_owner",
       "consumes": "source_slides",
       "produces": { "channel": "owner_match", "type": "OwnerMatch" },
       "params": {
-        "slides_from": "source_slides",
+        "from": "source_slides",
         "owner_labels_from": "owner_labels",
         "match_mode": "substring"
       }
@@ -36,7 +36,7 @@
     {
       "id": "filter_to_owner_slides",
       "role": "sink",
-      "op": "pptx_filter_slides",
+      "op": "media:pptx_filter_slides",
       "consumes": "owner_match",
       "params": {
         "source": "{{source_pptx}}",
@@ -47,7 +47,7 @@
     {
       "id": "apply_run_replacements",
       "role": "sink",
-      "op": "pptx_patch",
+      "op": "media:pptx_patch",
       "params": {
         "source": "active/shared/tmp/pptx-output/_stage1_filtered.pptx",
         "path": "active/shared/tmp/pptx-output/_stage2_patched.pptx",
@@ -57,7 +57,7 @@
     {
       "id": "apply_paragraph_replacements",
       "role": "sink",
-      "op": "pptx_patch_paragraphs",
+      "op": "media:pptx_patch_paragraphs",
       "params": {
         "source": "active/shared/tmp/pptx-output/_stage2_patched.pptx",
         "path": "{{output_pptx}}",
@@ -67,7 +67,7 @@
     {
       "id": "verify_output",
       "role": "source",
-      "op": "pptx_slide_text",
+      "op": "media:pptx_slide_text",
       "produces": { "channel": "output_slides", "type": "PptxSlides" },
       "params": {
         "path": "{{output_pptx}}"
@@ -76,12 +76,12 @@
     {
       "id": "diff_report",
       "role": "transform",
-      "op": "pptx_diff",
+      "op": "media:pptx_diff",
       "consumes": ["source_slides", "output_slides"],
       "produces": { "channel": "change_report", "type": "DiffReport" },
       "params": {
-        "before_from": "source_slides",
-        "after_from": "output_slides"
+        "before": "{{source_slides}}",
+        "after": "{{output_slides}}"
       }
     }
   ]

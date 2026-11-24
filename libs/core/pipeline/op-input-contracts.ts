@@ -640,6 +640,29 @@ const INPUT_CONTRACTS: ContractCatalog = {
     },
   },
   system: {
+    assert: {
+      summary:
+        'Fail-fast gate: every condition must hold or the step throws [ASSERT_FAILED]. Conditions use the governed structured-condition contract (evaluateCondition): an object like {from, operator, value?} or a bare context-path string meaning truthy. Expression strings are rejected by the evaluator.',
+      examples: [
+        {
+          conditions: [{ from: 'input.tenant', operator: 'not_empty' }],
+          message: 'tenant is required',
+        },
+      ],
+      schema: {
+        type: 'object',
+        required: ['conditions'],
+        properties: {
+          conditions: {
+            type: 'array',
+            minItems: 1,
+            items: { anyOf: [{ type: 'string', minLength: 1 }, { type: 'object' }] },
+          },
+          message: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: false,
+      },
+    },
     record_audio: {
       summary: 'Record microphone audio to WAV artifacts through the canonical audio-input bridge.',
       examples: [{ output: 'active/shared/tmp/mic-recording.wav', duration: 5 }],
