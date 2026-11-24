@@ -12,6 +12,8 @@ describe('actual-store onboarding authority', () => {
       const raw = f.input();
       const preview = f.api.previewOnboardingAuthority(f.principal, raw);
       const request = f.api.requestOnboardingAuthority(f.principal, raw, preview);
+      // The receipt points at the card that decides it, not an unrouted Home query.
+      expect(request.approval_url).toBe('/settings#settings-authority');
       expect(
         f.api.onboardingAuthorityRequestStatus(f.principal, person, request.request_id).status
       ).toBe('pending');

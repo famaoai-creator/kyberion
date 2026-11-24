@@ -11,6 +11,7 @@ import {
   revokeApprovalFromCli,
 } from './approval-cli-decision.js';
 import { delegateApprovalToCharter } from './approval-cli-delegate.js';
+import { cliApprovalStoreScope, listCliPendingApprovals } from './cli-personal-approvals.js';
 import { ScriptExitError } from './harness.js';
 
 export type ApprovalsArgv = Partial<
@@ -40,10 +41,12 @@ export async function handleApprovalsSubcommand(
     printOutput(ui('recorder:recorder_approval_updated', { id, title, status: 'revoked' }));
     return;
   }
-  const pending = listApprovalRequests({ status: 'pending' });
+  const listPending = () => listApprovalRequests({ status: 'pending' });
   if (argv.delegate) {
     const requestId = String(argv.delegate);
-    const request = pending.find((entry) => entry.id === requestId);
+    // Delegation composes a standing charter grant from an external-operation
+    // target; personal-partition requests carry none, so the ordinary store suffices.
+    const request = listPending().find((entry) => entry.id === requestId);
     if (!request) {
       printOutput(ui('recorder:recorder_approvals_not_found', { id: requestId }));
       throw new ScriptExitError(1, '', true);
@@ -54,6 +57,9 @@ export async function handleApprovalsSubcommand(
       throw new ScriptExitError(1, '', true);
     return;
   }
+  // The installed owner's personal partition is listed and decided too
+  // (cli-personal-approvals.ts); the terminal challenge is unchanged.
+  const pending = listCliPendingApprovals(listPending);
   if (argv.approve || argv.deny) {
     const requestId = String(argv.approve || argv.deny);
     const request = pending.find((entry) => entry.id === requestId);
@@ -70,9 +76,11 @@ export async function handleApprovalsSubcommand(
       const reason = message.reasonKey ? { reason: ui(message.reasonKey) } : {};
       return void printOutput(ui(message.key, { ...message.params, ...reason }));
     }
+    const storeScope = cliApprovalStoreScope(request);
     const decided = await decideApprovalFromCli(request, {
       decision: argv.approve ? 'approved' : 'rejected',
       note: argv.note || 'decided via pnpm kyberion approvals',
+      ...(storeScope ? { storeScope } : {}),
     });
     printOutput(
       ui('recorder:recorder_approval_updated', {

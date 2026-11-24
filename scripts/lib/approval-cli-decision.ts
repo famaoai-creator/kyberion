@@ -271,6 +271,12 @@ export async function decideApprovalFromCli(
   params: CliOperatorPrincipalOptions & {
     decision: 'approved' | 'rejected';
     note: string;
+    /**
+     * Opens the store partition that holds `request` around the (synchronous)
+     * decision write only — e.g. the owner's personal approvals. It never
+     * wraps the terminal challenge and grants no assurance.
+     */
+    storeScope?: <T>(run: () => T) => T;
   }
 ): Promise<ApprovalRequestRecord> {
   const humanOnly = request.accountability?.finalDecision === 'human_only';
@@ -295,32 +301,35 @@ export async function decideApprovalFromCli(
       humanOnly,
     });
   }
-  const decided = decideApprovalRequest('mission_controller', {
-    channel: request.channel,
-    storageChannel: request.storageChannel,
-    requestId: request.id,
-    decision: params.decision,
-    decidedBy: decider.decidedBy,
-    decidedByDisplayName: decider.decidedByDisplayName,
-    ...(decider.deciderIdentitySource
-      ? { deciderIdentitySource: decider.deciderIdentitySource }
-      : {}),
-    ...(decider.decidedInAgentSession
-      ? { decidedInAgentSession: decider.decidedInAgentSession }
-      : {}),
-    ...(challenged ? { decidedVia: 'cli_tty_challenge' as const } : {}),
-    decidedByRole: ownerRequired ? 'owner' : 'sovereign',
-    authMethod: humanOnly ? 'terminal_attested' : 'manual',
-    decidedByType: 'human',
-    authenticated: true,
-    ...(attestation
-      ? { presentedDigest: attestation.presentedDigest }
-      : {
-          payloadHash: request.accountability?.payloadHash,
-          effectBinding: request.accountability?.effectBinding,
-        }),
-    note: params.note,
-  });
+  const inStore = params.storeScope ?? (<T>(run: () => T): T => run());
+  const decided = inStore(() =>
+    decideApprovalRequest('mission_controller', {
+      channel: request.channel,
+      storageChannel: request.storageChannel,
+      requestId: request.id,
+      decision: params.decision,
+      decidedBy: decider.decidedBy,
+      decidedByDisplayName: decider.decidedByDisplayName,
+      ...(decider.deciderIdentitySource
+        ? { deciderIdentitySource: decider.deciderIdentitySource }
+        : {}),
+      ...(decider.decidedInAgentSession
+        ? { decidedInAgentSession: decider.decidedInAgentSession }
+        : {}),
+      ...(challenged ? { decidedVia: 'cli_tty_challenge' as const } : {}),
+      decidedByRole: ownerRequired ? 'owner' : 'sovereign',
+      authMethod: humanOnly ? 'terminal_attested' : 'manual',
+      decidedByType: 'human',
+      authenticated: true,
+      ...(attestation
+        ? { presentedDigest: attestation.presentedDigest }
+        : {
+            payloadHash: request.accountability?.payloadHash,
+            effectBinding: request.accountability?.effectBinding,
+          }),
+      note: params.note,
+    })
+  );
   if (attestation && evidence) {
     recordTerminalAttestation(
       decided,
