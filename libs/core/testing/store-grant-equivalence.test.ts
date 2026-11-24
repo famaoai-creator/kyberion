@@ -71,6 +71,7 @@ const STORE_GRANT_MATRIX_SPECS: readonly StoreGrantMatrixSpec[] = [
   // nhi_accountability_reader, so it must decide exactly as that matrix.
   { name: 'member_owner_reader', bind: 'none' },
   { name: 'audit_mirror_writer', bind: 'tenant' },
+  { name: 'audit_mirror_reader', bind: 'tenant' },
   { name: 'tenant_ledger_store', bind: 'tenant' },
   { name: 'delegation_record_store', bind: 'tenant' },
   { name: 'tenant_approval_store', bind: 'tenant' },

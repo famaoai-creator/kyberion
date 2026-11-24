@@ -15,7 +15,12 @@ async function loadFreshAuditChain(at: Date) {
   vi.setSystemTime(at);
   vi.resetModules();
   delete (globalThis as any)[GLOBAL_KEY];
-  return import('./audit-chain.js');
+  const mod = await import('./audit-chain.js');
+  // This fixture mocks secure-io without the policy layer: register an
+  // explicit passthrough so mirror verification runs. Grant/binding
+  // semantics are covered by audit-chain-mirror.model.test.ts.
+  mod.registerTenantMirrorReaderContext((_slug, fn) => fn());
+  return mod;
 }
 
 vi.mock('../path-resolver.js', () => ({

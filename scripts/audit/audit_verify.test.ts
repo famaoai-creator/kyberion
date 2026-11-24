@@ -128,6 +128,21 @@ describe('audit_verify', () => {
     expect(report.tenantMirrors.findings).toHaveLength(1);
   });
 
+  it('reports tenant mirror partitions this process may not verify as withheld', async () => {
+    mocks.auditVerifyTenantMirrors.mockReturnValue({
+      ok: true,
+      findings: [],
+      withheld: 1,
+    });
+    const { collectAuditVerifyReport, formatAuditVerifyReport } = await import('./audit_verify.js');
+
+    const report = collectAuditVerifyReport();
+
+    expect(report.ok).toBe(true);
+    expect(report.tenantMirrors.withheld).toBe(1);
+    expect(formatAuditVerifyReport(report).join('\n')).toContain('tenant mirrors withheld: 1');
+  });
+
   it('passes since and extra ledger paths through to the verifiers', async () => {
     const { collectAuditVerifyReport } = await import('./audit_verify.js');
 

@@ -485,6 +485,59 @@ function asAuditStoreWriter<T>(tenantSlug: string, fn: () => T): T {
   return tenantMirrorWriterContext ? tenantMirrorWriterContext(tenantSlug, fn) : fn();
 }
 
+/**
+ * Read-side counterpart of the writer seam. The mirror is the chain's own
+ * store in both directions, so verification must not depend on the caller's
+ * own grants either: authority.ts binds this to `audit_mirror_reader`, the
+ * declared tenant-bound reader grant of the mirror store. Tenant-bound like
+ * `tenant_ledger_store` (D9): a caller bound to another tenant cannot bind it
+ * ([ROLE_TENANT_SCOPE_MISMATCH]), and the verifier withholds that partition
+ * rather than reading it.
+ */
+export type TenantMirrorReaderContext = <T>(tenantSlug: string, fn: () => T) => T;
+let tenantMirrorReaderContext: TenantMirrorReaderContext | undefined;
+
+/**
+ * Registers the reader seam and returns a restore function. An unregistered
+ * seam is fail-closed: `asAuditStoreReader` refuses rather than falling back
+ * to the caller's identity — a mirror verify must never borrow whatever
+ * grants the caller happens to hold.
+ */
+export function registerTenantMirrorReaderContext(
+  context: TenantMirrorReaderContext | undefined
+): () => void {
+  const previous = tenantMirrorReaderContext;
+  tenantMirrorReaderContext = context;
+  return () => {
+    tenantMirrorReaderContext = previous;
+  };
+}
+
+function asAuditStoreReader<T>(tenantSlug: string, fn: () => T): T {
+  if (!tenantMirrorReaderContext) {
+    throw new Error(
+      '[TENANT_MIRROR_READER_UNAVAILABLE] tenant mirror reader seam is not registered — this build cannot bind the audit_mirror_reader grant'
+    );
+  }
+  return tenantMirrorReaderContext(tenantSlug, fn);
+}
+
+/**
+ * A mirror-verify error that means "this process may not verify that
+ * partition": the tenant binding was refused (bound caller, another tenant),
+ * the process may not issue the reader grant, or this build never registered
+ * the reader seam (fail-closed — never read under the caller's identity).
+ * Inside the reader grant the reads are always authorized, so any other
+ * error is a real fault and propagates. The partition is counted as withheld
+ * and never read, like the D9 tenant-ledger semantics.
+ */
+function isMirrorVerifyScopeError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /ROLE_TENANT_SCOPE_(MISMATCH|REQUIRED)|ROLE_ASSUMPTION_DENIED|STORE_GRANT_UNKNOWN|TENANT_MIRROR_READER_UNAVAILABLE/u.test(
+    message
+  );
+}
+
 function testAuditChainIo(): AuditChainIo | undefined {
   if (!isVitestProcess()) return undefined;
   return (
@@ -944,8 +997,14 @@ class AuditChainImpl {
   /**
    * Verify that tenant mirrors match the master chain exactly (SA-01 Task 4).
    * Checks counts and hashes of mirrored entries against the master record.
+   *
+   * Each tenant's partition is read under `audit_mirror_reader` bound to that
+   * tenant — never under the caller's identity (D9 symmetry with the tenant
+   * ledgers). A partition this process may not bind (another tenant than a
+   * bound caller's, or no issuance right) is counted as `withheld`, never
+   * read, and never named here.
    */
-  verifyTenantMirrors(): { ok: boolean; findings: string[] } {
+  verifyTenantMirrors(): { ok: boolean; findings: string[]; withheld?: number } {
     const findings: string[] = [];
     if (!auditIo) return { ok: false, findings: ['audit_io_not_registered'] };
     const masterEntries = this.loadAll();
@@ -963,62 +1022,81 @@ class AuditChainImpl {
     const mirrorRoot = tenantMirrorRoot(pathResolver.rootDir());
     const safeMirrorRoot = safeAuditPath(mirrorRoot, { allowMissingLeaf: true });
     if (!safeMirrorRoot) return { ok: false, findings: ['tenant_mirror_path_unsafe:root'] };
-    if (!auditIo.exists(safeMirrorRoot)) return { ok: true, findings };
 
+    let withheld = 0;
     // Tenant identity comes from the chained master entries, not from arbitrary
     // directory names under the mirror root.
     for (const slug of masterByTenant.keys()) {
       if (!isValidTenantSlug(slug)) continue;
-      const mirrorDir = path.join(safeMirrorRoot, slug);
-      const safeMirrorDir = safeAuditPath(mirrorDir, { allowMissingLeaf: true });
-      if (!safeMirrorDir) {
-        findings.push(`tenant_mirror_path_unsafe:${slug}`);
-        continue;
-      }
-      if (!auditIo.exists(safeMirrorDir)) continue;
-
-      const mirrorFiles = auditIo
-        .readdir(safeMirrorDir)
-        .filter((fileName) => AuditChainImpl.AUDIT_FILE_RE.test(fileName))
-        .sort((left, right) => left.localeCompare(right));
-
-      const mirrorEntries: AuditEntry[] = [];
-      for (const fileName of mirrorFiles) {
-        const mirrorFile = safeAuditPath(path.join(safeMirrorDir, fileName));
-        if (!mirrorFile) {
-          findings.push(`tenant_mirror_path_unsafe:${slug}:${fileName}`);
-          continue;
-        }
-        const read = this.readAuditFileForVerify(mirrorFile);
-        mirrorEntries.push(...read.entries);
-        findings.push(
-          ...this.readFindings(fileName, read).map(
-            (finding) => `tenant_mirror_unreadable:${slug}:${finding}`
-          )
-        );
-      }
-
-      const masterSet = masterByTenant.get(slug) || [];
-      if (mirrorEntries.length !== masterSet.length) {
-        findings.push(
-          `tenant_mirror_count_mismatch:${slug} (master=${masterSet.length}, mirror=${mirrorEntries.length})`
-        );
-      } else {
-        for (let i = 0; i < masterSet.length; i++) {
-          if (
-            masterSet[i].id !== mirrorEntries[i].id ||
-            masterSet[i].currentHash !== mirrorEntries[i].currentHash
-          ) {
-            findings.push(`tenant_mirror_hash_mismatch:${slug}:${masterSet[i].id}`);
-            break;
+      try {
+        // Per-partition buffer: a partition that ends up withheld must leave
+        // no trace in findings — merge only after the read block completes.
+        const partitionFindings: string[] = [];
+        asAuditStoreReader(slug, () => {
+          const mirrorDir = path.join(safeMirrorRoot, slug);
+          const safeMirrorDir = safeAuditPath(mirrorDir, { allowMissingLeaf: true });
+          if (!safeMirrorDir) {
+            partitionFindings.push(`tenant_mirror_path_unsafe:${slug}`);
+            return;
           }
-        }
+          if (!auditIo.exists(safeMirrorDir)) return;
+
+          const mirrorFiles = auditIo
+            .readdir(safeMirrorDir)
+            .filter((fileName) => AuditChainImpl.AUDIT_FILE_RE.test(fileName))
+            .sort((left, right) => left.localeCompare(right));
+
+          const mirrorEntries: AuditEntry[] = [];
+          for (const fileName of mirrorFiles) {
+            const mirrorFile = safeAuditPath(path.join(safeMirrorDir, fileName));
+            if (!mirrorFile) {
+              partitionFindings.push(`tenant_mirror_path_unsafe:${slug}:${fileName}`);
+              continue;
+            }
+            const read = this.readAuditFileForVerify(mirrorFile);
+            mirrorEntries.push(...read.entries);
+            partitionFindings.push(
+              ...this.readFindings(fileName, read).map(
+                (finding) => `tenant_mirror_unreadable:${slug}:${finding}`
+              )
+            );
+          }
+
+          const masterSet = masterByTenant.get(slug) || [];
+          if (mirrorEntries.length !== masterSet.length) {
+            partitionFindings.push(
+              `tenant_mirror_count_mismatch:${slug} (master=${masterSet.length}, mirror=${mirrorEntries.length})`
+            );
+          } else {
+            for (let i = 0; i < masterSet.length; i++) {
+              if (
+                masterSet[i].id !== mirrorEntries[i].id ||
+                masterSet[i].currentHash !== mirrorEntries[i].currentHash
+              ) {
+                partitionFindings.push(`tenant_mirror_hash_mismatch:${slug}:${masterSet[i].id}`);
+                break;
+              }
+            }
+          }
+        });
+        findings.push(...partitionFindings);
+      } catch (error) {
+        if (!isMirrorVerifyScopeError(error)) throw error;
+        withheld += 1;
+        // Never name the other tenant to a bound caller; the refusal marker
+        // distinguishes binding-refused from seam-unregistered for diagnosis.
+        const marker =
+          error instanceof Error ? error.message.match(/\[([A-Z_]+)\]/u)?.[1] : undefined;
+        logger.debug(
+          `tenant mirror verification skipped — this process may not bind that partition's tenant | next: verify from an unbound operator process or as that tenant | evidence: a confidential mirror partition: ${marker ?? 'verify scope denied'}`
+        );
       }
     }
 
     return {
       ok: findings.length === 0,
       findings,
+      ...(withheld > 0 ? { withheld } : {}),
     };
   }
 

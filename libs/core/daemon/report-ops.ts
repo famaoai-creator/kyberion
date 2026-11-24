@@ -67,6 +67,8 @@ export interface AuditVerifyCliReport {
   tenantMirrors: {
     ok: boolean;
     findings: string[];
+    /** Tenant mirror partitions this process may not verify (another tenant of a bound caller). */
+    withheld?: number;
   };
   promotionQueue: {
     ok: boolean;
@@ -224,6 +226,11 @@ export function formatAuditVerifyReport(report: AuditVerifyCliReport): string[] 
     );
   }
   lines.push(`Tenant mirrors: ${report.tenantMirrors.ok ? 'ok' : 'failed'}`);
+  if (report.tenantMirrors.withheld) {
+    lines.push(
+      `  - tenant mirrors withheld: ${report.tenantMirrors.withheld} (another tenant than this process's; verify from an unbound operator process)`
+    );
+  }
   if (report.tenantMirrors.findings.length > 0) {
     lines.push(`  - findings: ${report.tenantMirrors.findings.join(', ')}`);
   }

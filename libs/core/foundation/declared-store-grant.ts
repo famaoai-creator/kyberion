@@ -87,6 +87,10 @@ export const DECLARED_STORE_GRANTS: Readonly<Record<string, DeclaredStoreGrantDe
     }),
     // governance/audit-chain.ts tenant mirror (seam registered by authority.ts), bound per entry.
     audit_mirror_writer: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
+    // governance/audit-chain.ts tenant mirror verify (reader seam registered by
+    // authority.ts): tenant-bound like tenant_ledger_store so a caller bound to
+    // another tenant cannot bind it and the verifier withholds that partition.
+    audit_mirror_reader: Object.freeze({ baseRole: 'base_worker', tenantBound: true }),
     // foundation/operational-store-policy.ts (seam registered by authority.ts): ops alert files.
     ops_alert_store: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
     // tenant registry: one tenant profile (operational membership, mission, egress, workspace).

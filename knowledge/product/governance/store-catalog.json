@@ -1013,8 +1013,8 @@
       "tiers": ["confidential"],
       "status": "active",
       "sources": ["scope-model", "role-policy"],
-      "note": "S2 done: per-tenant copy of the master audit chain, written only by audit_mirror_writer (storage-layout TENANT_STORE_LEDGER_ROOTS).",
-      "grants": ["audit_mirror_writer"],
+      "note": "S2 done: per-tenant copy of the master audit chain, written only by audit_mirror_writer and read for verification only by audit_mirror_reader (storage-layout TENANT_STORE_LEDGER_ROOTS).",
+      "grants": ["audit_mirror_writer", "audit_mirror_reader"],
       "registration": {
         "family": "ledger",
         "key": "tenant_audit_mirror",
