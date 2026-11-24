@@ -327,7 +327,7 @@ describe('verifyTenantMirrors conformance under the real reader grant', () => {
     registerTenantMirrorReaderContext((tenantSlug, fn) =>
       withStoreGrant('audit_mirror_reader', fn, { tenantSlug })
     );
-  let restoreReader = registerReader();
+  registerReader();
 
   const savedEnv = new Map<string, string | undefined>();
   afterEach(() => {
