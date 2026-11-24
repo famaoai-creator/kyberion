@@ -48,7 +48,9 @@ import {
 import { inspectInstalledOnboardingRuntime } from './onboarding-runtime-identity.js';
 import { activateProvisionedAgentIdentity } from '../agent/agent-identity.js';
 import { withExecutionContext } from '../authority.js';
+import { createLogger } from '../logger.js';
 
+const logger = createLogger('onboarding-authority');
 export const ONBOARDING_AUTHORITY_CHANNEL = 'onboarding-authority';
 export interface OnboardingAuthorityPrincipal {
   /** Authenticated actor opening/applying a plan; an agent may only request/apply an approved plan. */
@@ -463,12 +465,18 @@ export function requestOnboardingAuthority(
   );
   return requestReceipt(record);
 }
+/**
+ * Where a person decides these requests: the Concierge authority card lists
+ * every pending request of the selected scope with its approve / reject
+ * controls. (`/?approvalId=` was never routed and left the person on Home.)
+ */
+export const ONBOARDING_AUTHORITY_REVIEW_PATH = '/settings#settings-authority';
 function requestReceipt(record: ApprovalRequestRecord) {
   return {
     ok: true as const,
     request_id: record.id,
     status: record.status,
-    approval_url: `/?approvalId=${encodeURIComponent(record.id)}&approvalChannel=${ONBOARDING_AUTHORITY_CHANNEL}`,
+    approval_url: ONBOARDING_AUTHORITY_REVIEW_PATH,
   };
 }
 function readPlan(
@@ -658,7 +666,12 @@ export function readOnboardingAuthority(
     .flatMap((record) => {
       try {
         return [onboardingAuthorityRequestStatus(principal, scope, record.id, options)];
-      } catch {
+      } catch (error) {
+        // Hidden from this card, but never silently: an unreadable binding is
+        // the difference between "no request" and "a request this view lost".
+        logger.warn(
+          `onboarding authority request hidden from the authority card — it could not be read for this viewer | next: run pnpm onboarding authority status --request-id ${record.id} --json | evidence: ${error instanceof Error ? error.message : String(error)}`
+        );
         return [];
       }
     })

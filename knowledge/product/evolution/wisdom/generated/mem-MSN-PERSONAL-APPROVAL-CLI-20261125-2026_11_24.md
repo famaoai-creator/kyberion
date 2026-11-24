@@ -1,0 +1,51 @@
+---
+record_id: mem-MSN-PERSONAL-APPROVAL-CLI-20261125-2026_11_24
+kind: knowledge_hint
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-PERSONAL-APPROVAL-CLI-20261125-2026_11_24
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-11-24T16:58:55.650Z
+source_branch: fix/personal-approval-cli-20261125
+source_commit: 56ba32ccd1c3dcf3551a1367a92390109b78709e
+---
+
+# Open a scoped approval partition at every surface that decides it, and gate terminal decisions per channel
+
+A personal approval partition opened only inside withAuthenticatedPersonalApprovals was written by onboarding authority but listed without that scope by the approvals CLI, so the request was invisible to the decider. Opening the partition then surfaced channels whose consumer expects an owner workflow role the terminal never settles.
+
+## Hint Scope
+
+mission
+
+## Trigger Phrases
+
+- ## Pattern
+
+1. When a store partition opens only inside a scope, enumerate every reader in the same change: CLI list / decide / revoke, Concierge cards, window launchers (`--new-window` re-runs the plain command, so env workarounds never reach it).
+2. Visibility is not decidability. Gate terminal decisions per channel with an allowlist, and prove each channel with an actual-store decide -> apply test; a channel whose consumer requires a different decider role records approved with no effect.
+3. Never swallow per-record failures in a listing; log the hidden record with a next step, or a stale state reads as nothing to approve.
+4. Script startup guidance becomes a surface log line; never print secret values, print how to generate them or where they are stored.
+5. Agents verify human-only decision paths with read-only listing and existing refusal tests, never by attempting the decision.
+
+## Evidence
+
+`scripts/lib/cli-personal-approvals.ts` (`CLI_PERSONAL_APPROVAL_CHANNELS`), `scripts/lib/cli-personal-approvals.integration.test.ts` (approve -> apply).
+
+## Recommended References
+
+- active/missions/public/MSN-PERSONAL-APPROVAL-CLI-20261125/evidence/retrospective.md
+- active/missions/public/MSN-PERSONAL-APPROVAL-CLI-20261125/evidence/REVIEW-execution-implement.md
+
+## Evidence
+
+- active/missions/public/MSN-PERSONAL-APPROVAL-CLI-20261125/evidence/retrospective.md
+- active/missions/public/MSN-PERSONAL-APPROVAL-CLI-20261125/evidence/REVIEW-execution-implement.md
+
+## Artifacts

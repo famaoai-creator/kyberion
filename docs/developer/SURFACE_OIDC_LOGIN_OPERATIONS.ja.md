@@ -136,10 +136,11 @@ node --import ./scripts/ts-loader.mjs scripts/dev_oidc_idp.ts
 #   --port 9099  --client-id kyberion-dev  --subject dev-user  --email <任意>
 
 # 2. 表示された export を、サーフェスを起動するシェルに貼り付けて起動
+#    (署名鍵の値は表示しない。ログに残るため。鍵はこのシェルで生成する)
 export KYBERION_OIDC_ISSUER=http://localhost:9099
 export KYBERION_OIDC_CLIENT_ID=kyberion-dev
 export KYBERION_OIDC_PROVIDER_LABEL='Dev IdP'
-export KYBERION_SESSION_SECRET=<表示された値>
+export KYBERION_SESSION_SECRET="$(openssl rand -hex 32)"
 
 # 3. この subject を自分の member に紐付ける(初回のみ)
 pnpm organization member link-identity <member-id> --issuer http://localhost:9099 --subject dev-user

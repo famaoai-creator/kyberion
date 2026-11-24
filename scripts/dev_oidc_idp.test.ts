@@ -5,7 +5,12 @@ import {
   resetOidcLoginCachesForTests,
   startOidcLogin,
 } from '@agent/core/surface/oidc-browser-login';
-import { startDevOidcIdp, type DevOidcIdp } from './dev_oidc_idp.js';
+import {
+  devOidcEnvExports,
+  devOidcSettingsActive,
+  startDevOidcIdp,
+  type DevOidcIdp,
+} from './dev_oidc_idp.js';
 
 let idp: DevOidcIdp | undefined;
 
@@ -146,5 +151,40 @@ describe('dev OIDC IdP', () => {
       kind: 'unbound',
       subject: 'dev-user',
     });
+  });
+});
+
+describe('dev OIDC IdP startup output', () => {
+  const options = { port: 9099, clientId: 'kyberion-dev', subject: 'dev-user' };
+
+  it('never prints a session signing key value', () => {
+    for (const set of [true, false]) {
+      const lines = devOidcEnvExports(options, set).join('\n');
+      expect(lines).not.toMatch(/KYBERION_SESSION_SECRET=[0-9a-f]{16,}/u);
+    }
+    expect(devOidcEnvExports(options, false).join('\n')).toContain(
+      'export KYBERION_SESSION_SECRET="$(openssl rand -hex 32)"'
+    );
+    expect(devOidcEnvExports(options, true).join('\n')).toContain('already set');
+  });
+
+  it('skips the exports only when this issuer and a session key are already in place', () => {
+    const issuer = 'http://localhost:9099';
+    expect(
+      devOidcSettingsActive({ source: 'stored', issuer, session_key_ready: true }, issuer)
+    ).toBe(true);
+    expect(devOidcSettingsActive({ source: 'env', issuer, session_key_ready: true }, issuer)).toBe(
+      true
+    );
+    expect(devOidcSettingsActive({ source: 'none', session_key_ready: true }, issuer)).toBe(false);
+    expect(
+      devOidcSettingsActive(
+        { source: 'stored', issuer: 'https://idp.example', session_key_ready: true },
+        issuer
+      )
+    ).toBe(false);
+    expect(
+      devOidcSettingsActive({ source: 'stored', issuer, session_key_ready: false }, issuer)
+    ).toBe(false);
   });
 });

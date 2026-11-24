@@ -1,7 +1,7 @@
 ---
 title: 'Approval Gate Design: Store First, Surface as Renderer'
 tags: [governance, approval, mission, gate, human-in-the-loop]
-last_updated: 2026-11-12
+last_updated: 2026-11-25
 ---
 
 # Approval Gate Design
@@ -123,6 +123,12 @@ human_only の依頼は `accountability.min_assurance`（A0〜A3）を持ち、�
   開くときの `requestedBy` と、`pnpm kyberion approvals --approve`（`pnpm kyberion approve` も同じ）の
   `decidedBy` の両方に記録する。onboarding の表示名は `requestedByDisplayName` / `decidedByDisplayName`
   に別に残し、比較には使わない。
+  - **owner の個人承認**: 個人スコープの依頼（`onboarding authority` の有効化など）は owner の個人パーティション
+    （`personal/shared/owners/<hash>/`）にあり、通常の CLI プロセスからは見えない。`pnpm kyberion approvals`
+    は正本 checkout（`inspectInstalledIdentity().source === 'local'`）で、`onboarding authority` と同じ
+    ローカル authority principal と `withAuthenticatedPersonalApprovals` の範囲を開いて一覧・決定する
+    （`scripts/lib/cli-personal-approvals.ts`）。開くのは可視性だけで、human_only の決定には同じ TTY
+    チャレンジ（A2 `terminal_attested`）が要る。worktree は正本へ委ねるので開かない。
   - agent のセッション内（`KYBERION_AGENT_ID`、`KYBERION_NHI_ID`、`KYBERION_RUN_ORIGIN=agent`、または
     `CLAUDECODE` などの provider CLI の目印）で CLI が依頼を開くと、依頼者は `agent:<…>`
     （例 `agent:claude-code`）になる。そのため agent が開いた依頼を人が承認しても自己承認にはならない。

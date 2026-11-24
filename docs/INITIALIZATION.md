@@ -216,8 +216,11 @@ scope 内の未確認を本人設定の欠落と判断して onboarding をや�
 
 個人 Mission で知識利用を記録する場合は `pnpm onboarding authority show --scope person --json`
 で NHI の状態を確認する。本人設定の適用直後は `provisioned` で、`activation_requires_approval`
-なら生成済みの個人用の有効化計画を preview → request の順に進める。人間がサインイン済みの
-Concierge で承認した後、`pnpm onboarding authority apply --request-id <ID> --json`
+なら生成済みの個人用の有効化計画を preview → request の順に進める。人間が承認する。
+サインイン済みの Concierge では `/settings#settings-authority`（request の `approval_url`）の
+承認ボタン、または自分の端末（エージェントセッションの外）で
+`pnpm kyberion approvals --approve <ID>` を実行して表示コードを入力する（A2）。
+承認後に `pnpm onboarding authority apply --request-id <ID> --json`
 を実行し、同じ show で実行準備ができたことを確認する。
 配信と `--knowledge-used` の報告は単独の operator 端末で行う。
 エージェントセッションで `personal_owner_required` が出た場合は、その端末に引き渡す。
