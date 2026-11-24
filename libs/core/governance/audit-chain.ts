@@ -1029,11 +1029,14 @@ class AuditChainImpl {
     for (const slug of masterByTenant.keys()) {
       if (!isValidTenantSlug(slug)) continue;
       try {
+        // Per-partition buffer: a partition that ends up withheld must leave
+        // no trace in findings — merge only after the read block completes.
+        const partitionFindings: string[] = [];
         asAuditStoreReader(slug, () => {
           const mirrorDir = path.join(safeMirrorRoot, slug);
           const safeMirrorDir = safeAuditPath(mirrorDir, { allowMissingLeaf: true });
           if (!safeMirrorDir) {
-            findings.push(`tenant_mirror_path_unsafe:${slug}`);
+            partitionFindings.push(`tenant_mirror_path_unsafe:${slug}`);
             return;
           }
           if (!auditIo.exists(safeMirrorDir)) return;
@@ -1047,12 +1050,12 @@ class AuditChainImpl {
           for (const fileName of mirrorFiles) {
             const mirrorFile = safeAuditPath(path.join(safeMirrorDir, fileName));
             if (!mirrorFile) {
-              findings.push(`tenant_mirror_path_unsafe:${slug}:${fileName}`);
+              partitionFindings.push(`tenant_mirror_path_unsafe:${slug}:${fileName}`);
               continue;
             }
             const read = this.readAuditFileForVerify(mirrorFile);
             mirrorEntries.push(...read.entries);
-            findings.push(
+            partitionFindings.push(
               ...this.readFindings(fileName, read).map(
                 (finding) => `tenant_mirror_unreadable:${slug}:${finding}`
               )
@@ -1061,7 +1064,7 @@ class AuditChainImpl {
 
           const masterSet = masterByTenant.get(slug) || [];
           if (mirrorEntries.length !== masterSet.length) {
-            findings.push(
+            partitionFindings.push(
               `tenant_mirror_count_mismatch:${slug} (master=${masterSet.length}, mirror=${mirrorEntries.length})`
             );
           } else {
@@ -1070,18 +1073,22 @@ class AuditChainImpl {
                 masterSet[i].id !== mirrorEntries[i].id ||
                 masterSet[i].currentHash !== mirrorEntries[i].currentHash
               ) {
-                findings.push(`tenant_mirror_hash_mismatch:${slug}:${masterSet[i].id}`);
+                partitionFindings.push(`tenant_mirror_hash_mismatch:${slug}:${masterSet[i].id}`);
                 break;
               }
             }
           }
         });
+        findings.push(...partitionFindings);
       } catch (error) {
         if (!isMirrorVerifyScopeError(error)) throw error;
         withheld += 1;
+        // Never name the other tenant to a bound caller; the refusal marker
+        // distinguishes binding-refused from seam-unregistered for diagnosis.
+        const marker =
+          error instanceof Error ? error.message.match(/\[([A-Z_]+)\]/u)?.[1] : undefined;
         logger.debug(
-          // Never name the other tenant to a bound caller.
-          `tenant mirror verification skipped — this process may not bind that partition's tenant | next: verify from an unbound operator process or as that tenant | evidence: a confidential mirror partition: ${error instanceof Error && /ROLE_TENANT_SCOPE_MISMATCH/u.test(error.message) ? 'ROLE_TENANT_SCOPE_MISMATCH' : 'verify scope denied'}`
+          `tenant mirror verification skipped — this process may not bind that partition's tenant | next: verify from an unbound operator process or as that tenant | evidence: a confidential mirror partition: ${marker ?? 'verify scope denied'}`
         );
       }
     }
