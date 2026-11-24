@@ -21,6 +21,7 @@
  */
 
 import { spawn } from 'node:child_process';
+import { hostNodePlatform } from '@agent/core/platform-facts';
 import { runExternalOperation } from '@agent/core/governance/external-operation';
 import { isDelegableExternalOperation } from '@agent/core/governance/external-operation-target';
 
@@ -45,7 +46,7 @@ export interface SpeakResult {
   error?: string;
 }
 
-const PLATFORM = process.platform as Platform;
+const PLATFORM = hostNodePlatform() as Platform;
 
 function buildCommandForPlatform(
   platform: Platform,
@@ -116,7 +117,11 @@ export async function speak(text: string, opts: SpeakOptions = {}): Promise<Spea
   return runExternalOperation(
     {
       operationId: 'voice:speak',
-      effect: { text, options: { voice: opts.voice, rate: opts.rate, timeoutMs } },
+      effect: {
+        params: { platform: PLATFORM },
+        text,
+        options: { voice: opts.voice, rate: opts.rate, timeoutMs },
+      },
       requiresApproval: true,
       delegable: isDelegableExternalOperation('voice:speak'),
     },

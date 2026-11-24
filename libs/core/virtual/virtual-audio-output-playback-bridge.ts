@@ -9,6 +9,7 @@ import {
   safeReadFile,
 } from '../secure-io.js';
 import { AudioDeviceLeaseManager, type AudioDeviceLease } from '../voice/audio-device-lease.js';
+import { hostNodePlatform } from '../platform-facts.js';
 import { pathResolver } from '../path-resolver.js';
 import { clamp, sanitizeIdSegment } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
@@ -347,7 +348,8 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
           `legacy-default-output:${candidate.name}`,
           `legacy-playback-${process.pid}-${Date.now()}`
         );
-        const adapter = resolveAudioPlaybackAdapter(process.platform);
+        const platform = hostNodePlatform();
+        const adapter = resolveAudioPlaybackAdapter(platform);
         if (!adapter) {
           throw new Error(`unsupported platform ${process.platform}`);
         }
@@ -357,6 +359,8 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
               operationId: 'voice:playback',
               effect: {
                 params: {
+                  platform,
+                  content_hash: sourceHash,
                   source_hash: sourceHash,
                   format: path.extname(playbackPath).toLowerCase(),
                   device_name: candidate.name,

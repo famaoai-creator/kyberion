@@ -5,6 +5,33 @@ const core = vi.hoisted(() => ({
   getVoiceSelectionSnapshot: vi.fn(),
   saveVoiceSelectionPreferences: vi.fn(),
 }));
+const priority = vi.hoisted(() => ({
+  list: vi.fn(),
+  set: vi.fn(),
+  remove: vi.fn(),
+  denied: null as Response | null,
+}));
+vi.mock('@agent/core/seam-selection-rules', () => ({
+  listSeamSelectionRules: priority.list,
+  setSeamSelectionRule: priority.set,
+  removeSeamSelectionRule: priority.remove,
+}));
+vi.mock('@agent/core/seam-provider-selection', () => ({
+  getSeamSelectionPolicy: () => ({ providers: { local_say: {}, espeak_ng: {} } }),
+}));
+vi.mock('@agent/core/voice-engine-registry', () => ({
+  listVoiceEngines: () =>
+    ['local_say', 'espeak_ng'].map((engine_id) => ({
+      engine_id,
+      display_name: engine_id,
+      supports: { playback: true },
+    })),
+  isLocalVoiceEngine: () => true,
+  VOICE_TTS_ENGINE_SEAM: 'voice-tts-engine',
+}));
+vi.mock('../../../../lib/installation-access', () => ({
+  requireConciergeInstallationAccess: () => ({ response: priority.denied }),
+}));
 const guard = vi.hoisted(() => ({ denied: null as Response | null }));
 const roles = vi.hoisted(() => [] as string[]);
 const viewer = vi.hoisted(() => ({ response: null as Response | null }));
@@ -51,6 +78,8 @@ describe('/api/voice/selection (in-process)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     guard.denied = null;
+    priority.denied = null;
+    priority.list.mockReturnValue([]);
     roles.length = 0;
     viewer.response = null;
     core.getVoiceSelectionSnapshot.mockReturnValue(snapshot);
@@ -77,6 +106,28 @@ describe('/api/voice/selection (in-process)', () => {
     // The personal profile is written as the Concierge personal-profile role.
     expect(roles).toEqual(['sovereign_concierge']);
     expect(await res.json()).not.toHaveProperty('storage_path');
+  });
+
+  it('saves an explicit playback order with actor and capability context', async () => {
+    expect((await POST(post({ tts_priority: ['espeak_ng', 'local_say'] }))).status).toBe(200);
+    expect(priority.set).toHaveBeenCalledWith({
+      rule_id: 'concierge-local-voice-priority',
+      seam: 'voice-tts-engine',
+      when: { context: { operation: 'speak_local' } },
+      prefer: ['espeak_ng', 'local_say'],
+      set_by: 'owner',
+    });
+    expect((await POST(post({ tts_priority: [] }))).status).toBe(200);
+    expect(priority.remove).toHaveBeenCalledWith('concierge-local-voice-priority');
+    expect(core.saveVoiceSelectionPreferences).not.toHaveBeenCalled();
+  });
+
+  it('refuses unknown, duplicate or unauthorized priority updates', async () => {
+    expect((await POST(post({ tts_priority: ['unknown'] }))).status).toBe(400);
+    expect((await POST(post({ tts_priority: ['local_say', 'local_say'] }))).status).toBe(400);
+    priority.denied = new Response('no', { status: 403 });
+    expect((await POST(post({ tts_priority: ['local_say'] }))).status).toBe(403);
+    expect(priority.set).not.toHaveBeenCalled();
   });
 
   it('POST rejects an empty or unknown-key body before saving', async () => {

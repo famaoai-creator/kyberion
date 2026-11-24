@@ -198,6 +198,10 @@ export type VoiceSelectionSttCandidate = {
 };
 export type VoiceSelection = {
   preferences: { tts_engine_id: string; stt_backend: string };
+  tts_priority?: {
+    order: string[];
+    options: { engine_id: string; display_name: string }[];
+  };
   tts: { candidates: VoiceSelectionTtsCandidate[] };
   stt: { candidates: VoiceSelectionSttCandidate[] };
 };
@@ -254,8 +258,22 @@ export function parseVoiceSelectionResponse(value: unknown): VoiceSelection | un
   ) {
     return undefined;
   }
+  const priority = record.tts_priority as VoiceSelection['tts_priority'];
+  if (
+    priority !== undefined &&
+    (!priority ||
+      !Array.isArray(priority.order) ||
+      !priority.order.every((id) => typeof id === 'string') ||
+      !Array.isArray(priority.options) ||
+      !priority.options.every(
+        (item) =>
+          item && typeof item.engine_id === 'string' && typeof item.display_name === 'string'
+      ))
+  )
+    return undefined;
   return {
     preferences: preferences as VoiceSelection['preferences'],
+    tts_priority: priority,
     tts: tts as VoiceSelection['tts'],
     stt: stt as VoiceSelection['stt'],
   };

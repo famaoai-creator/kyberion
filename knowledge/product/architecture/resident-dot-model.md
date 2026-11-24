@@ -150,10 +150,77 @@ A new unhealthy episode opens a pending alert with a fixed expiry. Publication
 requires another current unhealthy observation if quiet hours deferred the
 first one. The supervisor also re-reads the eligible source immediately before
 enqueue. A healthy observation closes the episode, and an expired episode
-cannot be published. Unavailable observations do not authorize an alert.
+cannot be published using its expired evidence. If no delivery was attempted,
+a newer unhealthy observation after quiet hours can renew the evidence window.
+An attempted delivery retains its original identity and expiry. Unavailable
+observations do not authorize an alert.
 After an interrupted enqueue, a still-fresh pending episode can replay the
 same unhealthy observation. Publication rechecks the source and quiet hours,
 and reuses the original inbox ID.
+
+When the source still fails the probe, the Dot prepares the first inbox entry
+from that confirmation. It records the scoped source path, confirmation time,
+whether the file is missing or fails the expected state, and a suggested
+operator check. It excludes the file contents and matching expression. The
+episode retains its prepared evidence before enqueue, so retries reuse the
+same text even if a later recheck observes a different failure. Preparation
+uses the existing probe read and inbox delivery scope. Any subsequent action
+uses the existing Dot authority and approval rules.
+
+A charter can opt into `signal_alerts.mode` and declare `digest_signals` by
+signal name. A scheduled digest is required when the list is nonempty. A
+configured signal keeps immediate delivery if there is no later eligible
+digest minute before expiry.
+
+| Mode      | Behavior                                                                                                                                    |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shadow`  | Records the proposed and applied routes. Keeps immediate inbox delivery.                                                                    |
+| `triage`  | Routes the declared subset into the existing digest after confirming it is still unhealthy and fresh. Other alerts keep immediate delivery. |
+| `prepare` | Applies the same routing and adds bounded, deterministic follow-up options to immediate alerts.                                             |
+
+`pnpm kyberion dot status <dot-id> --json` includes `signal_triage` for these modes.
+It shows the latest retained episode per declared probe, including proposed and
+applied routes, the reason, confirmation time, and expiry. In prepare mode an
+optional `corroboration: { dot_id, signal }` adds a fresh related observation
+from a declared handoff peer with exactly matching custody and work binding.
+A peer observation only supplements an independently confirmed local alert.
+A recorded route is fixed for its episode. Changing modes affects subsequent
+episodes while existing deferred entries continue to use their original digest
+lane while the digest remains configured and the observation is fresh. Digest
+admission reserves each episode ID before delivery and preserves the original
+snapshot for a retry. Before retrying, the sender rechecks the included
+episodes. If any is no longer eligible, it suppresses that frozen snapshot.
+Revoking or changing the applicable notification
+configuration prevents delivery of the stale snapshot. The episode is scoped
+to the charter. Existing unconfigured alert behavior is preserved.
+
+### Directed preparation and feedback
+
+A prepare-mode Dot can opt into `directed_intent: true`. An operator can ask
+it to check a declared file sooner through the existing addressed inbox lane.
+
+```sh
+pnpm kyberion dot inbox append --channel inbox --dot-id <dot-id> --prepare-signal "<signal>"
+```
+
+The Dot requires a fresh addressed inbox row in its own custody and a wake
+channel it has accepted. It matches only the exact declared signal and verifies
+the file independently before alerting. Message text adds no fetch authority.
+
+When an operator concludes a recurring signal belongs in the digest, they can
+submit that feedback as a scoped review request.
+
+```sh
+pnpm kyberion dot inbox request-digest <dot-id> "<signal>" "<reason>"
+pnpm kyberion approvals --approve <request-id>
+```
+
+After approval, set `signal_alerts.ratified_digest: { signal, approval_id }` on the
+charter. Authorized human approval, exact scope, probe, schedule and
+destination are verified before applying the preference to new episodes.
+Revocation prevents new uses and prevents a queued digest from retrying a
+snapshot that depended on the revoked preference. The existing authority and
+approval requirements for work execution still apply.
 
 Before writing an inbox entry the supervisor rereads the active charter and
 checks the tenant's operational status. A scope, role, route policy or probe

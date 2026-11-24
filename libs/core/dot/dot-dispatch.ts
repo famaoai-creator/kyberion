@@ -19,8 +19,12 @@ import {
   recordDeferredDotJudgmentApprovalFeedback,
 } from './dot-judgment-approval.js';
 import { isDotIntakeAdmission, loadDotExecutionPolicy } from './dot-execution-policy.js';
-import { sendDueDotDigest } from './dot-digest-delivery.js';
-import { publishDotSignalAlerts } from './dot-signal-alert.js';
+import { canResumeDotDigest, sendDueDotDigest } from './dot-digest-delivery.js';
+import {
+  dotSignalTriageEntries,
+  measureDirectedPreparationIntent,
+  publishDotSignalAlerts,
+} from './dot-signal-alert.js';
 export { DOT_DIGEST_LEDGER_PATH } from './dot-digest-delivery.js';
 import type { DotWorkResultRow } from './dot-state-paths.js';
 import {
@@ -1589,11 +1593,16 @@ export async function runDotHousekeeping(
     result.signals = observations.length;
     if (charter.notification.signal_alerts && deps.rereadCharter && !isOperationsHalted()) {
       try {
-        publishDotSignalAlerts(charter, observations, {
+        const intent = measureDirectedPreparationIntent(charter, nowOf(deps), deps.rootDir);
+        publishDotSignalAlerts(charter, intent ? [...observations, intent] : observations, {
           rootDir: deps.rootDir,
           now: nowOf(deps),
           quietHours: dotQuietHours(charter),
           currentCharter: deps.rereadCharter,
+          digestTimezone: dotCharterTimezone(charter),
+          listPeers: () =>
+            deps.listCharters?.() ??
+            listDotCharters(deps.rootDir, { errors: [] }).map((item) => item.charter),
         });
       } catch (error) {
         fail('signal_alerts', error);
@@ -1603,7 +1612,7 @@ export async function runDotHousekeeping(
     fail('signals', error);
   }
   try {
-    result.digest = maybeSendDotDigest(charter, deps);
+    result.digest = maybeSendDotDigest(charter, deps, deps.rereadCharter);
   } catch (error) {
     fail('digest', error);
   }
@@ -1615,6 +1624,8 @@ export async function runDotHousekeeping(
 // ---------------------------------------------------------------------------
 
 export { dotCharterTimezone } from './dot-digest-composition.js';
+export { requestDotSignalRoutingReview } from './dot-signal-learning.js';
+export { readDotSignalTriage } from './dot-signal-alert.js';
 export function composeDotDigest(
   charter: DotCharter,
   since: Date | undefined,
@@ -1641,11 +1652,17 @@ function dotDigestSectionLines(
 }
 
 /** Durable bounded catch-up and retries; accepted is enqueue evidence, not remote delivery. */
-export function maybeSendDotDigest(charter: DotCharter, deps: DotDispatchDeps = {}): boolean {
+export function maybeSendDotDigest(
+  charter: DotCharter,
+  deps: DotDispatchDeps = {},
+  rereadCharter?: () => DotCharter
+): boolean {
   return sendDueDotDigest(charter, dotCharterTimezone(charter), {
     rootDir: deps.rootDir,
     now: deps.now,
     compose: (since) => composeDotDigest(charter, since, deps),
+    deferredSignals: (now) => dotSignalTriageEntries(charter, now, deps.rootDir),
+    ...(rereadCharter ? { authorize: () => canResumeDotDigest(charter, rereadCharter) } : {}),
     notify: (text, key) => {
       const payload = {
         title: '[' + dotActorId(charter.dot_id) + '] digest',

@@ -14,6 +14,7 @@ import {
   type CharterScopeKind,
   type ExternalEffectPolicy,
 } from '../governance/accountability-charter.js';
+import { externalOperationGrantCatalog } from '../governance/external-operation-target.js';
 import { delegableCharterDecisions } from '../governance/charter-decision-vocabulary.js';
 import {
   acceptCharter,
@@ -684,6 +685,7 @@ export function readOnboardingAuthority(
             ready: false,
             reason: 'reason' in runtime ? runtime.reason : 'agent_accountability_mismatch',
           },
+    delegable_operations: externalOperationGrantCatalog(),
     delegable_decisions: delegableCharterDecisions().map((entry) => ({
       decision_type: entry.decision_type,
       label: entry.label,

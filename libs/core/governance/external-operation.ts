@@ -89,35 +89,42 @@ export function withExternalOperationInvocationAttempt<T>(
     throw new Error('[EXTERNAL_ATTEMPT_INVALID] Bounded nonempty host attempt identity required');
   return invocationAttempts.run({ operationId, attemptId }, body);
 }
-const explicitRequestContext = new AsyncLocalStorage<{
+type ExplicitExternalApprovalRequest = {
   operationId: string;
   reviewArtifacts: (effect: Record<string, unknown>) => string[];
   requestScope?: EventScopeInput;
-}>();
+};
+const explicitRequestContext = new AsyncLocalStorage<
+  ReadonlyMap<string, ExplicitExternalApprovalRequest>
+>();
 
 /** Host-only opt-in to enqueue a decision even without an interactive human.
  * Action data cannot enable this, and other operations retain headless behavior. */
 export function withExplicitExternalApprovalRequest<T>(
-  request: {
-    operationId: string;
-    reviewArtifacts: (effect: Record<string, unknown>) => string[];
-    requestScope?: EventScopeInput;
-  },
+  request: ExplicitExternalApprovalRequest,
   body: () => T
 ): T {
-  return explicitRequestContext.run(
-    {
+  return withExplicitExternalApprovalRequests([request], body);
+}
+
+export function withExplicitExternalApprovalRequests<T>(
+  requests: readonly ExplicitExternalApprovalRequest[],
+  body: () => T
+): T {
+  const byOperation = new Map<string, ExplicitExternalApprovalRequest>();
+  for (const request of requests) {
+    byOperation.set(request.operationId, {
       ...request,
       ...(request.requestScope ? { requestScope: normalizeEventScope(request.requestScope) } : {}),
-    },
-    body
-  );
+    });
+  }
+  return explicitRequestContext.run(byOperation, body);
 }
 /** True when a trusted host already produces governed review artifacts for this
  * operation, so authority resolvers must not duplicate that store write under a
  * caller ambient identity. */
 export function hasExplicitExternalApprovalRequest(operationId: string): boolean {
-  return explicitRequestContext.getStore()?.operationId === operationId;
+  return explicitRequestContext.getStore()?.has(operationId) ?? false;
 }
 const pipelineRunContext = new AsyncLocalStorage<string>();
 
@@ -665,8 +672,8 @@ export function admitExternalOperation(input: ExternalOperation): ApprovalGateRe
   );
   // Invocation identity prevents one approval becoming a standing grant for
   // identical messages; the effect hash prevents edits while awaiting approval.
-  const request = explicitRequestContext.getStore();
-  const enqueueRequest = request?.operationId === input.operationId;
+  const request = explicitRequestContext.getStore()?.get(input.operationId);
+  const enqueueRequest = request !== undefined;
   const correlationId = createHash('sha256')
     .update(
       JSON.stringify([

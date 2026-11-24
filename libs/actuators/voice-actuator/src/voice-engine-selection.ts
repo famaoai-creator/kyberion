@@ -39,6 +39,7 @@ export interface VoiceEngineRoutingInput {
   /** True when the caller named the engine (params.engine_id / engine.engine_id). */
   explicit: boolean;
   purpose?: string;
+  selectionContext?: Record<string, string>;
   /** Explicit request language; otherwise detected from the text. */
   language?: string;
   requires?: Omit<VoiceTtsRequirements, 'language'>;
@@ -195,8 +196,9 @@ export function routeVoiceEngine(input: VoiceEngineRoutingInput): VoiceEngineRou
   }
 
   // Rules exist but none matches this request: keep today's engine exactly.
+  const context = { ...input.selectionContext, language };
   const hasRules = Boolean(
-    matchSeamSelectionRule(VOICE_TTS_ENGINE_SEAM, { context: { language } })
+    matchSeamSelectionRule(VOICE_TTS_ENGINE_SEAM, { context, purpose: purpose || undefined })
   );
   const fallbackPurpose =
     baselineUnmet.length > 0
@@ -211,6 +213,7 @@ export function routeVoiceEngine(input: VoiceEngineRoutingInput): VoiceEngineRou
   const selection = selectVoiceTtsEngine({
     ...(effectivePurpose ? { purpose: effectivePurpose } : {}),
     requires,
+    context,
   });
   // Without a purpose or matching rule the seam default is the policy's, not
   // this caller's: keep the engine the op would have used when it can run.

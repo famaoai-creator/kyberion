@@ -101,7 +101,20 @@ describe('actual-store onboarding authority', () => {
         read: ['personal', 'public'],
         write: ['personal'],
       });
-      expect(f.api.readOnboardingAuthority(f.principal, person).charter?.data_tier).toEqual({
+      const authority = f.api.readOnboardingAuthority(f.principal, person);
+      expect(authority.delegable_operations).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ operation_id: 'voice:speak', optional_fields: ['platform'] }),
+          expect.objectContaining({
+            operation_id: 'voice:playback',
+            optional_fields: ['platform', 'format', 'content_hash'],
+          }),
+        ])
+      );
+      expect(authority.delegable_operations.map(({ operation_id }) => operation_id)).not.toContain(
+        'voice:record_sample'
+      );
+      expect(authority.charter?.data_tier).toEqual({
         read: ['personal', 'public'],
         write: ['personal'],
       });

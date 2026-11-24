@@ -71,13 +71,16 @@ export KYBERION_BASE_ROLE=sovereign
 
 ### 主体の登録と有効化
 
-| 遷移                      | 入口と成立条件                                                                                                                            |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Member を確保する         | `pnpm onboarding apply` が確認済みの入力を検証し、有効な owner Member を確保する。                                                        |
-| Agent Identity を登録する | 同じ apply が責任を持つ Member を NHI に紐づける。新規 NHI は `provisioned` で、個人用 NHI は環境のテナントを暗黙に引き継がない。         |
-| NHI を有効化する          | `pnpm kyberion onboarding authority` で対象 NHI の計画をレビューし、人の承認後に適用する。                                                |
-| テナント利用を有効化する  | 会社・既存テナントの経路では `pnpm tenant:activation` が対象コンテキストとプローブ証跡を検査し、受諾後に有効化する。                      |
-| 顧客の選択を確定する      | 顧客案件では `pnpm kyberion customer-decision actor-add` で決裁者を登録する。顧客の選択の確定には、そのアクターの決定権と承認証跡が必要。 |
+| 遷移                      | 入口と成立条件                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Member を確保する         | `pnpm onboarding apply` が確認済みの入力を検証し、有効な owner Member を確保する。                                                                                                                                                                                                                                                                                                       |
+| Agent Identity を登録する | 同じ apply が責任を持つ Member を NHI に紐づける。新規 NHI は `provisioned` で、個人用 NHI は環境のテナントを暗黙に引き継がない。                                                                                                                                                                                                                                                        |
+| NHI を有効化する          | `pnpm kyberion onboarding authority` で対象 NHI の計画をレビューし、人の承認後に適用する。                                                                                                                                                                                                                                                                                               |
+| 委任する操作を選ぶ        | Concierge の「設定 → 権限と承認」で、個人または組織の対象範囲を選び、操作・対象・有効期限を確認して申請する。承認後に適用する。読み上げ・音声再生の新しい委任は OS を指定せず、復旧先で利用できる実装を選ぶ。既に OS を指定して承認された委任は、その OS に限られる。CLI では `pnpm kyberion onboarding authority show --scope person --json` で操作と対象フィールドの一覧を確認できる。 |
+| テナント利用を有効化する  | 会社・既存テナントの経路では `pnpm tenant:activation` が対象コンテキストとプローブ証跡を検査し、受諾後に有効化する。                                                                                                                                                                                                                                                                     |
+| 顧客の選択を確定する      | 顧客案件では `pnpm kyberion customer-decision actor-add` で決裁者を登録する。顧客の選択の確定には、そのアクターの決定権と承認証跡が必要。                                                                                                                                                                                                                                                |
+
+読み上げの実装に優先順位を付ける場合は、委任とは別に Concierge の「設定 → 声と話し方」でエンジンを選んで並べ、優先順位を保存する。CLI では `pnpm kyberion seam select rules set --seam voice-tts-engine --rule-id concierge-local-voice-priority --context operation=speak_local --prefer mlx_audio_qwen3,espeak_ng` のように設定する。`--prefer` は先頭が最優先で、OS・言語・再生などの条件を満たす実装が候補になる。保存した優先順位はインストール全体のバックアップに含まれる。
 
 [主体と責任のデータモデル](../architecture/actor-identity-and-responsibility-model.md#people-and-agents-in-a-customer-decision)
 に識別子と代理関係を示す。[有限状態モデル](../../../libs/core/organization/onboarding-identity.model.test.ts)

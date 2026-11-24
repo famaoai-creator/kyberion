@@ -684,7 +684,7 @@ export function buildSummary(
       : ['- Not configured']),
     '',
     `## ${summaryPolicy.sections.next_steps}`,
-    '- Connection authentication is separate from authority: open Settings → Services to connect accounts, review exact GitHub/browser targets and limits, ask the installed agent to request delegation, then approve and apply the reviewed plan. The new agent stays provisioned until its signed activation plan is applied.',
+    '- Connection authentication is separate from authority: open Settings → Services to connect accounts. In Settings → Authority and approvals, choose the operations to delegate and their target fields and expiry, then review, approve and apply the plan. The new agent stays provisioned until its signed activation plan is applied.',
     '- CLI: run `pnpm kyberion onboarding authority show --scope person --json`, then use `preview`, `request`, `status`, and `apply` with the exact reviewed plan. Personal use needs no tenant; organization scope requires an explicitly selected tenant owner.',
     `- ${activationNextStep(activation)}`,
     ...(operations ? operationsNextSteps(operations).map((s) => `- ${s}`) : []),

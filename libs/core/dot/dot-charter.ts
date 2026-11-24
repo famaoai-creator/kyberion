@@ -236,7 +236,14 @@ export interface DotCharter {
     };
     digest_cron?: string;
     /** Publish an unresolved signal episode to the scoped inbox after quiet hours. */
-    signal_alerts?: { max_age_s: number };
+    signal_alerts?: {
+      max_age_s: number;
+      mode?: 'shadow' | 'triage' | 'prepare';
+      digest_signals?: string[];
+      directed_intent?: boolean;
+      ratified_digest?: { signal: string; approval_id: string };
+      corroboration?: { dot_id: string; signal: string };
+    };
     quiet_hours?: { start?: string; end?: string; timezone?: string };
     /** `inbox` (default) keeps every send in the local inbox; `live` uses deliver_to. */
     delivery_mode?: 'inbox' | 'live';
@@ -408,6 +415,32 @@ export function validateDotCharter(value: unknown, sourcePath = '<inline>'): Dot
     if (signals.length !== new Set(signals).size)
       throw new Error(
         `Invalid dot charter at ${sourcePath}: signal alerts require unique signal names`
+      );
+    const { corroboration } = bound.notification.signal_alerts;
+    if (
+      corroboration &&
+      (corroboration.dot_id === bound.dot_id ||
+        !bound.team?.accepts_handoffs_from?.includes(corroboration.dot_id))
+    )
+      throw new Error(
+        `Invalid dot charter at ${sourcePath}: signal corroboration requires a declared peer handoff source`
+      );
+    const { digest_signals, ratified_digest } = bound.notification.signal_alerts;
+    const digestSignals = [
+      ...(digest_signals ?? []),
+      ...(ratified_digest ? [ratified_digest.signal] : []),
+    ];
+    const eligible = new Set(
+      (bound.goal.signal_probes ?? [])
+        .filter(({ probe }) => probe.type === 'file' && probe.expect !== 'changed')
+        .map(({ signal }) => signal)
+    );
+    if (
+      digestSignals.length &&
+      (!bound.notification.digest_cron || digestSignals.some((name) => !eligible.has(name)))
+    )
+      throw new Error(
+        `Invalid dot charter at ${sourcePath}: digest signals require digest_cron and declared file expectations`
       );
   }
   isFrontDeskDiagnosticDot(bound);

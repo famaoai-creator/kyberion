@@ -310,6 +310,24 @@ describe('voice-tts-engine routing', () => {
       expect(mocks.record).not.toHaveBeenCalled();
     });
 
+    it('skips the first preferred engine when restored to an incompatible platform', async () => {
+      setSeamSelectionRule({
+        rule_id: 'portable-voice-order',
+        seam: 'voice-tts-engine',
+        when: { context: { operation: 'speak_local' } },
+        prefer: ['mlx_audio_qwen3', 'espeak_ng'],
+        set_by: 'user:test',
+      });
+      setPlatform('linux');
+      const result = await speak({ text: 'hello', language: 'en', local_only: true });
+      expect(result.status).toBe('succeeded');
+      expect(result.resolved_engine_id).toBe('espeak_ng');
+      expect(result.engine_selection).toMatchObject({
+        strategy: 'rule',
+        rule_id: 'portable-voice-order',
+      });
+    });
+
     it('selects by purpose and speaks the detected language', async () => {
       setPlatform('linux');
       const result = await speak({ text: 'こんにちは', purpose: 'naturalness' });

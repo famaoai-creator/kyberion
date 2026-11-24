@@ -264,3 +264,64 @@ describe('terminal evidence only', () => {
     expect(read).not.toHaveBeenCalled();
   });
 });
+
+it('does not deliver or retry a frozen digest after notification authority changes', () => {
+  const notify = vi.fn(() => ({ status: 'retryable' as const }));
+  const first = deps('2026-10-04T09:00:00Z', notify);
+  expect(sendDueDotDigest(charter, 'UTC', { ...first, authorize: () => false })).toBe(false);
+  expect(notify).not.toHaveBeenCalled();
+  expect(sendDueDotDigest(charter, 'UTC', { ...first, authorize: () => true })).toBe(false);
+  expect(notify).toHaveBeenCalledTimes(1);
+  const retry = deps('2026-10-04T09:11:00Z', notify);
+  expect(
+    sendDueDotDigest(
+      {
+        ...charter,
+        notification: {
+          ...charter.notification,
+          signal_alerts: { max_age_s: 7200, mode: 'shadow' },
+        },
+      },
+      'UTC',
+      { ...retry, authorize: () => true }
+    )
+  ).toBe(false);
+  expect(notify).toHaveBeenCalledTimes(1);
+});
+
+it.each(['retryable', 'uncertain'] as const)(
+  'admits each deferred episode only once across digest slots (%s)',
+  (status) => {
+    const configured = { ...charter, notification: { digest_cron: '*/5 * * * *' } };
+    const notify = vi.fn((_text: string, _key: string) => ({ status }));
+    const deferredSignals = () => [{ id: 'episode', text: 'deferred incident' }];
+    for (const at of ['2026-10-04T09:00:00Z', '2026-10-04T09:05:00Z']) {
+      sendDueDotDigest(configured, 'UTC', { ...deps(at, notify), deferredSignals });
+    }
+    expect(notify).toHaveBeenCalledTimes(2);
+    expect(notify.mock.calls.map((call) => call[0])).toEqual([
+      expect.stringContaining('deferred incident'),
+      'frozen digest',
+    ]);
+  }
+);
+
+it('does not replay frozen evidence after the probe definition is removed', () => {
+  const configured = {
+    ...charter,
+    goal: {
+      statement: 'Observe a source',
+      signal_probes: [
+        {
+          signal: 'ready',
+          probe: { type: 'file', path: 'knowledge/public/source', expect: 'exists' },
+        },
+      ],
+    },
+  } satisfies DotCharter;
+  const notify = vi.fn(() => ({ status: 'retryable' as const }));
+  sendDueDotDigest(configured, 'UTC', deps('2026-10-04T09:00:00Z', notify));
+  const changed = { ...configured, goal: { statement: configured.goal.statement } };
+  expect(sendDueDotDigest(changed, 'UTC', deps('2026-10-04T09:11:00Z', notify))).toBe(false);
+  expect(notify).toHaveBeenCalledTimes(1);
+});
