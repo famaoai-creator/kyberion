@@ -2668,6 +2668,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_MODEL_STATS",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Test-only: when 1, the finite-state checker (libs/core/testing) logs each exploration's status, visited state count, transition count and violated invariant as a JSON line, so model authors can read real counts without failing an assertion.",
+      "documented": true,
+      "subsystem": "governance"
+    },
+    {
       "name": "KYBERION_MOS_PRINCIPAL",
       "category": "runtime",
       "type": "string",

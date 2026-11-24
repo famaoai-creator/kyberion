@@ -413,6 +413,7 @@ Repository build, test, generator and gate scripts for contributors.
 | `pnpm kyberion check pr-title`                      | `pnpm check:pr-title`                      | Check a PR title against Conventional Commits                                                     |
 | `pnpm kyberion check rt-mode`                       |                                            | Check the runtime mode configuration for consistency.                                             |
 | `pnpm kyberion check script-integrity`              |                                            | Check package script integrity                                                                    |
+| `pnpm kyberion check stale-dist`                    | `pnpm check:stale-dist`                    | Fail when dist outputs are stale vs their TypeScript sources                                      |
 | `pnpm kyberion ci`                                  | `pnpm ci`                                  | Run the full CI sequence locally                                                                  |
 | `pnpm kyberion ci triage`                           |                                            | Classify a red CI log and print the next command per failure                                      |
 | `pnpm kyberion deps check`                          | `pnpm deps:check`                          | Check dependencies                                                                                |

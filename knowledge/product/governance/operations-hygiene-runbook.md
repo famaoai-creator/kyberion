@@ -429,6 +429,16 @@ outputs in `scripts/check/check_stale_dist.test.ts`. Platform-specific fixtures 
 explicit skips elsewhere and included in the native platform's CI command;
 `tests/workflow-operations-contract.test.ts` pins the Windows invocation.
 
+**Typecheck depends on fresh dist and install state.** `pnpm typecheck` resolves
+`@agent/*` workspace imports through each package's emitted `dist/*.d.ts`, so a
+stale package build surfaces as dozens of phantom export errors (TS2305/TS2339)
+rather than a staleness diagnostic, and a node_modules older than the lockfile
+surfaces as phantom missing modules. `pnpm typecheck` therefore runs
+`check:stale-dist` first — its content-hash scan names the actual stale target
+and the remedy (`pnpm run build`), and `.npmrc` sets `verify-deps-before-run=warn`
+so every script warns when the install state drifts from the lockfile. Fix the
+reported staleness before debugging individual type errors.
+
 **Gate budgets (`pnpm check`).** `scripts/run_checks.ts` defaults to at most 6 concurrent gates
 with a 120s default per gate (`DEFAULT_GATE_TIMEOUT_MS`). On a resource-constrained host,
 use `pnpm check -- --scope pr --jobs 1` (integer range 1–6). This changes scheduling only:
