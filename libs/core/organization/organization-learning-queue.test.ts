@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeRmSync } from '../secure-io.js';
-import { listMemoryPromotionCandidates } from '../knowledge/memory-promotion-queue.js';
+import {
+  listMemoryPromotionCandidates,
+  memoryPromotionQueuePath,
+} from '../knowledge/memory-promotion-queue.js';
 import { promoteMemoryCandidateToKnowledge } from '../knowledge/memory-promotion-workflow.js';
 import {
   enqueueOrganizationLearningCandidate,
@@ -11,6 +14,7 @@ import {
 import { listOrganizationLearningCandidates } from './organization-operating-model-management.js';
 import { transitionOrganizationLearningCandidate } from './organization-interventions.js';
 import {
+  fromOrganizationLearningMemoryCandidate,
   migrateLegacyOrganizationLearningCandidates,
   organizationLearningCandidateId,
   saveOrganizationLearningDecision,
@@ -105,6 +109,40 @@ describe('organization learning on the single MemoryCandidate queue (D8)', () =>
         rootDir,
       })[0]
     ).toMatchObject({ status: 'approved', decision_note: 'useful' });
+  });
+
+  it('captures a tenant-free personal learning under its owner and keeps its organization', () => {
+    const ownerNhi = `kyberion://agent/_/_/queue-owner-${process.pid}`;
+    const scope = { tier: 'personal', owner_nhi: ownerNhi } as const;
+    enqueueOrganizationLearningCandidate({
+      learningId: 'lrn-owned',
+      organizationId: ORG,
+      sourceType: 'routine_exception',
+      sourceRef: 'routine-3',
+      title: 'Owned personal learning',
+      summary: 'A personal learning with an explicit owner.',
+      targetKind: 'pattern',
+      tier: 'personal',
+      ownerNhi,
+      rootDir,
+    });
+    const rows = listMemoryPromotionCandidates(scope);
+    try {
+      expect(rows).toHaveLength(1);
+      // organization_id needs a tenant in the scope chain; it travels in origin instead.
+      expect(rows[0]!.scope).toEqual(scope);
+      expect(rows[0]!.origin?.attributes).toMatchObject({ organization_id: ORG });
+      expect(fromOrganizationLearningMemoryCandidate(rows[0]!)).toMatchObject({
+        organization_id: ORG,
+        learning_id: 'lrn-owned',
+        tier: 'personal',
+      });
+    } finally {
+      safeRmSync(path.dirname(path.dirname(memoryPromotionQueuePath(scope))), {
+        recursive: true,
+        force: true,
+      });
+    }
   });
 
   it('refuses a capture whose scope the record does not determine', () => {

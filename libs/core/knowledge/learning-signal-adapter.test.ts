@@ -6,11 +6,26 @@ const enqueueSignal = vi.hoisted(() =>
 );
 const persistHints = vi.hoisted(() => vi.fn());
 const identity = vi.hoisted(() => ({ tenantSlug: undefined as string | undefined }));
+const OWNER_AGENT = 'kyberion://agent/_/_/owner-agent';
+const owner = vi.hoisted(() => ({
+  scopeNhi: undefined as string | undefined,
+  actor: undefined as unknown,
+  installed: vi.fn(),
+  alert: vi.fn(),
+}));
 
 vi.mock('../core.js', () => ({ logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 vi.mock('./operational-learning.js', () => ({ enqueueOperationalLearningSignal: enqueueSignal }));
 vi.mock('./feedback-loop.js', () => ({ persistHints }));
 vi.mock('../authority.js', () => ({ resolveIdentityContext: () => identity }));
+vi.mock('../scope-context.js', () => ({
+  resolveScopeResolution: () => ({ scope: { nhi_id: owner.scopeNhi } }),
+}));
+vi.mock('../authn/actor-context.js', () => ({ currentActor: () => owner.actor }));
+vi.mock('../organization/personal-runtime-identity.js', () => ({
+  inspectInstalledPersonalRuntime: owner.installed,
+}));
+vi.mock('../daemon/ops-alert.js', () => ({ sendOpsAlert: owner.alert }));
 
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeRmSync } from '../secure-io.js';
@@ -21,6 +36,7 @@ import {
   errorCode,
   harvestLearningSignals,
   learningHarvestStatePath,
+  resolveHarvestOwnerNhi,
   shouldProposeCluster,
   type LearningObservation,
   type LearningSignalSource,
@@ -71,6 +87,17 @@ describe('learning-signal adapter (LS-01)', () => {
     enqueueSignal.mockImplementation((signal: { signalId: string }) => `ops-${signal.signalId}`);
     persistHints.mockClear();
     identity.tenantSlug = undefined;
+    owner.scopeNhi = undefined;
+    owner.actor = undefined;
+    owner.alert.mockReset();
+    owner.installed.mockReset();
+    owner.installed.mockReturnValue({
+      ready: true,
+      ownerId: 'user:owner',
+      agentId: OWNER_AGENT,
+      agentActive: true,
+      scope: { kind: 'person' },
+    });
     stateRoot = pathResolver.sharedTmp(
       `learning-signal-adapter-test-${process.pid}-${Math.random().toString(36).slice(2)}`
     );
@@ -103,7 +130,7 @@ describe('learning-signal adapter (LS-01)', () => {
         sourceRef: 'learning-signal:test-source:a',
         metadata: expect.objectContaining({ signal_source: 'test-source', total: 3 }),
       }),
-      { now: hours(5) }
+      { now: hours(5), ownerNhi: OWNER_AGENT }
     );
     expect(persistHints).toHaveBeenCalledWith(
       [
@@ -289,5 +316,133 @@ describe('learning-signal adapter (LS-01)', () => {
         until: new Date('2026-10-02T01:00:00Z'),
       })
     ).toEqual(['2026-09-30', '2026-10-01', '2026-10-02']);
+  });
+});
+
+describe('learning-signal adapter personal owner', () => {
+  let stateRoot: string;
+  const rows = [obs('a', hours(1)), obs('a', hours(2)), obs('a', hours(3))];
+
+  beforeEach(() => {
+    enqueueSignal.mockClear();
+    enqueueSignal.mockImplementation((signal: { signalId: string }) => `ops-${signal.signalId}`);
+    persistHints.mockClear();
+    identity.tenantSlug = undefined;
+    owner.scopeNhi = undefined;
+    owner.actor = undefined;
+    owner.alert.mockReset();
+    owner.installed.mockReset();
+    stateRoot = pathResolver.sharedTmp(
+      `learning-signal-owner-test-${process.pid}-${Math.random().toString(36).slice(2)}`
+    );
+  });
+
+  afterEach(() => {
+    if (safeExistsSync(stateRoot)) safeRmSync(stateRoot, { recursive: true, force: true });
+  });
+
+  const harvest = (now: Date, extra: LearningObservation[] = []) =>
+    harvestLearningSignals({ sources: [source(() => [...rows, ...extra])], now, stateRoot });
+  const ready = () =>
+    owner.installed.mockReturnValue({
+      ready: true,
+      ownerId: 'user:owner',
+      agentId: OWNER_AGENT,
+      agentActive: true,
+      scope: { kind: 'person' },
+    });
+
+  it("prefers the producer's own nhi_id over the installed runtime", () => {
+    owner.scopeNhi = 'kyberion://agent/_/_/producer';
+    expect(resolveHarvestOwnerNhi()).toBe('kyberion://agent/_/_/producer');
+    expect(owner.installed).not.toHaveBeenCalled();
+  });
+
+  it('uses the installed runtime only for an active agent of a standalone run', () => {
+    ready();
+    expect(resolveHarvestOwnerNhi()).toBe(OWNER_AGENT);
+    owner.installed.mockReturnValue({ ...owner.installed(), agentActive: false });
+    expect(resolveHarvestOwnerNhi()).toBeUndefined();
+    owner.installed.mockReturnValue({ ready: false, reason: 'operator_identity_required' });
+    expect(resolveHarvestOwnerNhi()).toBeUndefined();
+    ready();
+    owner.actor = { actorId: 'someone' };
+    expect(resolveHarvestOwnerNhi()).toBeUndefined();
+  });
+
+  it('keeps a cluster unsignaled without an owner and proposes it once one exists', () => {
+    owner.installed.mockReturnValue({ ready: false, reason: 'operator_identity_required' });
+    const first = harvest(hours(4));
+    expect(first.signals).toBe(0);
+    expect(first.sources[0].skipped_owner).toBe(1);
+    expect(enqueueSignal).not.toHaveBeenCalled();
+    expect(persistHints).not.toHaveBeenCalled();
+    expect(owner.alert).toHaveBeenCalledTimes(1);
+    expect(owner.alert).toHaveBeenCalledWith(
+      expect.objectContaining({ dedupe_key: 'learning-signal-harvest:personal-owner-missing' })
+    );
+
+    // The next occurrence touches the cluster again; now it has an owner.
+    ready();
+    const second = harvest(hours(5), [obs('a', hours(4.5))]);
+    expect(second.signals).toBe(1);
+    expect(enqueueSignal).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceType: 'runtime_signal' }),
+      {
+        now: hours(5),
+        ownerNhi: OWNER_AGENT,
+      }
+    );
+  });
+
+  it('reports a waiting cluster once across harvests, not on every run', () => {
+    owner.installed.mockReturnValue({ ready: false, reason: 'operator_identity_required' });
+    harvest(hours(4));
+    // Same records again, then a recurrence: still waiting, no new alert.
+    const again = harvest(hours(5));
+    const recurred = harvest(hours(6), [obs('a', hours(5.5))]);
+    expect(recurred.sources[0].skipped_owner).toBe(1);
+    expect(again.signals + recurred.signals).toBe(0);
+    expect(owner.alert).toHaveBeenCalledTimes(1);
+    expect(enqueueSignal).not.toHaveBeenCalled();
+  });
+
+  it('proposes a waiting cluster once an owner exists, even without a recurrence', () => {
+    owner.installed.mockReturnValue({ ready: false, reason: 'operator_identity_required' });
+    harvest(hours(4));
+    expect(enqueueSignal).not.toHaveBeenCalled();
+
+    ready();
+    const later = harvest(hours(8));
+    expect(later.signals).toBe(1);
+    expect(enqueueSignal).toHaveBeenCalledTimes(1);
+    expect(enqueueSignal).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceType: 'runtime_signal' }),
+      {
+        now: hours(8),
+        ownerNhi: OWNER_AGENT,
+      }
+    );
+    // Signaled: the next harvest neither re-proposes nor alerts.
+    const after = harvest(hours(9));
+    expect(after.signals).toBe(0);
+    expect(enqueueSignal).toHaveBeenCalledTimes(1);
+    expect(owner.alert).toHaveBeenCalledTimes(1);
+  });
+
+  it('never needs a personal owner for a tenant cluster', () => {
+    identity.tenantSlug = 'acme';
+    const tenantRows = rows.map((row) => ({ ...row, tenantSlug: 'acme' }));
+    const report = harvestLearningSignals({
+      sources: [source(() => tenantRows)],
+      now: hours(4),
+      stateRoot,
+    });
+    expect(report.signals).toBe(1);
+    expect(owner.installed).not.toHaveBeenCalled();
+    expect(enqueueSignal).toHaveBeenCalledWith(
+      expect.objectContaining({ tier: 'confidential', tenantSlug: 'acme' }),
+      { now: hours(4) }
+    );
   });
 });

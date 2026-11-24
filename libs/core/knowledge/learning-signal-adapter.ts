@@ -6,6 +6,14 @@ import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReaddir, safeStat } from '../secure-io.js';
 import { readJsonIfPresent, readJsonLines, writeJson } from '../foundation/json.js';
 import { resolveIdentityContext } from '../authority.js';
+import { currentActor } from '../authn/actor-context.js';
+import { sendOpsAlert } from '../daemon/ops-alert.js';
+import { currentExecutionScope } from '../foundation/execution-scope.js';
+import { currentResourceAccessScope } from '../foundation/resource-access-scope.js';
+import { hasDelegatedExecutionContext } from '../governance/delegated-execution.js';
+import { inspectInstalledPersonalRuntime } from '../organization/personal-runtime-identity.js';
+import { resolveScopeResolution } from '../scope-context.js';
+import { currentScopeEnvelope } from '../scope-envelope.js';
 import { storagePartitionSegments, type StoragePartition } from '../storage-layout.js';
 import { enqueueOperationalLearningSignal } from './operational-learning.js';
 import { persistHints } from './feedback-loop.js';
@@ -92,6 +100,13 @@ interface ClusterState {
   last_seen: string;
   refs: string[];
   signaled_at?: string;
+  /**
+   * Set when a tenant-free cluster crossed its threshold but no personal owner
+   * could be resolved. The drop is reported once (when this is first set), and
+   * a later harvest that can name an owner proposes the cluster even if it
+   * did not recur.
+   */
+  owner_pending_at?: string;
 }
 
 /**
@@ -137,6 +152,8 @@ export interface LearningSourceReport {
   signal_ids: string[];
   hints: number;
   skipped_scope: number;
+  /** Tenant-free clusters left unproposed because no personal owner could be resolved. */
+  skipped_owner: number;
   error?: string;
 }
 
@@ -248,6 +265,32 @@ interface ScopeRun {
 }
 
 /**
+ * Owner of the personal candidates a tenant-free harvest proposes: the
+ * producer's own nhi_id when its scope names one, otherwise — only for a
+ * standalone run (no delegated, scoped or actor context) — the installed
+ * personal runtime's active agent, verified against the registered owner.
+ * Undefined when neither holds; such clusters wait for a harvest that can
+ * name an owner. "Standalone" is process-level: a child process spawned by a
+ * surface (e.g. a console-triggered baseline) carries no caller context, so
+ * its tenant-free candidates go to the machine's installed owner. That only
+ * ever writes into the personal tier, never to a lower one.
+ */
+export function resolveHarvestOwnerNhi(): string | undefined {
+  const own = resolveScopeResolution().scope.nhi_id?.trim();
+  if (own) return own;
+  if (
+    currentActor() ||
+    currentScopeEnvelope() ||
+    currentExecutionScope() ||
+    currentResourceAccessScope() ||
+    hasDelegatedExecutionContext()
+  )
+    return undefined;
+  const installed = inspectInstalledPersonalRuntime();
+  return installed.ready && installed.agentActive ? installed.agentId : undefined;
+}
+
+/**
  * Read every source, update the per-scope cluster state, and propose the
  * clusters that crossed their recurrence threshold. A failing source is
  * reported and skipped; it never blocks the others and keeps its cursors.
@@ -268,6 +311,14 @@ export function harvestLearningSignals(
   });
   const scopeByTenant = new Map(scopes.map((scope) => [scope.tenantSlug, scope]));
   const reports: LearningSourceReport[] = [];
+  // Resolved on the first tenant-free proposal; null = not resolved yet.
+  let personalOwner: string | undefined | null = null;
+  const ownerNhi = (): string | undefined => {
+    if (personalOwner === null) personalOwner = resolveHarvestOwnerNhi();
+    return personalOwner;
+  };
+  // Clusters skipped for a missing owner for the first time in this harvest.
+  let newlyOwnerPending = 0;
 
   for (const source of options.sources) {
     const cursorMs = (scope: ScopeRun): number => {
@@ -285,6 +336,7 @@ export function harvestLearningSignals(
       signal_ids: [],
       hints: 0,
       skipped_scope: 0,
+      skipped_owner: 0,
     };
     reports.push(report);
 
@@ -355,8 +407,22 @@ export function harvestLearningSignals(
     }
     report.clusters = touched.size;
 
+    // Clusters still waiting for a personal owner are re-evaluated even when
+    // they did not recur, but only once this harvest can name the owner.
+    const candidates = [...touched.values()];
+    const pending: typeof candidates = [];
+    for (const scope of scopes) {
+      if (scope.tenantSlug) continue;
+      for (const [id, entry] of scope.state.clusters) {
+        if (entry.source !== source.id || !entry.owner_pending_at) continue;
+        if (touched.has(`${scope.tenantSlug}|${id}`)) continue;
+        pending.push({ scope, id, newCount: 0 });
+      }
+    }
+    if (pending.length > 0 && !options.dryRun && ownerNhi()) candidates.push(...pending);
+
     const hints: KnowledgeHint[] = [];
-    for (const { scope, id, newCount } of touched.values()) {
+    for (const { scope, id, newCount } of candidates) {
       const entry = scope.state.clusters.get(id);
       if (!entry) continue;
       if (!shouldProposeCluster(entry.total, entry.signaled_total, source.minOccurrences)) continue;
@@ -374,6 +440,18 @@ export function harvestLearningSignals(
       };
       report.proposed.push(cluster);
       if (options.dryRun) continue;
+      // A tenant-free cluster lands in the owner's personal learning queue. With
+      // no resolvable owner it stays unsignaled — its next occurrence proposes
+      // it under a harvest that has one — instead of failing the enqueue on
+      // every run.
+      if (!tenantSlug && !ownerNhi()) {
+        report.skipped_owner += 1;
+        if (!entry.owner_pending_at) {
+          entry.owner_pending_at = now.toISOString();
+          newlyOwnerPending += 1;
+        }
+        continue;
+      }
 
       const signalId = enqueueOperationalLearningSignal(
         {
@@ -396,12 +474,13 @@ export function harvestLearningSignals(
             last_seen: cluster.last_seen,
           },
         },
-        { now }
+        { now, ...(!tenantSlug && personalOwner ? { ownerNhi: personalOwner } : {}) }
       );
       if (!signalId) continue;
       report.signal_ids.push(signalId);
       entry.signaled_total = entry.total;
       entry.signaled_at = now.toISOString();
+      delete entry.owner_pending_at;
 
       if (source.hintCategory && !tenantSlug) {
         hints.push({
@@ -439,6 +518,30 @@ export function harvestLearningSignals(
       for (const [ref, lastReported] of seen) {
         if (lastReported !== reportedAt) seen.delete(ref);
       }
+    }
+  }
+
+  const skippedOwner = reports.reduce((sum, r) => sum + r.skipped_owner, 0);
+  if (skippedOwner > 0) {
+    logger.debug(
+      `[learning-signal-adapter] ${skippedOwner} cluster(s) waiting for a personal owner (${newlyOwnerPending} new)`
+    );
+  }
+  if (newlyOwnerPending > 0) {
+    try {
+      // Only when a cluster newly starts waiting — not on every harvest that
+      // finds it still waiting; it is proposed once a harvest names the owner.
+      sendOpsAlert({
+        severity: 'warning',
+        title: 'Learning signals waiting for a personal owner',
+        context: { clusters: newlyOwnerPending, waiting_total: skippedOwner },
+        recommendation:
+          'Complete identity onboarding (pnpm onboarding check --json) so the installed personal agent is active; standalone harvests (baseline, chronos) then queue these candidates under it.',
+        dedupe_key: 'learning-signal-harvest:personal-owner-missing',
+        category: 'learning',
+      });
+    } catch {
+      // observability only
     }
   }
 

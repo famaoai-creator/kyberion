@@ -65,7 +65,7 @@ interface LearningScope {
  */
 function resolveLearningScope(
   signal: Pick<OperationalLearningSignal, 'signalId' | 'tier' | 'tenantSlug' | 'organizationId'>,
-  options: { rootDir?: string }
+  options: { rootDir?: string; ownerNhi?: string }
 ): LearningScope | null {
   const tier = signal.tier || 'personal';
   const profile = loadOrganizationProfile(options.rootDir);
@@ -108,8 +108,13 @@ function resolveLearningScope(
     return null;
   }
   // Personal-tier candidates are partitioned by owner_nhi; the producer's
-  // resolved nhi_id is the only honest owner — never invent or default one.
-  const ownerNhi = tier === 'personal' ? resolvedScope.nhi_id?.trim() || undefined : undefined;
+  // resolved nhi_id is the honest owner — never invent or default one. A
+  // producer that runs with no nhi_id of its own (a standalone harvest) may
+  // name the owner it verified against the installed runtime.
+  const ownerNhi =
+    tier === 'personal'
+      ? resolvedScope.nhi_id?.trim() || options.ownerNhi?.trim() || undefined
+      : undefined;
   return {
     tier,
     ...(tenantSlug ? { tenantSlug } : {}),
@@ -146,7 +151,12 @@ function candidateInput(
  */
 export function enqueueOperationalLearningSignal(
   signal: OperationalLearningSignal,
-  options: { now?: Date; rootDir?: string } = {}
+  options: {
+    now?: Date;
+    rootDir?: string;
+    /** Owner of a personal candidate when the producer's scope names no nhi_id. */
+    ownerNhi?: string;
+  } = {}
 ): string | null {
   const scope = resolveLearningScope(signal, options);
   if (!scope) return null;
