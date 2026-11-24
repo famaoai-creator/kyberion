@@ -30,6 +30,7 @@ import {
   runExternalOperation,
   withOperationArgumentOrigins,
 } from '@agent/core/governance/external-operation';
+import { isDelegableExternalOperation } from '@agent/core/governance/external-operation-target';
 import { computeApprovalPayloadHash } from '@agent/core/governance/approval-presentation';
 import { ScriptExitError, type ScriptErrorDetails } from '../lib/harness.js';
 
@@ -192,7 +193,7 @@ async function fetchUrlBytes(url: string): Promise<Buffer> {
           operationId: 'network:fetch_read',
           effect: { params: { url, method: 'GET' } },
           requiresApproval: false,
-          delegable: false,
+          delegable: isDelegableExternalOperation('network:fetch_read'),
           observationOnly: true,
         },
         () => secureFetch<ArrayBuffer>(request),
