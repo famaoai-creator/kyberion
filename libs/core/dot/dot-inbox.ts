@@ -1,6 +1,9 @@
 import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import { type EventScopeInput } from '../event/event-scope.js';
 import { assertScopeContext } from '../foundation/scope-context-validation.js';
+import { probeSpecId } from '../pipeline/state-probe.js';
+import { dotAdmissionScopeHash } from './dot-admission-identity.js';
+import { alertProbes } from './dot-signal-scope.js';
 import { dotStatePath } from './dot-state-paths.js';
 /**
  * dot-inbox producer — the write side of the durable wake lane.
@@ -159,6 +162,59 @@ export interface DotInboxAppendDeps {
 export interface AppendedDotInboxEntry extends DotInboxEntryInput {
   channel: DotWakeChannel;
   enqueued_at: string;
+}
+
+/** Bind an explicit operator intent to the current Dot and declared probe. */
+export function dotPreparationIntentPayload(charter: DotCharter, signal: string, channel: string) {
+  if (
+    !charter.notification.signal_alerts?.directed_intent ||
+    charter.notification.signal_alerts.mode !== 'prepare' ||
+    !charter.attention.triggers.some(
+      (trigger) =>
+        trigger.kind === 'wake' && trigger.channels.some((candidate) => candidate === channel)
+    )
+  )
+    return undefined;
+  const declared = charter.goal.signal_probes?.find((entry) => entry.signal === signal);
+  if (!declared) return undefined;
+  const probeId = probeSpecId(declared.probe);
+  if (!alertProbes(charter).has(JSON.stringify([signal, probeId]))) return undefined;
+  return {
+    prepare_signal: signal,
+    prepare_probe_id: probeId,
+    prepare_scope_hash: dotAdmissionScopeHash(charter),
+  };
+}
+
+/** Return the newest fresh, explicitly addressed preparation intent. */
+export function latestDotPreparationIntent(
+  charter: DotCharter,
+  rootDir: string | undefined,
+  now: Date,
+  maxAgeMs: number
+): { signal: string; at: string } | undefined {
+  const file = path.join(rootDir ?? pathResolver.rootDir(), dotInboxPath(charter.scope));
+  if (!safeExistsSync(file)) return undefined;
+  const row = findDotInboxReceipt(file, (item) => {
+    const signal = item.payload?.prepare_signal;
+    const age = now.getTime() - Date.parse(item.enqueued_at);
+    if (
+      item.source !== 'cli' ||
+      item.dot_id !== charter.dot_id ||
+      typeof signal !== 'string' ||
+      age < 0 ||
+      !(age < maxAgeMs)
+    )
+      return false;
+    const binding = dotPreparationIntentPayload(charter, signal, item.channel);
+    return Boolean(
+      binding &&
+      item.payload?.prepare_probe_id === binding.prepare_probe_id &&
+      item.payload?.prepare_scope_hash === binding.prepare_scope_hash &&
+      dotInboxRowWakesCharter(item, charter)
+    );
+  });
+  return row ? { signal: String(row.payload?.prepare_signal), at: row.enqueued_at } : undefined;
 }
 
 /**

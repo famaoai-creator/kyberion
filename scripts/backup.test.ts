@@ -1345,6 +1345,15 @@ describe('backup file selection', () => {
     expect(exclusions.excludedRoots).toContain('active/shared/cache');
   });
 
+  it('includes the saved voice priority rule in a full backup', () => {
+    const entry = 'active/shared/runtime/seam-selection/rules.json';
+    safeWriteFile(`${root}/${entry}`, '{"version":"1.0.0","rules":[]}');
+    const entries = ['active', 'vault', 'knowledge/personal', 'knowledge/confidential'];
+    const exclusions = resolveBackupExclusions({ rootDir: root, entries, retentionEntries });
+    const selection = selectBackupFiles({ rootDir: root, entries, exclusions });
+    expect(selection.paths).toContain(entry);
+  });
+
   it('archives durable state only: no sockets, links, caches, scratch or earlier archives', async () => {
     const keep = [
       'active/missions/public/MSN-A/evidence.md',

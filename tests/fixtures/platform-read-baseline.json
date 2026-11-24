@@ -55,7 +55,6 @@
     "libs/shared-media/src/windows-native-image-generation-bridge.ts",
     "libs/shared-video/src/ingest/video-brief.ts",
     "libs/shared-video/src/v4l2-virtual-camera-output.ts",
-    "libs/shared-voice/src/native-tts.ts",
     "libs/shared-voice/src/realtime-voice-conversation.ts",
     "libs/shared-voice/src/voice-sample-recorder.ts",
     "libs/shared-voice/src/voice-selection-preferences.ts",

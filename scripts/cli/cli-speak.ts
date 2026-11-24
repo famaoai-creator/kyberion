@@ -40,6 +40,7 @@ import {
   safeReadFile,
   safeStat,
 } from '@agent/core/secure-io';
+import { runAudibleSpeak } from './cli-speak-authority.js';
 import { ScriptExitError } from '../lib/harness.js';
 import {
   assertExtension,
@@ -73,6 +74,7 @@ Speaks text with the local text-to-speech engine (governed engine selection, loc
   --device <name> Exact CoreAudio output device name; auto-selected only when one is available
   --lang <tag>    Language, e.g. ja, en (detected from the text when omitted)
   --rate <n>      Speaking rate in words per minute for playback
+  --invocation-id <uuid>  Resume the exact audible request after human approval
   --json          Print {backend, voice, language, out, bytes, warnings} as JSON
   --verbose       Keep runtime logs (off by default)
 
@@ -117,6 +119,7 @@ interface SpeakArgs extends CommonArgs {
   voice?: string;
   engine?: string;
   rate?: number;
+  invocationId?: string;
 }
 
 export interface SpeakResult {
@@ -160,6 +163,12 @@ function parseSpeakArgs(argv: string[]): SpeakArgs {
       args.stream = true;
     } else if (value === '--device') {
       args.device = takeValue(index, 'an exact CoreAudio output device name');
+      index += 1;
+    } else if (value === '--invocation-id') {
+      const raw = takeValue(index, 'an invocation UUID');
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw))
+        throw new ScriptExitError(1, '[speak] --invocation-id requires a UUID');
+      args.invocationId = raw.toLowerCase();
       index += 1;
     } else if (value === '--rate') {
       const raw = takeValue(index, 'a number (words per minute)');
@@ -418,6 +427,8 @@ export async function runSpeakCommand(
     print(SPEAK_USAGE);
     return undefined;
   }
+  if (args.invocationId && (args.stream || args.out))
+    throw new ScriptExitError(1, '[speak] --invocation-id is for direct audible playback');
   if (args.stream) {
     if (args.out || args.file || args.words.length || args.voice || args.rate !== undefined) {
       throw new ScriptExitError(
@@ -561,7 +572,11 @@ export async function runSpeakCommand(
   const text = resolveSpeakText(args);
   const result = target
     ? await speakToFile(deps, text, args, target)
-    : await speakAloud(deps, text, args);
+    : await runAudibleSpeak(
+        args.invocationId ?? randomUUID(),
+        { text, voice: args.voice, language: args.lang, engine: args.engine, rate: args.rate },
+        () => speakAloud(deps, text, args)
+      );
   print(renderSpeakResult(result, { json: args.json }));
   return result;
 }

@@ -10,6 +10,11 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core';
+import {
+  ExternalOperationApprovalRequired,
+  hasExplicitExternalApprovalRequest,
+  hasExternalOperationAuthority,
+} from '@agent/core/governance/external-operation';
 import { MAX_SPEAK_CHARS, runSpeakCommand, SPEAK_USAGE, type SpeakDeps } from './cli-speak.js';
 import type { MediaTool } from '../lib/perception/perception.js';
 
@@ -82,6 +87,28 @@ function createFakeSpeakDeps(
 describe('pnpm kyberion speak', () => {
   let workDir = '';
   const saved: Partial<Record<(typeof SCOPE_ENV_KEYS)[number], string | undefined>> = {};
+
+  it('opens an exact audible approval path and prints the invocation needed to resume', async () => {
+    const id = randomUUID();
+    const deps = createFakeSpeakDeps();
+    deps.voice = async () => {
+      expect(hasExternalOperationAuthority()).toBe(true);
+      expect(hasExplicitExternalApprovalRequest('voice:speak')).toBe(true);
+      expect(hasExplicitExternalApprovalRequest('voice:playback')).toBe(true);
+      expect(hasExplicitExternalApprovalRequest('voice:record_sample')).toBe(false);
+      throw new ExternalOperationApprovalRequired({
+        allowed: false,
+        status: 'pending',
+        requestId: 'apr-test',
+        message: 'Human approval required',
+      });
+    };
+    const print = vi.fn();
+    const result = runSpeakCommand(['hello', '--invocation-id', id], print, deps);
+    await expect(result).rejects.toThrow('approval: apr-test');
+    await expect(result).rejects.toThrow(`--invocation-id ${id}`);
+    expect(print).not.toHaveBeenCalled();
+  });
 
   beforeAll(() => {
     workDir = pathResolver.sharedTmp(`cli-speak-${randomUUID()}`);

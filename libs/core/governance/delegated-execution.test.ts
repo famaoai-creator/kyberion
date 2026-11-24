@@ -127,6 +127,28 @@ describe('operation-bound delegated execution', () => {
     );
     expect(effect).not.toHaveBeenCalled();
   });
+  it('exposes the difference between inspecting a permit and winning an execution claim', async () => {
+    const request = target();
+    const granted = authorizeDelegatedExecution(request, options());
+    expect(granted.allowed).toBe(true);
+    mocks.humanClaims = [
+      {
+        scope: { tenant_slug: scope.tenant_slug },
+        requestedByContext: { executionIdentity: delegatedExecutionIdentity(request) },
+        applyClaim: { claimId: 'human-winner' },
+      },
+    ];
+
+    expect(verifyDelegatedExecution({ ...request, permitId: granted.permitId! }, options())).toBe(
+      true
+    );
+    const effect = vi.fn(async () => 'executed');
+    await expect(runDelegatedExecution(request, effect, options())).rejects.toThrow(
+      'HUMAN_EXECUTION_RECONCILIATION_REQUIRED'
+    );
+    expect(effect).not.toHaveBeenCalled();
+  });
+
   it('rechecks a human winner after issuance before publishing the charter execution claim', async () => {
     const effect = vi.fn(async () => 'executed');
     let scans = 0;

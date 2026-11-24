@@ -16,6 +16,7 @@ import type { ConciergeLocale } from '../../../lib/i18n';
 import type { Setup, VoiceSelection } from '../../../lib/settings-types';
 import type { VoiceInputDevice } from '../../../lib/voice-types';
 import { FormScope, asText, type SettingsTranslate } from './form-scope';
+import { VoicePriorityEditor } from './VoicePriorityEditor';
 import { AvatarGenerationPanel } from './AvatarGenerationPanel';
 import { SettingsSaveFeedback, type SettingsSaveFeedbackState } from './SettingsSaveFeedback';
 
@@ -53,7 +54,10 @@ export type VoiceSectionProps = {
   voiceSelection: VoiceSelection | null;
   voiceDevices: VoiceInputDevice[];
   voiceSelectionBusy: boolean;
-  onSaveVoiceSelection: (field: 'tts_engine_id' | 'stt_backend', value: string) => void;
+  onSaveVoiceSelection: (
+    field: 'tts_engine_id' | 'stt_backend' | 'tts_priority',
+    value: string | string[]
+  ) => void;
   sectionRef: (element: HTMLElement | null) => void;
 };
 
@@ -247,6 +251,15 @@ export function VoiceSection({
                     }))}
                   />
                 </SettingRow>
+                {voiceSelection.tts_priority ? (
+                  <VoicePriorityEditor
+                    key={JSON.stringify(voiceSelection.tts_priority.order)}
+                    priority={voiceSelection.tts_priority}
+                    busy={voiceSelectionBusy}
+                    t={t}
+                    save={(order) => onSaveVoiceSelection('tts_priority', order)}
+                  />
+                ) : null}
               </>
             ) : (
               <div className="settings-row-block">

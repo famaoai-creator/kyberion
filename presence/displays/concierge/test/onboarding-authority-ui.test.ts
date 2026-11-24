@@ -105,6 +105,52 @@ async function mount(respond: (body?: Record<string, unknown>, url?: string) => 
   return { container, posts, click, change, check };
 }
 describe('onboarding authority review and resumption', () => {
+  it('creates portable playback delegation and revokes a legacy platform-bound grant', async () => {
+    const playback = { operation_id: 'voice:playback', platform: 'darwin', format: '.aiff' };
+    const m = await mount(async (body) =>
+      body
+        ? json({ ok: true, statement: 'Reviewed voice', digest: 'digest', base_hash: 'base' })
+        : json({
+            ...receipt(),
+            delegable_operations: [
+              {
+                operation_id: 'voice:playback',
+                fields: [],
+                optional_fields: ['platform', 'format', 'content_hash'],
+                required_one_of: [],
+              },
+            ],
+            charter: {
+              id: 'fixture',
+              expires_at: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+              grants: [playback],
+              delegated_decisions: {},
+              stopped: false,
+            },
+          })
+    );
+    await m.change('select[name="authority.operation"]', 'voice:playback');
+    expect(m.container.querySelector('input[name="authority.target"]')).toBeNull();
+    expect(m.container.querySelector('input[name="authority.grant.platform"]')).toBeNull();
+    await m.check('Pick a date', true);
+    await m.change('input[name="authority.expiry_custom"]', '2099-10-21T12:00');
+    await m.click('Preview exact authority');
+    expect(m.posts[0]).toMatchObject({
+      mode: 'grant',
+      grants: [{ operation_id: 'voice:playback' }],
+    });
+    expect(m.container.querySelector('input[name="authority.grant.format"]')).toBeNull();
+    await m.change('select[name="authority.grant.format"]', '.opus');
+    await m.click('Preview exact authority');
+    expect(m.posts[1]).toMatchObject({
+      mode: 'grant',
+      grants: [{ operation_id: 'voice:playback', format: '.opus' }],
+    });
+    await m.click('Review revocation');
+    await m.click('Preview exact authority');
+    expect(m.posts[2]).toMatchObject({ mode: 'revoke', grants: [playback] });
+  });
+
   it('reviews one private development bundle and personal tiers without granting base pushes', async () => {
     const m = await mount(async (body) =>
       !body

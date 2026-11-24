@@ -63,8 +63,13 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { migrateLegacyDotState } from '@agent/core/dot/dot-state-paths';
 import { migrateLegacyDotActions, observeDotActions } from '@agent/core/dot/dot-action-ledger';
 import { dotTokensUsedToday, readScopedDotWakeLedger } from '@agent/core/dot/dot-runtime';
-import { appendDotInboxEntry } from '@agent/core/dot/dot-inbox';
-import { dotDelegationCapacity } from '@agent/core/dot/dot-dispatch';
+import { appendDotInboxEntry, dotPreparationIntentPayload } from '@agent/core/dot/dot-inbox';
+import { resolveCliApprovalRequester } from '@agent/core/governance/cli-operator-principal';
+import {
+  dotDelegationCapacity,
+  readDotSignalTriage,
+  requestDotSignalRoutingReview,
+} from '@agent/core/dot/dot-dispatch';
 import { dotFeedbackPromptLines, latestDotSignals } from '@agent/core/dot/dot-feedback';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
@@ -290,6 +295,7 @@ async function reportWake(argv: string[]) {
  */
 function reportInbox(argv: string[]) {
   const [action, ...rest] = argv;
+  if (action === 'request-digest') return reportProactive(rest);
   if (action !== 'append') {
     throw new Error(
       'usage: pnpm kyberion dot inbox append --channel <ch> [--dot-id <id>] [--text <s>]'
@@ -308,14 +314,33 @@ function reportInbox(argv: string[]) {
   const target = dotId ? findDot(dotId).charter : undefined;
   if (!target && !rest.includes('--public-broadcast'))
     throw new Error('[DOT_INBOX_SCOPE] specify --dot-id or explicit --public-broadcast');
+  const signal = flag('prepare-signal');
+  const intent =
+    signal && target ? dotPreparationIntentPayload(target, signal, channel) : undefined;
+  if (signal && !intent)
+    throw new Error(
+      '[DOT_PREPARATION] select an opted-in Dot, a declared file signal and a declared wake channel'
+    );
   const entry = appendDotInboxEntry({
     channel,
     scope: target?.scope ?? { tier: 'public' },
     ...(dotId ? { dot_id: dotId } : {}),
     ...(flag('text') ? { text: flag('text') } : {}),
+    ...(intent ? { payload: intent } : {}),
     source: 'cli',
   });
   return { ok: true, appended: entry };
+}
+
+function reportProactive(argv: string[]) {
+  const [dotId, signal, ...feedback] = argv;
+  if (!dotId || !signal || !feedback.length)
+    throw new Error('usage: pnpm kyberion dot inbox request-digest <dot-id> <signal> <reason>');
+  const charter = findDot(dotId).charter;
+  const requester = resolveCliApprovalRequester({ legacy: 'dot-signal-operator' });
+  if (requester.source !== 'operator')
+    throw new Error('[DOT_SIGNAL_LEARNING] feedback requires an identified local operator');
+  return requestDotSignalRoutingReview(charter, signal, feedback.join(' '), requester);
 }
 
 /** Run a read under the charter's own role and tenant so tenant-scoped state is readable. */
@@ -411,6 +436,9 @@ function reportStatus(argv: string[]) {
           healthy: latest?.healthy ?? null,
           measured_at: latest?.measured_at ?? null,
         })),
+        ...(entry.charter.notification.signal_alerts?.mode
+          ? { signal_triage: asCharter(entry.charter, () => readDotSignalTriage(entry.charter)) }
+          : {}),
         recent_feedback: dotFeedbackPromptLines(entry.charter.dot_id),
         sections: collectStatusSections(entry.charter),
       };

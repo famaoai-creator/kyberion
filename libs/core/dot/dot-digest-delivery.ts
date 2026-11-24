@@ -5,8 +5,11 @@ import { appendJsonLine } from '../foundation/json.js';
 import { streamJsonLines } from '../storage/jsonl-read.js';
 import { safeMkdir } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
+import { recoveryEvidenceHash } from '../surface/front-desk-recovery-receipt.js';
+import { isOperationsHalted } from '../governance/operations-halt.js';
 import { matchesCron } from '../pipeline/cron-utils.js';
 import type { OperatorNotificationReceipt } from '../surface/operator-notifications.js';
+import { hasRatifiedDigestPreference } from './dot-signal-learning.js';
 import type { DotCharter } from './dot-charter.js';
 import { dotAdmissionScopeHash, withDotAdmissionLock } from './dot-admission-identity.js';
 
@@ -26,14 +29,39 @@ interface DigestRow {
   attempts?: number;
   next_attempt_at?: string;
   text?: string;
+  notification_hash?: string;
+  signal_episode_ids?: string[];
   reason?: string;
 }
 export interface DigestDeliveryDeps {
   rootDir?: string;
   now?: () => Date;
+  authorize?: () => boolean;
   compose: (since: Date | undefined) => string;
+  deferredSignals?: (now: Date) => Array<{ id: string; text: string }>;
   notify: (text: string, key: string) => OperatorNotificationReceipt;
 }
+export function dotDigestPolicyHash(charter: DotCharter): string {
+  const preference = charter.notification.signal_alerts?.ratified_digest;
+  return recoveryEvidenceHash([
+    charter.notification,
+    preference ? hasRatifiedDigestPreference(charter, preference.signal) : null,
+    charter.authority.authority_role,
+    charter.runtime?.execution_mode ?? null,
+    charter.goal?.signal_probes ?? [],
+  ]);
+}
+
+export function canResumeDotDigest(charter: DotCharter, rereadCharter: () => DotCharter): boolean {
+  if (isOperationsHalted()) return false;
+  const current = rereadCharter();
+  return (
+    current.status === 'active' &&
+    dotAdmissionScopeHash(current) === dotAdmissionScopeHash(charter) &&
+    dotDigestPolicyHash(current) === dotDigestPolicyHash(charter)
+  );
+}
+
 export function sendDueDotDigest(
   charter: DotCharter,
   timezone: string | undefined,
@@ -42,7 +70,9 @@ export function sendDueDotDigest(
   const cron = charter.notification.digest_cron;
   if (!cron) return false;
   return withDotAdmissionLock(charter, deps.rootDir, () => {
+    if (deps.authorize && !deps.authorize()) return false;
     const now = deps.now?.() ?? new Date();
+    const notificationHash = dotDigestPolicyHash(charter);
     const scope = dotAdmissionScopeHash(charter);
     const file = path.join(
       deps.rootDir ?? pathResolver.rootDir(),
@@ -56,8 +86,12 @@ export function sendDueDotDigest(
     const receiptMinutes = new Set<number>();
     /** Newest content time over delivered / accepted rows. */
     let lastDelivered: Date | undefined;
+    const admittedSignals = new Set<string>();
     const observe = (row: DigestRow): void => {
       latest.set(row.key, row);
+      if (Array.isArray(row.signal_episode_ids))
+        for (const id of row.signal_episode_ids)
+          if (typeof id === 'string') admittedSignals.add(id);
       if (!row.status) receiptMinutes.add(Math.floor(Date.parse(row.sent_at) / 60000));
       if (row.delivered || row.status === 'accepted') {
         const at = new Date(row.content_at ?? row.scheduled_at ?? row.sent_at);
@@ -117,6 +151,12 @@ export function sendDueDotDigest(
       // Legacy receipts use wall-clock cron keys: avoid re-sending their already observed minute.
       if (receiptMinutes.has(Math.floor(scheduled.getTime() / 60000))) return false;
       const last = lastDelivered;
+      const signals =
+        deps.deferredSignals?.(now).filter((entry) => !admittedSignals.has(entry.id)) ?? [];
+      const text = deps.compose(last);
+      const summary = signals.length
+        ? [text, 'Deferred signal alerts:', ...signals.map((entry) => entry.text)].join('\n')
+        : text;
       pending = append({
         dot_id: charter.dot_id,
         scope_hash: scope,
@@ -127,8 +167,22 @@ export function sendDueDotDigest(
         status: 'pending',
         attempts: 0,
         delivered: false,
-        text: deps.compose(last),
+        text: summary,
+        ...(signals.length ? { signal_episode_ids: signals.map((entry) => entry.id) } : {}),
+        notification_hash: notificationHash,
       });
+    }
+    if (pending.notification_hash && pending.notification_hash !== notificationHash) {
+      append({ ...pending, status: 'suppressed', reason: 'notification_configuration_changed' });
+      return false;
+    }
+    if (pending.attempts && pending.signal_episode_ids?.length) {
+      const eligible = new Set(deps.deferredSignals?.(now).map((entry) => entry.id) ?? []);
+      if (pending.signal_episode_ids.some((id) => !eligible.has(id))) {
+        // The snapshot and idempotency key are immutable once delivery was attempted.
+        append({ ...pending, status: 'suppressed', reason: 'signal_evidence_no_longer_current' });
+        return false;
+      }
     }
     const attempts = (pending.attempts ?? 0) + 1;
     const attempt = append({

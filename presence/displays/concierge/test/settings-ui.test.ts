@@ -30,6 +30,7 @@ import {
   toUploadFile,
 } from '../src/app/settings/settings-api';
 import { IntroduceSecretPanel } from '../src/app/settings/sections/IntroduceSecretPanel';
+import { VoicePriorityEditor } from '../src/app/settings/sections/VoicePriorityEditor';
 import { VoiceSection, VOICE_SAMPLE_ACCEPT } from '../src/app/settings/sections/VoiceSection';
 import { AvatarGenerationPanel } from '../src/app/settings/sections/AvatarGenerationPanel';
 import { SettingsReadiness } from '../src/app/settings/settings-readiness';
@@ -404,6 +405,37 @@ describe('settings interaction', () => {
     expect(serializeFake(m.container)).not.toContain(SECRET);
     // The input is open again for a retry.
     expect(prop(m.q('input.kb-secret-field__input'), 'disabled')).toBeFalsy();
+    m.unmount();
+  });
+
+  it('reorders known playback engines and submits their IDs in the chosen order', () => {
+    const save = vi.fn();
+    const m = mount(
+      createElement(VoicePriorityEditor, {
+        t,
+        busy: false,
+        save,
+        priority: {
+          order: ['first', 'second'],
+          options: [
+            { engine_id: 'first', display_name: 'First engine' },
+            { engine_id: 'second', display_name: 'Second engine' },
+            { engine_id: 'third', display_name: 'Third engine' },
+          ],
+        },
+      })
+    );
+    const click = (label: string, index = 0) => {
+      const buttons = [...m.container.querySelectorAll('button')].filter(
+        (node) => node.textContent === label
+      );
+      expect(buttons[index]).toBeDefined();
+      act(() => fireEvent(buttons[index]!, 'click'));
+    };
+    expect(m.q('select[name="voice.priority_add"]').localName).toBe('select');
+    click('Move down');
+    click('Save priority');
+    expect(save).toHaveBeenCalledWith(['second', 'first']);
     m.unmount();
   });
 

@@ -21,15 +21,20 @@ import {
   TextField,
 } from '@agent/shared-ui';
 
-type Grant =
-  | { operation_id: 'vcs:pr_create'; repository: string; visibility?: 'private' }
-  | {
-      operation_id: 'vcs:pr_merge' | 'vcs:push';
-      repository: string;
-      branch: string;
-      visibility?: 'private';
-    }
-  | { operation_id: 'browser:goto' | 'browser:open_tab'; origin: string };
+type Grant = { operation_id: string } & Record<string, string>;
+type GrantSpec = {
+  operation_id: string;
+  fields: string[];
+  optional_fields: string[];
+  required_one_of: string[];
+};
+const grantChoices: Record<string, Record<string, readonly string[]>> = {
+  'tenant:attest_provider': { training_use: ['none'] },
+  'voice:playback': {
+    format: ['.wav', '.aiff', '.aif', '.mp3', '.ogg', '.m4a', '.flac', '.aac', '.opus'],
+  },
+  'network:fetch': { method: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] },
+};
 type Pending = {
   request_id: string;
   status: string;
@@ -50,6 +55,7 @@ type Overview = {
     stopped: boolean;
     data_tier?: { read: string[]; write: string[] };
   };
+  delegable_operations?: GrantSpec[];
   delegable_decisions: { decision_type: string; label: Record<string, string> }[];
   pending_requests: Pending[];
   runtime: { ready: boolean; agent_id?: string; reason?: string };
@@ -71,13 +77,15 @@ const validDataTiers = (value: unknown): value is { read: string[]; write: strin
   );
 const validGrant = (value: unknown): value is Grant =>
   record(value) &&
-  (value.visibility === undefined || value.visibility === 'private') &&
-  (value.operation_id === 'vcs:pr_create'
-    ? typeof value.repository === 'string'
-    : ['vcs:pr_merge', 'vcs:push'].includes(String(value.operation_id))
-      ? typeof value.repository === 'string' && typeof value.branch === 'string'
-      : ['browser:goto', 'browser:open_tab'].includes(String(value.operation_id)) &&
-        typeof value.origin === 'string');
+  typeof value.operation_id === 'string' &&
+  Object.values(value).every((field) => typeof field === 'string');
+const validGrantSpec = (value: unknown): value is GrantSpec =>
+  record(value) &&
+  typeof value.operation_id === 'string' &&
+  ['fields', 'optional_fields', 'required_one_of'].every(
+    (key) =>
+      Array.isArray(value[key]) && value[key].every((item: unknown) => typeof item === 'string')
+  );
 function readOverview(value: unknown): Overview | null {
   if (
     !record(value) ||
@@ -89,6 +97,9 @@ function readOverview(value: unknown): Overview | null {
     typeof value.runtime.ready !== 'boolean' ||
     (value.runtime.agent_id !== undefined && typeof value.runtime.agent_id !== 'string') ||
     (value.runtime.reason !== undefined && typeof value.runtime.reason !== 'string') ||
+    (value.delegable_operations !== undefined &&
+      (!Array.isArray(value.delegable_operations) ||
+        !value.delegable_operations.every(validGrantSpec))) ||
     typeof value.renewal_required !== 'boolean' ||
     (value.renewal !== null &&
       (!record(value.renewal) ||
@@ -147,6 +158,8 @@ export function OnboardingAuthorityPanel({
   const [kind, setKind] = React.useState<CharterScopeKind>(CHARTER_SCOPE_PERSON);
   const [tenant, setTenant] = React.useState(selectedTenant || '');
   const [operation, setOperation] = React.useState('');
+  const [exactRevocation, setExactRevocation] = React.useState<Grant | null>(null);
+  const [fieldValues, setFieldValues] = React.useState<Record<string, string>>({});
   const [target, setTarget] = React.useState('');
   const [branch, setBranch] = React.useState('');
   const [mergeBase, setMergeBase] = React.useState('');
@@ -174,7 +187,35 @@ export function OnboardingAuthorityPanel({
   const active = React.useRef(scopeKey);
   active.current = scopeKey;
   const inFlight = React.useRef(false);
-  const grants: Grant[] =
+  const customEntries = (overview?.delegable_operations ?? []).filter(
+    (entry) =>
+      !['vcs:pr_create', 'vcs:pr_merge', 'vcs:push', 'browser:goto', 'browser:open_tab'].includes(
+        entry.operation_id
+      )
+  );
+  const custom = customEntries.find((entry) => entry.operation_id === operation);
+  const voice = operation === 'voice:speak' || operation === 'voice:playback';
+  const customFields = custom
+    ? [...custom.fields, ...custom.optional_fields].filter(
+        (key) => !voice || key !== 'platform' || mode === 'revoke'
+      )
+    : [];
+  const customReady =
+    !!custom &&
+    custom.fields.every((key) => fieldValues[key]?.trim()) &&
+    (!custom.required_one_of.length ||
+      custom.required_one_of.filter((key) => fieldValues[key]?.trim()).length === 1) &&
+    (voice || customFields.some((key) => fieldValues[key]?.trim()));
+  const customGrant = custom && {
+    operation_id: custom.operation_id,
+    ...Object.fromEntries(
+      customFields.flatMap((field) => {
+        const value = fieldValues[field]?.trim();
+        return value ? [[field, value]] : [];
+      })
+    ),
+  };
+  const presetGrants: Grant[] =
     operation === 'vcs:development'
       ? [
           {
@@ -215,6 +256,12 @@ export function OnboardingAuthorityPanel({
           : operation === 'browser:goto' || operation === 'browser:open_tab'
             ? [{ operation_id: operation, origin: target }]
             : [];
+  const grants =
+    mode === 'revoke' && exactRevocation
+      ? [exactRevocation]
+      : customGrant
+        ? [customGrant]
+        : presetGrants;
   const expiry =
     expires && Number.isFinite(Date.parse(expires)) ? new Date(expires).toISOString() : '';
   const chosenDecisions = Object.fromEntries(
@@ -457,10 +504,14 @@ export function OnboardingAuthorityPanel({
   }
   function revoke(grant: Grant) {
     setMode('revoke');
+    setExactRevocation(grant);
+    setFieldValues(
+      Object.fromEntries(Object.entries(grant).filter(([key]) => key !== 'operation_id'))
+    );
     setDecisions({});
     setOperation(grant.operation_id);
-    setTarget('repository' in grant ? grant.repository : grant.origin);
-    setBranch('branch' in grant ? grant.branch : '');
+    setTarget(grant.repository ?? grant.origin ?? '');
+    setBranch(grant.branch ?? '');
     setPrivateRepository('visibility' in grant && grant.visibility === 'private');
     setEditTiers(false);
     const timestamp = Date.parse(overview?.charter?.expires_at || '');
@@ -510,6 +561,8 @@ export function OnboardingAuthorityPanel({
         'authority.operation': (value) => {
           const next = asText(value);
           setOperation(next);
+          setFieldValues({});
+          setTarget('');
           setMode('grant');
           if (next === 'vcs:development') {
             setBranch('agent/kyberion-development');
@@ -517,6 +570,13 @@ export function OnboardingAuthorityPanel({
           }
         },
         'authority.private_repo': (value) => setPrivateRepository(value === true),
+        ...Object.fromEntries(
+          customFields.map((field) => [
+            `authority.grant.${field}`,
+            (value: unknown) =>
+              setFieldValues((previous) => ({ ...previous, [field]: asText(value) })),
+          ])
+        ),
         'authority.target': (value) => setTarget(asText(value)),
         'authority.branch': (value) => setBranch(asText(value)),
         'authority.merge_base': (value) => setMergeBase(asText(value)),
@@ -619,11 +679,10 @@ export function OnboardingAuthorityPanel({
                   {overview.charter.grants.map((grant, index) => (
                     <li key={index}>
                       {grant.operation_id} ·{' '}
-                      {'repository' in grant ? grant.repository : grant.origin}
-                      {'branch' in grant ? ` · ${grant.branch}` : ''}{' '}
-                      {'visibility' in grant && grant.visibility === 'private'
-                        ? t('authority.private_repository')
-                        : null}{' '}
+                      {Object.entries(grant)
+                        .filter(([key]) => key !== 'operation_id')
+                        .map(([key, value]) => `${key}: ${value}`)
+                        .join(' · ')}{' '}
                       <Button
                         label={t('authority.revoke')}
                         variant="ghost"
@@ -717,6 +776,15 @@ export function OnboardingAuthorityPanel({
                   { value: 'vcs:push', label: t('authority.push') },
                   { value: 'browser:goto', label: t('authority.goto') },
                   { value: 'browser:open_tab', label: t('authority.tab') },
+                  ...customEntries.map(({ operation_id }) => ({
+                    value: operation_id,
+                    label:
+                      operation_id === 'voice:speak'
+                        ? t('authority.voice_speak')
+                        : operation_id === 'voice:playback'
+                          ? t('authority.voice_playback')
+                          : operation_id,
+                  })),
                 ]}
               />
             </SettingRow>
@@ -726,21 +794,63 @@ export function OnboardingAuthorityPanel({
                 name="authority.private_repo"
                 label={t('authority.private_repository')}
                 value={privateRepository}
-                disabled={busy}
+                disabled={busy || mode === 'revoke'}
               />
             ) : null}
-            <SettingRow label={t('authority.target')} control_id="authority-target">
-              <TextField
-                id="authority-target"
-                name="authority.target"
-                label={t('authority.target')}
-                hide_label
-                type="url"
-                value={target}
-                disabled={busy}
-                placeholder="https://github.com/owner/repository"
-              />
-            </SettingRow>
+            {custom ? (
+              customFields.map((field) => {
+                const id = `authority-grant-${field}`;
+                const label = field === 'platform' && voice ? t('authority.voice_platform') : field;
+                const value = fieldValues[field] ?? '';
+                const choices = grantChoices[operation]?.[field];
+                return (
+                  <SettingRow key={field} label={label} control_id={id}>
+                    {choices && mode === 'grant' ? (
+                      <Select
+                        id={id}
+                        name={`authority.grant.${field}`}
+                        label={label}
+                        hide_label
+                        value={value}
+                        disabled={busy}
+                        placeholder={
+                          custom.fields.includes(field) ? t('authority.choose') : undefined
+                        }
+                        options={(custom.fields.includes(field)
+                          ? [...choices]
+                          : ['', ...choices]
+                        ).map((choice) => ({
+                          value: choice,
+                          label: choice || t('authority.any_target'),
+                        }))}
+                      />
+                    ) : (
+                      <TextField
+                        id={id}
+                        name={`authority.grant.${field}`}
+                        label={label}
+                        hide_label
+                        value={fieldValues[field] ?? ''}
+                        disabled={busy || mode === 'revoke'}
+                      />
+                    )}
+                  </SettingRow>
+                );
+              })
+            ) : (
+              <SettingRow label={t('authority.target')} control_id="authority-target">
+                <TextField
+                  id="authority-target"
+                  name="authority.target"
+                  label={t('authority.target')}
+                  hide_label
+                  type="url"
+                  value={target}
+                  disabled={busy || mode === 'revoke'}
+                  placeholder="https://github.com/owner/repository"
+                />
+              </SettingRow>
+            )}
             {operation === 'vcs:development' ? (
               <p className="kb-text kb-text--muted">{t('authority.development_bounds')}</p>
             ) : null}
@@ -762,7 +872,7 @@ export function OnboardingAuthorityPanel({
                   hide_label
                   value={branch}
                   readonly={operation === 'vcs:development'}
-                  disabled={busy}
+                  disabled={busy || mode === 'revoke'}
                   placeholder="main"
                 />
               </SettingRow>
@@ -776,7 +886,7 @@ export function OnboardingAuthorityPanel({
                   hide_label
                   value={mergeBase}
                   readonly
-                  disabled={busy}
+                  disabled={busy || mode === 'revoke'}
                 />
               </SettingRow>
             ) : null}
@@ -916,8 +1026,9 @@ export function OnboardingAuthorityPanel({
                 disabled={
                   busy ||
                   (!grants.length && !Object.keys(chosenDecisions).length && !editTiers) ||
-                  (grants.length && !target) ||
-                  (['vcs:push', 'vcs:pr_merge', 'vcs:development'].includes(operation) &&
+                  (mode !== 'revoke' && (custom ? !customReady : grants.length > 0 && !target)) ||
+                  (mode !== 'revoke' &&
+                    ['vcs:push', 'vcs:pr_merge', 'vcs:development'].includes(operation) &&
                     !branch) ||
                   (operation === 'vcs:development' && (!mergeBase || mergeBase === branch)) ||
                   !expiry ||

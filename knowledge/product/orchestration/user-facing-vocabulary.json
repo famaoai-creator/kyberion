@@ -14389,9 +14389,9 @@
         "qps-ploc": "⟦Ŧħė ȧůŧħőřïẑȧŧïőñ şėřṽïƈė řėŧůřñėḓ ȧñ ïñṽȧŀïḓ ĦŦŦṖŞ ḓėşŧïñȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
       },
       "authority.title": {
-        "en": "External service authority",
-        "ja": "外部サービスの操作権限",
-        "qps-ploc": "⟦Ėẋŧėřñȧŀ şėřṽïƈė ȧůŧħőřïŧẏ ŀőřėɱ ïṗ⟧"
+        "en": "Delegated operations",
+        "ja": "操作の委任",
+        "qps-ploc": "⟦Ḓėŀėɠȧŧėḓ őṗėřȧŧïőñş ŀőřėɱ ⟧"
       },
       "authority.separate": {
         "en": "Connecting an account does not authorize actions. Review authority separately.",
@@ -14399,14 +14399,34 @@
         "qps-ploc": "⟦Ƈőññėƈŧïñɠ ȧñ ȧƈƈőůñŧ ḓőėş ñőŧ ȧůŧħőřïẑė ȧƈŧïőñş. Řėṽïėẇ ȧůŧħőřïŧẏ şėṗȧřȧŧėŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
       },
       "authority.bounds": {
-        "en": "Delegate exact targets, branches and data tiers. Merging can be delegated within those limits. Browser clicks and script evaluation still require separate review.",
-        "ja": "対象・ブランチ・データ階層を指定して委任します。条件内のマージも委任できます。ブラウザのクリックやスクリプト評価は別の確認が必要です。",
-        "qps-ploc": "⟦Ḓėŀėɠȧŧė ėẋȧƈŧ ŧȧřɠėŧş, ƀřȧñƈħėş ȧñḓ ḓȧŧȧ ŧïėřş. Ɱėřɠïñɠ ƈȧñ ƀė ḓėŀėɠȧŧėḓ ẇïŧħïñ ŧħőşė ŀïɱïŧş. Ƀřőẇşėř ƈŀïƈķş ȧñḓ şƈřïṗŧ ėṽȧŀůȧŧïőñ şŧïŀŀ řėɋůïřė şėṗȧřȧŧė řėṽïėẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ⟧"
+        "en": "Choose an operation, its exact target, and an expiry. Review the plan before requesting approval.",
+        "ja": "操作・対象・有効期限を選び、内容を確認してから承認を申請します。",
+        "qps-ploc": "⟦Ƈħőőşė ȧñ őṗėřȧŧïőñ, ïŧş ėẋȧƈŧ ŧȧřɠėŧ, ȧñḓ ȧñ ėẋṗïřẏ. Řėṽïėẇ ŧħė ṗŀȧñ ƀėƒőřė řėɋůėşŧïñɠ ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
       },
       "authority.development": {
         "en": "Delegate repository development",
         "ja": "リポジトリ開発を委任",
         "qps-ploc": "⟦Ḓėŀėɠȧŧė řėṗőşïŧőřẏ ḓėṽėŀőṗɱėñŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "authority.any_target": {
+        "en": "Any",
+        "ja": "指定なし",
+        "qps-ploc": "⟦Ȧñẏ ŀőř⟧"
+      },
+      "authority.voice_speak": {
+        "en": "Speak aloud",
+        "ja": "テキストを読み上げる",
+        "qps-ploc": "⟦Şṗėȧķ ȧŀőůḓ ŀőř⟧"
+      },
+      "authority.voice_playback": {
+        "en": "Play audio",
+        "ja": "音声を再生する",
+        "qps-ploc": "⟦Ṗŀȧẏ ȧůḓïő ŀőř⟧"
+      },
+      "authority.voice_platform": {
+        "en": "Playback platform",
+        "ja": "再生する OS",
+        "qps-ploc": "⟦Ṗŀȧẏƀȧƈķ ṗŀȧŧƒőřɱ ŀőřėɱ⟧"
       },
       "authority.development_bounds": {
         "en": "Review one consent for pull requests, pushing to the candidate branch and merging into the base branch. Direct pushes to the base are not included.",
@@ -15372,6 +15392,41 @@
         "en": "Avatar image",
         "ja": "アバター画像",
         "qps-ploc": "⟦Ȧṽȧŧȧř ïɱȧɠė ŀőř⟧"
+      },
+      "setup.voice_priority": {
+        "en": "Read-aloud engine priority",
+        "ja": "読み上げエンジンの優先順位",
+        "qps-ploc": "⟦Řėȧḓ-ȧŀőůḓ ėñɠïñė ṗřïőřïŧẏ ŀőřėɱ ïṗ⟧"
+      },
+      "setup.voice_priority_help": {
+        "en": "The first compatible engine is used. An empty list uses the default selection rules.",
+        "ja": "利用条件を満たす先頭のエンジンを使います。リストが空の場合は既定の選択ルールに従います。",
+        "qps-ploc": "⟦Ŧħė ƒïřşŧ ƈőɱṗȧŧïƀŀė ėñɠïñė ïş ůşėḓ. Ȧñ ėɱṗŧẏ ŀïşŧ ůşėş ŧħė ḓėƒȧůŀŧ şėŀėƈŧïőñ řůŀėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "setup.voice_priority_up": {
+        "en": "Move up",
+        "ja": "上へ移動",
+        "qps-ploc": "⟦Ɱőṽė ůṗ ŀőř⟧"
+      },
+      "setup.voice_priority_down": {
+        "en": "Move down",
+        "ja": "下へ移動",
+        "qps-ploc": "⟦Ɱőṽė ḓőẇñ ŀőř⟧"
+      },
+      "setup.voice_priority_remove": {
+        "en": "Remove",
+        "ja": "削除",
+        "qps-ploc": "⟦Řėɱőṽė ŀőř⟧"
+      },
+      "setup.voice_priority_add": {
+        "en": "Add an engine",
+        "ja": "エンジンを追加",
+        "qps-ploc": "⟦Ȧḓḓ ȧñ ėñɠïñė ŀőřė⟧"
+      },
+      "setup.voice_priority_save": {
+        "en": "Save priority",
+        "ja": "優先順位を保存",
+        "qps-ploc": "⟦Şȧṽė ṗřïőřïŧẏ ŀőřė⟧"
       },
       "setup.voice_profile": {
         "en": "Voice profile",

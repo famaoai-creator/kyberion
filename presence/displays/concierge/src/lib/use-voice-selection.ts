@@ -18,7 +18,10 @@ export interface UseVoiceSelectionResult {
   voiceDevices: VoiceInputDevice[];
   voiceSelectionBusy: boolean;
   refreshVoiceSelection: () => Promise<void>;
-  saveVoiceSelection: (field: 'tts_engine_id' | 'stt_backend', value: string) => Promise<void>;
+  saveVoiceSelection: (
+    field: 'tts_engine_id' | 'stt_backend' | 'tts_priority',
+    value: string | string[]
+  ) => Promise<void>;
 }
 
 export function useVoiceSelection(setNotice: (notice: Notice) => void): UseVoiceSelectionResult {
@@ -47,14 +50,14 @@ export function useVoiceSelection(setNotice: (notice: Notice) => void): UseVoice
   }, []);
 
   const saveVoiceSelection = React.useCallback(
-    async (field: 'tts_engine_id' | 'stt_backend', value: string) => {
+    async (field: 'tts_engine_id' | 'stt_backend' | 'tts_priority', value: string | string[]) => {
       if (!voiceSelection) return;
       setVoiceSelectionBusy(true);
       try {
         const response = await fetch('/api/voice/selection', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ ...voiceSelection.preferences, [field]: value }),
+          body: JSON.stringify({ [field]: value }),
         });
         const next = parseVoiceSelectionResponse(await response.json().catch(() => null));
         if (!response.ok || !next) throw new Error('Voice selection could not be saved');

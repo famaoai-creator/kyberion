@@ -610,6 +610,18 @@ export function isDelegableExternalOperation(operationId: string): boolean {
   return operationAuthorization(operationId).delegable !== undefined;
 }
 
+/** Serializable authoring fields, without exposing effect-target builders. */
+export function externalOperationGrantCatalog() {
+  return Object.entries(EXTERNAL_OPERATION_DELEGATION)
+    .filter(([operationId]) => isDelegableExternalOperation(operationId))
+    .map(([operation_id, spec]) => ({
+      operation_id,
+      fields: spec.fields,
+      optional_fields: spec.optionalFields ?? [],
+      required_one_of: spec.requiredOneOf ?? [],
+    }));
+}
+
 /** Effect → raw grant target for the resolver (undefined = not delegable here). */
 export function buildExternalOperationTarget(
   operationId: string,

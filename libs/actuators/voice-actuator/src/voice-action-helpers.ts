@@ -345,11 +345,13 @@ export async function speakLocal(params: Record<string, unknown>): Promise<any> 
   const routing = routeVoiceEngine({
     text,
     baselineEngine,
+    selectionContext: { operation: 'speak_local' },
     explicit: engineNamed,
     purpose: typeof params.purpose === 'string' ? params.purpose : undefined,
     language: explicitLanguage,
     requires: {
       platform: process.platform,
+      playback: true,
       ...(params.local_only === true ? { localOnly: true } : {}),
     },
   });

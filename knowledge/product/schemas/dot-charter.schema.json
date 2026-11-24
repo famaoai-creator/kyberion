@@ -744,7 +744,42 @@
           "additionalProperties": false,
           "required": ["max_age_s"],
           "properties": {
-            "max_age_s": { "type": "integer", "minimum": 60, "maximum": 86400 }
+            "max_age_s": { "type": "integer", "minimum": 60, "maximum": 86400 },
+            "mode": {
+              "enum": ["shadow", "triage", "prepare"],
+              "description": "Shadow records the proposed route. Triage applies the route. Prepare additionally includes decision context."
+            },
+            "directed_intent": {
+              "type": "boolean",
+              "description": "Allow explicitly addressed requests to check a declared file signal ahead of periodic measurement."
+            },
+            "ratified_digest": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["signal", "approval_id"],
+              "properties": {
+                "signal": { "type": "string", "minLength": 1, "maxLength": 128 },
+                "approval_id": { "type": "string", "minLength": 1, "maxLength": 128 }
+              },
+              "description": "Reference a human-ratified preference for a declared file signal."
+            },
+            "corroboration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["dot_id", "signal"],
+              "properties": {
+                "dot_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+                "signal": { "type": "string", "minLength": 1, "maxLength": 128 }
+              },
+              "description": "Optional same-scope peer observation included as advisory evidence in prepared alerts."
+            },
+            "digest_signals": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "maxItems": 32,
+              "uniqueItems": true,
+              "description": "Declared file signals eligible for scheduled digest delivery."
+            }
           },
           "description": "Opt into scoped inbox alerts for unresolved file-probe signals, on a fresh observation outside quiet hours."
         },

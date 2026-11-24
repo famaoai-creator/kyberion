@@ -283,6 +283,8 @@ export interface VoiceTtsRequirements {
   /** Language of the text (primary subtag). */
   language?: string;
   platform?: NodeJS.Platform;
+  /** The request must play audio. */
+  playback?: boolean;
   /** Artifact format the request must produce. */
   format?: VoiceEngineArtifactFormat;
   /**
@@ -310,6 +312,7 @@ export function unmetVoiceTtsRequirements(
   if (requires.platform && !isSupportedPlatform(engine, requires.platform)) {
     unmet.push(`platform ${requires.platform}`);
   }
+  if (requires.playback && !engine.supports.playback) unmet.push('playback');
   if (requires.format && !engine.supports.artifact_formats.includes(requires.format)) {
     unmet.push(`format ${requires.format}`);
   }
@@ -392,7 +395,10 @@ export function selectVoiceTtsEngine(
     candidates: listVoiceTtsEngineCandidates(requires, engines),
     ...(purpose ? { purpose } : {}),
     ...(Object.keys(context).length ? { context } : {}),
-    decisionKey: purpose ?? 'default',
+    decisionKey:
+      options.context?.operation === 'speak_local'
+        ? `speak_local:${purpose ?? 'default'}`
+        : (purpose ?? 'default'),
     ...(options.record === false ? { record: false, pin: false } : {}),
   });
   if (decision.strategy === 'unresolved') throw new VoiceTtsEngineSelectionError(decision);
