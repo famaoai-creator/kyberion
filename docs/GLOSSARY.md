@@ -684,6 +684,14 @@ The `work_shape` of a top-level WorkItem: what kind of work it is — `solution_
 
 An always-on resident agent holding a standing responsibility across sessions, declared by a **dot charter** (`dots/*.json`, schema `knowledge/product/schemas/dot-charter.schema.json`): goal (with key results), attention triggers (`cron` / `watch` / `wake` / `probe` / `event`), an _existing_ authority role (a charter never grants authority), a decision floor over the autonomous-ops gate, and notification routing. Acts as `dot:<id>` on WorkItems, approvals and the audit chain; inspected via `pnpm kyberion dot list` and `dot status`. → [resident-dot-model](../knowledge/product/architecture/resident-dot-model.md) · [dots/README](../dots/README.md)
 
+**Proactive preparation** uses `goal.signal_probes` for observations and
+`notification.signal_alerts.mode` for triage. `shadow` records the proposed
+route and keeps immediate inbox delivery. `prepare` applies the routing policy
+and adds follow-up options. A routing preference from operator feedback
+requires human approval before use. Run `pnpm kyberion dot status <dot-id> --json`
+and inspect `signal_triage` for the latest proposed and applied routes. →
+[Proactive signal alerts](../knowledge/product/architecture/resident-dot-model.md#proactive-signal-alerts)
+
 ### Accountability Charter
 
 A tenant-scoped standing declaration of the accountable human, authority envelope (spend limits, deputies, validity) and loss appetite (`libs/core/governance/accountability-charter*.ts`). The charter bounds delegation of existing authority. An eligible action within an active charter may run with accountable-human attribution and no per-action approval. A delegation miss can fall back to individual approval when the policy and execution boundary allow it. A hard stop blocks execution. See the [external-operation decision table](../knowledge/product/architecture/scope-governance-plane.md#外部操作1件の認可). Owners sign it in Concierge Settings › Organization and members; `approval_inbox charter` reports what ran under it. Distinct from a dot charter and from the Charter (`AGENTS.md`).

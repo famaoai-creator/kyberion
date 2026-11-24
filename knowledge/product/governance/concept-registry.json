@@ -413,10 +413,15 @@
       "term": "Dot",
       "aliases": ["Resident Dot"],
       "category": "execution",
-      "definition": "An always-on resident agent holding a standing responsibility across sessions, declared by a dot charter (goal, attention triggers, an existing authority envelope and a tier/tenant/organization scope) and driven by the agent-runtime supervisor.",
+      "definition": "An always-on resident agent holding a standing responsibility across sessions, declared by a dot charter (goal, attention triggers, an existing authority envelope and a tier/tenant/organization scope) and driven by the agent-runtime supervisor. Proactive preparation uses declared signal probes, shadow or prepare signal routing, and human-ratified routing preferences.",
       "glossary_anchor": "dot-resident-dot",
       "canonical_doc": "knowledge/product/architecture/resident-dot-model.md",
-      "owner_modules": ["libs/core/dot/dot-charter.ts", "libs/core/dot/resident-dot-scope.ts"],
+      "owner_modules": [
+        "libs/core/dot/dot-charter.ts",
+        "libs/core/dot/resident-dot-scope.ts",
+        "libs/core/dot/dot-signal-alert.ts",
+        "libs/core/dot/dot-signal-learning.ts"
+      ],
       "not_to_confuse_with": ["agent-runtime-supervisor", "nhi"]
     },
     {

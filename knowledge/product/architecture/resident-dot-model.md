@@ -167,6 +167,12 @@ same text even if a later recheck observes a different failure. Preparation
 uses the existing probe read and inbox delivery scope. Any subsequent action
 uses the existing Dot authority and approval rules.
 
+Proactive preparation starts with the observations declared in
+`goal.signal_probes`. The charter's `notification.signal_alerts` controls
+triage, from recording a proposed route in `shadow` to preparing follow-up
+options in `prepare`. Routing feedback follows the human approval flow
+described below.
+
 A charter can opt into `signal_alerts.mode` and declare `digest_signals` by
 signal name. A scheduled digest is required when the list is nonempty. A
 configured signal keeps immediate delivery if there is no later eligible
