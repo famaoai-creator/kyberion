@@ -417,6 +417,7 @@
     "assemble_changelog",
     "asset_promoter",
     "attacker",
+    "audit_mirror_reader",
     "audit_mirror_writer",
     "base_analyst",
     "base_ecosystem_architect",
