@@ -12,6 +12,7 @@ import {
 } from '@agent/core';
 import {
   ExternalOperationApprovalRequired,
+  ExternalOperationOutcomeUnverified,
   hasExplicitExternalApprovalRequest,
   hasExternalOperationAuthority,
 } from '@agent/core/governance/external-operation';
@@ -108,6 +109,34 @@ describe('pnpm kyberion speak', () => {
     await expect(result).rejects.toThrow('approval: apr-test');
     await expect(result).rejects.toThrow(`--invocation-id ${id}`);
     expect(print).not.toHaveBeenCalled();
+  });
+
+  it.each(['expired', 'rejected', 'effect_mismatch'] as const)(
+    'does not give approval replay instructions for %s',
+    async (requestStatus) => {
+      const deps = createFakeSpeakDeps();
+      deps.voice = async () => {
+        throw new ExternalOperationApprovalRequired({
+          allowed: false,
+          status: 'pending',
+          requestStatus,
+          requestId: 'apr-test',
+        });
+      };
+      const result = runSpeakCommand(['hello'], vi.fn(), deps);
+      await expect(result).rejects.toThrow('Review the previous decision');
+      await expect(result).rejects.not.toThrow('--invocation-id');
+    }
+  );
+
+  it('asks to verify prior playback when the execution result is uncertain', async () => {
+    const deps = createFakeSpeakDeps();
+    deps.voice = async () => {
+      throw new ExternalOperationOutcomeUnverified(new Error('receipt unavailable'));
+    };
+    const result = runSpeakCommand(['hello'], vi.fn(), deps);
+    await expect(result).rejects.toThrow('verify the previous playback result before retrying');
+    await expect(result).rejects.not.toThrow('--invocation-id');
   });
 
   beforeAll(() => {

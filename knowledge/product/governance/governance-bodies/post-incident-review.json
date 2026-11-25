@@ -30,15 +30,15 @@
       ],
       "agenda": [
         "タイムラインと検知〜収束の振り返り",
-        "根本原因分析(5-Whys/特性要因)の妥当性",
-        "再発防止策の実効性と担当・期限",
+        "原因と寄与要因、判断時点の観測、証跡と不明点の確認",
+        "再発防止策の実効性と担当・期限・検証条件",
         "類似リスクの横展開(cross-project remediation)",
         "レビュー判定"
       ],
       "entry_criteria": ["post-mortem", "incident-timeline", "evidence-index"],
       "exit_criteria": [
         "原因と対策の因果が証跡と矛盾しない",
-        "再発防止策に担当と期限がある",
+        "再発防止策に担当・期限・検証条件があり、レビュー結果と対策の検証状況を区別している",
         "blameless の原則が守られている"
       ],
       "decisions": ["go", "conditional_go", "hold"],

@@ -16,6 +16,13 @@ export type ExternalOperationCommitProof =
     }
   | { kind: 'charter'; charter: Charter; input: ApprovalGateCharterInput };
 
+/** Request ID for the exact human decision verified by this proof. */
+export function externalApprovalRequestId(
+  proof?: ExternalOperationCommitProof
+): string | undefined {
+  return proof?.kind === 'approval' ? proof.requestId : undefined;
+}
+
 function currentApproval(requestId: string, operationId: string, payloadHash: string) {
   const record = loadApprovalRequest('external-operation', requestId);
   if (

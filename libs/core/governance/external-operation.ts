@@ -54,6 +54,7 @@ import {
 import { remoteMcpBindingForEffect } from './remote-mcp-interface.js';
 import {
   captureExternalApprovalProof,
+  externalApprovalRequestId,
   verifyExternalOperationCommitProof,
   type ExternalOperationCommitProof,
 } from './external-operation-proof.js';
@@ -157,6 +158,7 @@ export interface ExternalOperationApprovalBlock {
   approval: ApprovalGateResult;
   correlationId: string;
   channel: 'external-operation';
+  executionUnverified?: true;
 }
 const approvalBlockContext = new AsyncLocalStorage<
   (block: ExternalOperationApprovalBlock) => void
@@ -398,6 +400,26 @@ export function assertExternalOperationCommit(input: ExternalOperation): void {
     }
   }
   admitted.committed = true;
+  const requestId = externalApprovalRequestId(admitted.proof);
+  if (requestId) {
+    try {
+      auditChain.record({
+        agentId: admitted.authority?.agentId ?? 'external-actuator',
+        action: 'external_operation_commit',
+        operation: admitted.operationId,
+        result: 'allowed',
+        metadata: {
+          requestId,
+          invocation_id: admitted.reservation?.invocationId,
+          effect_hash: admitted.effectHash,
+        },
+      });
+    } catch {
+      logger.warn(
+        '[EXTERNAL_COMMIT_AUDIT_UNRECORDED] Verify admission and durable execution evidence'
+      );
+    }
+  }
 }
 
 export class ExternalOperationApprovalRequired extends Error {
@@ -429,6 +451,7 @@ function signalExternalOutcomeStop(input: Pick<ExternalOperation, 'operationId'>
     },
     correlationId: `external:${randomUUID()}`,
     channel: 'external-operation',
+    executionUnverified: true,
   });
 }
 
@@ -979,6 +1002,7 @@ export function recordExternalOperationOutcome(
       );
     }
   }
+  const requestId = externalApprovalRequestId(admitted.proof);
   try {
     auditChain.record({
       agentId: admitted.authority?.agentId ?? 'external-actuator',
@@ -988,6 +1012,7 @@ export function recordExternalOperationOutcome(
       reason: `External operation ${outcome}; admission is not proof of execution`,
       metadata: {
         outcome,
+        ...(requestId ? { requestId } : {}),
         tenant_slug: admitted.tenantSlug,
         invocation_id: admitted.reservation?.invocationId ?? admitted.authority?.invocationId,
         effect_hash: admitted.effectHash,

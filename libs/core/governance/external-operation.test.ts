@@ -421,6 +421,16 @@ describe('external operation common admission', () => {
       { ...first, id: 'apr-1', status: 'approved' } as never,
     ]);
     expect(enqueue().allowed).toBe(true);
+    assertExternalOperationCommit(input);
+    recordExternalOperationOutcome(input, 'succeeded');
+    for (const action of ['external_operation_commit', 'external_operation_outcome']) {
+      expect(auditChain.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action,
+          metadata: expect.objectContaining({ requestId: 'apr-1' }),
+        })
+      );
+    }
     expect(reserveExternalOperation).toHaveBeenCalledTimes(1);
     expect(() =>
       withExplicitExternalApprovalRequest(
@@ -1133,6 +1143,7 @@ describe('external operation common admission', () => {
       expect(result).toEqual({ partial: true });
       expect(observer).toHaveBeenCalledTimes(1);
       expect(observer.mock.calls[0]![0].approval.requestId).toBeUndefined();
+      expect(observer.mock.calls[0]![0].executionUnverified).toBe(true);
     }
   );
 
