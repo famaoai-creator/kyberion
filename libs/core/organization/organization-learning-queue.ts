@@ -102,16 +102,23 @@ export function organizationLearningScope(
       throw new Error(
         `[MEMORY_SCOPE_REQUIRED] personal organization learning for '${record.organization_id}' has no owner_nhi | next: personal learnings need an explicit owner; the record does not name one`
       );
-    return {
-      tier: 'personal',
-      owner_nhi: owner,
-      organization_id: record.organization_id,
-      ...(tenant && tenant !== 'shared' ? { tenant_slug: tenant } : {}),
-    };
+    // An organization sits under a tenant in the entity scope chain
+    // (`organization_id requires a tenant_slug`), so a tenant-free personal
+    // scope names only its owner; the organization travels in
+    // origin.attributes (see toOrganizationLearningMemoryCandidate).
+    return tenant && tenant !== 'shared'
+      ? {
+          tier: 'personal',
+          owner_nhi: owner,
+          tenant_slug: tenant,
+          organization_id: record.organization_id,
+        }
+      : { tier: 'personal', owner_nhi: owner };
   }
   // Public: a tenant on a public scope would need a brokered promotion, so the
-  // record's tenant label (if any) travels in origin.attributes instead.
-  return { tier: 'public', organization_id: record.organization_id };
+  // record's tenant label (if any) travels in origin.attributes instead — and
+  // with no tenant the organization does too.
+  return { tier: 'public' };
 }
 
 function sourceTypeFor(record: OrganizationLearningCandidate): MemoryCandidateSourceType {
@@ -153,6 +160,8 @@ export function toOrganizationLearningMemoryCandidate(
         source_ref: record.source_ref,
         target_kind: record.target_kind,
         evidence_refs: record.evidence_refs,
+        // Tenant-free scopes cannot carry organization_id; the reader falls back to this.
+        organization_id: record.organization_id,
         ...(record.tenant_slug ? { tenant_slug: record.tenant_slug } : {}),
         ...(record.metadata ? { metadata: record.metadata } : {}),
       },
@@ -167,7 +176,10 @@ export function fromOrganizationLearningMemoryCandidate(
 ): OrganizationLearningCandidate | null {
   if (row.origin?.record_kind !== 'organization_learning') return null;
   const attributes = (row.origin.attributes || {}) as Record<string, unknown>;
-  const organizationId = String(row.scope?.organization_id || '');
+  const organizationId = String(
+    row.scope?.organization_id ||
+      (typeof attributes.organization_id === 'string' ? attributes.organization_id : '')
+  );
   const tenant =
     row.scope?.tenant_slug ||
     (typeof attributes.tenant_slug === 'string' ? attributes.tenant_slug : undefined);

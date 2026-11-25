@@ -121,6 +121,18 @@
       "note": "script entrypoints that are CLI-registered land in the CLI reference"
     },
     {
+      "change": "scripts/cli/cli-read.ts",
+      "docs": [
+        "knowledge/product/orchestration/perception-playbook.md",
+        "knowledge/product/orchestration/perception-playbook.ja.md",
+        "knowledge/product/orchestration/document-file-reading-playbook.md",
+        "knowledge/product/orchestration/document-file-reading-playbook.ja.md",
+        "knowledge/product/orchestration/capability-verb-inventory.md",
+        "knowledge/product/orchestration/capability-verb-inventory.ja.md"
+      ],
+      "note": "the `read` verb's accepted inputs and refusals are documented in the perception and document-reading playbooks and the verb inventory"
+    },
+    {
       "change": "presence/displays/concierge/src/app/api/service-catalog/route.ts",
       "docs": [
         "knowledge/public/connections/setup_guide.md",

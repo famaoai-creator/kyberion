@@ -1,5 +1,5 @@
 /**
- * `pnpm kyberion read <file> [--ocr] [--json] [--out <file>]`
+ * `pnpm kyberion read <file|url> [--ocr] [--json] [--out <file>]`
  *
  * The one-line way for any agent (Claude, Codex, Gemini, …) to read a
  * pdf / pptx / docx / xlsx / html / markdown / text / csv / tsv / json / yaml
@@ -9,8 +9,10 @@
  * ingest ceremony use — and prints Markdown (or JSON) to stdout.
  *
  * Inputs must live inside the repository (the sandbox boundary is not
- * widened): a file elsewhere is refused with the copy-in instruction. URLs are
- * refused too — remote content is egress-governed (network:fetch).
+ * widened): a file elsewhere is refused with the copy-in instruction.
+ * http(s) URLs are fetched with GET through the same governed boundary as
+ * `network:fetch` (egress policy + audit chain, no approval for reads) and
+ * read from memory — no temp file is written.
  */
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -18,14 +20,23 @@ import {
   inferDocumentFormat,
   READABLE_DOCUMENT_EXTENSIONS,
   readDocument,
+  type ReadableDocumentFormat,
   type ReadDocumentResult,
 } from '@agent/core/media/document-reader';
 import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
+import { assertNetworkEgress, secureFetch, SecureFetchError } from '@agent/core/network';
+import {
+  ExternalOperationApprovalRequired,
+  runExternalOperation,
+  withOperationArgumentOrigins,
+} from '@agent/core/governance/external-operation';
+import { isDelegableExternalOperation } from '@agent/core/governance/external-operation-target';
+import { computeApprovalPayloadHash } from '@agent/core/governance/approval-presentation';
 import { ScriptExitError, type ScriptErrorDetails } from '../lib/harness.js';
 
-export const READ_USAGE = `Usage: pnpm kyberion read <file> [--ocr] [--tier <tier>] [--training-use <policy>] [--tenant <slug>] [--json] [--out <file>] [--images <dir>]
+export const READ_USAGE = `Usage: pnpm kyberion read <file|url> [--ocr] [--tier <tier>] [--training-use <policy>] [--tenant <slug>] [--json] [--out <file>] [--images <dir>]
 
-Reads a ${Object.keys(READABLE_DOCUMENT_EXTENSIONS).join(' / ')} file with the native engines and prints Markdown.
+Reads a ${Object.keys(READABLE_DOCUMENT_EXTENSIONS).join(' / ')} file or an http(s) URL with the native engines and prints Markdown.
 HTML → Markdown (<title> as heading; scripts/styles dropped). Markdown / text / yaml as-is.
 JSON is pretty-printed when valid. Small csv/tsv become Markdown tables (large ones stay as-is).
   --ocr         Also OCR embedded images (slides/pages/pictures; pdf/pptx/docx); local_only is the default
@@ -39,8 +50,9 @@ JSON is pretty-printed when valid. Small csv/tsv become Markdown tables (large o
 
 The file must be inside the repository. Copy external files first, e.g.
   mkdir -p active/shared/tmp/<job> && cp ~/Downloads/<file> active/shared/tmp/<job>/
-URLs are not fetched: remote pages go through the egress-governed network:fetch op
-(see knowledge/product/orchestration/document-file-reading-playbook.md).`;
+http(s) URLs are fetched with GET through the egress-governed network:fetch_read path
+(egress policy deny/warn/allow + audit chain, like network:fetch GET). Format is taken
+from the URL extension when present, else from the content (PDF/OOXML magic, '<' → html).`;
 
 const URL_PATTERN = /^[a-z][a-z0-9+.-]*:\/\//i;
 
@@ -77,6 +89,11 @@ const NOT_FOUND_DETAILS: ScriptErrorDetails = {
   code: 'NOT_FOUND',
   category: 'not_found',
   retryable: false,
+};
+const FETCH_FAILED_DETAILS: ScriptErrorDetails = {
+  code: 'FETCH_FAILED',
+  category: 'network',
+  retryable: true,
 };
 
 function parseReadArgs(argv: string[]): ReadArgs {
@@ -141,9 +158,146 @@ export function renderReadResult(result: ReadDocumentResult, asJson: boolean): s
   );
 }
 
+/** Injectable fetch boundary so URL reads stay hermetic in tests. */
+export interface ReadCommandDeps {
+  fetchUrl?: (url: string) => Promise<Buffer>;
+}
+
+/** Fetch a remote page through the same governed boundary as `network:fetch` GET. */
+async function fetchUrlBytes(url: string): Promise<Buffer> {
+  const request = {
+    url,
+    method: 'GET',
+    responseType: 'arraybuffer' as const,
+    timeout: 20000,
+    // secureFetch validates only the entry URL — each redirect hop goes back
+    // through the same egress gate, or a 3xx to a denied/private host would
+    // bypass it. options.href holds the resolved target at this point.
+    beforeRedirect: (options: Record<string, unknown>) => {
+      assertNetworkEgress(typeof options.href === 'string' ? options.href : '');
+    },
+  };
+  // The URL came from the operator's own argv — attest it as user-origin
+  // evidence so the protected `params.url` argument keeps honest lineage.
+  const body = await withOperationArgumentOrigins(
+    [
+      {
+        path: ['params', 'url'],
+        value_hash: computeApprovalPayloadHash({ value: url }),
+        authority: 'user',
+      },
+    ],
+    () =>
+      runExternalOperation(
+        {
+          operationId: 'network:fetch_read',
+          effect: { params: { url, method: 'GET' } },
+          requiresApproval: false,
+          delegable: isDelegableExternalOperation('network:fetch_read'),
+          observationOnly: true,
+        },
+        () => secureFetch<ArrayBuffer>(request),
+        () => 'succeeded'
+      )
+  );
+  return Buffer.from(body);
+}
+
+/** Classify fetch-path failures into the §3.2 error contract. */
+function toUrlReadError(error: unknown, url: string): ScriptExitError {
+  if (error instanceof ScriptExitError) return error;
+  const message = error instanceof Error ? error.message : String(error);
+  if (error instanceof SecureFetchError) {
+    if (error.httpStatus === 404) {
+      return new ScriptExitError(1, `[read] ${url} returned HTTP 404`, false, undefined, {
+        ...NOT_FOUND_DETAILS,
+      });
+    }
+    if (error.httpStatus === 401 || error.httpStatus === 403) {
+      return new ScriptExitError(
+        1,
+        `[read] ${url} was denied by the remote server (HTTP ${error.httpStatus})`,
+        false,
+        undefined,
+        { ...OUTSIDE_SCOPE_DETAILS }
+      );
+    }
+    return new ScriptExitError(1, `[read] fetch failed: ${message}`, false, undefined, {
+      ...FETCH_FAILED_DETAILS,
+      // Timeouts and 5xx are worth a retry; a 4xx other than the ones above is not.
+      retryable: error.httpStatus === undefined || error.httpStatus >= 500,
+    });
+  }
+  if (/Unsupported protocol|Invalid URL/.test(message)) {
+    return new ScriptExitError(1, `[read] ${url}: ${message}`, false, undefined, {
+      ...INVALID_INPUT_DETAILS,
+      next_action: 'pass an http:// or https:// URL',
+    });
+  }
+  // Governance denials (egress policy, sandbox, policy gate, approval stops)
+  // throw bracketed ALL_CAPS tags like [NETWORK_POLICY_VIOLATION]; class them
+  // as permission_denied, never as a retryable network failure.
+  if (
+    error instanceof ExternalOperationApprovalRequired ||
+    /\[[A-Z][A-Z0-9_]{3,}\]|Blocked URL|sandbox|policy|egress|rate.?limit|scope.?mismatch/i.test(
+      message
+    )
+  ) {
+    return new ScriptExitError(1, `[read] ${url}: ${message}`, false, undefined, {
+      ...OUTSIDE_SCOPE_DETAILS,
+      next_action: 'check the egress policy / sandbox network allowance for this host',
+    });
+  }
+  return new ScriptExitError(1, `[read] fetch failed: ${message}`, false, undefined, {
+    ...FETCH_FAILED_DETAILS,
+  });
+}
+
+/** Extension first (it also names OOXML), content sniffing as fallback. */
+function inferUrlDocumentFormat(url: string, body: Buffer): ReadableDocumentFormat {
+  let pathname: string;
+  try {
+    pathname = new URL(url).pathname.toLowerCase();
+  } catch {
+    throw new ScriptExitError(1, `[read] ${url}: Invalid URL`, false, undefined, {
+      ...INVALID_INPUT_DETAILS,
+      next_action: 'pass an http:// or https:// URL',
+    });
+  }
+  const byExtension = READABLE_DOCUMENT_EXTENSIONS[path.extname(pathname)];
+  if (byExtension) return byExtension;
+  if (body.subarray(0, 5).equals(Buffer.from('%PDF-'))) return 'pdf';
+  if (
+    body.length >= 4 &&
+    body[0] === 0x50 &&
+    body[1] === 0x4b &&
+    body[2] === 0x03 &&
+    body[3] === 0x04
+  ) {
+    throw new ScriptExitError(
+      1,
+      `[read] ${url} looks like an Office document (zip) but the URL has no extension ` +
+        'to name it (.docx/.pptx/.xlsx). Save it under active/shared/tmp/<job>/ with the right ' +
+        'extension and read that file.',
+      false,
+      undefined,
+      {
+        ...INVALID_INPUT_DETAILS,
+        code: 'UNSUPPORTED_TYPE',
+        next_action:
+          'save the response under active/shared/tmp/<job>/ with a .docx/.pptx/.xlsx extension, then read that file',
+      }
+    );
+  }
+  const head = body.subarray(0, 1024).toString('utf8').trimStart();
+  if (head.startsWith('<')) return 'html';
+  return 'text';
+}
+
 export async function runReadCommand(
   argv: string[],
-  print: (text: string) => void
+  print: (text: string) => void,
+  deps: ReadCommandDeps = {}
 ): Promise<ReadDocumentResult | undefined> {
   const args = parseReadArgs(argv);
   if (args.help || !args.file) {
@@ -151,65 +305,8 @@ export async function runReadCommand(
     print(READ_USAGE);
     return undefined;
   }
-  if (URL_PATTERN.test(args.file)) {
-    throw new ScriptExitError(
-      1,
-      `[read] ${args.file} is a URL — read only reads local files. Fetch remote content through the ` +
-        'egress-governed network:fetch op (see knowledge/product/orchestration/document-file-reading-playbook.md), ' +
-        'save it under active/shared/tmp/<job>/, then read that file.',
-      false,
-      undefined,
-      {
-        ...INVALID_INPUT_DETAILS,
-        next_action:
-          'fetch remote content through the egress-governed network:fetch op, save it under active/shared/tmp/<job>/, then read that file',
-      }
-    );
-  }
-  const absolute = pathResolver.rootResolve(args.file);
-  if (!isInsideRepository(absolute)) {
-    // The scope guard runs on path arithmetic alone: an outside path is never
-    // stat'ed, so `read` cannot serve as an existence oracle and the refusal
-    // is identical whether the file exists or not.
-    throw new ScriptExitError(
-      1,
-      `[read] ${args.file} is outside the repository. Copy it in first:\n` +
-        `  mkdir -p active/shared/tmp/<job> && cp "${args.file}" active/shared/tmp/<job>/`,
-      false,
-      undefined,
-      {
-        ...OUTSIDE_SCOPE_DETAILS,
-        next_action:
-          'copy the file into active/shared/tmp/<job>/ inside the repository, then read it',
-      }
-    );
-  }
-  // Only an authorized in-repository path is probed: a missing leaf inside the
-  // allowed scope is NOT_FOUND, which outside paths never reach.
-  if (!safeExistsSync(absolute)) {
-    throw new ScriptExitError(
-      1,
-      `[read] ${args.file} does not exist inside the repository — check the path, then retry.`,
-      false,
-      undefined,
-      NOT_FOUND_DETAILS
-    );
-  }
-  const format = inferDocumentFormat(absolute);
-  if (!format) {
-    throw new ScriptExitError(
-      1,
-      `[read] unsupported file type "${path.extname(absolute) || '(none)'}". ` +
-        `Readable: ${Object.keys(READABLE_DOCUMENT_EXTENSIONS).join(', ')}. ` +
-        'Source code and other text can be opened with the editor; binary formats need a dedicated verb (see / listen / watch).',
-      false,
-      undefined,
-      {
-        ...INVALID_INPUT_DETAILS,
-        code: 'UNSUPPORTED_TYPE',
-      }
-    );
-  }
+  // Output flags are validated before any egress so a refused flag never
+  // performs a real fetch.
   if (args.images && !isInsideRepository(pathResolver.rootResolve(args.images))) {
     throw new ScriptExitError(
       1,
@@ -228,13 +325,76 @@ export async function runReadCommand(
       OUTSIDE_SCOPE_DETAILS
     );
   }
-  const result = await readDocument(absolute, format, {
-    ocr: args.ocr,
-    ...(args.tier ? { tier: args.tier } : {}),
-    ...(args.tenant ? { tenantSlug: args.tenant } : {}),
-    ...(args.trainingUse ? { trainingUse: args.trainingUse } : {}),
-    ...(args.images ? { imagesDir: args.images } : {}),
-  });
+  let remote: { buffer: Buffer; format: ReadableDocumentFormat } | undefined;
+  if (URL_PATTERN.test(args.file)) {
+    let body: Buffer;
+    try {
+      body = await (deps.fetchUrl ?? fetchUrlBytes)(args.file);
+    } catch (error) {
+      throw toUrlReadError(error, args.file);
+    }
+    remote = { buffer: body, format: inferUrlDocumentFormat(args.file, body) };
+  }
+  let format: ReadableDocumentFormat | undefined;
+  if (remote) {
+    format = remote.format;
+  } else {
+    const absolute = pathResolver.rootResolve(args.file);
+    if (!isInsideRepository(absolute)) {
+      // The scope guard runs on path arithmetic alone: an outside path is never
+      // stat'ed, so `read` cannot serve as an existence oracle and the refusal
+      // is identical whether the file exists or not.
+      throw new ScriptExitError(
+        1,
+        `[read] ${args.file} is outside the repository. Copy it in first:\n` +
+          `  mkdir -p active/shared/tmp/<job> && cp "${args.file}" active/shared/tmp/<job>/`,
+        false,
+        undefined,
+        {
+          ...OUTSIDE_SCOPE_DETAILS,
+          next_action:
+            'copy the file into active/shared/tmp/<job>/ inside the repository, then read it',
+        }
+      );
+    }
+    // Only an authorized in-repository path is probed: a missing leaf inside the
+    // allowed scope is NOT_FOUND, which outside paths never reach.
+    if (!safeExistsSync(absolute)) {
+      throw new ScriptExitError(
+        1,
+        `[read] ${args.file} does not exist inside the repository — check the path, then retry.`,
+        false,
+        undefined,
+        NOT_FOUND_DETAILS
+      );
+    }
+    format = inferDocumentFormat(absolute);
+  }
+  if (!format) {
+    throw new ScriptExitError(
+      1,
+      `[read] unsupported file type "${path.extname(args.file) || '(none)'}". ` +
+        `Readable: ${Object.keys(READABLE_DOCUMENT_EXTENSIONS).join(', ')}. ` +
+        'Source code and other text can be opened with the editor; binary formats need a dedicated verb (see / listen / watch).',
+      false,
+      undefined,
+      {
+        ...INVALID_INPUT_DETAILS,
+        code: 'UNSUPPORTED_TYPE',
+      }
+    );
+  }
+  const result = await readDocument(
+    remote ? remote.buffer : pathResolver.rootResolve(args.file),
+    format,
+    {
+      ocr: args.ocr,
+      ...(args.tier ? { tier: args.tier } : {}),
+      ...(args.tenant ? { tenantSlug: args.tenant } : {}),
+      ...(args.trainingUse ? { trainingUse: args.trainingUse } : {}),
+      ...(args.images ? { imagesDir: args.images } : {}),
+    }
+  );
   const rendered = renderReadResult(result, args.json);
   const notices: string[] = [];
   if (args.images) {

@@ -41,6 +41,10 @@ status: active
 - [VCS host API seam の設計 (gh CLI 依存の抽象化)](./VCS_HOST_API_SEAM_DESIGN_2026-11-04.ja.md) — completed
 - [推論の資格情報の持ち主・種類・貸し出しと claude CLI の隔離（設計）](./CLAUDE_CLI_TENANT_CREDENTIAL_DESIGN_2026-11-16.ja.md) — active
 
+## CLI・知覚動詞
+
+- [kyberion read の URL 直接読み取り対応計画](./KYBERION_READ_URL_SUPPORT_PLAN_2026-11-25.ja.md) — completed（MSN-READ-URL-20261125 で実装。`read <url>` が secureFetch 経由で GET 取得し、リダイレクト各ホップも egress 再検証）
+
 ## 依存関係の変更記録
 
 - [Lockfile 変更レビュー — @presence/mission-deck](./LOCKFILE_CHANGE_MISSION_DECK_2026-11-20.md) — completed

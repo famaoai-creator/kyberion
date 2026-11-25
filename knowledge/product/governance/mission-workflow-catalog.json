@@ -2717,11 +2717,12 @@
             {
               "task_id_suffix": "post-mortem",
               "team_role": "implementer",
-              "description": "失敗を Environment/Logic/Governance に分類し、根本原因と再発防止策を evidence/post-mortem.md に執筆する(incident-post-mortem パイプライン相当)",
+              "description": "証跡と判断時点の情報から原因・寄与要因を分析し、事実・仮説・不明点を区別して evidence/post-mortem.md に記録する。重大事案や複数の制御が関与する事案では CAST で分析する",
               "deliverable": "evidence/post-mortem.md",
               "acceptance_criteria": [
-                "根本原因が証跡で裏付けられている",
-                "再発防止策に担当と期限がある"
+                "事実・仮説・不明点を分け、原因・寄与要因・判断時点の観測を証跡に紐づけている",
+                "再発防止策に担当・期限・検証条件がある",
+                "コード実行境界に関わる事案では、権限とデータへの影響、隔離・復旧の証跡と不明点を記録している"
               ],
               "expected_output_format": "files",
               "estimated_scope": "M",
@@ -2751,7 +2752,10 @@
               "team_role": "reviewer",
               "description": "post-mortem を根本原因の妥当性・証跡整合・blameless 観点でレビューし判定を記録する",
               "review_target_suffix": "post-mortem",
-              "acceptance_criteria": ["原因と対策の因果が通っている", "証跡と矛盾がない"],
+              "acceptance_criteria": [
+                "原因と対策の因果が証跡と矛盾せず、未確定事項が明記されている",
+                "再発防止策の検証条件が原因に対応している"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium"
@@ -2787,7 +2791,9 @@
               "team_role": "implementer",
               "description": "レビュー済み post-mortem を最終報告として evidence/incident-report-final.md に整形し関係者へ共有する",
               "deliverable": "evidence/incident-report-final.md",
-              "acceptance_criteria": ["最終報告が生成されている"],
+              "acceptance_criteria": [
+                "最終報告が生成され、ポストモーテムのレビュー結果と各再発防止策の WorkItem および検証状況が分かる"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
@@ -10577,11 +10583,12 @@
             {
               "task_id_suffix": "author-postmortem",
               "team_role": "implementer",
-              "description": "タイムライン再構成と根本原因分析(5-Whys/特性要因)、再発防止策を evidence/post-mortem.md に執筆する(blameless)",
+              "description": "証跡索引を evidence/evidence-index.json、時系列を evidence/incident-timeline.md に保全する。証跡と判断時点の情報から原因・寄与要因を分析し、事実・仮説・不明点を区別して evidence/post-mortem.md に記録する。重大事案や複数の制御が関与する事案では CAST で分析する",
               "deliverable": "evidence/post-mortem.md",
               "acceptance_criteria": [
-                "根本原因が証跡で裏付けられている",
-                "再発防止策に担当と期限がある"
+                "事実・仮説・不明点を分け、原因・寄与要因・判断時点の観測を証跡に紐づけている",
+                "再発防止策に担当・期限・検証条件がある",
+                "コード実行境界に関わる事案では、権限とデータへの影響、隔離・復旧の証跡と不明点を記録している"
               ],
               "expected_output_format": "files",
               "estimated_scope": "M",
@@ -10594,9 +10601,15 @@
             "checks": [
               {
                 "kind": "evidence_exists",
-                "params": {
-                  "path": "evidence/post-mortem.md"
-                }
+                "params": { "path": "evidence/evidence-index.json" }
+              },
+              {
+                "kind": "evidence_exists",
+                "params": { "path": "evidence/incident-timeline.md" }
+              },
+              {
+                "kind": "evidence_exists",
+                "params": { "path": "evidence/post-mortem.md" }
               }
             ]
           }
@@ -10613,7 +10626,7 @@
               "review_target_suffix": "author-postmortem",
               "acceptance_criteria": [
                 "原因と対策の因果が証跡と矛盾しない",
-                "再発防止策に担当と期限がある"
+                "再発防止策に担当・期限・検証条件があり、未確定事項が明記されている"
               ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
@@ -10652,7 +10665,8 @@
               "deliverable": "evidence/incident-report-final.md",
               "acceptance_criteria": [
                 "内部/顧客向け報告が整合している",
-                "横展開先(cross-project remediation)が特定されている"
+                "横展開先(cross-project remediation)が特定されている",
+                "復旧確認・ポストモーテムのレビュー・各対策の検証状況を区別し、対策を WorkItem に関連付けている"
               ],
               "expected_output_format": "files",
               "estimated_scope": "S",

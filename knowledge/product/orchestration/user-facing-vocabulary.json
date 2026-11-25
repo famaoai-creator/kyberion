@@ -9241,9 +9241,9 @@
         "qps-ploc": "⟦Ṗřėṽïėẇ őř řůñ ėẋṗőřŧ-ŧħėñ-ḓėŀėŧė ƒőř ȧ ƈŀőşïñɠ ŧėñȧñŧ őř ṗřőĵėƈŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
       },
       "cli_cmd_operator_cli_read": {
-        "en": "Read a document (pdf, pptx, docx, xlsx, html, md, txt, csv, json, yaml) as Markdown",
-        "ja": "文書 (pdf/pptx/docx/xlsx/html/md/txt/csv/json/yaml) を Markdown で読む",
-        "qps-ploc": "⟦Řėȧḓ ȧ ḓőƈůɱėñŧ (ṗḓƒ, ṗṗŧẋ, ḓőƈẋ, ẋŀşẋ, ħŧɱŀ, ɱḓ, ŧẋŧ, ƈşṽ, ĵşőñ, ẏȧɱŀ) ȧş Ɱȧřķḓőẇñ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+        "en": "Read a document or URL (pdf, pptx, docx, xlsx, html, md, txt, csv, json, yaml) as Markdown",
+        "ja": "文書または URL (pdf/pptx/docx/xlsx/html/md/txt/csv/json/yaml) を Markdown で読む",
+        "qps-ploc": "⟦Řėȧḓ ȧ ḓőƈůɱėñŧ őř ŮŘĿ (ṗḓƒ, ṗṗŧẋ, ḓőƈẋ, ẋŀşẋ, ħŧɱŀ, ɱḓ, ŧẋŧ, ƈşṽ, ĵşőñ, ẏȧɱŀ) ȧş Ɱȧřķḓőẇñ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
       },
       "cli_cmd_operator_cli_write": {
         "en": "Author a document from a semantic brief",
@@ -14417,6 +14417,46 @@
         "en": "Any",
         "ja": "指定なし",
         "qps-ploc": "⟦Ȧñẏ ŀőř⟧"
+      },
+      "authority.voice_approval_id": {
+        "en": "Local voice approval ID",
+        "ja": "ローカル音声の承認 ID",
+        "qps-ploc": "⟦Ŀőƈȧŀ ṽőïƈė ȧṗṗřőṽȧŀ ÏḒ ŀőřėɱ ï⟧"
+      },
+      "authority.voice_status_check": {
+        "en": "Check voice approval",
+        "ja": "音声の承認状態を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ṽőïƈė ȧṗṗřőṽȧŀ ŀőřėɱ ⟧"
+      },
+      "authority.voice_status_pending": {
+        "en": "Waiting for approval. Open the request in the inbox to review it.",
+        "ja": "承認待ちです。受信トレイで申請を開いて確認してください。",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ȧṗṗřőṽȧŀ. Őṗėñ ŧħė řėɋůėşŧ ïñ ŧħė ïñƀőẋ ŧő řėṽïėẇ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "authority.voice_status_approved": {
+        "en": "Approved. Follow the CLI resume instructions if playback has not already been attempted. Check the execution record if the result is uncertain.",
+        "ja": "承認済みです。再生をまだ試していない場合は CLI の案内に従って再開できます。結果が不明な場合は実行記録を確認してください。",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ. Ƒőŀŀőẇ ŧħė ƇĿÏ řėşůɱė ïñşŧřůƈŧïőñş ïƒ ṗŀȧẏƀȧƈķ ħȧş ñőŧ ȧŀřėȧḓẏ ƀėėñ ȧŧŧėɱṗŧėḓ. Ƈħėƈķ ŧħė ėẋėƈůŧïőñ řėƈőřḓ ïƒ ŧħė řėşůŀŧ ïş ůñƈėřŧȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
+      },
+      "authority.voice_status_rejected": {
+        "en": "Rejected. Review the decision before starting another request.",
+        "ja": "却下済みです。次の申請を始める前に判断を確認してください。",
+        "qps-ploc": "⟦Řėĵėƈŧėḓ. Řėṽïėẇ ŧħė ḓėƈïşïőñ ƀėƒőřė şŧȧřŧïñɠ ȧñőŧħėř řėɋůėşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "authority.voice_status_expired": {
+        "en": "Expired. Review the old request before submitting another.",
+        "ja": "期限切れです。次の申請を始める前に以前の申請を確認してください。",
+        "qps-ploc": "⟦Ėẋṗïřėḓ. Řėṽïėẇ ŧħė őŀḓ řėɋůėşŧ ƀėƒőřė şůƀɱïŧŧïñɠ ȧñőŧħėř. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "authority.voice_status_revoked": {
+        "en": "Revoked. Check prior execution evidence before retrying.",
+        "ja": "取り消し済みです。再試行前に以前の実行記録を確認してください。",
+        "qps-ploc": "⟦Řėṽőķėḓ. Ƈħėƈķ ṗřïőř ėẋėƈůŧïőñ ėṽïḓėñƈė ƀėƒőřė řėŧřẏïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "authority.voice_status_unavailable": {
+        "en": "This local voice approval could not be found or read. Check the ID and your access.",
+        "ja": "ローカル音声の承認を確認できません。ID とアクセス権を確認してください。",
+        "qps-ploc": "⟦Ŧħïş ŀőƈȧŀ ṽőïƈė ȧṗṗřőṽȧŀ ƈőůŀḓ ñőŧ ƀė ƒőůñḓ őř řėȧḓ. Ƈħėƈķ ŧħė ÏḒ ȧñḓ ẏőůř ȧƈƈėşş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
       },
       "authority.voice_speak": {
         "en": "Speak aloud",

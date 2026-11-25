@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { frontDeskText } from '../../../lib/i18n';
 import type { ConciergeLocale } from '../../../lib/i18n';
+import { VoiceApprovalStatus } from './VoiceApprovalStatus';
 import { OnboardingAuthorityPanel } from './OnboardingAuthorityPanel';
 import { ProviderAttestationSection } from './ProviderAttestationSection';
 import { GovernanceSection } from './GovernanceSection';
@@ -42,6 +43,7 @@ export function AuthoritySection({
         tenants={authorityTenants}
         selectedTenant={selectedTenant}
       />
+      <VoiceApprovalStatus t={t} />
       <ProviderAttestationSection
         t={t}
         locale={locale}

@@ -14,8 +14,9 @@ phase_affinity: [alignment, execution]
 Which engine to use when an agent has to **read** an office document or PDF — to
 answer a question, summarize it, or land it in `knowledge/` — and the traps that
 cost time when the wrong rung is picked. `read` also takes `.html` / `.htm` / `.md` /
-`.txt` / `.csv` / `.tsv` / `.json` / `.yaml` / `.yml` (URLs are refused — save them
-with `network:fetch` first). Text-native formats stay readable text: markdown / text /
+`.txt` / `.csv` / `.tsv` / `.json` / `.yaml` / `.yml`, and `http(s)` URLs —
+`read` fetches them through the egress-governed `secureFetch` (GET only;
+localhost and private-network hosts are refused). Text-native formats stay readable text: markdown / text /
 yaml as-is, JSON pretty-printed when valid, small csv/tsv as Markdown tables (large
 ones stay raw with a warning). Images, audio and video have their own commands
 (`see` / `listen` / `watch`) — see [perception-playbook.md](./perception-playbook.md).

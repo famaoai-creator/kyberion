@@ -1,0 +1,28 @@
+{
+  "record_id": "mem-MSN-READ-URL-20261125-2026_11_24",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Folding egress-gated fetch into a verb: re-validate every redirect hop",
+  "summary": "When a CLI verb gains URL input and fetches through secureFetch/runExternalOperation, entry-URL validation alone is an SSRF bypass — follow-redirects chases a 3xx to a denied or private host. Re-run assertNetworkEgress on each hop via axios beforeRedirect (options.href holds the resolved target).",
+  "candidate_id": "mem-MSN-READ-URL-20261125-2026_11_24",
+  "evidence_refs": [
+    "active/missions/public/MSN-READ-URL-20261125/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-READ-URL-20261125/evidence/implementation-report.md",
+    "active/missions/public/MSN-READ-URL-20261125/evidence/test-report.md",
+    "active/missions/public/MSN-READ-URL-20261125/evidence/distillation.md"
+  ],
+  "created_at": "2026-11-24T23:19:53.693Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "When a perception or utility verb folds in remote fetching: (1) wrap the call in runExternalOperation with the read-only op id (network:fetch_read; requiresApproval:false, delegable:false, observationOnly:true) and attest argv-derived params as authority:user via withOperationArgumentOrigins; (2) entry-URL validation is NOT enough — axios follows 3xx unchecked, so a redirect to a private or policy-denied host bypasses egress. Add beforeRedirect that calls assertNetworkEgress on options.href for every hop; (3) classify governance denials ([A-Z_]{4,} bracketed tags, sandbox/policy/approval stops) as permission_denied non-retryable, never as retryable network failures; (4) keep unit tests hermetic through an injectable fetch seam, but add one module-mock test that exercises the real governed wiring (secureFetch call shape + redirect re-validation); (5) an Office zip without a filename extension cannot name its format — refuse with the save-and-read recovery path instead of guessing."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-READ-URL-20261125/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-READ-URL-20261125/evidence/implementation-report.md",
+    "active/missions/public/MSN-READ-URL-20261125/evidence/test-report.md",
+    "active/missions/public/MSN-READ-URL-20261125/evidence/distillation.md"
+  ],
+  "source_branch": "feat/read-url-support-20261125",
+  "source_commit": "6cb6548312ec53d103155947ac4e11c5e4561602"
+}

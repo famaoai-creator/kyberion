@@ -153,9 +153,9 @@ describe('script-harness error contract', () => {
 describe('read command error contract', () => {
   let workDir = '';
 
-  const detailsOf = async (argv: string[]) => {
+  const detailsOf = async (argv: string[], deps?: Parameters<typeof runReadCommand>[2]) => {
     try {
-      await runReadCommand(argv, () => undefined);
+      await runReadCommand(argv, () => undefined, deps);
       return undefined;
     } catch (error) {
       expect(error).toBeInstanceOf(ScriptExitError);
@@ -196,11 +196,23 @@ describe('read command error contract', () => {
     );
   });
 
-  it('classifies a URL as invalid input pointing at the governed fetch path', async () => {
-    const error = await detailsOf(['https://example.com/a.pdf']);
-    expect(error?.details?.code).toBe('INVALID_INPUT');
-    expect(error?.details?.category).toBe('invalid_input');
-    expect(error?.details?.next_action).toContain('network:fetch');
+  it('classifies URL fetch failures without leaking network errors as internal', async () => {
+    const { SecureFetchError } = await import('@agent/core/network');
+    const denied = await detailsOf(['https://example.com/a.pdf'], {
+      fetchUrl: async () => {
+        throw new Error('[NETWORK_POLICY_VIOLATION] host denied');
+      },
+    });
+    expect(denied?.details?.code).toBe('OUTSIDE_ALLOWED_SCOPE');
+    expect(denied?.details?.category).toBe('permission_denied');
+    const upstream = await detailsOf(['https://example.com/a.pdf'], {
+      fetchUrl: async () => {
+        throw new SecureFetchError('Network Error: boom (503)', 503);
+      },
+    });
+    expect(upstream?.details?.code).toBe('FETCH_FAILED');
+    expect(upstream?.details?.category).toBe('network');
+    expect(upstream?.details?.retryable).toBe(true);
   });
 
   it('keeps stdout a single JSON document under --json --images/--out', async () => {
