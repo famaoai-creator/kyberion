@@ -21,7 +21,8 @@ export function formatLearningHarvestReport(report: LearningHarvestReport): stri
     const status = source.error ? `error: ${source.error}` : `${source.observed} observed`;
     lines.push(
       `  - ${source.source}: ${status}, ${source.clusters} cluster(s), ${source.proposed.length} proposed` +
-        (source.skipped_scope ? `, ${source.skipped_scope} outside the active tenant` : '')
+        (source.skipped_scope ? `, ${source.skipped_scope} outside the active tenant` : '') +
+        (source.skipped_owner ? `, ${source.skipped_owner} waiting for a personal owner` : '')
     );
     for (const cluster of source.proposed) {
       lines.push(`      * ${cluster.title} — ${cluster.total} total (${cluster.new_count} new)`);

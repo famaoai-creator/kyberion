@@ -50,6 +50,35 @@ describe('operational learning signals (LC-16)', () => {
     );
   });
 
+  it("owns a personal candidate by the producer's nhi_id, else by the owner it names", () => {
+    const signal = {
+      signalId: 'owned',
+      sourceType: 'runtime_signal' as const,
+      sourceRef: 'test:owned',
+      title: 'Owned',
+      summary: 'Personal candidate.',
+    };
+    const prior = process.env.KYBERION_NHI_ID;
+    try {
+      delete process.env.KYBERION_NHI_ID;
+      enqueue.mockClear();
+      enqueueOperationalLearningSignal(signal, { ownerNhi: 'kyberion://agent/_/_/installed' });
+      expect(enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ tier: 'personal', ownerNhi: 'kyberion://agent/_/_/installed' })
+      );
+
+      process.env.KYBERION_NHI_ID = 'kyberion://agent/_/_/producer';
+      enqueue.mockClear();
+      enqueueOperationalLearningSignal(signal, { ownerNhi: 'kyberion://agent/_/_/installed' });
+      expect(enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ ownerNhi: 'kyberion://agent/_/_/producer' })
+      );
+    } finally {
+      if (prior === undefined) delete process.env.KYBERION_NHI_ID;
+      else process.env.KYBERION_NHI_ID = prior;
+    }
+  });
+
   it('does not downgrade confidential signals without tenant scope', () => {
     enqueue.mockClear();
     const learningId = enqueueOperationalLearningSignal({
