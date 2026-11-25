@@ -14,17 +14,27 @@ vi.mock('node:child_process', async (importOriginal) => ({
   spawn: spawnMock,
 }));
 
+type SilentChild = EventEmitter & {
+  stdout: PassThrough;
+  stderr: PassThrough;
+  stdin: PassThrough;
+  pid: number;
+  exitCode: number | null;
+  signalCode: NodeJS.Signals | null;
+  kill: ReturnType<typeof vi.fn<(signal?: NodeJS.Signals) => boolean>>;
+};
+
 /** A child that stays silent until killed, like a CLI hung at launch. */
-function silentChild(): any {
-  const child = new EventEmitter() as any;
+function silentChild(): SilentChild {
+  const child = new EventEmitter() as SilentChild;
   child.stdout = new PassThrough();
   child.stderr = new PassThrough();
   child.stdin = new PassThrough();
   child.pid = 4242;
   child.exitCode = null;
   child.signalCode = null;
-  child.kill = vi.fn((signal: string) => {
-    child.signalCode = signal;
+  child.kill = vi.fn((signal?: NodeJS.Signals) => {
+    child.signalCode = signal ?? null;
     queueMicrotask(() => child.emit('close', null));
     return true;
   });

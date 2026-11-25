@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const recordSpy = vi.fn((entry: any) => ({ id: 'AUD-TEST-1', ...entry }));
+const recordSpy = vi.fn((entry: Record<string, unknown>) => ({ id: 'AUD-TEST-1', ...entry }));
 vi.mock('../governance/audit-chain.js', () => ({
-  auditChain: { record: (e: any) => recordSpy(e) },
+  auditChain: { record: (e: Record<string, unknown>) => recordSpy(e) },
 }));
 vi.mock('./co-session-hook.js', () => ({
   coSessionHookDrain: () => [],
