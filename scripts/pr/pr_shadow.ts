@@ -1,5 +1,9 @@
 import { parseArgs } from 'node:util';
 import {
+  evaluateAutonomousLoopReadiness,
+  formatAutonomousLoopReadiness,
+} from '@agent/core/governance/autonomous-loop-readiness';
+import {
   DEFAULT_IGNORED_CHECKS,
   evaluateFactoryReadiness,
   listPrShadowRecords,
@@ -159,10 +163,13 @@ export function formatObserveResult(result: ObserveResult): string {
   return lines.join('\n');
 }
 
-function readTenantOption(argv: string[]): string | undefined {
+function readReportOptions(argv: string[]): { tenant?: string; loopReadiness: boolean } {
   const { values, tokens } = parseArgs({
     args: argv,
-    options: { tenant: { type: 'string' } },
+    options: {
+      tenant: { type: 'string' },
+      'loop-readiness': { type: 'boolean' },
+    },
     allowPositionals: true,
     strict: false,
     tokens: true,
@@ -170,12 +177,13 @@ function readTenantOption(argv: string[]): string | undefined {
   const hasTenantOption = tokens.some(
     (token) => token.kind === 'option' && token.name === 'tenant'
   );
-  if (!hasTenantOption) return undefined;
+  const loopReadiness = values['loop-readiness'] === true;
+  if (!hasTenantOption) return { loopReadiness };
   const raw = typeof values.tenant === 'string' ? values.tenant.trim() : '';
   if (!raw || raw.startsWith('-')) {
     throw new ScriptExitError(2, '--tenant requires a tenant slug');
   }
-  return raw;
+  return { tenant: raw, loopReadiness };
 }
 
 export function formatFactoryReadiness(report: FactoryReadinessReport): string {
@@ -203,22 +211,30 @@ export const runPrShadow = defineScript({
       return result;
     }
     if (command === 'report') {
-      const tenant = readTenantOption(context.argv);
+      const { tenant, loopReadiness: includeLoopReadiness } = readReportOptions(context.argv);
       const summary = summarizePrShadow(listPrShadowRecords());
-      if (!tenant) {
+      if (!tenant && !includeLoopReadiness) {
         context.print(
           context.json ? JSON.stringify(summary, null, 2) : formatPrShadowSummary(summary)
         );
         return summary;
       }
-      const factoryReadiness = evaluateFactoryReadiness({ tenant_slug: tenant });
-      const reportWithFactory = { ...summary, factory_readiness: factoryReadiness };
-      context.print(
-        context.json
-          ? JSON.stringify(reportWithFactory, null, 2)
-          : `${formatPrShadowSummary(summary)}\n\n${formatFactoryReadiness(factoryReadiness)}`
-      );
-      return reportWithFactory;
+      const factoryReadiness = tenant
+        ? evaluateFactoryReadiness({ tenant_slug: tenant })
+        : undefined;
+      const loopReadiness = includeLoopReadiness
+        ? evaluateAutonomousLoopReadiness(tenant ? { tenant_slug: tenant } : {})
+        : undefined;
+      const report = {
+        ...summary,
+        ...(factoryReadiness ? { factory_readiness: factoryReadiness } : {}),
+        ...(loopReadiness ? { loop_readiness: loopReadiness } : {}),
+      };
+      const sections = [formatPrShadowSummary(summary)];
+      if (factoryReadiness) sections.push(formatFactoryReadiness(factoryReadiness));
+      if (loopReadiness) sections.push(formatAutonomousLoopReadiness(loopReadiness));
+      context.print(context.json ? JSON.stringify(report, null, 2) : sections.join('\n\n'));
+      return report;
     }
     throw new ScriptExitError(2, `Unknown pr-shadow command: ${command} (observe | report)`);
   },

@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, autonomy, resident-agent, dots, charter, supervision]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-11-19
+last_updated: 2026-11-25
 ---
 
 # Resident Dot Model
@@ -665,3 +665,13 @@ bounded pending pressure, new-process restart and competing process claims,
 stale offers, pre/post-dispatch failure, partial wake-tool effects, terminal
 receipt correlation, tenant/full-scope isolation and fail-closed state/source loss.
 Never invoke real providers, notifications or resident daemons for these fixtures.
+
+## Governed `task_session` executor tools
+
+When a charter explicitly includes `task_session` in `authority.allowed_execution_shapes`,
+the executor binds `createDotTaskSessionToolRuntime` (`libs/core/dot/dot-task-session-tools.ts`)
+into the bounded `worker-goal-driver` loop (`scripts/dot/dot_executor_step.ts`). Before
+each tool call (`dot_read_scoped_file`, `dot_search_knowledge`,
+`dot_write_scoped_deliverable`, `dot_cite_knowledge_used`), the runtime re-asserts
+that the WorkItem claim/lease is current and enforces symlink-free scope containment,
+artifact writes via `writeScopedArtifact`, and knowledge delivery/usage feedback tracking.

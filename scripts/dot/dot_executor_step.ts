@@ -47,6 +47,10 @@ import {
   type DotExecutorPorts,
   type DotGoalMode,
 } from '@agent/core/dot/dot-executor';
+import {
+  createDotTaskSessionToolRuntime,
+  type DotTaskSessionToolContext,
+} from '@agent/core/dot/dot-task-session-tools';
 import '@agent/core/dot/dot-extension-bootstrap';
 import {
   resolveDotWakeBackend,
@@ -85,6 +89,17 @@ export interface DotExecutorStepDeps extends DotExecutorDeps {
     assertExecutionCurrent?: () => void
   ) => ReturnType<DotExecutorPorts['runPipeline']>;
   maxPerSweep?: number;
+  taskToolDeps?: Partial<
+    Pick<
+      DotTaskSessionToolContext,
+      | 'findKnowledge'
+      | 'recordDelivery'
+      | 'recordUsage'
+      | 'writeArtifact'
+      | 'audit'
+      | 'maxToolCalls'
+    >
+  >;
 }
 
 /**
@@ -366,13 +381,42 @@ export function buildDotExecutorPorts(
         ? undefined
         : DOT_EXECUTOR_TASK_SESSION_GUIDANCE,
     goalMode: () => goalModeOf(resolution),
-    async runGoalTurn(options) {
+    async runGoalTurn(options, signal, context) {
       if (!resolved)
         throw new DotExecutorPreEffectError('no reasoning backend resolved for the goal turn');
       const observed = observeBackendCalls(options.backend ?? resolved);
+      const useTaskTools =
+        context?.executionShape === 'task_session' &&
+        context.item.metadata?.task_session_mode !== 'advisory';
+      const taskRuntime = useTaskTools
+        ? createDotTaskSessionToolRuntime({
+            charter,
+            item: context.item,
+            rootDir: deps.rootDir,
+            assertCurrent: () => {
+              context.assertCurrent();
+              if (!deps.claim) assertWorkClaimsAllowed(context.item.item_id);
+            },
+            ...(deps.taskToolDeps ?? {}),
+          })
+        : undefined;
+      const driverOptions = taskRuntime
+        ? {
+            ...options,
+            ...(signal ? { signal } : {}),
+            backend: observed.backend,
+            extraTools: [...(options.extraTools ?? []), ...taskRuntime.definitions],
+            executeTool: (call: Parameters<typeof taskRuntime.executeTool>[0]) =>
+              taskRuntime.executeTool(call),
+          }
+        : {
+            ...options,
+            ...(signal ? { signal } : {}),
+            backend: observed.backend,
+          };
       let result: Awaited<ReturnType<typeof drive>>;
       try {
-        result = await drive({ ...options, backend: observed.backend });
+        result = await drive(driverOptions);
       } catch (error) {
         if (observed.called()) throw error;
         throw new DotExecutorPreEffectError(
@@ -382,6 +426,7 @@ export function buildDotExecutorPorts(
       return {
         ...result,
         finalText: result.finalReport ?? result.goal.terminalReason,
+        ...(taskRuntime ? { taskToolSummary: taskRuntime.getSummary() } : {}),
       };
     },
     async delegateText(prompt, timeoutMs, signal) {

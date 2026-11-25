@@ -1,6 +1,6 @@
 ---
 title: 'Loop Closure Machinery — 4つの自己改善ループの実装地図'
-last_updated: 2026-11-21
+last_updated: 2026-11-25
 ---
 
 # Loop Closure Machinery — 4つの自己改善ループの実装地図
@@ -79,6 +79,8 @@ L4 人間フィードバック 却下 → ask-why 1問(5カテゴリ) → イベ
 
 - **共有語彙**: `libs/core/contracts/rejection-reason.ts`(5カテゴリ + `normalizeRejectionReasonCategory`)。カテゴリを閉じているのは学習側の dedup を決定論化するため。
 - **機械由来のギャップ**(goal 不充足)は IL-04 が元から閉じている。L4 はそこに**人間由来の却下を同じ状態機械で合流**させた(新設なし)。
+- **会話中の自然な訂正の捕捉 (IL-05)**: `libs/core/knowledge/conversational-correction-learning.ts` が `surface-runtime-orchestrator` 上のスコープ付き会話ターンから「今後は〜して」「〜しないで」等の選好・境界ルールを `intent-phrase-lexicon.json` で検出し、レビュー可能な `MemoryCandidate` を生成する(権限・手順は自動変更しない)。
+- **記憶ループ健全性と自律ループ診断**: `libs/core/knowledge/memory-loop-health.ts` が `promoted / retrieved / used` と `loop_status` (`empty | stalled | partial | closed`) を計測し、`libs/core/governance/autonomous-loop-readiness.ts`（`pnpm tsx scripts/pr/pr_shadow.ts report --loop-readiness`）が heartbeat / active dot / memory loop / factory readiness を統合診断する。
 
 ## 主要な環境変数
 

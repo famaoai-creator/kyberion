@@ -537,6 +537,135 @@ describe('dot-executor supervisor step', () => {
     expect(goalDriver).toHaveBeenCalledWith(
       expect.objectContaining({ systemPrompt: expect.stringContaining('You run read-only') })
     );
+    const callArg = (goalDriver as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as Record<
+      string,
+      unknown
+    >;
+    expect(callArg?.extraTools).toBeUndefined();
+    expect(callArg?.executeTool).toBeUndefined();
+  });
+
+  it('wires governed task_session tools when charter allows task_session and runs search -> deliverable -> cite', async () => {
+    const goalDriver = vi.fn(async (opts: Record<string, unknown>) => {
+      const executeTool = opts.executeTool as (call: {
+        name: string;
+        input: Record<string, unknown>;
+      }) => Promise<unknown>;
+      await executeTool({
+        name: 'dot_search_knowledge',
+        input: { topic: 'ops', limit: 2 },
+      });
+      await executeTool({
+        name: 'dot_write_scoped_deliverable',
+        input: { name: 'report.md', content: '# Report\nDone.\n' },
+      });
+      await executeTool({
+        name: 'dot_cite_knowledge_used',
+        input: {
+          document_path: 'knowledge/product/evolution/wisdom/generated/ops.md',
+          useful: true,
+        },
+      });
+      return {
+        goalId: 'g',
+        finalState: 'complete',
+        goal: {},
+        turnsRun: 2,
+        rewindCount: 0,
+        persisted: null,
+        finalReport: 'Completed with scoped deliverable.',
+      };
+    });
+    const target = {
+      item_id: 'governed-ts',
+      title: 'Research and deliver report',
+      description: 'Use governed tools',
+      status: 'ready',
+      version: 1,
+      created_at: '2026-10-04T09:00:00Z',
+      metadata: {
+        dot_id: 'step-dot',
+        action_ref: 'dact-governed-ts',
+        requested_work_shape: 'task_session',
+      },
+    } as unknown as WorkItem;
+    const rows = await runDotExecutorStep(
+      new Date('2026-10-04T10:00:00Z'),
+      [
+        {
+          path: 'dots/step-dot.json',
+          charter: {
+            ...CHARTER,
+            authority: {
+              ...CHARTER.authority,
+              allowed_execution_shapes: ['task_session', 'pipeline'],
+            },
+          },
+        },
+      ],
+      {
+        rootDir: 'active/shared/tmp/dot-executor-step-tests',
+        backend: toolBackend,
+        goalDriver: goalDriver as never,
+        listItems: () => [target],
+        claim: () => ({ item: target, lease: { lease_id: 'l1' } as never }),
+        release: () => ({ item: target, lease: {} as never }),
+        throttle: () => 'normal',
+        tokenCapReached: () => false,
+        reap: () => ({ expired: [], recovered: [], parked: [], replayed: [] }),
+        appendInbox: () => {},
+        audit: () => {},
+        taskToolDeps: {
+          findKnowledge: vi.fn(async () => [
+            {
+              path: 'knowledge/product/evolution/wisdom/generated/ops.md',
+              title: 'Ops',
+              excerpt: 'Ops',
+              tags: ['ops'],
+              score: 0.9,
+            },
+          ]),
+          recordDelivery: vi.fn((input) => ({
+            deliveryRecordPath: 'delivery.jsonl',
+            refs: input.refs.map((ref: Record<string, unknown>) => ({
+              ...ref,
+              delivery_id: 'd1',
+            })),
+          })) as never,
+          recordUsage: vi.fn(() => ({ usageUpdated: true, promotionCandidateIds: [] })) as never,
+          writeArtifact: vi.fn(() => ({
+            absolute_path:
+              'active/shared/artifacts/public/shared/report/dot-step-dot/governed-ts/report.md',
+            repo_relative_path:
+              'active/shared/artifacts/public/shared/report/dot-step-dot/governed-ts/report.md',
+            index_path: 'active/shared/artifacts/public/shared/artifacts-index.jsonl',
+            scope_kind: 'tenant' as const,
+          })) as never,
+          audit: vi.fn(),
+        },
+      }
+    );
+    expect(goalDriver).toHaveBeenCalledWith(
+      expect.objectContaining({
+        extraTools: expect.arrayContaining([
+          expect.objectContaining({ name: 'dot_read_scoped_file' }),
+          expect.objectContaining({ name: 'dot_search_knowledge' }),
+          expect.objectContaining({ name: 'dot_write_scoped_deliverable' }),
+          expect.objectContaining({ name: 'dot_cite_knowledge_used' }),
+        ]),
+        executeTool: expect.any(Function),
+      })
+    );
+    expect(rows).toMatchObject([
+      {
+        work_item_id: 'governed-ts',
+        status: 'done',
+        summary: expect.stringContaining(
+          'active/shared/artifacts/public/shared/report/dot-step-dot/governed-ts/report.md'
+        ),
+      },
+    ]);
+    expect(rows[0]?.summary).toContain('cited: 1');
   });
 
   it('is registered after key-result measurement', () => {
