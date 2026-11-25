@@ -1,9 +1,17 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import ExcelJS from 'exceljs';
 import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
 import { READ_USAGE, runReadCommand } from './cli-read.js';
+
+// Only the transport is stubbed — the governed wiring around it
+// (runExternalOperation admission, user-origin attestation, assertNetworkEgress
+// on the entry URL and every redirect hop) runs for real.
+vi.mock('@agent/core/network', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/network')>();
+  return { ...actual, secureFetch: vi.fn(actual.secureFetch) };
+});
 
 describe('pnpm kyberion read', () => {
   let workDir = '';
@@ -108,10 +116,86 @@ describe('pnpm kyberion read', () => {
     expect(output.join('\n')).toBe('# Page\n\nHello **there**');
   });
 
-  it('refuses URLs with a pointer to the governed fetch path', async () => {
-    await expect(runReadCommand(['https://example.com/a.html'], () => {})).rejects.toThrow(
-      /is a URL[\s\S]*network:fetch/
+  it('reads http(s) URLs through the governed fetch boundary', async () => {
+    const fetched: string[] = [];
+    const output: string[] = [];
+    await runReadCommand(['https://example.com/page.html'], (text) => output.push(text), {
+      fetchUrl: async (url) => {
+        fetched.push(url);
+        return Buffer.from(
+          '<html><head><title>Remote</title></head><body><p>Hello <b>web</b></p></body></html>'
+        );
+      },
+    });
+    expect(fetched).toEqual(['https://example.com/page.html']);
+    expect(output.join('\n')).toBe('# Remote\n\nHello **web**');
+  });
+
+  it('sniffs html content when the URL has no extension', async () => {
+    const output: string[] = [];
+    const result = await runReadCommand(
+      ['https://example.com/articles/7/aoto/'],
+      (text) => output.push(text),
+      { fetchUrl: async () => Buffer.from('<html><body><p>Hi</p></body></html>') }
     );
+    expect(result?.format).toBe('html');
+    expect(output.join('\n')).toContain('Hi');
+  });
+
+  it('refuses Office-zip URLs without an extension and names the save-and-read path', async () => {
+    await expect(
+      runReadCommand(['https://example.com/download'], () => {}, {
+        fetchUrl: async () => Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]),
+      })
+    ).rejects.toThrow(/Office document[\s\S]*active\/shared\/tmp/);
+  });
+
+  it('classifies URL fetch failures into the error contract', async () => {
+    const { SecureFetchError } = await import('@agent/core/network');
+    const cases: Array<[Error, string]> = [
+      [new Error('Unsupported protocol: file:'), 'INVALID_INPUT'],
+      [new Error('Blocked URL: localhost'), 'OUTSIDE_ALLOWED_SCOPE'],
+      [new Error('[NETWORK_POLICY_VIOLATION] host denied'), 'OUTSIDE_ALLOWED_SCOPE'],
+      [new Error('[SANDBOX_NETWORK_DENIED] sandbox blocked'), 'OUTSIDE_ALLOWED_SCOPE'],
+      [new Error('[POLICY_BLOCKED] operation denied'), 'OUTSIDE_ALLOWED_SCOPE'],
+      [new SecureFetchError('Network Error: not found (404)', 404), 'NOT_FOUND'],
+      [new SecureFetchError('Network Error: boom (503)', 503), 'FETCH_FAILED'],
+    ];
+    for (const [cause, code] of cases) {
+      await expect(
+        runReadCommand(['https://example.com/x'], () => {}, {
+          fetchUrl: async () => {
+            throw cause;
+          },
+        })
+      ).rejects.toMatchObject({ details: expect.objectContaining({ code }) });
+    }
+  });
+
+  it('wires the default fetch through the governed secureFetch boundary', async () => {
+    const { secureFetch } = await import('@agent/core/network');
+    const mocked = vi.mocked(secureFetch);
+    mocked.mockClear();
+    mocked.mockResolvedValue(
+      new TextEncoder().encode('<html><body><p>wired</p></body></html>').buffer as ArrayBuffer
+    );
+    const output: string[] = [];
+    await runReadCommand(['https://example.com/wired'], (text) => output.push(text));
+    expect(output.join('\n')).toContain('wired');
+    expect(mocked).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://example.com/wired',
+        method: 'GET',
+        responseType: 'arraybuffer',
+      })
+    );
+    // Redirect re-validation: a hop to a private-network host must be denied
+    // through the same egress gate instead of being followed blindly.
+    const request = mocked.mock.calls[0]?.[0] as {
+      beforeRedirect: (options: Record<string, unknown>) => void;
+    };
+    expect(() => request.beforeRedirect({ href: 'http://127.0.0.1/meta' })).toThrow();
+    expect(() => request.beforeRedirect({ href: 'https://example.com/next' })).not.toThrow();
   });
 
   it('reads csv/json text-native files and refuses unknown types', async () => {

@@ -9241,9 +9241,9 @@
         "qps-ploc": "⟦Ṗřėṽïėẇ őř řůñ ėẋṗőřŧ-ŧħėñ-ḓėŀėŧė ƒőř ȧ ƈŀőşïñɠ ŧėñȧñŧ őř ṗřőĵėƈŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
       },
       "cli_cmd_operator_cli_read": {
-        "en": "Read a document (pdf, pptx, docx, xlsx, html, md, txt, csv, json, yaml) as Markdown",
-        "ja": "文書 (pdf/pptx/docx/xlsx/html/md/txt/csv/json/yaml) を Markdown で読む",
-        "qps-ploc": "⟦Řėȧḓ ȧ ḓőƈůɱėñŧ (ṗḓƒ, ṗṗŧẋ, ḓőƈẋ, ẋŀşẋ, ħŧɱŀ, ɱḓ, ŧẋŧ, ƈşṽ, ĵşőñ, ẏȧɱŀ) ȧş Ɱȧřķḓőẇñ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+        "en": "Read a document or URL (pdf, pptx, docx, xlsx, html, md, txt, csv, json, yaml) as Markdown",
+        "ja": "文書または URL (pdf/pptx/docx/xlsx/html/md/txt/csv/json/yaml) を Markdown で読む",
+        "qps-ploc": "⟦Řėȧḓ ȧ ḓőƈůɱėñŧ őř ŮŘĿ (ṗḓƒ, ṗṗŧẋ, ḓőƈẋ, ẋŀşẋ, ħŧɱŀ, ɱḓ, ŧẋŧ, ƈşṽ, ĵşőñ, ẏȧɱŀ) ȧş Ɱȧřķḓőẇñ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
       },
       "cli_cmd_operator_cli_write": {
         "en": "Author a document from a semantic brief",
