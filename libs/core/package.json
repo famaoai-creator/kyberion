@@ -1444,6 +1444,10 @@
       "types": "./dist/dot/dot-step-circuit.d.ts",
       "default": "./dist/dot/dot-step-circuit.js"
     },
+    "./dot/dot-task-session-tools": {
+      "types": "./dist/dot/dot-task-session-tools.d.ts",
+      "default": "./dist/dot/dot-task-session-tools.js"
+    },
     "./dot/dot-wake-backend": {
       "types": "./dist/dot/dot-wake-backend.d.ts",
       "default": "./dist/dot/dot-wake-backend.js"
@@ -1871,6 +1875,10 @@
     "./governance/authorization-overlay": {
       "types": "./dist/governance/authorization-overlay.d.ts",
       "default": "./dist/governance/authorization-overlay.js"
+    },
+    "./governance/autonomous-loop-readiness": {
+      "types": "./dist/governance/autonomous-loop-readiness.d.ts",
+      "default": "./dist/governance/autonomous-loop-readiness.js"
     },
     "./governance/autonomous-ops-gate": {
       "types": "./dist/governance/autonomous-ops-gate.d.ts",
@@ -2479,6 +2487,10 @@
     "./knowledge-weight-recalculation": {
       "types": "./dist/knowledge/knowledge-weight-recalculation.d.ts",
       "default": "./dist/knowledge/knowledge-weight-recalculation.js"
+    },
+    "./knowledge/conversational-correction-learning": {
+      "types": "./dist/knowledge/conversational-correction-learning.d.ts",
+      "default": "./dist/knowledge/conversational-correction-learning.js"
     },
     "./knowledge/distill-candidate-registry": {
       "types": "./dist/knowledge/distill-candidate-registry.d.ts",
@@ -6383,6 +6395,10 @@
     "./surface/ask-view": {
       "types": "./dist/surface/ask-view.d.ts",
       "default": "./dist/surface/ask-view.js"
+    },
+    "./surface/attention-triage": {
+      "types": "./dist/surface/attention-triage.d.ts",
+      "default": "./dist/surface/attention-triage.js"
     },
     "./surface/browser-human-request": {
       "types": "./dist/surface/browser-human-request.d.ts",

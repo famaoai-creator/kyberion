@@ -91,6 +91,7 @@ import { assertDotAccountabilityCharter } from './dot-authority.js';
 export { assertDotAccountabilityCharter } from './dot-authority.js';
 import { recordAutonomyExecution } from '../governance/autonomy-action-state.js';
 import type { DotCharter, LoadedDotCharter } from './dot-charter.js';
+import type { DotTaskSessionToolSummary } from './dot-task-session-tools.js';
 import type { DotStatusSection } from './dot-extensions.js';
 import { DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE, type DotExecutionShape } from './dot-proposals.js';
 import { requestedExecutionShape } from './dot-requested-shape.js';
@@ -251,14 +252,26 @@ export function isDotExecutorStaleAttemptError(error: unknown): boolean {
  * way. A timeout is quarantined because signalling abort does not prove the
  * port stopped or that it produced no effects.
  */
+export interface DotGoalTurnContext {
+  item: WorkItem;
+  executionShape: 'direct_reply' | 'task_session';
+  assertCurrent: () => void;
+}
+
 export interface DotExecutorPorts {
   /** A production adapter without governed work tools must declare this limitation. */
   taskSessionUnavailable?: string;
   /** Bounded goal-driven loop under the charter role (live tool backend). */
   runGoalTurn(
     o: DotWakeLoopOptions,
-    signal?: AbortSignal
-  ): Promise<DotWakeLoopResult & { finalText?: string }>;
+    signal?: AbortSignal,
+    context?: DotGoalTurnContext
+  ): Promise<
+    DotWakeLoopResult & {
+      finalText?: string;
+      taskToolSummary?: DotTaskSessionToolSummary;
+    }
+  >;
   /** One advisory delegated turn, bounded by `timeoutMs`; no uniform no-effect guarantee. */
   delegateText(prompt: string, timeoutMs: number, signal?: AbortSignal): Promise<string>;
   /** Run an allowed pipeline in-process. */
@@ -303,7 +316,17 @@ export function listClaimableDotWorkItems(c: DotCharter, deps: DotExecutorDeps =
         !activeTerminalResult(terminal, item) &&
         !hasUncertainAttempt(item)
     )
-    .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.item_id.localeCompare(b.item_id));
+    .sort((a, b) =>
+      a.created_at !== b.created_at
+        ? a.created_at < b.created_at
+          ? -1
+          : 1
+        : a.item_id < b.item_id
+          ? -1
+          : a.item_id > b.item_id
+            ? 1
+            : 0
+    );
 }
 
 function executorSystemPrompt(c: DotCharter, readOnly: boolean): string {
@@ -313,7 +336,7 @@ function executorSystemPrompt(c: DotCharter, readOnly: boolean): string {
     'Stay inside the role write scopes. Never start a mission, create WorkItems, edit dot charters, or touch another tenant.',
     readOnly
       ? 'You run read-only: investigate and answer; describe concrete changes instead of making them — the dot re-proposes any effect.'
-      : 'Do the work, verify it, then mark the goal complete (or blocked with the reason).',
+      : 'Use your governed task tools (dot_read_scoped_file, dot_search_knowledge, dot_write_scoped_deliverable, dot_cite_knowledge_used) within scope to complete the work, write any deliverable, cite used knowledge, then mark the goal complete (or blocked with the reason).',
     'End with a short plain-text report: what you did, what changed, and anything left open.',
   ].join('\n');
 }
@@ -485,6 +508,24 @@ async function routeItem(
       tokens: Math.ceil((prompt.length + text.length) / 3),
     };
   }
+  const assertTaskTurnCurrent = () => {
+    signal.throwIfAborted();
+    if (!deps.claim && !deps.listItems) {
+      const current = getWorkItem(item.item_id, { rootDir: deps.rootDir });
+      if (
+        !current ||
+        !item.current_attempt_id ||
+        current.current_attempt_id !== item.current_attempt_id ||
+        !item.lease_id ||
+        current.lease_id !== item.lease_id ||
+        current.status !== 'in_progress'
+      ) {
+        throw new DotExecutorStaleAttemptError(
+          `dot task_session attempt for ${item.item_id} is no longer current`
+        );
+      }
+    }
+  };
   const result = await withDotUsage(() =>
     ports.runGoalTurn(
       {
@@ -502,13 +543,27 @@ async function routeItem(
             : {}),
         },
       },
-      signal
+      signal,
+      {
+        item,
+        executionShape: shape,
+        assertCurrent: assertTaskTurnCurrent,
+      }
     )
   );
   const report = result.finalText?.trim();
   const state = result.finalState ?? 'paused';
   const status: Outcome['status'] =
     state === 'complete' ? 'done' : state === 'blocked' ? 'blocked' : 'failed';
+  const toolSummary = result.taskToolSummary;
+  const toolSuffix =
+    shape === 'task_session' &&
+    toolSummary &&
+    (toolSummary.deliverables.length > 0 || toolSummary.citedKnowledgePaths.length > 0)
+      ? c.scope.tier === 'public' && toolSummary.deliverables.length > 0
+        ? ` [deliverables: ${toolSummary.deliverables.map((d) => d.path).join(', ')}; cited: ${toolSummary.citedKnowledgePaths.length}]`
+        : ` [deliverables: ${toolSummary.deliverables.length}; cited: ${toolSummary.citedKnowledgePaths.length}]`
+      : '';
   return {
     mode: 'goal_turn',
     status,
@@ -517,7 +572,8 @@ async function routeItem(
       (report ||
         (status === 'done'
           ? `goal complete in ${result.turnsRun} turn(s)`
-          : `goal ${state} after ${result.turnsRun} turn(s)`)),
+          : `goal ${state} after ${result.turnsRun} turn(s)`)) +
+      toolSuffix,
     tokens: result.goal.budgetStats?.tokensUsed,
   };
 }

@@ -10,9 +10,9 @@
  *   - used: distinct promoted records a worker reported as used
  *     (`recordKnowledgeUsageFeedback` → `last_used_at`) within the window.
  *
- * Reads the KP-05 usage aggregates only (read-only, deterministic). A warning
- * — advisory, never a gate — is attached when records exist but none reached
- * a context pack in the window, i.e. the loop is open.
+ * Reads the KP-05 usage aggregates only (read-only, deterministic). Warnings
+ * — advisory, never a gate — are attached when records exist but none reach
+ * context packs (`warning`) or when retrieved records are never cited (`usage_warning`).
  */
 import * as path from 'node:path';
 import * as pathResolver from '../path-resolver.js';
@@ -25,14 +25,21 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const KINDS = ['wisdom', 'operations', 'patterns', 'templates'] as const;
 export const MEMORY_LOOP_DEFAULT_WINDOW_DAYS = 28;
 
+export type MemoryLoopStatus = 'idle' | 'delivery_open' | 'usage_open' | 'closed';
+
 export interface MemoryLoopHealth {
   window_days: number;
   window_start: string;
   promoted: number;
   retrieved: number;
   used: number;
+  loop_status: MemoryLoopStatus;
+  retrieval_rate: number;
+  utilization_rate: number;
   /** Advisory: present when promoted > 0 and retrieved === 0 in the window. */
   warning?: string;
+  /** Advisory: present when retrieved > 0 and used === 0 in the window. */
+  usage_warning?: string;
 }
 
 export interface ComputeMemoryLoopHealthOptions {
@@ -76,6 +83,22 @@ function withinWindow(at: string | undefined, startMs: number): boolean {
   return Number.isFinite(parsed) && parsed >= startMs;
 }
 
+function roundRate(numerator: number, denominator: number): number {
+  if (denominator <= 0) return 0;
+  return Math.round((numerator / denominator) * 1000) / 1000;
+}
+
+function deriveLoopStatus(
+  promoted: number,
+  retrievedCount: number,
+  usedCount: number
+): MemoryLoopStatus {
+  if (promoted === 0) return 'idle';
+  if (retrievedCount === 0) return 'delivery_open';
+  if (usedCount === 0) return 'usage_open';
+  return 'closed';
+}
+
 export function computeMemoryLoopHealth(
   options: ComputeMemoryLoopHealthOptions = {}
 ): MemoryLoopHealth {
@@ -114,17 +137,28 @@ export function computeMemoryLoopHealth(
   }
 
   const promoted = countPromotedRecords(knowledgeBase, tenants);
+  const retrievedCount = retrieved.size;
+  const usedCount = used.size;
+  const loopStatus = deriveLoopStatus(promoted, retrievedCount, usedCount);
   const health: MemoryLoopHealth = {
     window_days: windowDays,
     window_start: new Date(startMs).toISOString(),
     promoted,
-    retrieved: retrieved.size,
-    used: used.size,
+    retrieved: retrievedCount,
+    used: usedCount,
+    loop_status: loopStatus,
+    retrieval_rate: roundRate(retrievedCount, promoted),
+    utilization_rate: roundRate(usedCount, retrievedCount),
   };
-  if (promoted > 0 && retrieved.size === 0) {
+  if (promoted > 0 && retrievedCount === 0) {
     health.warning =
       `memory loop open — ${promoted} promoted record(s), none retrieved into a context pack in the last ${windowDays} day(s)` +
       ' | next: check findRelevantPromotedKnowledge results and knowledge-slices excludes' +
+      ' | evidence: KP-05 usage aggregate (runtime/feedback-loop/knowledge-usage)';
+  } else if (retrievedCount > 0 && usedCount === 0) {
+    health.usage_warning =
+      `memory loop usage unmeasured — ${retrievedCount} promoted record(s) delivered, none reported used in the last ${windowDays} day(s)` +
+      ' | next: report used refs via dot_cite_knowledge_used or mission record-evidence --knowledge-used' +
       ' | evidence: KP-05 usage aggregate (runtime/feedback-loop/knowledge-usage)';
   }
   return health;
@@ -133,4 +167,11 @@ export function computeMemoryLoopHealth(
 /** One report line: `promoted N → retrieved N → used N (window Dd)`. */
 export function formatMemoryLoopHealthLine(health: MemoryLoopHealth): string {
   return `memory_loop: promoted ${health.promoted} → retrieved ${health.retrieved} → used ${health.used} (last ${health.window_days} days)`;
+}
+
+/** Detailed multi-part summary including status and retrieval/utilization rates. */
+export function formatMemoryLoopHealthDetail(health: MemoryLoopHealth): string {
+  const retrievalPct = Math.round(health.retrieval_rate * 100);
+  const utilizationPct = Math.round(health.utilization_rate * 100);
+  return `${formatMemoryLoopHealthLine(health)} [${health.loop_status}; retrieval=${retrievalPct}%, utilization=${utilizationPct}%]`;
 }

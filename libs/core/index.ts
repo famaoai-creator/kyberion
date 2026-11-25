@@ -143,3 +143,7 @@ export * from './governance/asset-scope-inspection.js';
 
 export * from './secret/account-introduction.js';
 export * from './secret/account-broker.js';
+export * from './dot/dot-task-session-tools.js';
+export * from './governance/autonomous-loop-readiness.js';
+export * from './knowledge/conversational-correction-learning.js';
+export * from './surface/attention-triage.js';

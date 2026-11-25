@@ -4270,6 +4270,61 @@
         "Start a new project to write a report",
         "Don't forget to write the report"
       ]
+    },
+    "conversational_correction.trigger": {
+      "old_regex": "new contract: natural conversational correction or standing preference trigger (IL-05)",
+      "sites": [
+        "libs/core/knowledge/conversational-correction-learning.ts:detectConversationalCorrection"
+      ],
+      "match": [
+        "今後は結論から先に簡潔に書いてください",
+        "次からは承認を取ってから進めて",
+        "From now on keep status updates brief",
+        "Next time please ask first before touching config"
+      ],
+      "no_match": [
+        "昨日の会議の議事録を要約して",
+        "What is the status of the PR?",
+        "承認待ちの件数を教えて"
+      ]
+    },
+    "conversational_correction.style_format": {
+      "old_regex": "new contract: conversational correction targeting style or format (IL-05)",
+      "sites": [
+        "libs/core/knowledge/conversational-correction-learning.ts:detectConversationalCorrection"
+      ],
+      "match": [
+        "もっと簡潔に箇条書きでまとめて",
+        "表形式で要約してほしい",
+        "Please make the report concise with bullet points",
+        "Use markdown summary format"
+      ],
+      "no_match": ["明日の会議の時間を決めて", "承認してから進めて"]
+    },
+    "conversational_correction.priority_timing": {
+      "old_regex": "new contract: conversational correction targeting priority or timing (IL-05)",
+      "sites": [
+        "libs/core/knowledge/conversational-correction-learning.ts:detectConversationalCorrection"
+      ],
+      "match": [
+        "期限が近いものを先に優先して",
+        "それは後回しで急ぎの対応だけ朝一に",
+        "Handle urgent deadline items first and deprioritize the rest"
+      ],
+      "no_match": ["箇条書きで短く書いて", "勝手に実行しないで"]
+    },
+    "conversational_correction.scope_boundary": {
+      "old_regex": "new contract: conversational correction targeting scope or approval boundary (IL-05)",
+      "sites": [
+        "libs/core/knowledge/conversational-correction-learning.ts:detectConversationalCorrection"
+      ],
+      "match": [
+        "勝手に変更せず事前に確認してください",
+        "そのファイルは対象外なので触らないで",
+        "Ask first before changing config; secrets are out of scope",
+        "Require approval and do not touch production"
+      ],
+      "no_match": ["表形式でまとめて", "今日中に終わらせて"]
     }
   }
 }

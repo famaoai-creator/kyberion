@@ -3,7 +3,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as io from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import type { KnowledgeUsageAggregateEntry } from './knowledge-usage-aggregate.js';
-import { computeMemoryLoopHealth, formatMemoryLoopHealthLine } from './memory-loop-health.js';
+import {
+  computeMemoryLoopHealth,
+  formatMemoryLoopHealthDetail,
+  formatMemoryLoopHealthLine,
+} from './memory-loop-health.js';
 
 const ROOT = pathResolver.sharedTmp(`memory-loop-health-${process.pid}`);
 const NOW = new Date('2026-11-10T00:00:00.000Z');
@@ -55,23 +59,75 @@ describe('memory loop health', () => {
         entry('knowledge/product/governance/working-philosophy.md', { delivered_count: 9 }),
       ],
     });
-    expect(health).toMatchObject({ promoted: 2, retrieved: 1, used: 1, window_days: 28 });
+    expect(health).toMatchObject({
+      promoted: 2,
+      retrieved: 1,
+      used: 1,
+      window_days: 28,
+      loop_status: 'closed',
+      retrieval_rate: 0.5,
+      utilization_rate: 1,
+    });
     expect(health.warning).toBeUndefined();
+    expect(health.usage_warning).toBeUndefined();
     expect(formatMemoryLoopHealthLine(health)).toBe(
       'memory_loop: promoted 2 → retrieved 1 → used 1 (last 28 days)'
+    );
+    expect(formatMemoryLoopHealthDetail(health)).toBe(
+      'memory_loop: promoted 2 → retrieved 1 → used 1 (last 28 days) [closed; retrieval=50%, utilization=100%]'
     );
   });
 
   it('warns (without failing) when promoted records never reach a context pack', () => {
     const health = computeMemoryLoopHealth({ now: NOW, rootDir: ROOT, loadAggregate: () => [] });
-    expect(health).toMatchObject({ promoted: 2, retrieved: 0, used: 0 });
+    expect(health).toMatchObject({
+      promoted: 2,
+      retrieved: 0,
+      used: 0,
+      loop_status: 'delivery_open',
+      retrieval_rate: 0,
+      utilization_rate: 0,
+    });
     expect(health.warning).toMatch(/^memory loop open — 2 promoted record\(s\)/);
+    expect(health.usage_warning).toBeUndefined();
+  });
+
+  it('emits usage_warning when records are retrieved but none are reported used', () => {
+    const health = computeMemoryLoopHealth({
+      now: NOW,
+      rootDir: ROOT,
+      loadAggregate: () => [
+        entry(PRODUCT, {
+          delivered_count: 2,
+          used_count: 0,
+          last_delivered_at: '2026-11-09T00:00:00.000Z',
+        }),
+      ],
+    });
+    expect(health).toMatchObject({
+      promoted: 2,
+      retrieved: 1,
+      used: 0,
+      loop_status: 'usage_open',
+      retrieval_rate: 0.5,
+      utilization_rate: 0,
+    });
+    expect(health.warning).toBeUndefined();
+    expect(health.usage_warning).toMatch(/^memory loop usage unmeasured — 1 promoted record\(s\)/);
   });
 
   it('stays quiet when nothing has been promoted', () => {
     const empty = pathResolver.sharedTmp(`memory-loop-health-empty-${process.pid}`);
     const health = computeMemoryLoopHealth({ now: NOW, rootDir: empty, loadAggregate: () => [] });
-    expect(health).toMatchObject({ promoted: 0, retrieved: 0, used: 0 });
+    expect(health).toMatchObject({
+      promoted: 0,
+      retrieved: 0,
+      used: 0,
+      loop_status: 'idle',
+      retrieval_rate: 0,
+      utilization_rate: 0,
+    });
     expect(health.warning).toBeUndefined();
+    expect(health.usage_warning).toBeUndefined();
   });
 });
