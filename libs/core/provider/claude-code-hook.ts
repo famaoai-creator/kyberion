@@ -227,7 +227,10 @@ function repoRelativePublicPath(filePath: string, cwd: unknown): string | undefi
   if (detectTier(filePath) !== 'public') return undefined;
   let rel = filePath;
   if (rel.startsWith('/') || /^[A-Za-z]:[\\/]/.test(rel)) {
-    const base = typeof cwd === 'string' && cwd ? cwd.replace(/[\\/]+$/, '') : '';
+    // Trim trailing separators without a trailing-quantifier regex
+    // (CodeQL js/polynomial-redos flags `[\\/]+$` on hook payload input).
+    let base = typeof cwd === 'string' ? cwd : '';
+    while (base.endsWith('/') || base.endsWith('\\')) base = base.slice(0, -1);
     if (!base || !rel.startsWith(`${base}/`)) return undefined;
     rel = rel.slice(base.length + 1);
   }
