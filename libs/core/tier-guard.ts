@@ -1138,8 +1138,12 @@ export function validateWritePermission(
     // credential_allocation_manager → runtime/grants/confidential/${KYBERION_TENANT}/)
     // is matched before the knowledge-path projection, which no such grant can match.
     // Only grants naming a state root itself count; a broad ancestor such as
-    // `active/shared/runtime/` must not reach tier data.
+    // `active/shared/runtime/` must not reach tier data. Inside an exact
+    // resource ceiling the scoped authorizers (storeGrantAuthorizes /
+    // capability checks) are the only grant path — an ambient partition grant
+    // must not re-widen a deliberately narrower capability.
     if (
+      !currentResourceAccessScope() &&
       rolePermissionRecord(policy, currentRole)?.allow_write?.some((p: string) => {
         const expanded = expandPolicyPath(p, currentMission, tenantSlug);
         return (
@@ -1481,11 +1485,15 @@ function ledgerRoleReadGrant(
     const expanded = expandPolicyPath(pattern, missionId, identity.tenantSlug);
     if (expanded === null) return false;
     // Durable-state roots (e.g. grants → credential_allocation_manager) are
-    // tier-partitioned the same way and admit the same explicit root grants.
+    // tier-partitioned the same way and admit the same explicit root grants —
+    // except inside an exact resource ceiling, where scoped authorizers
+    // (storeGrantAuthorizes / capability checks) are the only grant path and an
+    // ambient partition grant must not re-widen a deliberately narrower
+    // capability (e.g. the Concierge checkpoint capability under runtime/dot/).
     return (
       [
         ...Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS),
-        ...Object.values(PARTITIONED_RUNTIME_STATE_ROOTS),
+        ...(currentResourceAccessScope() ? [] : Object.values(PARTITIONED_RUNTIME_STATE_ROOTS)),
       ].some((root) => pathStartsWith(expanded, root)) && pathStartsWith(relativePath, expanded)
     );
   });
