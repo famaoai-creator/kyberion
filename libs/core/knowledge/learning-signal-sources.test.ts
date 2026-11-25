@@ -489,7 +489,12 @@ describe('built-in learning-signal sources (LS-02)', () => {
     mocks.healthSamples.mockReturnValue([
       { timestamp: '2026-10-01T00:30:00Z', process_name: 'chronos', rss_mb: 100, heap_used_mb: 50 },
       { timestamp: '2026-10-01T01:00:00Z', process_name: 'chronos', rss_mb: 100, heap_used_mb: 50 },
-      { timestamp: '2026-10-01T20:00:00Z', process_name: 'chronos', rss_mb: 300, heap_used_mb: 50 },
+      {
+        timestamp: '2026-10-01T20:00:00Z',
+        process_name: 'chronos',
+        rss_mb: 300,
+        heap_used_mb: 160,
+      },
     ]);
     expect(runtimeHealthSource.read(WINDOW)).toEqual([
       expect.objectContaining({
