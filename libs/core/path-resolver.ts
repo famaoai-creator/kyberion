@@ -359,6 +359,8 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/oauth/',
   'shared/runtime/voice-loopback-receipts/',
   'shared/runtime/background-review/nudge/',
+  // Per-session prompt/tool counters for the long-session hook nudge (provider/session-length-nudge.ts).
+  'shared/runtime/session-length/',
   'shared/runtime/mesh-hub/',
   'shared/observability/mesh-hub/',
   // Durable hearing session/receipt state is always isolated during tests.

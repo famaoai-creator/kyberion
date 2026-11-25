@@ -20,6 +20,7 @@ import {
   stubReasoningBackend,
 } from '../reasoning/reasoning-backend.js';
 import type { ReasoningBackend } from '../reasoning/reasoning-backend-contracts.js';
+import { isReasoningRole } from '../reasoning/reasoning-route-resolver.js';
 import type { DotCharter } from './dot-charter.js';
 import { assertAdvisoryBackendPermission } from '../provider/provider-permission-profiles.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
@@ -64,6 +65,18 @@ export interface ResolveDotWakeBackendOptions {
   backendFor?: (name: string) => DotWakeBackend | undefined;
 }
 
+/**
+ * The reasoning role a Dot wake routes on. The charter's authority role is an
+ * authorization identity (e.g. `organization_operator`); it doubles as the
+ * reasoning role only when the route policy defines a role of that name, and
+ * otherwise the wake routes on `default` instead of failing with
+ * `Unknown reasoning role`.
+ */
+export function dotReasoningRole(charter: DotCharter): string {
+  const authorityRole = charter.authority.authority_role;
+  return isReasoningRole(authorityRole) ? authorityRole : 'default';
+}
+
 export function resolveDotWakeBackend(
   charter: DotCharter,
   backend?: DotWakeBackend,
@@ -75,7 +88,7 @@ export function resolveDotWakeBackend(
   if (dotBackendIsUnconfiguredStub(chosen, { injected: options.injected })) {
     return { mode: 'unavailable', reason: DOT_WAKE_BACKEND_UNAVAILABLE };
   }
-  const role = options.role ?? charter.authority.authority_role;
+  const role = options.role ?? dotReasoningRole(charter);
   if (chosen.generateWithTools && backendHasLiveToolCandidate(chosen, role)) {
     return { mode: 'tool', backend: chosen };
   }
@@ -98,13 +111,12 @@ export async function runDelegatedWake(
   prompt: string,
   timeoutMs: number
 ): Promise<string> {
-  // Route on the charter's authority role, the same role resolveDotWakeBackend
-  // checked for a live candidate. Without it the call fell to the `default`
-  // role chain, which can differ from the chain that passed the check.
+  // Route on the same reasoning role resolveDotWakeBackend checked for a live
+  // candidate (dotReasoningRole), so the call cannot fall to a different chain.
   const options = {
     advisory: true,
     profile: 'planner',
-    role: charter.authority.authority_role,
+    role: dotReasoningRole(charter),
   } as const;
   // Unnamed injected ports are explicit hosts/test seams. Every production
   // backend has a governed identity, rechecked per candidate by failover.

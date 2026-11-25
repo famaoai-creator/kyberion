@@ -198,18 +198,33 @@ export function evaluateRuntimeHealthTrends(
     // after the host wakes is paged out (tens of MB). First-vs-last of single
     // samples reads that noise as growth, so compare the upper quartile of the
     // first and last thirds of the window (robust to paged-out dips) and
-    // require a minimum absolute increase.
+    // require a minimum absolute increase. A one-off spike in the last third
+    // (a heavy in-process job) still lifts that quartile, so the growth must
+    // also show in the heap floor — the lower quartile of heap_used, which a
+    // JS leak raises because live objects survive every GC, while a spike does
+    // not. The RSS floor is not used: paged-out samples after macOS sleep are
+    // common enough (3 of 8 in one third) to fake a rising RSS floor. Off-heap
+    // (native/Buffer) growth is therefore not reported here.
     const span = Math.max(1, Math.floor(list.length / 3));
-    const before = upperQuartileOf(list.slice(0, span).map((s) => s.rss_mb));
-    const after = upperQuartileOf(list.slice(-span).map((s) => s.rss_mb));
+    const head = list.slice(0, span);
+    const tail = list.slice(-span);
+    const before = upperQuartileOf(head.map((s) => s.rss_mb));
+    const after = upperQuartileOf(tail.map((s) => s.rss_mb));
     if (before > 0 && after - before >= RSS_GROWTH_MIN_DELTA_MB) {
       const ratio = after / before;
-      if (ratio >= thresholds.rss_growth_warning_ratio) {
+      const heapFrom = lowerQuartileOf(head.map((s) => s.heap_used_mb));
+      const heapTo = lowerQuartileOf(tail.map((s) => s.heap_used_mb));
+      const heapFloorRose =
+        heapFrom > 0 &&
+        heapTo - heapFrom >= RSS_GROWTH_MIN_DELTA_MB &&
+        heapTo / heapFrom >= thresholds.rss_growth_warning_ratio;
+      if (ratio >= thresholds.rss_growth_warning_ratio && heapFloorRose) {
         const label = span > 1 ? ` (upper quartile of ${span} samples each end)` : '';
+        const heap = `; heap floor ${heapFrom}MB → ${heapTo}MB`;
         findings.push({
           kind: 'rss_growth',
           severity: ratio >= thresholds.rss_growth_red_ratio ? 'critical' : 'warning',
-          detail: `${processName}: RSS ${before}MB → ${after}MB (${ratio.toFixed(2)}x) in the window${label}`,
+          detail: `${processName}: RSS ${before}MB → ${after}MB (${ratio.toFixed(2)}x) in the window${label}${heap}`,
         });
       }
     }
@@ -228,6 +243,12 @@ export function evaluateRuntimeHealthTrends(
 
 /** Growth smaller than this (MB) is never reported, whatever the ratio. */
 export const RSS_GROWTH_MIN_DELTA_MB = 50;
+
+/** Nearest-rank 25th percentile. */
+function lowerQuartileOf(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.max(0, Math.ceil(sorted.length * 0.25) - 1)]!;
+}
 
 /** Nearest-rank 75th percentile. */
 function upperQuartileOf(values: number[]): number {

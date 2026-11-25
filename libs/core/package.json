@@ -3348,6 +3348,10 @@
       "types": "./dist/mission/mission-artifact-closure.d.ts",
       "default": "./dist/mission/mission-artifact-closure.js"
     },
+    "./mission/mission-artifact-publish": {
+      "types": "./dist/mission/mission-artifact-publish.d.ts",
+      "default": "./dist/mission/mission-artifact-publish.js"
+    },
     "./mission/mission-assessment": {
       "types": "./dist/mission/mission-assessment.d.ts",
       "default": "./dist/mission/mission-assessment.js"

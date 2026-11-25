@@ -36,6 +36,7 @@ import {
   taskSessionPath,
   type TaskSession,
 } from '../task/task-session.js';
+import { requireMissionScopeRegistration } from '../mission/mission-creation.js';
 import { loadState, saveState } from '../mission/mission-state.js';
 import type { MissionState } from '../mission/mission-types.js';
 import { auditChain } from '../governance/audit-chain.js';
@@ -1169,6 +1170,34 @@ export async function reassignMissionToProject(input: {
       `Mission scope (${state.tier}:${missionTenant}) must match target project scope (${targetProject.tier}:${targetTenant}); cross-tier or cross-tenant reassignment is denied.`
     );
   }
+  // A project's organization is its owner's record. `start` copies it onto a
+  // linked mission and refuses a mission that has none, so a link that left
+  // the mission without it would strand the mission paused. Bind it here, and
+  // refuse a mission that already belongs to a different organization.
+  const targetOrganization = targetProject.organization_id;
+  if (targetOrganization && state.organization_id && state.organization_id !== targetOrganization) {
+    throw new Error(
+      `Mission organization (${state.organization_id}) must match target project organization (${targetOrganization}); cross-organization reassignment is not supported`
+    );
+  }
+  const bindOrganization = Boolean(targetOrganization && !state.organization_id);
+  // `start` and `resume` verify the organization is configured for the tenant.
+  // Refuse here, naming the cause, rather than leave the mission paused behind
+  // an organization its tenant has no profile for.
+  if (targetOrganization) {
+    try {
+      requireMissionScopeRegistration({
+        tenantSlug: state.tenant_slug || state.tenant_id,
+        organizationId: targetOrganization,
+      });
+    } catch (error) {
+      throw new Error(
+        `Target project ${targetProjectId} names organization '${targetOrganization}', which is not configured for tenant '${state.tenant_slug || state.tenant_id || 'shared'}'; ` +
+          `the mission would no longer start | next: configure the organization profile or correct the project's organization_id before reassigning` +
+          ` (${error instanceof Error ? error.message : String(error)})`
+      );
+    }
+  }
   if (input.dry_run)
     return {
       mission_id: missionId,
@@ -1186,6 +1215,7 @@ export async function reassignMissionToProject(input: {
       : oldProject?.traceability_refs || [];
   const nextState: MissionState = {
     ...state,
+    ...(bindOrganization ? { organization_id: targetOrganization } : {}),
     relationships: {
       ...relationshipsWithoutTrack,
       project: {
@@ -1223,7 +1253,9 @@ export async function reassignMissionToProject(input: {
         event: 'PROJECT_REASSIGNED',
         from: oldProjectId || 'independent',
         to: targetProjectId,
-        note: input.note || `Mission reassigned to ${targetProjectId}`,
+        note:
+          (input.note || `Mission reassigned to ${targetProjectId}`) +
+          (bindOrganization ? ` (organization ${targetOrganization} bound from the project)` : ''),
       },
     ],
   };

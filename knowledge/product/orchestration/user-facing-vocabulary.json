@@ -10140,6 +10140,11 @@
         "ja": "リポジトリを型チェック",
         "qps-ploc": "⟦Ŧẏṗėƈħėƈķ ŧħė řėṗőşïŧőřẏ ŀőřėɱ ï⟧"
       },
+      "cli_cmd_script_usage_weekly": {
+        "en": "Report weekly Kyberion usage",
+        "ja": "Kyberion の週次利用状況を報告",
+        "qps-ploc": "⟦Řėṗőřŧ ẇėėķŀẏ Ķẏƀėřïőñ ůşȧɠė ŀőřėɱ ïṗş⟧"
+      },
       "cli_cmd_script_validate": {
         "en": "Build, typecheck, and run full checks",
         "ja": "ビルド・型チェック・全チェックを実行",

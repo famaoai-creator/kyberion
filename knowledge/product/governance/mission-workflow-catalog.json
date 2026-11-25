@@ -1857,9 +1857,12 @@
             {
               "task_id_suffix": "publish",
               "team_role": "implementer",
-              "description": "評価を通過した最終文書を納品先へ配置し、発行を記録する",
+              "description": "評価を通過した最終文書を `pnpm mission publish-artifact <ID> --path evidence/<最終ファイル>` で成果物として公開し、発行を記録する。納品先への配置は finish が行う（プロジェクトに紐づく mission は project の artifacts/、紐づかない場合は所有者の storage floor）。provider CLI からプロジェクトのディレクトリへ直接書かない",
               "deliverable": "evidence/document-final.md",
-              "acceptance_criteria": ["最終成果物が納品先に配置される"],
+              "acceptance_criteria": [
+                "最終成果物が publish-artifact で公開され、artifact_id が記録されている",
+                "納品先がプロジェクトか所有者 floor かが確認されている"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",

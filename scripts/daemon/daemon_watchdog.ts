@@ -294,6 +294,14 @@ export interface DaemonWatchdogReport {
   alerts?: Array<{ daemon_id: string; severity: OpsAlertSeverity; receipt: OpsAlertReceipt }>;
   /** True when no recent previous run exists (first run or host wake). */
   grace_run?: boolean;
+  /**
+   * Unhealthy daemons this run confirmed (also unhealthy on the immediately
+   * preceding run). Only these alert and request recovery; a first sighting is
+   * recorded in the run state and waits for the next run.
+   */
+  confirmed?: string[];
+  /** Unhealthy on this run only — awaiting confirmation by the next run. */
+  pending?: string[];
   /** EV-02: one governed recovery receipt per unhealthy daemon. */
   recovery?: DaemonRecoveryOutcome[];
 }
@@ -432,14 +440,22 @@ export function checkDaemonHeartbeats(options: DaemonWatchdogOptions = {}): Daem
   };
   const alerts: NonNullable<DaemonWatchdogReport['alerts']> = [];
   const confirmedIds: string[] = [];
+  const pendingIds: string[] = [];
   for (const status of failed) {
-    // Critical needs a confirmed outage of a daemon that must run: unhealthy
-    // on this run AND on the immediately preceding one. A first sighting —
-    // typically right after the host wakes — and optional daemons warn.
+    // An alert needs a confirmed outage: unhealthy on this run AND on the
+    // immediately preceding one. A first sighting — nearly always the first
+    // run after the host wakes, before daemons have ticked — is recorded in
+    // the run state only; it used to emit a warning and a matching
+    // "recovered" record on every wake. Required daemons page critical,
+    // optional ones warn.
     const optional = daemonRequirement(status.daemon_id, serviceView) === 'optional';
     const confirmed = isConfirmedOutage(status.daemon_id, previous, now);
-    if (confirmed) confirmedIds.push(status.daemon_id);
-    const severity: OpsAlertSeverity = !optional && confirmed ? 'critical' : 'warning';
+    if (!confirmed) {
+      pendingIds.push(status.daemon_id);
+      continue;
+    }
+    confirmedIds.push(status.daemon_id);
+    const severity: OpsAlertSeverity = optional ? 'warning' : 'critical';
     const receipt = sendOpsAlert(
       {
         severity,
@@ -453,9 +469,8 @@ export function checkDaemonHeartbeats(options: DaemonWatchdogOptions = {}): Daem
           confirmed,
           stale_after_ms: dotStaleAfter.get(status.daemon_id) ?? baseHeartbeatOptions.staleAfterMs,
         },
-        recommendation: confirmed
-          ? 'Verify the launchd/systemd unit for this daemon, restart the unit if needed, and inspect the daemon logs before resuming unattended operation.'
-          : 'First sighting (or first run after the host woke) — the next watchdog run confirms or clears it; restart only if it persists.',
+        recommendation:
+          'Verify the launchd/systemd unit for this daemon, restart the unit if needed, and inspect the daemon logs before resuming unattended operation.',
         options: buildWatchdogRestartHints([status.daemon_id]),
         // Per daemon and severity: another daemon failing, or this warning
         // escalating to critical, is a new key and pages immediately.
@@ -466,9 +481,13 @@ export function checkDaemonHeartbeats(options: DaemonWatchdogOptions = {}): Daem
     );
     alerts.push({ daemon_id: status.daemon_id, severity, receipt });
   }
-  // Resolved records close the episode in the alert log.
+  // Resolved records close an alerted episode in the alert log; a first
+  // sighting that cleared on its own was never alerted, so it closes silently.
+  // (A run state written before `confirmed` existed closes as before.)
   for (const status of statuses) {
     if (status.status !== 'healthy' || !previous?.unhealthy[status.daemon_id]) continue;
+    const alerted = previous.alerted ?? previous.confirmed;
+    if (alerted && !alerted.includes(status.daemon_id)) continue;
     const receipt = sendOpsAlert(
       {
         severity: 'info',
@@ -492,10 +511,20 @@ export function checkDaemonHeartbeats(options: DaemonWatchdogOptions = {}): Daem
     const rank: Record<OpsAlertSeverity, number> = { critical: 2, warning: 1, info: 0 };
     report.alert = [...alerts].sort((a, b) => rank[b.severity] - rank[a.severity])[0]!.receipt;
   }
+  if (confirmedIds.length > 0) report.confirmed = confirmedIds;
+  if (pendingIds.length > 0) report.pending = pendingIds;
   persistRunState(options.rootDir, {
     timestamp: now.toISOString(),
     unhealthy: Object.fromEntries(failed.map((status) => [status.daemon_id, status.status])),
     confirmed: confirmedIds,
+    // Episodes that alerted stay open (for the recovery record) while the
+    // daemon remains unhealthy, even across a sleep gap that resets confirmation.
+    alerted: failed
+      .map((status) => status.daemon_id)
+      .filter(
+        (id) =>
+          confirmedIds.includes(id) || (previous?.alerted ?? previous?.confirmed ?? []).includes(id)
+      ),
   });
   return report;
 }
@@ -528,7 +557,12 @@ export async function checkDaemonHeartbeatsWithRecovery(
   } catch {
     /* sweep failures must never mask a watchdog verdict */
   }
-  const unhealthy = report.statuses.filter((status) => status.status !== 'healthy');
+  // Recovery (a restart request that may reach the operator) only for a
+  // confirmed outage — a first sighting after wake must not queue approvals.
+  const confirmed = new Set(report.confirmed ?? []);
+  const unhealthy = report.statuses.filter(
+    (status) => status.status !== 'healthy' && confirmed.has(status.daemon_id)
+  );
   if (unhealthy.length === 0) return report;
   try {
     return {
@@ -702,7 +736,14 @@ export function formatDaemonWatchdogReport(report: DaemonWatchdogReport): string
     );
   }
   if (report.grace_run && !report.ok) {
-    lines.push('Grace run: no recent previous run (first run or host wake) — findings warn only');
+    lines.push(
+      'Grace run: no recent previous run (first run or host wake) — nothing can be confirmed yet'
+    );
+  }
+  if (report.pending?.length) {
+    lines.push(
+      `Pending confirmation (first sighting; no alert or recovery yet): ${report.pending.join(', ')}`
+    );
   }
   const alertLines = report.alerts?.length
     ? report.alerts.map((entry) => ({

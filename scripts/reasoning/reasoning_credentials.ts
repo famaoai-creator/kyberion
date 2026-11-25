@@ -130,9 +130,16 @@ async function runCredentialCommandImpl(
           1,
           'Task binding rejected. Check the current claim/scope, approval and stored key. No operator fallback was used.'
         );
+      // Classified refusals ([CREDENTIAL_OWNER_REQUIRED], [ROLE_TENANT_SCOPE_MISMATCH], …)
+      // name the failed precondition and carry no secret material; show the code
+      // and its first line so the owner is not left guessing.
+      const classified =
+        error instanceof Error
+          ? /^\[[A-Z0-9_]+\][^\n]{0,300}/u.exec(error.message)?.[0]
+          : undefined;
       throw new ScriptExitError(
         1,
-        'Allocation command failed. Check the tenant, approval, active mission/project, and --help. No key value is accepted on argv.'
+        `Allocation command failed${classified ? `: ${classified}` : ''}. Check the tenant, approval, active mission/project, and --help. No key value is accepted on argv.`
       );
     }
   }

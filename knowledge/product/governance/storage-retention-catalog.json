@@ -286,6 +286,14 @@
       "note": "Daemon heartbeat files (daemon-heartbeat.ts). Live daemons refresh mtime continuously, so a 14d TTL only ever removes entries of long-dead daemons."
     },
     {
+      "path": "active/shared/runtime/session-length",
+      "artifact_class": "cache",
+      "ttl_days": 14,
+      "action": "delete",
+      "backup": "exclude",
+      "note": "Per-session prompt/tool-event counters for the long-session hook nudge (libs/core/provider/session-length-nudge.ts). One small JSON per host session; a lost file only delays the next handoff hint."
+    },
+    {
       "path": "active/shared/runtime/a2a",
       "artifact_class": "state",
       "action": "review_required",

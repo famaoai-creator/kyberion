@@ -4,6 +4,16 @@ const enqueue = vi.hoisted(() => vi.fn());
 const list = vi.hoisted(() => vi.fn((): unknown[] => []));
 const lock = vi.hoisted(() => vi.fn((_id: string, fn: () => unknown) => fn()));
 const loadProfile = vi.hoisted(() => vi.fn(() => ({ organization_id: 'org-test' })));
+// The producer's resolved NHI (scope resolution) is the personal-tier owner.
+const producerNhi = vi.hoisted(() => vi.fn((): string | undefined => 'nhi:test-owner'));
+const opsAlert = vi.hoisted(() => vi.fn());
+vi.mock('../organization/nhi-session-admission.js', () => ({
+  NHI_IDENTITY_ENV: 'KYBERION_NHI_ID',
+}));
+vi.mock('../scope-context.js', () => ({
+  resolveScopeResolution: () => ({ scope: { nhi_id: producerNhi() } }),
+}));
+vi.mock('../daemon/ops-alert.js', () => ({ sendOpsAlert: opsAlert }));
 vi.mock('../core.js', () => ({ logger: { debug: vi.fn(), warn: vi.fn() } }));
 vi.mock('../organization/organization-profile.js', () => ({
   loadOrganizationProfile: loadProfile,
@@ -17,6 +27,7 @@ vi.mock('../foundation/lock-utils.js', () => ({ withLockSync: lock }));
 import {
   enqueueOperationalLearningCandidateOnce,
   enqueueOperationalLearningSignal,
+  resetOperationalLearningAlertStateForTests,
 } from './operational-learning.js';
 
 describe('operational learning signals (LC-16)', () => {
@@ -45,9 +56,41 @@ describe('operational learning signals (LC-16)', () => {
         sourceType: 'routine_exception',
         targetKind: 'sop_candidate',
         tier: 'personal',
+        ownerNhi: 'nhi:test-owner',
         rootDir: 'active/shared/tmp/ops-learning-fixture',
       })
     );
+  });
+
+  it('skips personal signals when the process claims no owner and alerts once, not per signal', () => {
+    enqueue.mockClear();
+    opsAlert.mockClear();
+    lock.mockClear();
+    resetOperationalLearningAlertStateForTests();
+    producerNhi.mockReturnValue(undefined);
+    try {
+      const signal = (id: string) => ({
+        signalId: id,
+        sourceType: 'routine_exception' as const,
+        sourceRef: `test:${id}`,
+        title: 'Review',
+        summary: 'Needs an owner.',
+      });
+      expect(enqueueOperationalLearningSignal(signal('runtime-health'))).toBeNull();
+      expect(enqueueOperationalLearningSignal(signal('execution-metric'))).toBeNull();
+      expect(
+        enqueueOperationalLearningCandidateOnce({ ...signal('cd'), learningId: 'cdl-1' })
+      ).toBeNull();
+      expect(enqueue).not.toHaveBeenCalled();
+      expect(lock).not.toHaveBeenCalled();
+      expect(opsAlert).toHaveBeenCalledTimes(1);
+      expect(opsAlert.mock.calls[0][0]).toMatchObject({
+        dedupe_key: 'operational-learning:personal-owner-missing',
+        context: { tier: 'personal', missing: 'KYBERION_NHI_ID' },
+      });
+    } finally {
+      producerNhi.mockReturnValue('nhi:test-owner');
+    }
   });
 
   it('does not downgrade confidential signals without tenant scope', () => {

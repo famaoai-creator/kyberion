@@ -1134,6 +1134,25 @@ export function validateWritePermission(
     stateKnowledgePath &&
     isProtectedStorageFloorTier(partitionedRuntimeStateTierInPath(relativePath))
   ) {
+    // An authority role granted this runtime partition by its real path (e.g.
+    // credential_allocation_manager → runtime/grants/confidential/${KYBERION_TENANT}/)
+    // is matched before the knowledge-path projection, which no such grant can match.
+    // Only grants naming a state root itself count; a broad ancestor such as
+    // `active/shared/runtime/` must not reach tier data.
+    if (
+      rolePermissionRecord(policy, currentRole)?.allow_write?.some((p: string) => {
+        const expanded = expandPolicyPath(p, currentMission, tenantSlug);
+        return (
+          expanded !== null &&
+          Object.values(PARTITIONED_RUNTIME_STATE_ROOTS).some((root) =>
+            pathStartsWith(expanded, root)
+          ) &&
+          pathStartsWith(relativePath, expanded)
+        );
+      })
+    ) {
+      return { allowed: true };
+    }
     return personaTierWriteDecision(policy, stateKnowledgePath, identity, operation);
   }
 
@@ -1461,10 +1480,13 @@ function ledgerRoleReadGrant(
     if (typeof pattern !== 'string') return false;
     const expanded = expandPolicyPath(pattern, missionId, identity.tenantSlug);
     if (expanded === null) return false;
+    // Durable-state roots (e.g. grants → credential_allocation_manager) are
+    // tier-partitioned the same way and admit the same explicit root grants.
     return (
-      Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS).some((root) =>
-        pathStartsWith(expanded, root)
-      ) && pathStartsWith(relativePath, expanded)
+      [
+        ...Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS),
+        ...Object.values(PARTITIONED_RUNTIME_STATE_ROOTS),
+      ].some((root) => pathStartsWith(expanded, root)) && pathStartsWith(relativePath, expanded)
     );
   });
 }

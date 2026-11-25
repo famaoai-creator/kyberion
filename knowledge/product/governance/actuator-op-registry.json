@@ -355,6 +355,7 @@
         "run_soak_restart_e2e",
         "run_software_quality_report",
         "run_translation_coverage",
+        "run_usage_weekly_report",
         "validate_productivity_dry_run",
         "wait"
       ]

@@ -40,6 +40,42 @@ describe('summarizeTranscriptUsage', () => {
       inputTokens: 310, // 100 + 10 cache-creation + 200
       outputTokens: 130, // 50 + 80
       turns: 2,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 10,
+    });
+  });
+
+  it('counts per-content-block lines sharing a message.id once (last record wins)', () => {
+    const block = (id: string, usage: Record<string, number>) =>
+      JSON.stringify({
+        type: 'assistant',
+        message: { id, model: 'claude-opus-5-5', usage },
+      });
+    const text = [
+      // Claude Code writes one line per content block, repeating id + usage.
+      block('msg_A', { input_tokens: 5, output_tokens: 1, cache_read_input_tokens: 1000 }),
+      block('msg_A', { input_tokens: 5, output_tokens: 40, cache_read_input_tokens: 1000 }),
+      block('msg_A', {
+        input_tokens: 5,
+        output_tokens: 40,
+        cache_read_input_tokens: 1000,
+        cache_creation_input_tokens: 200,
+      }),
+      block('msg_B', { input_tokens: 3, output_tokens: 7, cache_read_input_tokens: 2000 }),
+      block('msg_B', { input_tokens: 3, output_tokens: 7, cache_read_input_tokens: 2000 }),
+      // No id: counted individually.
+      JSON.stringify({
+        type: 'assistant',
+        message: { usage: { input_tokens: 1, output_tokens: 1, cache_creation_input_tokens: 4 } },
+      }),
+    ].join('\n');
+    expect(summarizeTranscriptUsage(text)).toEqual({
+      model: 'claude-opus-5-5',
+      inputTokens: 5 + 200 + 3 + 1 + 4,
+      outputTokens: 40 + 7 + 1,
+      turns: 3,
+      cacheReadTokens: 1000 + 2000,
+      cacheCreationTokens: 200 + 4,
     });
   });
 
@@ -78,8 +114,25 @@ describe('recordCliUsage', () => {
       expect.objectContaining({
         model: 'claude-opus-4-8',
         usage: { prompt_tokens: 310, completion_tokens: 130 },
+        cache_read_tokens: 0,
+        cache_creation_tokens: 0,
       })
     );
+  });
+
+  it('carries cache read / creation tokens on the claude-code-cli row (outside usage)', () => {
+    recordCliUsage({
+      model: 'claude-opus-5-5',
+      inputTokens: 213,
+      outputTokens: 48,
+      turns: 3,
+      cacheReadTokens: 3000,
+      cacheCreationTokens: 204,
+    });
+    const extra = recordMock.mock.calls[0]![3];
+    expect(extra.usage).toEqual({ prompt_tokens: 213, completion_tokens: 48 });
+    expect(extra.cache_read_tokens).toBe(3000);
+    expect(extra.cache_creation_tokens).toBe(204);
   });
 
   describe('session-hook provenance stamp', () => {

@@ -1,0 +1,6 @@
+---
+category: Added
+---
+
+- **Weekly usage report.** `pnpm usage:weekly [-- --week YYYY-MM-DD] [--out <path>] [--json]` and the scheduled `pipelines/usage-weekly-report.json` (Monday 08:00 JST, `core:run_usage_weekly_report`) summarize the previous Monday–Sunday (JST) week from the audit chain: volume against the week before, sessions with long ones flagged (1,000+ events), tool mix, event counts per tenant touched, missions created and started, prompts in sessions that never touched a mission, trigger failures grouped by normalized reason with laptop sleep (`host_suspended`) reported separately rather than as an error, dot delegation denials, and a short list of improvement candidates derived by rules. The report holds counts and categories only and never copies prompt text. It is written to `active/shared/runtime/reports/usage-weekly/usage-weekly-<week>.md` plus a `.json` beside it.
+- **Long-session nudge.** The Claude Code `UserPromptSubmit` hook adds one hint suggesting a handoff note and `/clear` once a session reaches 150 prompts or 1,500 audited tool events, and repeats it every 25 prompts after that. It counts with a small per-session file under `active/shared/runtime/session-length/` (14-day retention) instead of scanning the audit chain, and a counter failure never fails the hook.

@@ -1,0 +1,34 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "usage-weekly-report",
+  "name": "Usage Weekly Report",
+  "version": "1.0.0",
+  "description": "Weekly Kyberion usage report from the audit chain via core:run_usage_weekly_report — volume vs previous week, sessions (long sessions flagged), tool mix, tenants touched (counts), missions, prompts outside missions, trigger failures (host_suspended split out), dot denials and rule-derived improvement candidates. Counts and categories only; writes active/shared/runtime/reports/usage-weekly/usage-weekly-<week>.md (+ .json).",
+  "_refs": {
+    "implementation": "scripts/report/report_usage_weekly.ts",
+    "aggregation": "scripts/report/usage_weekly_aggregate.ts"
+  },
+  "schedule": {
+    "id": "usage-weekly-report",
+    "cron": "0 8 * * 1",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "id": "usage-weekly-report",
+      "role": "source",
+      "op": "core:run_usage_weekly_report",
+      "produces": { "channel": "usage_weekly_report", "type": "Json" },
+      "params": { "export_as": "usage_weekly_report" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "usage_weekly_report",
+      "params": {
+        "message": "[USAGE-WEEKLY] week {{usage_weekly_report.week}}: {{usage_weekly_report.total_events}} events, {{usage_weekly_report.prompts}} prompts, {{usage_weekly_report.long_sessions}} long session(s), {{usage_weekly_report.trigger_failed}} trigger failures ({{usage_weekly_report.host_suspended}} host_suspended), {{usage_weekly_report.improvement_candidates}} improvement candidate(s) → {{usage_weekly_report.markdown_path}}"
+      }
+    }
+  ]
+}

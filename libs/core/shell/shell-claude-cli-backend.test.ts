@@ -47,6 +47,7 @@ vi.mock('../mission/delegation-concurrency.js', () => ({
   }),
   withWallClockBudget: withWallClockBudgetMock,
   DelegationWallClockExceededError: class DelegationWallClockExceededError extends Error {},
+  DelegationInactivityExceededError: class DelegationInactivityExceededError extends Error {},
 }));
 
 // WS-02: the private git index is stubbed so no real index is ever copied.
@@ -89,7 +90,9 @@ describe('shell-claude-cli-backend', () => {
     );
     const backend = new ShellClaudeCliBackend({ bin: 'claude', model: 'opus' });
     expect(await backend.delegateTask('task')).toBe('plain report');
-    expect(spawnMock.mock.calls[0][1]).toContain('json');
+    expect(spawnMock.mock.calls[0][1]).toEqual(
+      expect.arrayContaining(['--output-format', 'stream-json', '--verbose'])
+    );
     const extra = vi.mocked(metrics.record).mock.calls[0][3];
     expect(extra).toMatchObject({
       usage_source: 'provider',
@@ -436,7 +439,7 @@ describe('shell-claude-cli-backend', () => {
       spawnMock.mockClear();
     });
 
-    it('no profile: preserves baseline permission argv while requesting the native JSON envelope', async () => {
+    it('no profile: preserves baseline permission argv while requesting the native JSON stream', async () => {
       spawnMock.mockReturnValueOnce(createChild('ok'));
 
       const backend = new ShellClaudeCliBackend({ bin: 'claude', model: 'opus' });
@@ -450,7 +453,8 @@ describe('shell-claude-cli-backend', () => {
         '--model',
         'opus',
         '--output-format',
-        'json',
+        'stream-json',
+        '--verbose',
       ]);
     });
 
@@ -482,6 +486,43 @@ describe('shell-claude-cli-backend', () => {
       const [, argv] = spawnMock.mock.calls[0];
       const permissionModeIndex = argv.indexOf('--permission-mode');
       expect(argv[permissionModeIndex + 1]).toBe('plan');
+    });
+
+    it('advisory calls close the operator settings / MCP / hooks surface (no CLAUDE.md, memory, extras)', async () => {
+      spawnMock.mockReturnValueOnce(createChild('ok'));
+
+      const backend = new ShellClaudeCliBackend({
+        bin: 'claude',
+        model: 'opus',
+        extraArgs: ['--permission-mode', 'bypassPermissions'],
+      });
+      await backend.delegateTask('wake', undefined, { advisory: true, profile: 'planner' });
+
+      const [, argv] = spawnMock.mock.calls[0];
+      expect(argv).toEqual(
+        expect.arrayContaining([
+          '--strict-mcp-config',
+          '--mcp-config',
+          '{"mcpServers":{}}',
+          '--setting-sources',
+          '',
+          '--settings',
+          '{"disableAllHooks":true}',
+        ])
+      );
+      expect(argv[argv.indexOf('--permission-mode') + 1]).toBe('plan');
+      expect(argv).not.toContain('bypassPermissions');
+    });
+
+    it('non-advisory calls keep the operator surface (no isolation tuple)', async () => {
+      spawnMock.mockReturnValueOnce(createChild('ok'));
+
+      const backend = new ShellClaudeCliBackend({ bin: 'claude', model: 'opus' });
+      await backend.delegateTask('do the thing', undefined, { profile: 'planner' });
+
+      const [, argv] = spawnMock.mock.calls[0];
+      expect(argv).not.toContain('--setting-sources');
+      expect(argv).not.toContain('--strict-mcp-config');
     });
 
     it('ambient read-only sandbox applies the explorer mapping to an unprofiled delegation', async () => {

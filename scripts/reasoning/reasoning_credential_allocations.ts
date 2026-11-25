@@ -83,7 +83,12 @@ async function registerCredential(
   const spec = requireCredentialService(service);
   const label = typeof values.label === 'string' ? values.label : undefined;
   const plan = planOf(values.plan as string | undefined);
-  const operator = resolveCliOperatorIdentity().principalId;
+  // The loopback owner lives in knowledge/personal/members/: read it under the
+  // same execution context organization_member uses, or the caller is unknown
+  // and every owner-gated register fails with [CREDENTIAL_OWNER_REQUIRED].
+  const operator = withExecutionContext('sovereign_concierge', () =>
+    resolveCliOperatorIdentity()
+  ).principalId;
   const fromFile = typeof values['from-file'] === 'string' ? values['from-file'] : undefined;
   const tokenExpiresAt = values['token-expires'] as string | undefined;
   const contractTenant = values['contract-tenant'] as string | undefined;
