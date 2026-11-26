@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   pendingSave: vi.fn(),
   resolvedIntent: vi.fn(),
   safeExec: vi.fn(),
+  recordExecutionFeedback: vi.fn(),
+  materializeCandidate: vi.fn(),
 }));
 vi.mock('../secure-io.js', async () => ({
   ...(await vi.importActual<typeof import('../secure-io.js')>('../secure-io.js')),
@@ -46,6 +48,13 @@ vi.mock('../agent/agent-manifest.js', async () => ({
   }),
 }));
 vi.mock('../mesh/a2a-bridge.js', () => ({ a2aBridge: { route: mocks.route } }));
+vi.mock('../knowledge/execution-feedback.js', async () => ({
+  ...(await vi.importActual<typeof import('../knowledge/execution-feedback.js')>(
+    '../knowledge/execution-feedback.js'
+  )),
+  recordExecutionFeedback: mocks.recordExecutionFeedback,
+  materializeExecutionFeedbackCandidate: mocks.materializeCandidate,
+}));
 vi.mock('../intent/intent-contract.js', async () => ({
   ...(await vi.importActual<typeof import('../intent/intent-contract.js')>(
     '../intent/intent-contract.js'
@@ -111,6 +120,17 @@ beforeEach(() => {
   mocks.shouldCompile.mockReturnValue(false);
   mocks.pendingLoad.mockReturnValue(null);
   mocks.pendingSave.mockImplementation((record) => record);
+  mocks.recordExecutionFeedback.mockImplementation((value) => ({
+    ...value,
+    kind: 'execution-feedback',
+    schema_version: '1.0.0',
+    feedback_id: 'fb-conv-1',
+    recorded_at: '2026-11-25T00:00:00.000Z',
+    source: 'user',
+  }));
+  mocks.materializeCandidate.mockReturnValue({
+    candidate: { candidate_id: 'MC-CONV-1' },
+  });
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -241,5 +261,37 @@ describe('surface conversation context opt-in wiring', () => {
     expect(mocks.ensure).not.toHaveBeenCalled();
     expect(mocks.stop).not.toHaveBeenCalled();
     expect(result.conversationRuntime).toBeUndefined();
+  });
+
+  it('captures IL-05 conversational corrections on scoped turns without changing authority', async () => {
+    const result = await runSurfaceMessageConversation({
+      ...baseInput,
+      locale: 'ja',
+      text: '今後は結論から先に簡潔に書いてください',
+    });
+    expect(result.conversationalCorrectionCandidateId).toBe('MC-CONV-1');
+    expect(mocks.recordExecutionFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scope: expect.objectContaining({ tier: 'confidential', tenant_slug: 'acme' }),
+        outcome: 'partially_satisfied',
+      })
+    );
+
+    const askOnlyResult = await runSurfaceMessageConversation({
+      ...baseInput,
+      locale: 'ja',
+      text: '今後は結論から先に簡潔に書いてください',
+      workAuthority: 'ask_only',
+    });
+    expect(askOnlyResult.conversationalCorrectionCandidateId).toBeUndefined();
+
+    vi.clearAllMocks();
+    const secretResult = await runSurfaceMessageConversation({
+      ...baseInput,
+      locale: 'ja',
+      text: '今後は sk-1234567890abcdefghijklmnop を使わず簡潔に書いてください',
+    });
+    expect(secretResult.conversationalCorrectionCandidateId).toBeUndefined();
+    expect(mocks.recordExecutionFeedback).not.toHaveBeenCalled();
   });
 });

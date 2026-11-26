@@ -21183,6 +21183,71 @@
         "ja": "件数の数え方",
         "qps-ploc": "⟦Ħőẇ ŧħïş ïş ƈőůñŧėḓ ŀőřėɱ ⟧"
       },
+      "ia_inbox_focus_tab": {
+        "en": "Focus (top 3)",
+        "ja": "フォーカス (上位3件)",
+        "qps-ploc": "⟦Ƒőƈůş (ŧőṗ 3) ŀőřė⟧"
+      },
+      "ia_inbox_focus_all_tab": {
+        "en": "All items",
+        "ja": "すべて",
+        "qps-ploc": "⟦Ȧŀŀ ïŧėɱş ŀőř⟧"
+      },
+      "ia_inbox_focus_banner": {
+        "en": "Focus mode: showing your top {shown} items ({hidden} lower-priority items set aside).",
+        "ja": "フォーカスモード: 優先度上位 {shown} 件を表示中です（残り {hidden} 件は折りたたみ中）。",
+        "qps-ploc": "⟦Ƒőƈůş ɱőḓė: şħőẇïñɠ ẏőůř ŧőṗ {shown} ïŧėɱş ({hidden} ŀőẇėř-ṗřïőřïŧẏ ïŧėɱş şėŧ ȧşïḓė). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "ia_inbox_focus_summary": {
+        "en": "Focus resolves {clears} waiting records in ~{minutes} min.",
+        "ja": "上位3件で {clears} 件の待ちを解消できます（目安 {minutes} 分）。",
+        "qps-ploc": "⟦Ƒőƈůş řėşőŀṽėş {clears} ẇȧïŧïñɠ řėƈőřḓş ïñ ~{minutes} ɱïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "ia_inbox_triage_overdue": {
+        "en": "Overdue",
+        "ja": "期限超過",
+        "qps-ploc": "⟦Őṽėřḓůė ŀőř⟧"
+      },
+      "ia_inbox_triage_deadline_soon": {
+        "en": "Due soon",
+        "ja": "期限間近",
+        "qps-ploc": "⟦Ḓůė şőőñ ŀőř⟧"
+      },
+      "ia_inbox_triage_high_risk": {
+        "en": "High risk",
+        "ja": "高リスク",
+        "qps-ploc": "⟦Ħïɠħ řïşķ ŀőř⟧"
+      },
+      "ia_inbox_triage_blocking": {
+        "en": "Blocking",
+        "ja": "後続ブロック",
+        "qps-ploc": "⟦Ƀŀőƈķïñɠ ŀőř⟧"
+      },
+      "ia_inbox_triage_grouped": {
+        "en": "Grouped batch",
+        "ja": "まとめ処理",
+        "qps-ploc": "⟦Ɠřőůṗėḓ ƀȧŧƈħ ŀőřė⟧"
+      },
+      "ia_inbox_triage_aging": {
+        "en": "Waiting long",
+        "ja": "長期滞留",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ŀőñɠ ŀőř⟧"
+      },
+      "ia_inbox_bucket_now": {
+        "en": "Now",
+        "ja": "今すぐ",
+        "qps-ploc": "⟦Ñőẇ ŀőř⟧"
+      },
+      "ia_inbox_bucket_today": {
+        "en": "Today",
+        "ja": "今日中",
+        "qps-ploc": "⟦Ŧőḓȧẏ ŀőř⟧"
+      },
+      "ia_inbox_bucket_batch": {
+        "en": "Batch",
+        "ja": "まとめて",
+        "qps-ploc": "⟦Ƀȧŧƈħ ŀőř⟧"
+      },
       "ia_inbox_waiting_long_badge": {
         "en": "Waiting a long time",
         "ja": "長く待っています",

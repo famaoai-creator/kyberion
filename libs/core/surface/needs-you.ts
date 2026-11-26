@@ -502,3 +502,12 @@ export function pageNeedsYou(
     ...(next < filtered.length ? { nextCursor: String(next) } : {}),
   };
 }
+
+export {
+  triageNeedsYouAttention,
+  type AttentionBucket,
+  type AttentionReasonKey,
+  type AttentionTriagePlan,
+  type AttentionTriagedItem,
+  type TriageNeedsYouOptions,
+} from './attention-triage.js';

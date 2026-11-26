@@ -202,4 +202,12 @@ describe('formatting and arguments', () => {
     expect(report?.factory_readiness?.tenant_slug).toBe('acme');
     expect(report?.factory_readiness?.ready).toBe(false);
   });
+
+  it('attaches autonomous loop readiness when --loop-readiness is passed to report', async () => {
+    const report = (await runPrShadow(['report', '--loop-readiness', '--json'])) as {
+      loop_readiness?: { status: string; memory_loop: { loop_status: string } };
+    };
+    expect(['ready', 'degraded', 'blocked']).toContain(report?.loop_readiness?.status);
+    expect(report?.loop_readiness?.memory_loop).toBeDefined();
+  });
 });

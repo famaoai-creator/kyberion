@@ -1834,6 +1834,89 @@
           ]
         }
       }
+    },
+    "conversational_correction.trigger": {
+      "description": "Natural conversational correction or standing preference instruction (IL-05).",
+      "word_boundary": "ascii",
+      "locales": {
+        "ja": {
+          "phrases": [
+            "違う、",
+            "そうじゃなくて",
+            "そうではなく",
+            "次からは",
+            "次回から",
+            "今後は",
+            "これからは",
+            "もっと簡潔に",
+            "やめてほしい",
+            "変えてほしい"
+          ]
+        },
+        "en": {
+          "phrases": [
+            "no, instead",
+            "next time",
+            "from now on",
+            "don't do that",
+            "do not do that",
+            "instead of",
+            "please remember to",
+            "keep it"
+          ]
+        }
+      }
+    },
+    "conversational_correction.style_format": {
+      "description": "Correction targeting output style, brevity, or formatting.",
+      "word_boundary": "ascii",
+      "locales": {
+        "ja": {
+          "phrases": ["簡潔", "箇条書き", "短く", "丁寧", "要約", "表形式", "日本語で", "英語で"]
+        },
+        "en": {
+          "phrases": [
+            "concise",
+            "bullet points",
+            "shorter",
+            "format",
+            "summary",
+            "brief",
+            "markdown"
+          ]
+        }
+      }
+    },
+    "conversational_correction.priority_timing": {
+      "description": "Correction targeting urgency, ordering, or scheduling priority.",
+      "word_boundary": "ascii",
+      "locales": {
+        "ja": {
+          "phrases": ["先に", "優先", "期限", "後回し", "朝一", "急ぎ"]
+        },
+        "en": {
+          "phrases": ["priority", "deadline", "first", "urgent", "later", "deprioritize"]
+        }
+      }
+    },
+    "conversational_correction.scope_boundary": {
+      "description": "Correction targeting autonomy boundaries, confirmation, or scope limits.",
+      "word_boundary": "ascii",
+      "locales": {
+        "ja": {
+          "phrases": ["勝手に", "確認して", "対象外", "範囲", "承認", "触らないで"]
+        },
+        "en": {
+          "phrases": [
+            "ask first",
+            "confirm first",
+            "out of scope",
+            "don't touch",
+            "do not touch",
+            "approval"
+          ]
+        }
+      }
     }
   }
 }

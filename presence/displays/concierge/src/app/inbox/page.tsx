@@ -33,6 +33,7 @@ import {
   type NeedsYouSummary,
 } from '../../lib/needs-you-client';
 import { inboxReturnToCandidateHref } from '../../lib/inbox-links';
+import { selectInboxVisibleItems } from '../../lib/inbox-focus';
 import {
   NeedsYouCard,
   cardAnchor,
@@ -107,6 +108,7 @@ function InboxView() {
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<{ text: string; error?: boolean } | null>(null);
   const [deferred, setDeferred] = React.useState<Set<string>>(new Set());
+  const [focusMode, setFocusMode] = React.useState(false);
 
   React.useEffect(() => setDeferred(readDeferred()), []);
 
@@ -227,6 +229,18 @@ function InboxView() {
     }
   };
 
+  const unDeferred = React.useMemo(
+    () => (items ?? []).filter((item) => !deferred.has(item.id)),
+    [items, deferred]
+  );
+  const filtered = Boolean(filters.reason || filters.overdue);
+  const focusSelection = React.useMemo(
+    () => selectInboxVisibleItems(unDeferred, { focusMode, filtered }),
+    [unDeferred, focusMode, filtered]
+  );
+  const visible = focusSelection.visible;
+  const hiddenByFocusCount = Math.max(0, unDeferred.length - visible.length);
+
   // A deep link (`/inbox#decide-approval-<id>` or `/inbox?request=<id>`) lands
   // on its card once the queue has loaded: reveal a set-aside card, use a
   // folded group's lead card.
@@ -247,13 +261,16 @@ function InboxView() {
       });
       return;
     }
+    if (focusMode && !visible.some((entry) => cardAnchor(entry) === landing.scrollTo)) {
+      setFocusMode(false);
+      return;
+    }
     landedHash.current = hash;
     const element = document.getElementById(landing.scrollTo);
     element?.scrollIntoView({ block: 'start' });
     element?.focus?.({ preventScroll: true });
-  }, [items, deferred]);
+  }, [items, deferred, focusMode, visible]);
 
-  const visible = (items ?? []).filter((item) => !deferred.has(item.id));
   const setAsideItems = (items ?? []).filter((item) => deferred.has(item.id));
   // "N more" counts what is still waiting here: the total minus the cards set aside.
   const waitingCount = Math.max(0, total - setAsideItems.length);
@@ -300,7 +317,6 @@ function InboxView() {
     })),
   ];
   const next = visible[0];
-  const filtered = Boolean(filters.reason || filters.overdue);
   // An approval opened from a knowledge candidate (learning review) offers the
   // way back to that candidate's row in the library.
   const returnToCandidate = inboxReturnToCandidateHref(
@@ -363,6 +379,20 @@ function InboxView() {
               },
             ]}
           />
+          {(unDeferred.length > 3 || focusMode) && !filtered ? (
+            <div className="inbox-focus-toggle" role="group" aria-label={c('ia_inbox_focus_tab')}>
+              <Button
+                label={c('ia_inbox_focus_tab')}
+                variant={focusMode ? 'primary' : 'secondary'}
+                onClick={() => setFocusMode(true)}
+              />
+              <Button
+                label={c('ia_inbox_focus_all_tab')}
+                variant={!focusMode ? 'primary' : 'secondary'}
+                onClick={() => setFocusMode(false)}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -394,6 +424,22 @@ function InboxView() {
         )
       ) : (
         <>
+          {focusMode && !filtered && hiddenByFocusCount > 0 ? (
+            <Callout
+              tone="info"
+              title={c('ia_inbox_focus_banner', {
+                shown: visible.length,
+                hidden: hiddenByFocusCount,
+              })}
+            >
+              <p className="decide-muted">
+                {c('ia_inbox_focus_summary', {
+                  clears: focusSelection.plan.focus_clears_records,
+                  minutes: focusSelection.plan.estimated_focus_minutes,
+                })}
+              </p>
+            </Callout>
+          ) : null}
           {next ? (
             <NextAction
               eyebrow={`${t('decide.next_eyebrow')} · ${c(`ia_inbox_reason_${next.reason}`)}`}
@@ -419,7 +465,7 @@ function InboxView() {
               />
             ))}
           </div>
-          {nextCursor ? (
+          {nextCursor && !(focusMode && !filtered && hiddenByFocusCount > 0) ? (
             <Button
               label={c('ia_inbox_load_more')}
               variant="secondary"

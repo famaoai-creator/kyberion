@@ -129,7 +129,8 @@ import {
   type ExecutionFeedbackInput,
 } from '../knowledge/execution-feedback.js';
 import { executionFeedbackScopeKey } from '../knowledge/execution-feedback-candidates.js';
-import { assertMemoryScope } from '../knowledge/memory-scope.js';
+import { assertMemoryScope, type MemoryScopeEnvelope } from '../knowledge/memory-scope.js';
+import { captureConversationalCorrectionLearning } from '../knowledge/conversational-correction-learning.js';
 import { normalizeEventScope, parseEventScopeInput } from '../event/event-scope.js';
 import * as surfaceRuntimeData from './surface-runtime-conversation-data.js';
 
@@ -756,6 +757,19 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: surfaceRuntimeData.SurfaceRuntimeRouteHand
   },
 ];
 
+function resolveTurnMemoryScope(
+  rawScope: SurfaceConversationInput['scope']
+): MemoryScopeEnvelope | undefined {
+  const eventScope = rawScope ? normalizeEventScope(parseEventScopeInput(rawScope)) : undefined;
+  const memoryContext = eventScope
+    ? (({ scope_kind: _kind, ...context }) => context)(eventScope)
+    : undefined;
+  return memoryContext &&
+    (memoryContext.tier !== 'public' || Object.keys(memoryContext).some((key) => key !== 'tier'))
+    ? assertMemoryScope(memoryContext)
+    : undefined;
+}
+
 /**
  * Scope selection classifies feedback; it never grants execution authority.
  * Event scope_kind is transport metadata, not a memory-envelope field.
@@ -764,17 +778,7 @@ function bindExecutionFeedbackToTurn(
   input: Pick<SurfaceConversationInput, 'scope' | 'correlationId' | 'surface'>,
   feedback: ExecutionFeedbackInput
 ): ExecutionFeedbackInput {
-  const eventScope = input.scope
-    ? normalizeEventScope(parseEventScopeInput(input.scope))
-    : undefined;
-  const memoryContext = eventScope
-    ? (({ scope_kind: _kind, ...context }) => context)(eventScope)
-    : undefined;
-  const scope =
-    memoryContext &&
-    (memoryContext.tier !== 'public' || Object.keys(memoryContext).some((key) => key !== 'tier'))
-      ? assertMemoryScope(memoryContext)
-      : undefined;
+  const scope = resolveTurnMemoryScope(input.scope);
   if (
     feedback.scope !== undefined &&
     executionFeedbackScopeKey(feedback.scope) !== executionFeedbackScopeKey(scope)
@@ -1274,6 +1278,35 @@ async function runSurfaceMessageConversationTurn(
     await surfaceRuntimeData.startSurfaceBackgroundReview(input);
   }
   const result = await runSurfaceConversation(buildSurfaceConversationInput(input));
+  // IL-05 conversational correction capture: detect natural-language standing
+  // rules during normal scoped conversation and emit a reviewable candidate
+  // without mutating authority or interrupting delivery.
+  if (
+    !feedback &&
+    input.workAuthority !== 'ask_only' &&
+    !input.isolation &&
+    !scopedCliFeedback &&
+    input.scope &&
+    (input.correlationId || input.threadTs || input.conversationKey)
+  ) {
+    try {
+      const turnInput = buildSurfaceConversationInput(input);
+      const capture = captureConversationalCorrectionLearning({
+        text: input.text,
+        scope: resolveTurnMemoryScope(input.scope),
+        intentId: result.intentResolution?.normalized_intent,
+        correlationId: input.correlationId,
+        surface: input.surface,
+        locales: input.locale ? [input.locale] : undefined,
+      });
+      if (capture.captured && capture.feedback && capture.candidate) {
+        recordFeedbackSignal(turnInput, capture.feedback);
+        result.conversationalCorrectionCandidateId = capture.candidate.candidate_id;
+      }
+    } catch {
+      // Conversational correction capture must never block surface responses.
+    }
+  }
   // Enforce the surface UX contract on the outbound user-facing text. This is
   // the single chokepoint for all surface responses; validation is non-blocking
   // (a violation is logged and attached to the result, never dropped) so a

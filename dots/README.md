@@ -146,15 +146,14 @@ matching tools). State is kept under `active/shared/runtime/dot/`.
    it instead, leave it archived (or cancel it through the work board). Do not
    reopen the item directly — a plain reopen is re-archived as a conflict.
 
-### Executor limitations
+### Executor capabilities and bounds
 
-- `task_session` is **not available**: no governed task-session executor
-  ships yet. It is not a default shape, and dispatch refuses a `task_session`
-  proposal before the gate or any operator ask, even when a charter declares
-  it. Use `pipeline` (with a `pipeline_ref` from `allowed_pipelines`) for
-  effects and `direct_reply` for advisory answers. A legacy `task_session`
-  item is closed as blocked (`reason_code: capability_unavailable`) without
-  waking the dot; the dot sees it in its work results on the next wake.
+- `task_session` runs inside a bounded `worker-goal-driver` loop with four governed
+  work tools (`dot_read_scoped_file`, `dot_search_knowledge`,
+  `dot_write_scoped_deliverable`, `dot_cite_knowledge_used`) when the charter's
+  `authority.allowed_execution_shapes` explicitly allows `task_session`. Each tool
+  call re-verifies the live WorkItem lease and scope isolation, writes deliverables
+  via `writeScopedArtifact`, and records knowledge delivery/usage feedback.
 - `direct_reply` asks the provider for advisory behavior; not every provider
   enforces it mechanically, so its summary is prefixed as unverified.
 - A failure **before any effect** (no backend resolved, pipeline missing or

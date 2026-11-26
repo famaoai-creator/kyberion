@@ -559,6 +559,7 @@ export interface SurfaceConversationResult {
   intentResolution?: IntentResolutionContract;
   executionFeedbackRequest?: ExecutionFeedbackRequest;
   executionFeedbackRecord?: ExecutionFeedbackRecord;
+  conversationalCorrectionCandidateId?: string;
 }
 
 export interface SurfaceDelegationResult {

@@ -583,7 +583,12 @@ describe('executeDotWorkItem', () => {
         budget: { wallClockBudgetMs: 120_000, turnBudget: 4 },
         objective: expect.stringContaining('Target: service:ops; intent: apply'),
       }),
-      expect.any(AbortSignal)
+      expect.any(AbortSignal),
+      expect.objectContaining({
+        executionShape: 'task_session',
+        item: expect.objectContaining({ item_id: 'w1' }),
+        assertCurrent: expect.any(Function),
+      })
     );
     expect(h.releases[0]).toMatchObject({
       itemId: 'w1',
@@ -1264,5 +1269,71 @@ describe('capability, pre-effect and report recovery (PR #915 review)', () => {
     );
     expect(rows).toEqual([]);
     expect(h.claims).toHaveLength(0);
+  });
+});
+
+describe('task_session deliverable & citation summary formatting', () => {
+  it('includes deliverable path for public charters and withholds private paths for confidential charters', async () => {
+    const publicCharter = charter();
+    const publicItem = item('w7', { requested_work_shape: 'task_session' });
+    const hPub = harness([publicItem]);
+    const pPub = ports({
+      runGoalTurn: vi.fn(async () => ({
+        turnsRun: 1,
+        finalState: 'complete',
+        goal: { budgetStats: { tokensUsed: 120 } },
+        finalText: 'Wrote report.',
+        taskToolSummary: {
+          toolCalls: 2,
+          readPaths: [],
+          deliveredKnowledgePaths: ['knowledge/public/ok.md'],
+          citedKnowledgePaths: ['knowledge/public/ok.md'],
+          deliverables: [
+            {
+              path: 'active/public/shared/artifacts/deliverables/w7.md',
+              sha256: 'abc',
+              bytes: 12,
+            },
+          ],
+        },
+      })),
+    });
+    const pubRow = await executeDotWorkItem(publicCharter, publicItem, pPub, hPub.deps);
+    expect(pubRow.status).toBe('done');
+    expect(pubRow.summary).toContain('active/public/shared/artifacts/deliverables/w7.md');
+    expect(pubRow.summary).toContain(
+      '[deliverables: active/public/shared/artifacts/deliverables/w7.md; cited: 1]'
+    );
+
+    const confCharter = charter({ scope: { tier: 'confidential', tenant_slug: 'acme' } });
+    const confItem = item('w8', { requested_work_shape: 'task_session' }, {
+      context: { tenant_slug: 'acme' },
+    } as Partial<WorkItem>);
+    const hConf = harness([confItem]);
+    const pConf = ports({
+      runGoalTurn: vi.fn(async () => ({
+        turnsRun: 1,
+        finalState: 'complete',
+        goal: { budgetStats: { tokensUsed: 140 } },
+        finalText: 'Wrote tenant report.',
+        taskToolSummary: {
+          toolCalls: 2,
+          readPaths: [],
+          deliveredKnowledgePaths: ['knowledge/confidential/acme/ok.md'],
+          citedKnowledgePaths: ['knowledge/confidential/acme/ok.md'],
+          deliverables: [
+            {
+              path: 'active/confidential/acme/artifacts/deliverables/secret.md',
+              sha256: 'def',
+              bytes: 24,
+            },
+          ],
+        },
+      })),
+    });
+    const confRow = await executeDotWorkItem(confCharter, confItem, pConf, hConf.deps);
+    expect(confRow.status).toBe('done');
+    expect(confRow.summary).toContain('[deliverables: 1; cited: 1]');
+    expect(confRow.summary).not.toContain('secret.md');
   });
 });
