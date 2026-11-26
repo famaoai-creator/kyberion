@@ -107,6 +107,10 @@ describe('renderer width model', () => {
     expect(wrapParagraphForRenderer('検証環境', 4)).toHaveLength(2);
     expect(wrapParagraphForRenderer('検証環境', 4.1)).toHaveLength(1);
   });
+
+  it('trims a long trailing whitespace run when wrapping', () => {
+    expect(wrapParagraphForRenderer(`確認${'\t'.repeat(20_000)}`, 4)).toEqual(['確認']);
+  });
 });
 
 describe('preset text rectangles', () => {
