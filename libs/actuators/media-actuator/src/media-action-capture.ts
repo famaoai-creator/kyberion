@@ -426,7 +426,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       }
       for (const issue of rendered.issues.slice(0, 12)) {
         logger.warn(
-          `[MEDIA_TEXT_FIT] pptx_render_check: slide ${issue.slideIndex} element ${issue.elementIndex}${issue.elementName ? ` (${issue.elementName})` : ''} ${issue.kind} "${issue.excerpt}" — ${issue.detail} | next: shorten the text, widen / heighten the box or lower the size | evidence: ${issue.shapeType} ${issue.fontSizePt}pt`
+          `[MEDIA_TEXT_FIT] pptx_render_check: slide ${issue.slideIndex} element ${issue.elementIndex} ${issue.kind} — text needs more space | next: shorten the text, widen / heighten the box or lower the size | evidence: ${issue.lines} line(s) at ${issue.fontSizePt}pt`
         );
       }
       const failing = rendered.issues.filter((issue) =>
@@ -436,11 +436,16 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         throw new Error(
           `pptx_render_check: ${sourcePath} has ${failing.length} text box(es) at or above '${failOn}' that do not hold their text in the rendered deck | next: shorten the text, enlarge the box or lower the size, or rerun with fail_on: never to inspect | evidence: ${failing
             .slice(0, 6)
-            .map(
-              (issue) =>
-                `slide ${issue.slideIndex} element ${issue.elementIndex} ${issue.kind} "${issue.excerpt}"`
-            )
+            .map((issue) => `slide ${issue.slideIndex} element ${issue.elementIndex} ${issue.kind}`)
             .join('; ')}`
+        );
+      }
+      if (
+        rendered.unmatchedElements > 0 &&
+        (failOn === 'warn' || (failOn === 'error' && rendered.checkedElements === 0))
+      ) {
+        throw new Error(
+          `[MEDIA_TEXT_FIT] pptx_render_check: inconclusive — ${rendered.unmatchedElements} authored text box(es) could not be matched to the rendered PDF | next: confirm design_from matches the rendered deck and inspect the output with fail_on: never`
         );
       }
       return {

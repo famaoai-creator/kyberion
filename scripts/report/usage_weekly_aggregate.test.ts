@@ -24,10 +24,17 @@ import {
 
 const WEEK = resolveUsageWeek('2026-11-16');
 const SECRET_PROMPT = 'confidential board numbers for tenant acme';
+const SYSTEM_SCOPE = { tier: 'public', scope_kind: 'system' };
 
 function rec(partial: Partial<UsageAuditRecord> & { at: string }): UsageAuditRecord {
   const { at, ...rest } = partial;
-  return { agentId: 'claude_code', result: 'completed', timestamp: at, ...rest };
+  return {
+    agentId: 'claude_code',
+    result: 'completed',
+    timestamp: at,
+    scope: SYSTEM_SCOPE,
+    ...rest,
+  };
 }
 
 function hook(session: string, extra: Record<string, unknown> = {}) {
@@ -279,6 +286,57 @@ describe('buildUsageWeeklyReport + markdown', () => {
     expect(markdown).not.toContain(SECRET_PROMPT);
     expect(JSON.stringify(report)).not.toContain(SECRET_PROMPT);
   });
+
+  it('keeps confidential, personal, tenant, and unclassified records out of shared totals', () => {
+    const timestamp = '2026-11-16T00:00:00Z';
+    const at = { at: timestamp, action: 'claude_code_user_prompt' };
+    const report = buildUsageWeeklyReport({
+      window: WEEK,
+      current: [
+        rec(at),
+        rec({ ...at, scope: { tier: 'personal', scope_kind: 'system' } }),
+        rec({ ...at, scope: { tier: 'confidential', tenant_slug: 'tenant-private' } }),
+        rec({ ...at, tenantSlug: 'legacy-private' }),
+        rec({ ...at, scope: { tier: 'public', tenant_slug: 'tenant-private' } }),
+        rec({ ...at, scope: undefined }),
+        rec({ ...at, metadata: { file_path: 'knowledge/personal/private.md' } }),
+      ],
+      previous: [
+        rec({
+          ...at,
+          at: '2026-11-09T00:00:00Z',
+          scope: { tier: 'personal', scope_kind: 'system' },
+        }),
+      ],
+      metrics: [
+        metric(timestamp, { actor_id: 'dot:system-dot' }),
+        metric(timestamp, {
+          actor_id: 'dot:private-dot',
+          scope: { tier: 'confidential', tenant_slug: 'tenant-private' },
+        }),
+      ],
+      supervisor: [
+        { ts: timestamp, decision: 'agent_runtime_ask_completed', scope: SYSTEM_SCOPE },
+        {
+          ts: timestamp,
+          decision: 'agent_runtime_ask_completed',
+          scope: { tier: 'personal', scope_kind: 'system' },
+          input_tokens: 200,
+        },
+      ],
+    });
+    expect(report.current.prompts).toBe(1);
+    expect(report.previous.total_events).toBe(0);
+    expect(report.execution_origin.sources).toEqual({
+      audit_records: 1,
+      execution_metrics_records: 1,
+      supervisor_events: 1,
+    });
+    expect(report.execution_origin.supervisor.ask_input_tokens).toBe(0);
+    for (const output of [JSON.stringify(report), renderUsageWeeklyMarkdown(report)]) {
+      expect(output).not.toMatch(/tenant-private|legacy-private|private-dot|system-dot/);
+    }
+  });
 });
 
 function metric(at: string, partial: Partial<ExecutionMetricRecord> = {}): ExecutionMetricRecord {
@@ -483,7 +541,7 @@ describe('aggregateExecutionOrigins', () => {
       current: audit,
       previous: [],
       metrics,
-      supervisor,
+      supervisor: supervisor.map((row) => ({ ...row, scope: SYSTEM_SCOPE })),
       now: new Date('2026-11-24T00:00:00Z'),
     });
     expect(report.execution_origin.by_origin.map((r) => r.origin)).toEqual([
@@ -499,14 +557,14 @@ describe('aggregateExecutionOrigins', () => {
       `| interactive_cli | 2 | 0 | 0 | 0 | ${INTERACTIVE_CLI_TOKENS_UNAVAILABLE} | ${INTERACTIVE_CLI_TOKENS_UNAVAILABLE} | - |`
     );
     expect(markdown).toContain('| dot | 1 | 0 | 3 | 1 | 200 | 100 | 80% |');
-    expect(markdown).toContain('| dot:tenant-a-ops | 1 | 3 | 1 | 2 | 1.5 | 200 | 100 | 80% |');
-    expect(markdown).toContain('| process_exit | 1 |');
+    expect(markdown).not.toContain('dot:tenant-a-ops');
+    expect(JSON.stringify(report)).not.toContain('dot:tenant-a-ops');
   });
 
   it('defaults to empty metrics/supervisor input', () => {
     const report = buildUsageWeeklyReport({ window: WEEK, current: [], previous: [] });
     expect(report.execution_origin.sources.execution_metrics_records).toBe(0);
-    expect(report.execution_origin.dots).toEqual([]);
+    expect(report.execution_origin.by_origin.every((row) => row.llm_calls === 0)).toBe(true);
   });
 });
 
@@ -522,7 +580,7 @@ describe('readExecutionMetricsForWindow + readSupervisorEventsForWindow', () => 
     if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
   });
 
-  it('reads the system ledger plus partitions and the dated supervisor files inside the window', () => {
+  it('reads the system ledger and the dated supervisor files inside the window', () => {
     const file = path.join(dir, 'execution-metrics.jsonl');
     safeWriteFile(
       file,
@@ -538,8 +596,8 @@ describe('readExecutionMetricsForWindow + readSupervisorEventsForWindow', () => 
       path.join(partitionRoot, 'public', 'shared', 'execution-metrics.jsonl'),
       `${JSON.stringify(metric('2026-11-20T00:00:00Z', { actor_id: 'partition' }))}\n`
     );
-    const rows = readExecutionMetricsForWindow(WEEK, { file, partitionRoot });
-    expect(rows.map((r) => r.actor_id)).toEqual(['system', 'partition']);
+    const rows = readExecutionMetricsForWindow(WEEK, file);
+    expect(rows.map((r) => r.actor_id)).toEqual(['system']);
 
     safeWriteFile(
       path.join(dir, 'agent-runtime-supervisor-events-2026-11-22.jsonl'),
@@ -552,12 +610,7 @@ describe('readExecutionMetricsForWindow + readSupervisorEventsForWindow', () => 
   });
 
   it('returns nothing when the sources do not exist', () => {
-    expect(
-      readExecutionMetricsForWindow(WEEK, {
-        file: path.join(dir, 'missing.jsonl'),
-        partitionRoot: path.join(dir, 'missing'),
-      })
-    ).toEqual([]);
+    expect(readExecutionMetricsForWindow(WEEK, path.join(dir, 'missing.jsonl'))).toEqual([]);
     expect(readSupervisorEventsForWindow(WEEK, path.join(dir, 'missing'))).toEqual([]);
   });
 });

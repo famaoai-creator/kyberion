@@ -783,7 +783,8 @@ export interface RenderedBoxMeasurement {
   renderedBottomIn?: number;
 }
 
-export interface PptxRenderTextCheckResult extends PptxTextFitReport {
+export interface PptxRenderTextCheckResult extends Omit<PptxTextFitReport, 'status'> {
+  status: PptxTextFitReport['status'] | 'inconclusive';
   /** Boxes whose rendered lines could not be located in the PDF. */
   unmatchedElements: number;
   boxes: RenderedBoxMeasurement[];
@@ -915,8 +916,10 @@ export function compareRenderedTextRuns(
       });
     }
   }
+  const summary = summarizeTextFitIssues(issues, predictions.length - unmatched, skippedElements);
   return {
-    ...summarizeTextFitIssues(issues, predictions.length - unmatched, skippedElements),
+    ...summary,
+    status: summary.status === 'pass' && unmatched > 0 ? 'inconclusive' : summary.status,
     unmatchedElements: unmatched,
     boxes,
   };

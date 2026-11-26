@@ -701,7 +701,9 @@ describe('shell-claude-cli-backend', () => {
       expect(withWallClockBudgetMock).toHaveBeenCalledTimes(1);
       const [opts, fn] = withWallClockBudgetMock.mock.calls[0];
       expect(opts).toMatchObject({ provider: 'claude', budgetMs: 12345 });
-      expect(opts.signal).toBe(controller.signal);
+      expect(opts.signal?.aborted).toBe(false);
+      controller.abort();
+      expect(opts.signal?.aborted).toBe(true);
       expect(opts.child).toEqual(expect.objectContaining({ kill: expect.any(Function) }));
       expect(typeof fn).toBe('function');
     });

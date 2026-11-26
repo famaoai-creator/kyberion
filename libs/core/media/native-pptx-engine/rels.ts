@@ -57,11 +57,11 @@ export function generateLayoutRels(masterId: number): string {
 </Relationships>`;
 }
 
-export function generateMasterRels(layoutCount: number): string {
+export function generateMasterRels(layoutNumbers: readonly number[]): string {
   let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`;
   let rId = 1;
-  for (let i = 1; i <= layoutCount; i++) {
+  for (const i of layoutNumbers) {
     xml += `\n  <Relationship Id="rId${rId++}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout${i}.xml"/>`;
   }
   xml += `\n  <Relationship Id="rId${rId++}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/>`;

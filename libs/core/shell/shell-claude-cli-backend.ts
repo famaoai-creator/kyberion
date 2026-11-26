@@ -1206,28 +1206,32 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       // An enclosing supervised delegation still hears this call's progress.
       const outerProgress = captureDelegationProgressReporter();
       const startupTimeoutMs = this.startupTimeoutMs;
+      const startup = supervised ? new AbortController() : undefined;
+      const stopSignal =
+        startup && signal ? AbortSignal.any([startup.signal, signal]) : (startup?.signal ?? signal);
       let startupStalled = false;
+      let stderr = '';
+      const startupTimer = startup
+        ? setTimeout(() => {
+            if (stopSignal?.aborted) return;
+            startupStalled = true;
+            startup.abort();
+          }, startupTimeoutMs)
+        : undefined;
+      startupTimer?.unref?.();
 
       const raw = await withWallClockBudget(
         {
           provider: 'claude',
           budgetMs: this.timeoutMs,
           child: delegationChildHandleFromChildProcess(child),
-          signal,
+          signal: stopSignal,
           ...(supervised ? { inactivity: { timeoutMs: this.inactivityMs } } : {}),
         },
         () =>
           new Promise<string>((resolve, reject) => {
-            let stderr = '';
             let spawned = false;
             const progress = captureDelegationProgressReporter();
-            const startupTimer = supervised
-              ? setTimeout(() => {
-                  startupStalled = true;
-                  if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
-                }, startupTimeoutMs)
-              : undefined;
-            startupTimer?.unref?.();
             let pending = '';
             child.once('spawn', () => {
               spawned = true;
@@ -1240,9 +1244,10 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
               const lines = pending.split('\n');
               pending = lines.pop() ?? '';
               for (const line of lines) {
-                if (!line.trim()) continue;
+                const type = claudeStreamRecordType(line);
+                if (!type) continue;
                 if (startupTimer) clearTimeout(startupTimer);
-                const event = claudeStreamProgressEvent(line);
+                const event = claudeStreamProgressEventForType(type);
                 if (event) {
                   progress(event);
                   outerProgress(event);
@@ -1251,15 +1256,6 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
             });
             child.stderr.on('data', (chunk) => (stderr += chunk.toString()));
             child.on('close', (code) => {
-              if (startupTimer) clearTimeout(startupTimer);
-              if (startupStalled) {
-                reject(
-                  new Error(
-                    `[shell-claude-cli] timed out: startup stalled, no CLI output within ${startupTimeoutMs}ms. stderr: ${stderr.slice(0, 300)}`
-                  )
-                );
-                return;
-              }
               if (code !== 0) {
                 // The JSON envelope carries the real cause (auth expiry, usage
                 // limit, overload) on stdout; an empty stderr alone classified
@@ -1283,19 +1279,30 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
             child.stdin.write(stdin);
             child.stdin.end();
           })
-      ).catch((err) => {
-        if (err instanceof DelegationWallClockExceededError) {
-          spawnEnv.dispose();
-          throw new Error(`[shell-claude-cli] timed out after ${this.timeoutMs}ms`);
-        }
-        if (err instanceof DelegationInactivityExceededError) {
-          spawnEnv.dispose();
-          throw new Error(
-            `[shell-claude-cli] timed out: no assistant or tool progress for ${this.inactivityMs}ms`
-          );
-        }
-        throw err;
-      });
+      )
+        .catch((err) => {
+          if (startupStalled) {
+            spawnEnv.dispose();
+            throw new Error(
+              `[shell-claude-cli] timed out: startup stalled, no CLI stream record within ${startupTimeoutMs}ms. stderr: ${stderr.slice(0, 300)}`,
+              { cause: err }
+            );
+          }
+          if (err instanceof DelegationWallClockExceededError) {
+            spawnEnv.dispose();
+            throw new Error(`[shell-claude-cli] timed out after ${this.timeoutMs}ms`);
+          }
+          if (err instanceof DelegationInactivityExceededError) {
+            spawnEnv.dispose();
+            throw new Error(
+              `[shell-claude-cli] timed out: no assistant or tool progress for ${this.inactivityMs}ms`
+            );
+          }
+          throw err;
+        })
+        .finally(() => {
+          if (startupTimer) clearTimeout(startupTimer);
+        });
       const text = supervised ? extractClaudeStreamResult(raw) : raw;
       completionChars = text.length;
       status = 'success';
@@ -1321,6 +1328,11 @@ export const CLAUDE_CLI_DEFAULT_INACTIVITY_MS = 300_000;
 export function claudeStreamProgressEvent(
   line: string
 ): 'assistant_message' | 'tool_completed' | undefined {
+  return claudeStreamProgressEventForType(claudeStreamRecordType(line));
+}
+
+function claudeStreamRecordType(line: string): string | undefined {
+  if (!line.trimStart().startsWith('{')) return undefined;
   let record: unknown;
   try {
     record = parseSafeJsonInput(line, 'Claude CLI stream record');
@@ -1329,6 +1341,12 @@ export function claudeStreamProgressEvent(
   }
   if (!record || typeof record !== 'object') return undefined;
   const type = (record as Record<string, unknown>).type;
+  return typeof type === 'string' ? type : undefined;
+}
+
+function claudeStreamProgressEventForType(
+  type: string | undefined
+): 'assistant_message' | 'tool_completed' | undefined {
   if (type === 'assistant') return 'assistant_message';
   if (type === 'user') return 'tool_completed';
   return undefined;

@@ -207,7 +207,7 @@ export function enforceMediaPptxTextFit(
   const report = checkPptxTextFit(protocol as PptxDesignProtocol);
   for (const issue of report.issues.slice(0, 12)) {
     logger.warn(
-      `[MEDIA_TEXT_FIT] ${options.op}: slide ${issue.slideIndex} element ${issue.elementIndex}${issue.elementName ? ` (${issue.elementName})` : ''} ${issue.kind} "${issue.excerpt}" — ${issue.detail} | next: shorten the text, widen / heighten the box or lower the size | evidence: ${issue.shapeType} ${issue.fontSizePt}pt`
+      `[MEDIA_TEXT_FIT] ${options.op}: slide ${issue.slideIndex} element ${issue.elementIndex} ${issue.kind} — text needs more space | next: shorten the text, widen / heighten the box or lower the size | evidence: ${issue.lines} line(s) at ${issue.fontSizePt}pt`
     );
   }
   if (report.issues.length > 12) {
@@ -222,10 +222,7 @@ export function enforceMediaPptxTextFit(
     throw new Error(
       `[MEDIA_TEXT_FIT] ${options.op}: ${failing.length} text box(es) at or above '${level}' do not hold their text — the rendered deck would wrap or overflow | next: shorten the text, enlarge the box or lower the size; rerun with text_fit: never (or allow_layout_overflow: true) to inspect | evidence: ${failing
         .slice(0, 6)
-        .map(
-          (issue) =>
-            `slide ${issue.slideIndex} element ${issue.elementIndex} ${issue.kind} "${issue.excerpt}"`
-        )
+        .map((issue) => `slide ${issue.slideIndex} element ${issue.elementIndex} ${issue.kind}`)
         .join('; ')}`
     );
   }

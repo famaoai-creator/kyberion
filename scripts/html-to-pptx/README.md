@@ -59,6 +59,8 @@ KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/html-to-pptx/convert.
 
 ## 設計メモ・限界（v1）
 
+- 描画済み PDF と照合できないテキストボックスがある場合、ほかに問題が見つからなければ `inconclusive` と未照合件数を返します。既定の `fail_on: "error"` は、照合対象があるのにすべて未照合の場合に失敗します。`warn` では一部が未照合でも失敗し、`never` では結果を報告します。
+
 - **規約ベースの意味変換**であり、ピクセル忠実なブラウザ変換ではない（＝編集可能で軽量・オンブランド、汎用HTMLは対象外）。
 - 依存ゼロの自作HTMLパーサ（`html-parse.ts`）。自己生成の整形式HTMLを前提（`<style>`/`<script>`はraw-text扱い）。cheerio/jsdom等は入れない（社用端末・パッチ受け渡し方針）。
 - レイアウトはトップダウンのフロー＋高さ見積り。1スライドに収まらない章は「（続き）」スライドへ自動分割。

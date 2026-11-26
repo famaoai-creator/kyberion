@@ -7,7 +7,8 @@
  * so the old gate passed it untouched — labels wrapped in a chevron and a
  * body box overflowed in the rendered deck while preflight said "pass".
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeMkdir, safeRmSync } from '@agent/core/secure-io';
 import { resolveSofficeBinary } from '@agent/core/visual-raster';
@@ -98,6 +99,23 @@ describe('text fit in pptx_layout_preflight / pptx_render', () => {
     expect(kinds).toContain('step-label:unexpected_wrap');
     expect(kinds).toContain('step-body:overflow');
     expect(kinds.some((k) => k.startsWith('fits:'))).toBe(false);
+  });
+
+  it('keeps authored excerpts and names in the report instead of the warning log', async () => {
+    const warning = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    try {
+      const result = await preflight({});
+      const diagnostics = result.context.media_layout_diagnostics as { textFit: PptxTextFitReport };
+      expect(
+        diagnostics.textFit.issues.find((issue) => issue.elementName === 'step-label')
+      ).toMatchObject({ excerpt: expect.stringContaining('自動処理で検証') });
+      const messages = warning.mock.calls.flat().join('\n');
+      expect(messages).toContain('unexpected_wrap');
+      expect(messages).not.toContain('自動処理で検証');
+      expect(messages).not.toContain('step-label');
+    } finally {
+      warning.mockRestore();
+    }
   });
 
   it('text_fit: error fails the step on overflow; allow_layout_overflow keeps review-only output', async () => {

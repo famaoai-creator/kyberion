@@ -162,7 +162,19 @@ export async function generateNativePptx(
 
   const slideCount = protocol.slides.length;
   const masterCount = protocol.rawMasters?.length || 1;
-  const layoutCount = protocol.rawLayouts?.length || 2;
+  const usesRawMasters = Boolean(
+    (protocol.rawMasters?.length || protocol.rawMasterXml) && protocol.rawLayouts?.length
+  );
+  const layoutNumbers = usesRawMasters
+    ? protocol.rawLayouts!.map((layout, i) => layout.partNumber ?? i + 1)
+    : [1, 2];
+  const layoutCount = layoutNumbers.length;
+  if (
+    layoutNumbers.some((number) => !Number.isSafeInteger(number) || number < 1) ||
+    new Set(layoutNumbers).size !== layoutCount
+  ) {
+    throw new Error('PPTX layout parts must have unique positive integer numbers');
+  }
 
   // Pre-count diagrams, charts, and notes for Content_Types
   let totalDiagrams = 0;
@@ -187,7 +199,7 @@ export async function generateNativePptx(
     Buffer.from(
       generateContentTypes(
         slideCount,
-        layoutCount,
+        layoutNumbers,
         masterCount,
         totalDiagrams,
         totalCharts,
@@ -220,9 +232,6 @@ export async function generateNativePptx(
   // sldMasterId values must not collide with any sldLayoutId written by the
   // masters below (inherited masters carry their own layout IDs; the generated
   // master uses 2147483650 + i).
-  const usesRawMasters = Boolean(
-    (protocol.rawMasters?.length || protocol.rawMasterXml) && protocol.rawLayouts
-  );
   const reservedLayoutIds = usesRawMasters
     ? collectSldLayoutIds(
         protocol.rawMasters?.length
@@ -286,7 +295,7 @@ export async function generateNativePptx(
   // 4. Slide Master & Layouts
   let imageCounter = 1;
 
-  if ((protocol.rawMasters?.length || protocol.rawMasterXml) && protocol.rawLayouts) {
+  if (usesRawMasters) {
     // === RAW PASSTHROUGH MODE: inject original masters/layouts/themes/media ===
 
     // Inject all slide masters and their themes
@@ -316,13 +325,13 @@ export async function generateNativePptx(
       } else {
         zip.addFile(
           'ppt/slideMasters/_rels/slideMaster1.xml.rels',
-          Buffer.from(generateMasterRels(layoutCount), 'utf8')
+          Buffer.from(generateMasterRels(layoutNumbers), 'utf8')
         );
       }
     }
 
-    protocol.rawLayouts.forEach((layout, i) => {
-      const num = i + 1;
+    protocol.rawLayouts!.forEach((layout, i) => {
+      const num = layoutNumbers[i]!;
       zip.addFile(`ppt/slideLayouts/slideLayout${num}.xml`, Buffer.from(layout.xml, 'utf8'));
       if (layout.relsXml) {
         zip.addFile(
@@ -467,7 +476,7 @@ export async function generateNativePptx(
     zip.addFile('ppt/slideMasters/slideMaster1.xml', Buffer.from(masterXml, 'utf8'));
     zip.addFile(
       'ppt/slideMasters/_rels/slideMaster1.xml.rels',
-      Buffer.from(generateMasterRels(layoutCount), 'utf8')
+      Buffer.from(generateMasterRels(layoutNumbers), 'utf8')
     );
     zip.addFile('ppt/slideLayouts/slideLayout1.xml', Buffer.from(titleLayoutXml, 'utf8'));
     zip.addFile(
@@ -657,7 +666,8 @@ export async function generateNativePptx(
       bgXml = `<p:bg><p:bgPr><a:solidFill><a:srgbClr val="${slide.backgroundFill.replace('#', '')}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>`;
     }
 
-    const layoutId = slide.layoutIndex ?? (slideNumber === 1 ? 1 : 2);
+    const layoutId =
+      slide.layoutIndex ?? layoutNumbers[slideNumber === 1 ? 0 : Math.min(1, layoutCount - 1)]!;
 
     const slideXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">

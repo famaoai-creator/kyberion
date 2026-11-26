@@ -3,14 +3,12 @@
  * (`active/shared/logs/audit/audit-YYYY-MM-DD.jsonl`, UTC-dated).
  *
  * Weeks run Monday 00:00 → next Monday 00:00 Asia/Tokyo (JST has no DST, so a
- * fixed +09:00 offset is exact). The report carries counts and categories
- * only: prompt text, commands and file paths are read to classify activity
- * (tenant touched, mission touched) and are never copied into the output —
- * prompts can carry confidential tenant content.
+ * fixed +09:00 offset is exact). The shared report carries system-level
+ * counts. An audit row needs an explicit public system scope to contribute.
  *
  * The execution-origin section (`aggregateExecutionOrigins`) additionally
- * reads the execution-metrics ledger (LLM calls, tokens, per-wake accounting)
- * and the agent-runtime supervisor events — counts and token totals only.
+ * reads the system execution-metrics ledger and system supervisor events for
+ * LLM calls and token totals.
  *
  * Pure aggregation (`aggregateUsageWeek`, `aggregateExecutionOrigins`,
  * `buildUsageWeeklyReport`, `renderUsageWeeklyMarkdown`) is separated from the
@@ -20,10 +18,11 @@
 
 import * as path from 'node:path';
 import { isReservedScopeName, isValidTenantSlug } from '@agent/core/entity-scope';
+import { parseEventScopeFromRecord } from '@agent/core/event-scope';
 import { tenantOfPath } from '@agent/core/path-tenant-attribution';
 import { streamJsonLines } from '@agent/core/jsonl-read';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import { safeExistsSync } from '@agent/core/secure-io';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -48,6 +47,8 @@ export interface UsageAuditRecord {
   result?: string;
   reason?: string;
   metadata?: Record<string, unknown>;
+  scope?: unknown;
+  tenantSlug?: string;
 }
 
 export interface UsageWeekWindow {
@@ -145,7 +146,7 @@ export const EXECUTION_ORIGINS: readonly ExecutionOrigin[] = [
   'other',
 ];
 
-/** One execution-metrics ledger row (`work/metrics/execution-metrics.jsonl` + tier partitions). */
+/** One execution-metrics ledger row from the system partition. */
 export interface ExecutionMetricRecord {
   timestamp?: string;
   component?: string;
@@ -154,6 +155,7 @@ export interface ExecutionMetricRecord {
   accounting_id?: string;
   operation?: string;
   usage?: Record<string, unknown>;
+  scope?: unknown;
   /** Stop-hook (`claude-code-cli`) rows keep cache counters beside `usage`. */
   cache_read_tokens?: number;
   cache_creation_tokens?: number;
@@ -218,13 +220,27 @@ export interface ExecutionOriginSummary {
 export interface UsageWeeklyReport {
   generated_at: string;
   window: { week: string; start: string; end: string; timezone: 'Asia/Tokyo' };
-  current: UsageWeekSummary;
-  previous: UsageWeekSummary;
+  current: SharedUsageWeekSummary;
+  previous: SharedUsageWeekSummary;
   delta: Record<'total_events' | 'prompts' | 'tool_events' | 'sessions' | 'trigger_failed', number>;
   /** Current week only. */
-  execution_origin: ExecutionOriginSummary;
+  execution_origin: SharedExecutionOriginSummary;
   improvement_candidates: UsageImprovementCandidate[];
 }
+
+type SharedUsageWeekSummary = Omit<
+  UsageWeekSummary,
+  'by_action' | 'sessions' | 'tenants_touched' | 'tool_mix' | 'missions' | 'trigger' | 'dot_denials'
+> & {
+  sessions: Omit<UsageWeekSummary['sessions'], 'top'>;
+  missions: Pick<UsageWeekSummary['missions'], 'created' | 'started'>;
+  trigger: Omit<UsageWeekSummary['trigger'], 'by_reason' | 'by_source'>;
+  dot_denials: Pick<UsageWeekSummary['dot_denials'], 'total'>;
+};
+
+type SharedExecutionOriginSummary = Pick<ExecutionOriginSummary, 'sources' | 'by_origin'> & {
+  supervisor: Omit<ExecutionOriginSummary['supervisor'], 'daemon_stops_by_reason'>;
+};
 
 // ---------------------------------------------------------------------------
 // Week arithmetic (JST)
@@ -313,11 +329,6 @@ export function defaultExecutionMetricsFile(): string {
   return pathResolver.resolve('work/metrics/execution-metrics.jsonl');
 }
 
-/** Root of the `<tier>/<tenant|shared>/execution-metrics.jsonl` partitions. */
-export function defaultExecutionMetricsPartitionRoot(): string {
-  return pathResolver.shared('runtime/execution-metrics');
-}
-
 export function defaultSupervisorEventsDir(): string {
   return pathResolver.shared('observability/mission-control');
 }
@@ -343,40 +354,13 @@ function readJsonlWindow(
   }
 }
 
-function listDirs(dir: string): string[] {
-  try {
-    return safeExistsSync(dir) ? safeReaddir(dir) : [];
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Execution-metrics rows inside the window: the system ledger plus every
- * readable `<tier>/<scope>/` partition. A partition the current persona may
- * not read (tier-guard) is skipped, not fatal.
- */
+/** Read only the system ledger, even when the caller can read other partitions. */
 export function readExecutionMetricsForWindow(
   window: UsageWeekWindow,
-  options: { file?: string; partitionRoot?: string } = {}
+  file: string = defaultExecutionMetricsFile()
 ): ExecutionMetricRecord[] {
   const rows: Record<string, unknown>[] = [];
-  readJsonlWindow(options.file ?? defaultExecutionMetricsFile(), window, (r) => r.timestamp, rows);
-  const root = options.partitionRoot ?? defaultExecutionMetricsPartitionRoot();
-  for (const tier of listDirs(root)) {
-    for (const scope of listDirs(path.join(root, tier))) {
-      try {
-        readJsonlWindow(
-          path.join(root, tier, scope, 'execution-metrics.jsonl'),
-          window,
-          (r) => r.timestamp,
-          rows
-        );
-      } catch {
-        // Partition not readable by this persona — skip.
-      }
-    }
-  }
+  readJsonlWindow(file, window, (r) => r.timestamp, rows);
   return rows as ExecutionMetricRecord[];
 }
 
@@ -1029,12 +1013,11 @@ export function deriveImprovementCandidates(
         '. Start a mission for substantive work so evidence and learnings are kept.',
     });
   }
-  for (const row of current.trigger.by_reason) {
-    if (row.key === HOST_SUSPENDED_REASON || row.count < TRIGGER_CLUSTER_MIN) continue;
+  if (current.trigger.failed_excluding_host_suspended >= TRIGGER_CLUSTER_MIN) {
     out.push({
-      id: `trigger-failure:${row.key}`,
+      id: 'trigger-failures',
       severity: 'medium',
-      text: `Trigger failures "${row.key}" x${row.count} — a recurring cause; fix the configuration or grant instead of letting sweeps retry.`,
+      text: `${current.trigger.failed_excluding_host_suspended} trigger failures. Review the audit records before allowing further retries.`,
     });
   }
   if (current.trigger.host_suspended >= HOST_SUSPENDED_NOTE_MIN) {
@@ -1044,12 +1027,11 @@ export function deriveImprovementCandidates(
       text: `${current.trigger.host_suspended} wake(s) overlapped host sleep (not failures; retried on the next sweep).`,
     });
   }
-  for (const row of current.dot_denials.by_reason) {
-    if (row.count < DOT_DENIAL_CLUSTER_MIN) continue;
+  if (current.dot_denials.total >= DOT_DENIAL_CLUSTER_MIN) {
     out.push({
-      id: `dot-denial:${row.key}`,
+      id: 'dot-denials',
       severity: 'medium',
-      text: `Dot delegation denied "${row.key}" x${row.count} — review the approval loop (requests expiring or cancelled unanswered).`,
+      text: `${current.dot_denials.total} Dot delegation denials. Review the approval loop for unanswered or expired requests.`,
     });
   }
   if (previous.total_events > 0) {
@@ -1065,6 +1047,72 @@ export function deriveImprovementCandidates(
   return out;
 }
 
+function isSystemUsageRecord(record: object, allowUnscoped = false): boolean {
+  const row = record as Record<string, unknown>;
+  // The canonical parser prefers a nested scope over flat fields. Honor
+  // legacy flat entity markers even if the nested scope claims system use.
+  if (
+    row.tenantSlug ||
+    row.tenantId ||
+    row.tenant_slug ||
+    row.tenant_id ||
+    row.organizationId ||
+    row.organization_id ||
+    row.projectId ||
+    row.project_id ||
+    row.missionId ||
+    row.mission_id ||
+    row.taskId ||
+    row.task_id ||
+    row.sessionId ||
+    row.session_id
+  )
+    return false;
+  if (row.tier !== undefined && row.tier !== 'public') return false;
+  const parsed = parseEventScopeFromRecord(row);
+  if (parsed.invalid) return false;
+  if (!parsed.scope) {
+    return allowUnscoped && row.scope === undefined && row.scope_context === undefined;
+  }
+  const explicit = plainObject(row.scope_context ?? row.scope) ?? row;
+  return explicit.tier === 'public' && parsed.scope.scope_kind === 'system';
+}
+
+function systemAuditRecord(record: UsageAuditRecord): boolean {
+  if (!isSystemUsageRecord(record)) return false;
+  // Some legacy hooks ran outside the tenant binding but still logged
+  // operations against protected paths. Exclude those rows as well.
+  return !/(?:knowledge|active\/(?:missions|projects|organizations)|active\/shared\/(?:tmp|artifacts|staging|cache))\/(?:personal|confidential)\//u.test(
+    locatorText(record).replaceAll('\\', '/')
+  );
+}
+
+function sharedUsageSummary(summary: UsageWeekSummary): SharedUsageWeekSummary {
+  return {
+    week: summary.week,
+    total_events: summary.total_events,
+    prompts: summary.prompts,
+    tool_events: summary.tool_events,
+    by_day: summary.by_day,
+    peak_prompt_hours_jst: summary.peak_prompt_hours_jst,
+    sessions: {
+      count: summary.sessions.count,
+      long_session_threshold: summary.sessions.long_session_threshold,
+      long_sessions: summary.sessions.long_sessions,
+    },
+    missions: { created: summary.missions.created, started: summary.missions.started },
+    prompts_outside_mission: summary.prompts_outside_mission,
+    trigger: {
+      delivered: summary.trigger.delivered,
+      failed: summary.trigger.failed,
+      failed_excluding_host_suspended: summary.trigger.failed_excluding_host_suspended,
+      host_suspended: summary.trigger.host_suspended,
+    },
+    dot_denials: { total: summary.dot_denials.total },
+    tenant_scope_violations: summary.tenant_scope_violations,
+  };
+}
+
 export function buildUsageWeeklyReport(input: {
   window: UsageWeekWindow;
   current: readonly UsageAuditRecord[];
@@ -1075,8 +1123,25 @@ export function buildUsageWeeklyReport(input: {
   supervisor?: readonly SupervisorEventRecord[];
 }): UsageWeeklyReport {
   const previousWindow = previousUsageWeek(input.window);
-  const current = aggregateUsageWeek(input.current, input.window, input.longSessionThreshold);
-  const previous = aggregateUsageWeek(input.previous, previousWindow, input.longSessionThreshold);
+  const currentAudit = input.current.filter(systemAuditRecord);
+  const current = aggregateUsageWeek(currentAudit, input.window, input.longSessionThreshold);
+  const previous = aggregateUsageWeek(
+    input.previous.filter(systemAuditRecord),
+    previousWindow,
+    input.longSessionThreshold
+  );
+  const { sources, by_origin, supervisor } = aggregateExecutionOrigins({
+    window: input.window,
+    audit: currentAudit,
+    metrics: (input.metrics ?? []).filter((row) => isSystemUsageRecord(row, true)),
+    supervisor: (input.supervisor ?? []).filter((row) =>
+      isSystemUsageRecord(
+        row,
+        row.decision === 'agent_runtime_supervisor_daemon_started' ||
+          row.decision === 'agent_runtime_supervisor_daemon_stopping'
+      )
+    ),
+  });
   return {
     generated_at: (input.now ?? new Date()).toISOString(),
     window: {
@@ -1085,8 +1150,8 @@ export function buildUsageWeeklyReport(input: {
       end: new Date(input.window.end_ms).toISOString(),
       timezone: 'Asia/Tokyo',
     },
-    current,
-    previous,
+    current: sharedUsageSummary(current),
+    previous: sharedUsageSummary(previous),
     delta: {
       total_events: current.total_events - previous.total_events,
       prompts: current.prompts - previous.prompts,
@@ -1094,12 +1159,18 @@ export function buildUsageWeeklyReport(input: {
       sessions: current.sessions.count - previous.sessions.count,
       trigger_failed: current.trigger.failed - previous.trigger.failed,
     },
-    execution_origin: aggregateExecutionOrigins({
-      window: input.window,
-      audit: input.current,
-      metrics: input.metrics ?? [],
-      supervisor: input.supervisor ?? [],
-    }),
+    execution_origin: {
+      sources,
+      by_origin,
+      supervisor: {
+        asks_completed: supervisor.asks_completed,
+        asks_failed: supervisor.asks_failed,
+        ask_input_tokens: supervisor.ask_input_tokens,
+        ask_output_tokens: supervisor.ask_output_tokens,
+        asks_usage_estimated: supervisor.asks_usage_estimated,
+        daemon_started: supervisor.daemon_started,
+      },
+    },
     improvement_candidates: deriveImprovementCandidates(current, previous),
   };
 }
@@ -1109,7 +1180,6 @@ export function collectUsageWeeklyReport(input: {
   window: UsageWeekWindow;
   auditDir?: string;
   metricsFile?: string;
-  metricsPartitionRoot?: string;
   supervisorDir?: string;
   now?: Date;
 }): UsageWeeklyReport {
@@ -1118,10 +1188,7 @@ export function collectUsageWeeklyReport(input: {
     window: input.window,
     current: readAuditRecordsForWindow(input.window, auditDir),
     previous: readAuditRecordsForWindow(previousUsageWeek(input.window), auditDir),
-    metrics: readExecutionMetricsForWindow(input.window, {
-      file: input.metricsFile,
-      partitionRoot: input.metricsPartitionRoot,
-    }),
+    metrics: readExecutionMetricsForWindow(input.window, input.metricsFile),
     supervisor: readSupervisorEventsForWindow(input.window, input.supervisorDir),
     now: input.now,
   });
@@ -1135,16 +1202,7 @@ function signed(value: number): string {
   return value > 0 ? `+${value}` : String(value);
 }
 
-function countTable(header: string, rows: readonly UsageCount[]): string[] {
-  if (rows.length === 0) return ['_none_'];
-  return [
-    `| ${header} | count |`,
-    '| --- | ---: |',
-    ...rows.map((r) => `| ${r.key} | ${r.count} |`),
-  ];
-}
-
-function outsideCell(summary: UsageWeekSummary): string {
+function outsideCell(summary: SharedUsageWeekSummary): string {
   const o = summary.prompts_outside_mission;
   const ratio = o.ratio === null ? '-' : pct(o.ratio);
   return `${o.prompts} (${ratio})${o.unattributed_prompts > 0 ? ` +${o.unattributed_prompts} unattributed` : ''}`;
@@ -1163,7 +1221,7 @@ function tokenCells(row: { tokens: ExecutionTokenTotals | null; token_note?: str
   return `${row.tokens.input_tokens}${mark} | ${row.tokens.output_tokens}${mark} | ${ratioCell(row.tokens.cache_hit_ratio)}`;
 }
 
-function renderExecutionOrigin(o: ExecutionOriginSummary): string[] {
+function renderExecutionOrigin(o: SharedExecutionOriginSummary): string[] {
   const notes = o.by_origin.filter((r) => r.tokens && r.token_note);
   const sup = o.supervisor;
   return [
@@ -1180,36 +1238,9 @@ function renderExecutionOrigin(o: ExecutionOriginSummary): string[] {
     ),
     ...(notes.length > 0 ? ['', ...notes.map((r) => `† ${r.origin}: ${r.token_note}.`)] : []),
     '',
-    'Trigger / daemon agents (audit events):',
-    '',
-    ...countTable('agent', o.trigger_daemon_agents),
-    '',
-    'Other agents (audit events, top):',
-    '',
-    ...countTable('agent', o.other_agents),
-    '',
-    '### Dots',
-    '',
-    ...(o.dots.length === 0
-      ? ['_none_']
-      : [
-          '| dot | audit events | LLM calls | LLM failures | wakes | calls / wake | input tokens (incl. cache) | output tokens | cache hit |',
-          '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
-          ...o.dots.map(
-            (d) =>
-              `| ${d.dot} | ${d.audit_events} | ${d.llm_calls} | ${d.llm_failures} | ${d.wakes} | ${d.calls_per_wake === null ? '-' : d.calls_per_wake.toFixed(1)} | ${tokenCells(d)} |`
-          ),
-        ]),
-    '',
-    'Reasoning route events (no actor id; not attributed to an origin):',
-    '',
-    ...countTable('component (status)', o.reasoning_routes),
-    '',
     '### Supervisor-hosted agent runtimes',
     '',
     `Asks completed ${sup.asks_completed} (input ${sup.ask_input_tokens} / output ${sup.ask_output_tokens} tokens; ${sup.asks_usage_estimated} estimated), failed ${sup.asks_failed}. Daemon starts ${sup.daemon_started}.`,
-    '',
-    ...countTable('daemon stop reason', sup.daemon_stops_by_reason),
     '',
   ];
 }
@@ -1259,36 +1290,13 @@ export function renderUsageWeeklyMarkdown(report: UsageWeeklyReport): string {
     '',
     `Peak prompt hours (JST): ${c.peak_prompt_hours_jst.map((r) => `${r.key}:00 (${r.count})`).join(', ') || '-'}`,
     '',
-    '## Events by action',
-    '',
-    ...countTable('action', c.by_action),
-    '',
     '## Sessions',
     '',
     `${c.sessions.count} session(s); ${c.sessions.long_sessions} at or above ${c.sessions.long_session_threshold} events.`,
     '',
-    '| session | host | events | prompts | tool events | touched mission | first | last |',
-    '| --- | --- | ---: | ---: | ---: | --- | --- | --- |',
-    ...c.sessions.top.map(
-      (s) =>
-        `| ${s.session}${s.events >= c.sessions.long_session_threshold ? ' ⚠' : ''} | ${s.host} | ${s.events} | ${s.prompts} | ${s.tool_events} | ${s.touched_mission ? 'yes' : 'no'} | ${s.first_at} | ${s.last_at} |`
-    ),
-    '',
-    '## Tool mix',
-    '',
-    ...countTable('tool', c.tool_mix),
-    '',
-    '## Tenants touched (events referencing a tenant path)',
-    '',
-    ...countTable('tenant', c.tenants_touched),
-    '',
     '## Missions',
     '',
-    ...countTable('lifecycle verb', c.missions.by_verb),
-    '',
-    'Created mission families (date suffix removed):',
-    '',
-    ...countTable('family', c.missions.created_families),
+    `Created ${c.missions.created}; started ${c.missions.started}.`,
     '',
     `Prompts outside any mission: ${c.prompts_outside_mission.prompts} of ${c.prompts} (${outsideRatio}) across ${c.prompts_outside_mission.sessions} session(s)` +
       (c.prompts_outside_mission.unattributed_prompts > 0
@@ -1299,17 +1307,9 @@ export function renderUsageWeeklyMarkdown(report: UsageWeeklyReport): string {
     '',
     `Delivered ${c.trigger.delivered}; failed ${c.trigger.failed} — ${c.trigger.failed_excluding_host_suspended} real failures + ${c.trigger.host_suspended} host_suspended (laptop sleep, retried; not an error).`,
     '',
-    ...countTable('normalized reason', c.trigger.by_reason),
-    '',
-    'Real failures by trigger source:',
-    '',
-    ...countTable('source', c.trigger.by_source),
-    '',
     '## Dot delegation denials',
     '',
-    ...countTable('operation: reason', c.dot_denials.by_reason),
-    '',
-    ...countTable('dot', c.dot_denials.by_dot),
+    `${c.dot_denials.total} delegation denial(s).`,
     '',
   ];
   return lines.join('\n');

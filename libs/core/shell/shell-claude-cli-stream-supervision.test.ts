@@ -35,7 +35,10 @@ function silentChild(): SilentChild {
   child.signalCode = null;
   child.kill = vi.fn((signal?: NodeJS.Signals) => {
     child.signalCode = signal ?? null;
-    queueMicrotask(() => child.emit('close', null));
+    queueMicrotask(() => {
+      child.emit('exit', null, signal);
+      child.emit('close', null, signal);
+    });
     return true;
   });
   return child;
@@ -79,6 +82,27 @@ describe('claude-cli stream supervision', () => {
     await expect(backend.delegateTask('task')).rejects.toThrow(/timed out: startup stalled/);
     expect(Date.now() - started).toBeLessThan(5_000);
     expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+  });
+
+  it('escalates when junk output precedes a startup stall and the child ignores SIGTERM', async () => {
+    vi.stubEnv('KYBERION_DELEGATION_KILL_GRACE_MS', '25');
+    try {
+      const child = silentChild();
+      const stop = child.kill.getMockImplementation()!;
+      child.kill.mockImplementation((signal) => (signal === 'SIGTERM' ? true : stop(signal)));
+      spawnMock.mockReturnValueOnce(child);
+      queueMicrotask(() => child.stdout.write('startup warning before the stream\n'));
+      const backend = new ShellClaudeCliBackend({
+        bin: 'claude',
+        model: 'opus',
+        timeoutMs: 60_000,
+        startupTimeoutMs: 50,
+      });
+      await expect(backend.delegateTask('task')).rejects.toThrow(/timed out: startup stalled/);
+      expect(child.kill.mock.calls).toEqual([['SIGTERM'], ['SIGKILL']]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('forwards stream progress to an enclosing supervised delegation', async () => {

@@ -3,7 +3,7 @@
   "pipeline_id": "usage-weekly-report",
   "name": "Usage Weekly Report",
   "version": "1.0.0",
-  "description": "Weekly Kyberion usage report from the audit chain via core:run_usage_weekly_report — volume vs previous week, sessions (long sessions flagged), tool mix, tenants touched (counts), missions, prompts outside missions, trigger failures (host_suspended split out), dot denials and rule-derived improvement candidates. Counts and categories only; writes active/shared/runtime/reports/usage-weekly/usage-weekly-<week>.md (+ .json).",
+  "description": "Weekly system usage counts from the system audit, execution-metrics and supervisor records. Includes week-over-week volume, long-session counts, mission counts, trigger failures, Dot denials and LLM usage by execution origin. Writes active/shared/runtime/reports/usage-weekly/usage-weekly-<week>.md (+ .json).",
   "_refs": {
     "implementation": "scripts/report/report_usage_weekly.ts",
     "aggregation": "scripts/report/usage_weekly_aggregate.ts"

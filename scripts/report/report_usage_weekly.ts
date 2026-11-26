@@ -1,6 +1,6 @@
 /**
- * Weekly Kyberion usage report — volume, sessions, tool mix, tenants touched,
- * missions, trigger failures (host sleep split out), dot denials and the
+ * Weekly system usage report — volume, sessions, mission counts, trigger
+ * failures (host sleep split out), Dot denials and the
  * execution origin split (interactive CLI / Dot wakes / triggers & daemons /
  * supervisor-hosted runtimes / other, with LLM calls and tokens from the
  * execution-metrics ledger), plus rule-derived improvement candidates.
@@ -57,7 +57,6 @@ export function runUsageWeeklyReportOnce(
     now?: Date;
     auditDir?: string;
     metricsFile?: string;
-    metricsPartitionRoot?: string;
     supervisorDir?: string;
   } = {}
 ): UsageWeeklyRunResult {
@@ -66,7 +65,6 @@ export function runUsageWeeklyReportOnce(
     window,
     auditDir: options.auditDir,
     metricsFile: options.metricsFile,
-    metricsPartitionRoot: options.metricsPartitionRoot,
     supervisorDir: options.supervisorDir,
     now: options.now,
   });
