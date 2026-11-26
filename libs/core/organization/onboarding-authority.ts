@@ -10,6 +10,7 @@ import {
   CHARTER_SCOPE_PERSON,
   charterScopeTenantSlug,
   isPersonalCharterScope,
+  type AuthorableCharterScope,
   type CharterScope,
   type CharterScopeKind,
   type ExternalEffectPolicy,
@@ -169,7 +170,7 @@ function parseDataTier(raw: unknown, scope: CharterScope): OnboardingAuthorityIn
   };
   return { read: parse('read'), write: parse('write') };
 }
-export function onboardingAuthorityScope(raw: unknown): CharterScope {
+export function onboardingAuthorityScope(raw: unknown): AuthorableCharterScope {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return deny('scope required');
   const value = raw as Record<string, unknown>;
   if (value.scope_kind === CHARTER_SCOPE_PERSON && value.tenant_slug === undefined)

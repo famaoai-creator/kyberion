@@ -171,6 +171,16 @@ export async function runActuatorCli(opts: {
   /** Override inner action kind for handleAction-style CLIs (get/list stay capture). */
   resolveOpKind?: (input: unknown) => PipelineStepType;
   printResult?: (result: unknown) => void;
+  /**
+   * Runs the `--input` file's dispatch inside the actuator's context for that
+   * exact file (repo-relative path, the text read, the parsed input) — e.g.
+   * the browser actuator binds a native pipeline file to its Run Manifest.
+   * Not applied to `--dry-run` or `--serve`.
+   */
+  withInputFile?: <T>(
+    file: { inputPath: string; sourceText: string; input: unknown },
+    dispatch: () => Promise<T>
+  ) => Promise<T>;
   args: string[];
 }): Promise<void> {
   assertCapabilityAllowed(opts.name);
@@ -261,10 +271,22 @@ export async function runActuatorCli(opts: {
   }
 
   const dryRun = argv.dryRun === true;
-  const result = await actuator.dispatch('execute', input, {
-    dryRun,
-    dryRunKind: resolveCliActionKind(input, opts.resolveOpKind),
-  });
+  const dispatch = () =>
+    actuator.dispatch('execute', input, {
+      dryRun,
+      dryRunKind: resolveCliActionKind(input, opts.resolveOpKind),
+    });
+  const result =
+    opts.withInputFile && !dryRun
+      ? await opts.withInputFile(
+          {
+            inputPath: pathResolver.toRepoRelative(inputPath),
+            sourceText: inputContent,
+            input,
+          },
+          dispatch
+        )
+      : await dispatch();
   const printResult =
     opts.printResult || ((value: unknown) => console.log(JSON.stringify(value, null, 2)));
   if (!result.ok || actuatorOutputFailed(result.output)) {

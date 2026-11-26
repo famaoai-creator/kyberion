@@ -3742,7 +3742,7 @@
       "enum": ["scheduled", "interactive", "agent"],
       "required": false,
       "subsystem": "observability",
-      "description": "Explicit run origin stamped on traces (metadata.origin) when set by a launcher, e.g. scheduled for the baseline-check janitor spawn and the Chronos daemon. Consulted right after VITEST/CI; unknown values are ignored.",
+      "description": "Explicit run origin stamped on traces (metadata.origin) when set by a launcher, e.g. scheduled for the baseline-check janitor spawn and the Chronos daemon; agent for terminal-actuator PTY sessions, which also makes detectAgentExecutionContext treat the process as agent-driven (a pipeline Run Principal is then never attended). Consulted right after VITEST/CI; unknown values are ignored.",
       "documented": true
     },
     {

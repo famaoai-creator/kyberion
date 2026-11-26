@@ -7,12 +7,17 @@ import {
 } from './pr-publication-runtime.js';
 import { currentInstalledPersonCharterRuntime } from './person-charter-runtime.js';
 import { withPersonCharterRegistryAccess } from './person-charter-store-access.js';
+import {
+  runManifestGateCoversCharterScope,
+  withRunManifestGateStoreAccess,
+} from './run-manifest-gate-store.js';
 /**
  * Accountability charter — persistence, acceptance and the consumption ledger.
  *
  * Layout (path seam mirrors member-registry: `rootDir` for hermetic tests):
  *   person       knowledge/personal/charters/{charter_id}.json
  *   organization knowledge/confidential/{tenant}/charters/{charter_id}.json
+ *   run_manifest knowledge/confidential/{tenant}/charters/run-manifests/{manifest_hash}/{charter_id}.json
  *   ledger       <same dir>/{charter_id}.ledger.jsonl   (append-only)
  *
  * Only the accountable human can accept (or clear a tripwire): the acceptance
@@ -48,9 +53,24 @@ import {
   type CharterScope,
   type CharterUsage,
   type CharterValidationContext,
+  RUN_MANIFEST_HASH_PATTERN,
+  charterScopesEqual,
   isOrganizationCharterScope,
   isPersonalCharterScope,
+  isRunManifestCharterScope,
+  isTenantCharterScope,
 } from './accountability-charter.js';
+
+import {
+  DEFAULT_RUN_MANIFEST_RUNS_PER_DAY,
+  countRunManifestRunsOnDay,
+  runManifestGrantsFor,
+  runManifestRunDay,
+} from './run-manifest-grant.js';
+import { computeApprovalPayloadHash } from './approval-presentation.js';
+import { verifyRunManifestTrustApproval } from './run-manifest-approval.js';
+import type { RunManifest } from '../pipeline/run-manifest.js';
+import type { MemberRegistryPathOptions } from '../organization/member-registry.js';
 
 export interface CharterPathOptions {
   rootDir?: string;
@@ -70,13 +90,21 @@ function charterRoot(options: CharterPathOptions): string {
   return options.rootDir ?? pathResolver.primaryCheckoutRootDir();
 }
 
+/** Subdirectory of a tenant's charter store holding one directory per approved manifest. */
+const RUN_MANIFEST_CHARTER_DIR = 'run-manifests';
+
 export function charterDir(scope: CharterScope, options: CharterPathOptions = {}): string {
   const root = charterRoot(options);
   if (isPersonalCharterScope(scope)) return path.join(root, 'knowledge', 'personal', 'charters');
   if (!isValidTenantSlug(scope.tenant_slug)) {
     throw new Error(`[charter] invalid tenant slug '${scope.tenant_slug}'`);
   }
-  return path.join(root, 'knowledge', 'confidential', scope.tenant_slug, 'charters');
+  const tenantDir = path.join(root, 'knowledge', 'confidential', scope.tenant_slug, 'charters');
+  if (!isRunManifestCharterScope(scope)) return tenantDir;
+  if (!RUN_MANIFEST_HASH_PATTERN.test(scope.manifest_hash)) {
+    throw new Error(`[charter] invalid run manifest hash '${scope.manifest_hash}'`);
+  }
+  return path.join(tenantDir, RUN_MANIFEST_CHARTER_DIR, scope.manifest_hash);
 }
 
 export function charterPath(
@@ -102,7 +130,9 @@ function scopedCharterIo<T>(
   scope: CharterScope,
   files: string[],
   writes: string[],
-  action: () => T
+  action: () => T,
+  /** Directories the action may create (each with its ancestors). */
+  mkdirs: string[] = []
 ): T {
   const identity = currentExecutionScope();
   const publication = currentPrPublicationScope();
@@ -135,7 +165,20 @@ function scopedCharterIo<T>(
     const relative = (file: string) => pathResolver.storeRelativePath(file);
     return withPersonCharterRegistryAccess(files.map(relative), writes.map(relative), action);
   }
-  if (!isOrganizationCharterScope(scope) || !identity?.tenantSlug) return action();
+  // A manifest-bound run's gate (pipeline-run-manifest-model §3.5): the run
+  // dispatches under surface_runtime, so its own tenant's charters and the
+  // bound manifest's ledger are read and appended through the exact gate
+  // store grant, never the caller's wider rights.
+  if (runManifestGateCoversCharterScope(scope)) {
+    const relative = (file: string) => pathResolver.storeRelativePath(file);
+    return withRunManifestGateStoreAccess(
+      writes.length > 0 ? 'charter-ledger-write' : 'charter-read',
+      files.map(relative),
+      writes.map(relative),
+      action
+    );
+  }
+  if (!isTenantCharterScope(scope) || !identity?.tenantSlug) return action();
   if (identity.tenantSlug !== scope.tenant_slug)
     throw new Error('[CHARTER_SCOPE_DENIED] Caller tenant differs from charter tenant');
   const relative = (file: string) => {
@@ -150,7 +193,16 @@ function scopedCharterIo<T>(
       tenantSlug: scope.tenant_slug,
       readExact: files.map(relative),
       writeExact: writes.map(relative),
-      mkdirExact: [],
+      mkdirExact: [
+        ...new Set(
+          mkdirs.flatMap((dir) => {
+            const out: string[] = [];
+            for (let next = relative(dir); next && next !== '.'; next = path.posix.dirname(next))
+              out.push(next);
+            return out;
+          })
+        ),
+      ],
     },
     () =>
       withExecutionContext(
@@ -175,12 +227,7 @@ export function readCharter(
     if (parsed?.charter_id !== charterId) {
       throw new Error(`[charter] file '${file}' declares charter_id '${parsed?.charter_id}'`);
     }
-    if (
-      parsed.scope?.kind !== scope.kind ||
-      (isOrganizationCharterScope(scope) &&
-        (!isOrganizationCharterScope(parsed.scope) ||
-          parsed.scope.tenant_slug !== scope.tenant_slug))
-    )
+    if (!parsed.scope || !charterScopesEqual(parsed.scope, scope))
       throw new Error(
         '[CHARTER_SCOPE_DENIED] Persisted charter scope differs from requested resource'
       );
@@ -258,13 +305,58 @@ export function findLatestCharterForRenewal(
   return heads[0];
 }
 
-/** Every charter currently in force: the person's own, plus one per registered tenant. */
-export function listActiveCharters(now: Date, options: CharterPathOptions = {}): Charter[] {
+/** Run-manifest charter scopes stored for one tenant (one per approved manifest hash). */
+export function listRunManifestCharterScopes(
+  tenantSlug: string,
+  options: CharterPathOptions = {}
+): Extract<CharterScope, { kind: 'run_manifest' }>[] {
+  const tenantScope: CharterScope = { kind: 'organization', tenant_slug: tenantSlug };
+  const dir = path.join(charterDir(tenantScope, options), RUN_MANIFEST_CHARTER_DIR);
+  return scopedCharterIo(tenantScope, [dir], [], () => {
+    let safeDir: string;
+    try {
+      safeDir = safePath(dir, options);
+    } catch {
+      return [];
+    }
+    if (!safeExistsSync(safeDir)) return [];
+    return safeReaddir(safeDir)
+      .filter((name) => RUN_MANIFEST_HASH_PATTERN.test(name))
+      .sort()
+      .map((manifest_hash) => ({
+        kind: 'run_manifest' as const,
+        tenant_slug: tenantSlug,
+        manifest_hash,
+      }));
+  });
+}
+
+/**
+ * Every charter currently in force: the person's own and one per registered
+ * tenant. Run-manifest charters (one per approved pipeline manifest) are a
+ * separate namespace that organization/person consumers (reports, digests,
+ * trust delegation) must not mistake for an organization charter: they are
+ * listed only with `includeRunManifests`.
+ */
+export function listActiveCharters(
+  now: Date,
+  options: CharterPathOptions & { includeRunManifests?: boolean } = {}
+): Charter[] {
+  const tenants = listTenantProfileSlugs(options);
   const scopes: CharterScope[] = [
     { kind: 'person' },
-    ...listTenantProfileSlugs(options).map(
-      (tenant_slug) => ({ kind: 'organization', tenant_slug }) as const
-    ),
+    ...tenants.map((tenant_slug) => ({ kind: 'organization', tenant_slug }) as const),
+    ...(options.includeRunManifests
+      ? tenants.flatMap((tenant_slug) => {
+          try {
+            return listRunManifestCharterScopes(tenant_slug, options);
+          } catch {
+            // A tenant outside the caller's scope reports no manifests here; its
+            // organization charter path surfaces the denial on its own.
+            return [];
+          }
+        })
+      : []),
   ];
   const out: Charter[] = [];
   for (const scope of scopes) {
@@ -315,6 +407,11 @@ export function acceptCharter(
 }
 
 function acceptCharterLocked(input: AcceptCharterInput, options: CharterPathOptions): Charter {
+  if (isRunManifestCharterScope(input.draft.scope)) {
+    throw new Error(
+      '[charter] a run_manifest charter is issued only from an approved project-trust record | next: use ensureRunManifestCharter'
+    );
+  }
   assertHumanActor(input.acceptedBy, 'accept charter');
   if (input.acceptedBy.id !== input.draft.accountable.actor) {
     throw new Error(
@@ -378,9 +475,156 @@ function acceptCharterLocked(input: AcceptCharterInput, options: CharterPathOpti
   } else if (input.replaces) {
     throw new Error(`[charter] '${input.replaces}' is not an active charter of this scope`);
   }
+  persistCharterFile(file, charter);
+  return charter;
+}
+
+/** The single charter-document write; callers hold the decision lock. */
+function persistCharterFile(file: string, charter: Charter): void {
   safeMkdir(path.dirname(file), { recursive: true });
   safeWriteFile(file, JSON.stringify(charter, null, 2) + '\n', { encoding: 'utf8' });
-  return charter;
+}
+
+// ---------------------------------------------------------------------------
+// Run-manifest charters — issued from a verified human approval, never accepted
+// ---------------------------------------------------------------------------
+
+/** Same id as charter-service MANUAL_STOP_TRIPWIRE (imported there; kept literal to avoid a cycle). */
+const RUN_MANIFEST_TRIPWIRES = ['manual-stop'];
+
+export interface IssueRunManifestCharterInput {
+  /** Project-trust approval request id; the record is loaded and re-verified here. */
+  approvalRequestId: string;
+  /** The manifest compiled from the current file (its hash must equal the approved one). */
+  manifest: RunManifest;
+  now?: Date;
+  memberOptions?: MemberRegistryPathOptions;
+}
+
+export interface IssuedRunManifestCharter {
+  charter: Charter;
+  /** False when an identical charter from the same approval was already in force. */
+  created: boolean;
+}
+
+/**
+ * Canonical digest of a run-manifest charter's content, without the fields
+ * that legitimately differ between issuance and a later re-derivation
+ * (acceptance time, lineage pointer).
+ */
+function runManifestCharterDigest(charter: Charter): string {
+  const { replaces_charter_id: _lineage, ...rest } = charter;
+  return computeApprovalPayloadHash({
+    ...rest,
+    accountable: { ...charter.accountable, accepted_at: null },
+  } as unknown as Record<string, unknown>);
+}
+
+function runManifestCharterId(manifestHash: string, approvalRequestId: string): string {
+  const approval = createHash('sha256').update(approvalRequestId, 'utf8').digest('hex');
+  return `rm-${manifestHash.slice(0, 16)}-${approval.slice(0, 16)}`;
+}
+
+/**
+ * Issue (idempotently) the run-manifest charter of one approved project-trust
+ * record. The only path that persists a `run_manifest` charter: the approval
+ * is re-verified from the store (human, authenticated, digest-verified, tenant
+ * owner, v2 payload bound to this manifest), and every charter field is
+ * derived here — the caller supplies no charter content.
+ */
+export function issueRunManifestCharter(
+  input: IssueRunManifestCharterInput,
+  options: CharterPathOptions = {}
+): IssuedRunManifestCharter {
+  const now = input.now ?? new Date();
+  const verified = verifyRunManifestTrustApproval(input.approvalRequestId, input.manifest, {
+    now,
+    memberOptions: input.memberOptions,
+  });
+  const scope: CharterScope = {
+    kind: 'run_manifest',
+    tenant_slug: verified.tenantSlug,
+    manifest_hash: verified.manifestHash,
+  };
+  const grants = runManifestGrantsFor(input.manifest);
+  if (grants.length === 0)
+    throw new Error(
+      '[RUN_MANIFEST_CHARTER_EMPTY] the manifest has no step a charter can cover | next: every external step stays on per-step approval'
+    );
+  const charterId = runManifestCharterId(verified.manifestHash, verified.requestId);
+  const evidenceRef = `approval:project-trust/${verified.requestId}`;
+  return withCharterDecisionLock(scope, () => {
+    const active = findActiveCharter(scope, now, options);
+    const charter: Charter = {
+      charter_id: charterId,
+      scope,
+      accountable: {
+        actor: verified.accountable,
+        authority_basis: { kind: 'owner', evidence_ref: evidenceRef },
+        accepted_at: now.toISOString(),
+        expires_at: verified.expiresAt,
+        // The digest of the card the owner verifiably saw is the accepted statement.
+        statement_sha256: verified.presentedDigest,
+        deputies: [],
+      },
+      envelope: {
+        manifest_operations: grants,
+        principal_modes: [...verified.principalModes],
+        // Approvals from before the daily cap omit it (DEFAULT applies at count time).
+        ...(verified.runsPerDay !== undefined ? { runs_per_day: verified.runsPerDay } : {}),
+        money: { currency: 'JPY', per_action: 0, per_day: 0, per_month: 0 },
+        data_tier: { read: [`confidential:${verified.tenantSlug}`], write: [] },
+        external_effects: {},
+        irreversible: 'named_actions_only',
+        irreversible_named_actions: [...new Set(grants.map((grant) => grant.operation_id))].sort(),
+      },
+      appetite: {
+        max_loss_per_incident: 0,
+        reputational_class_max: 'B',
+        blast_radius_max: { recipients: 1, systems: 1 },
+        tripwires: [...RUN_MANIFEST_TRIPWIRES],
+      },
+    };
+    if (active?.charter_id === charterId) {
+      // Reuse only the exact charter this approval derives: a stored file
+      // edited after issuance (wider grants, other principal modes) is refused.
+      if (runManifestCharterDigest(active) !== runManifestCharterDigest(charter))
+        throw new Error(
+          `[RUN_MANIFEST_CHARTER_TAMPERED] stored charter ${charterId} differs from the one approval ${verified.requestId} derives — the charter file was changed after issuance | next: inspect ${pathResolver.storeRelativePath(charterPath(scope, charterId, options))} (restore it, or retire it and approve the pipeline again); every external step asks until then`
+        );
+      return { charter: active, created: false };
+    }
+    const file = safePath(charterPath(scope, charterId, options), options);
+    if (safeExistsSync(file))
+      throw new Error(
+        `[RUN_MANIFEST_CHARTER_RETIRED] charter ${charterId} from approval ${verified.requestId} is no longer in force | next: approve the pipeline again`
+      );
+    const violations = validateCharter(charter, { holder_role: 'owner', now });
+    if (violations.length > 0)
+      throw new Error(`[charter] invalid run-manifest charter:\n- ${violations.join('\n- ')}`);
+    if (active) {
+      // A newer approval of the same manifest (e.g. other run principals)
+      // replaces the old charter; standing stops carry over through lineage.
+      const inherited = loadCharterUsage(active, now, options);
+      if (inherited.tripwires_hit.some((hit) => !charter.appetite.tripwires.includes(hit)))
+        throw new Error(
+          '[CHARTER_ACCOUNTING_LINEAGE] Clear standing tripwires explicitly before replacing this charter'
+        );
+      charter.replaces_charter_id = active.charter_id;
+      retireCharterLocked(
+        active,
+        { kind: 'human', id: verified.accountable },
+        `replaced by ${charter.charter_id}`,
+        options,
+        now
+      );
+    }
+    // A tenant-scoped run creates the per-manifest charter directory itself.
+    scopedCharterIo(scope, [file], [file], () => persistCharterFile(file, charter), [
+      path.dirname(file),
+    ]);
+    return { charter, created: true };
+  });
 }
 
 export function isCharterRetired(charter: Charter, options: CharterPathOptions = {}): boolean {
@@ -516,6 +760,14 @@ export type LedgerEntry =
       amendment_requested?: unknown;
       correlation_id?: string;
     }
+  | {
+      /** One pipeline run bound to a run-manifest charter (usage audit, not consumption). */
+      kind: 'run_started';
+      ts: string;
+      run_id: string;
+      principal_mode: string;
+      manifest_hash: string;
+    }
   | { kind: 'tripwire'; ts: string; tripwire: string; detail?: string }
   | { kind: 'tripwire_clear'; ts: string; tripwire: string; cleared_by: string }
   | { kind: 'retired'; ts: string; retired_by: string; reason: string };
@@ -562,6 +814,24 @@ function appendLedger(
   ) {
     if (!readCharter(scope, charterId, options))
       throw new Error('[PERSON_CHARTER_RESOURCE_DENIED] Existing owned charter required');
+    return scopedCharterIo(scope, [file], [file], () =>
+      appendJsonLine(safePath(file, options), entry)
+    );
+  }
+  if (
+    isRunManifestCharterScope(scope) &&
+    runManifestGateCoversCharterScope(scope) &&
+    [
+      'consumption',
+      'delegated_execution',
+      'denied',
+      'execution_started',
+      'execution_outcome',
+      'tripwire',
+    ].includes(entry.kind)
+  ) {
+    if (!readCharter(scope, charterId, options))
+      throw new Error('[RUN_MANIFEST_GATE_SCOPE] Existing charter required');
     return scopedCharterIo(scope, [file], [file], () =>
       appendJsonLine(safePath(file, options), entry)
     );
@@ -698,6 +968,166 @@ export function recordCharterExecutionStarted(
       { kind: 'execution_started', ts: now.toISOString(), ...evidence },
       options
     );
+  });
+}
+
+/** Today's (UTC) bound runs of a run-manifest charter against its daily cap. */
+export interface RunManifestRunUsage {
+  /** UTC calendar date the count covers (YYYY-MM-DD). */
+  day: string;
+  runs_today: number;
+  runs_per_day: number;
+}
+
+export type RunManifestRunStart =
+  | ({ recorded: true; already_recorded: boolean } & RunManifestRunUsage)
+  | ({ recorded: false; reason: 'daily_cap' } & RunManifestRunUsage);
+
+type RunManifestScope = { tenant_slug: string; manifest_hash: string };
+
+function runManifestScopeOf(scope: RunManifestScope): CharterScope {
+  return {
+    kind: 'run_manifest',
+    tenant_slug: scope.tenant_slug,
+    manifest_hash: scope.manifest_hash,
+  };
+}
+
+/**
+ * Ledger entries of every run-manifest charter of one tenant + manifest hash
+ * (current, replaced, retired or expired), so a re-approval of the same
+ * manifest never restarts the day's count — the same idea as money usage
+ * summing the charter lineage (loadCharterUsage).
+ */
+function runManifestScopeEntries(scope: CharterScope, options: CharterPathOptions): LedgerEntry[] {
+  return listCharterIds(scope, options).flatMap((id) => readLedger(scope, id, options));
+}
+
+function runManifestUsageOf(
+  runsPerDay: number | undefined,
+  entries: readonly LedgerEntry[],
+  now: Date
+): RunManifestRunUsage {
+  const day = runManifestRunDay(now);
+  return {
+    day,
+    runs_today: countRunManifestRunsOnDay(entries, day),
+    runs_per_day: runsPerDay ?? DEFAULT_RUN_MANIFEST_RUNS_PER_DAY,
+  };
+}
+
+/**
+ * Read-only: today's run count (across every charter of the same tenant +
+ * manifest) and this charter's cap.
+ */
+export function readRunManifestRunUsage(
+  charter: Charter,
+  options: CharterPathOptions = {},
+  now: Date = new Date()
+): RunManifestRunUsage {
+  return runManifestUsageOf(
+    charter.envelope.runs_per_day,
+    runManifestScopeEntries(charter.scope, options),
+    now
+  );
+}
+
+/** Read-only: distinct runs bound today (UTC) across every charter of this tenant + manifest. */
+export function countRunManifestScopeRunsToday(
+  scope: RunManifestScope,
+  options: CharterPathOptions = {},
+  now: Date = new Date()
+): number {
+  return countRunManifestRunsOnDay(
+    runManifestScopeEntries(runManifestScopeOf(scope), options),
+    runManifestRunDay(now)
+  );
+}
+
+/**
+ * Whether `runId` was recorded (and so counted) on this charter's ledger on
+ * the UTC day of `at`. The external-operation gate requires it, so an
+ * in-process caller that installs a binding without recording the run cannot
+ * skip the daily cap.
+ */
+export function hasRunManifestRunStarted(
+  charter: Charter,
+  runId: string,
+  at: Date,
+  options: CharterPathOptions = {}
+): boolean {
+  const day = runManifestRunDay(at);
+  return readLedger(charter.scope, charter.charter_id, options).some(
+    (e) => e.kind === 'run_started' && e.run_id === runId && runManifestRunDay(e.ts) === day
+  );
+}
+
+/**
+ * Read-only: the charter one approval issued for this manifest, or null
+ * before the first bound run issued it.
+ */
+export function readIssuedRunManifestCharter(
+  scope: RunManifestScope & { approval_request_id: string },
+  options: CharterPathOptions = {}
+): Charter | null {
+  return readCharter(
+    runManifestScopeOf(scope),
+    runManifestCharterId(scope.manifest_hash, scope.approval_request_id),
+    options
+  );
+}
+
+/**
+ * Record that one pipeline run executes under a run-manifest charter, so every
+ * use of the approval is auditable per run, and enforce the daily run cap
+ * (`envelope.runs_per_day`, per UTC day, counted across every charter of the
+ * same tenant + manifest). Idempotent per run id within one UTC day: a run id
+ * already recorded on this charter today is admitted again without counting
+ * twice; on a later day it counts again. At the cap nothing is appended and
+ * `recorded: false` is returned — the caller leaves the run unbound
+ * (per-step approval); it never fails the run.
+ */
+export function recordRunManifestRunStarted(
+  charter: Charter,
+  run: { run_id: string; principal_mode: string },
+  options: CharterPathOptions = {},
+  now: Date = new Date()
+): RunManifestRunStart {
+  if (charter.scope.kind !== 'run_manifest')
+    throw new Error('[charter] run starts are recorded only on a run_manifest charter');
+  const manifestHash = charter.scope.manifest_hash;
+  const day = runManifestRunDay(now);
+  return withCharterDecisionLock(charter.scope, (): RunManifestRunStart => {
+    const own = readLedger(charter.scope, charter.charter_id, options);
+    const entries = runManifestScopeEntries(charter.scope, options);
+    const usage = runManifestUsageOf(charter.envelope.runs_per_day, entries, now);
+    if (
+      own.some(
+        (e) =>
+          e.kind === 'run_started' && e.run_id === run.run_id && runManifestRunDay(e.ts) === day
+      )
+    )
+      return { recorded: true, already_recorded: true, ...usage };
+    // A run id already counted today on another charter of this manifest is
+    // not a new run; it is recorded here (the gate reads this ledger) only.
+    const countedToday = entries.some(
+      (e) => e.kind === 'run_started' && e.run_id === run.run_id && runManifestRunDay(e.ts) === day
+    );
+    if (!countedToday && usage.runs_today >= usage.runs_per_day)
+      return { recorded: false, reason: 'daily_cap', ...usage };
+    const entry: LedgerEntry = {
+      kind: 'run_started',
+      ts: now.toISOString(),
+      run_id: run.run_id,
+      principal_mode: run.principal_mode,
+      manifest_hash: manifestHash,
+    };
+    appendLedger(charter.scope, charter.charter_id, entry, options);
+    return {
+      recorded: true,
+      already_recorded: false,
+      ...runManifestUsageOf(charter.envelope.runs_per_day, [...entries, entry], now),
+    };
   });
 }
 
@@ -1005,9 +1435,11 @@ export function recordCharterDenial(
  * the (short) synchronous decision, never across an external effect.
  */
 export function withCharterDecisionLock<T>(scope: CharterScope, fn: () => T, timeoutMs = 5000): T {
-  const key = isOrganizationCharterScope(scope)
-    ? `charter-decision:organization:${scope.tenant_slug}`
-    : 'charter-decision:person';
+  const key = isRunManifestCharterScope(scope)
+    ? `charter-decision:run_manifest:${scope.tenant_slug}:${scope.manifest_hash}`
+    : isOrganizationCharterScope(scope)
+      ? `charter-decision:organization:${scope.tenant_slug}`
+      : 'charter-decision:person';
   return withLockSync(key, fn, timeoutMs);
 }
 

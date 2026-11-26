@@ -5,7 +5,21 @@ import {
 } from '@agent/core/browser/browser-extension-bridge';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
-import { defineCatalogBackedActuator } from '@agent/core/actuator/actuator-sdk';
+import {
+  currentPipelineRunSession,
+  defineCatalogBackedActuator,
+} from '@agent/core/actuator/actuator-sdk';
+import { currentScope } from '@agent/core/scope-context';
+import {
+  classifyPipelineBrowserOptions,
+  terminalHumanPresence,
+} from '@agent/core/pipeline/run-manifest';
+import {
+  runNativeBrowserPipelineFile,
+  type NativeBrowserPipelineFile,
+  type NativeBrowserRunOptions,
+} from './browser-native-run-manifest.js';
+import { currentRunManifestBinding } from '@agent/core/governance/external-operation-runtime';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import {
   buildBrowserElementPresentPipeline,
@@ -172,6 +186,29 @@ export const actuator = defineCatalogBackedActuator({
     const navigation = op === 'goto' || op === 'navigate' || op === 'open_tab';
     const isolated = navigation && params.onboarding_isolated_navigation === true;
     const { onboarding_isolated_navigation: _configuration, ...operationParams } = params;
+    // A runner step is dispatched one op at a time, so the authoring
+    // pipeline's `session_id` and `options` reach the browser only here.
+    // Under a runner they come from the out-of-band run session (a step can
+    // export into the `__pipeline_*` context keys), confined to the run's
+    // location-derived scope. Under a run-manifest binding nothing else is
+    // trusted. A direct SDK caller's context is its own input (ambient scope).
+    // Only allowlisted, partition-confined options are applied; the runner
+    // warns once per run about the rest, which are dropped (as they were
+    // before runner dispatch forwarded options). An isolated onboarding
+    // navigation keeps its fresh confined session and ignores both.
+    const runSession = currentPipelineRunSession();
+    const contextTrusted = !runSession && !currentRunManifestBinding();
+    const sessionId = runSession
+      ? runSession.session_id
+      : contextTrusted
+        ? context.__pipeline_session_id
+        : undefined;
+    const pipelineOptions = runSession
+      ? runSession.options
+      : contextTrusted
+        ? context.__pipeline_options
+        : undefined;
+    const optionScope = runSession ? runSession.scope : currentScope();
     return {
       action: 'pipeline',
       steps: [
@@ -182,7 +219,24 @@ export const actuator = defineCatalogBackedActuator({
         },
       ],
       context,
-      ...(isolated ? { options: { onboarding_isolated_navigation: true } } : {}),
+      ...(isolated
+        ? { options: { onboarding_isolated_navigation: true } }
+        : {
+            ...(typeof sessionId === 'string' && sessionId ? { session_id: sessionId } : {}),
+            ...(isRecord(pipelineOptions)
+              ? {
+                  // A bound run keeps its session's profile inside the run
+                  // partition, as its approval card shows.
+                  options: classifyPipelineBrowserOptions(
+                    pipelineOptions,
+                    optionScope,
+                    runSession && currentRunManifestBinding()
+                      ? { sessionId: runSession.session_id ?? 'default' }
+                      : undefined
+                  ).applied,
+                }
+              : {}),
+          }),
     };
   },
 });
@@ -267,8 +321,38 @@ const main = async () => {
     name: 'browser-actuator',
     args: currentProcessArgv(),
     handleAction,
+    // `--input <native pipeline file>`: the actuator is the file's runner, so
+    // it binds the run to the file's approved Run Manifest (if any).
+    withInputFile: (file, dispatch) =>
+      isPipelineAction(file.input)
+        ? runNativeBrowserPipelineFile(
+            {
+              inputPath: file.inputPath,
+              sourceText: file.sourceText,
+              pipeline: file.input as unknown as Record<string, unknown>,
+            },
+            () => dispatch(),
+            { hasHuman: terminalHumanPresence() }
+          )
+        : dispatch(),
   });
 };
+
+/**
+ * Run a native pipeline file read by the caller (`pnpm kyberion browser run
+ * --adf`): `dispatch` is the caller's own `handleAction` call (the file plus
+ * entry flags), told whether the run is bound. The binding is decided in the
+ * caller's context — the one that could read the file; the dispatch keeps the
+ * entry's own narrow identity either way (the bound run's gate uses the
+ * session's gate store, §3.5).
+ */
+function runNativePipelineFile<T>(
+  file: NativeBrowserPipelineFile,
+  dispatch: (bound: boolean) => Promise<T>,
+  options: NativeBrowserRunOptions
+): Promise<T> {
+  return runNativeBrowserPipelineFile(file, dispatch, options);
+}
 
 if (isDirectEntry(import.meta.url, 'libs/actuators/browser-actuator/src/index.ts')) {
   void runActuatorCliEntryPoint(main, 'browser-actuator');
@@ -276,6 +360,7 @@ if (isDirectEntry(import.meta.url, 'libs/actuators/browser-actuator/src/index.ts
 
 export {
   handleAction,
+  runNativePipelineFile,
   buildBrowserElementPresentPipeline,
   buildSnapshot,
   resolveRefSelector,

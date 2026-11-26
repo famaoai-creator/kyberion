@@ -29,12 +29,13 @@ import {
   RECIPIENT_CLASSES,
   type Charter,
   type CharterEnvelope,
+  type CharterScope,
   type CharterScopeKind,
   type ExternalEffectClass,
   type InformationCategory,
   type RecipientClass,
   type ReputationalClass,
-  isOrganizationCharterScope,
+  charterScopeTenantSlug,
 } from './accountability-charter.js';
 import {
   delegableCharterDecisions,
@@ -580,7 +581,7 @@ export function acceptCharterFromForm(
 }
 
 export interface CharterView {
-  scope_kind?: CharterScopeKind;
+  scope_kind?: CharterScope['kind'];
   external_operations?: ExternalOperationGrant[];
   reputational_class_max: ReputationalClass;
   charter_id: string;
@@ -621,7 +622,7 @@ export function viewCharter(
     charter_id: charter.charter_id,
     scope_kind: charter.scope.kind,
     external_operations: structuredClone(charter.envelope.external_operations ?? []),
-    tenant_slug: isOrganizationCharterScope(charter.scope) ? charter.scope.tenant_slug : '',
+    tenant_slug: charterScopeTenantSlug(charter.scope) ?? '',
     responsible: charter.accountable.actor,
     deputies: charter.accountable.deputies,
     accepted_at: charter.accountable.accepted_at,

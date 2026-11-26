@@ -86,6 +86,7 @@ import {
   dispatchLeafOp,
   findStepByIdRecursive,
   hasBoundExecutionAuthorization,
+  nestedManifestPrefix,
 } from './pipeline-execution-part-control.js';
 
 /** Install on first use so a step that actually judges does not depend on the eager pre-pass. */
@@ -200,15 +201,23 @@ export async function runStepsInternal(
       runNestedSteps,
       currentStep,
     };
+    // `bodyKey` names the authored body (`then`, `pipeline`, `cases.0.steps`)
+    // so nested steps keep their Run Manifest entry ids; omitted for bodies
+    // that are not part of the authored file (include fragments).
     const runBody = async (
       body: PipelineAdfStep[],
       seedCtx: Record<string, unknown>,
       failureLabel: string,
-      iteration = 'branch'
+      iteration = 'branch',
+      bodyKey?: string
     ) => {
       const nested = await withDelegatedExecutionFrame(
         `${currentStep?.id || rawOp}:${iteration}`,
-        () => runNestedSteps(prepareEngineSteps(body), seedCtx)
+        () =>
+          runNestedSteps(
+            prepareEngineSteps(body, nestedManifestPrefix(currentStep, bodyKey)),
+            seedCtx
+          )
       );
       if (nested.status === 'failed') {
         throw new Error(nested.results.find((r) => r.status === 'failed')?.error || failureLabel);
@@ -218,7 +227,7 @@ export async function runStepsInternal(
     const runLoopBody: (
       dctx: ControlOpDispatchContext
     ) => Promise<Record<string, unknown> | AdfSkippedStep> = async (dctx) => {
-      const { rawOp, action, params, ctx } = dctx;
+      const { rawOp, action, params, ctx, currentStep } = dctx;
       const body = Array.isArray(params.pipeline)
         ? (params.pipeline as PipelineAdfStep[])
         : undefined;
@@ -240,11 +249,14 @@ export async function runStepsInternal(
         if (condition !== undefined && action !== 'retry_until_quality') {
           if (!evaluateCondition(condition, workingCtx)) break;
         }
-        const nested = await runBody(
-          body,
-          workingCtx,
-          `${rawOp} iteration failed`,
-          String(loopCount)
+        // Each iteration is its own occurrence (as foreach items are): the
+        // same effect repeated by a loop must not collide with the previous
+        // iteration's once-only external-operation reservation.
+        const iteration = loopCount;
+        const nested = await withExternalOperationOccurrence(
+          `${action}:${currentStep?.id || rawOp}:${iteration}`,
+          () =>
+            runBody(body, workingCtx, `${rawOp} iteration failed`, String(iteration), 'pipeline')
         );
         workingCtx = nested.context;
         iterations.push({
@@ -733,7 +745,13 @@ export async function runStepsInternal(
         const conditionResult = evaluateCondition(params.condition, ctx);
         const branch = conditionResult ? params.then : params.else;
         if (Array.isArray(branch)) {
-          const nested = await runBody(branch, ctx, 'core:if branch failed');
+          const nested = await runBody(
+            branch,
+            ctx,
+            'core:if branch failed',
+            'branch',
+            conditionResult ? 'then' : 'else'
+          );
           return nested.context;
         }
         if (!conditionResult) {
@@ -747,12 +765,20 @@ export async function runStepsInternal(
       switch: async (dctx) => {
         const { params, ctx } = dctx;
         const cases = Array.isArray(params.cases) ? params.cases : [];
-        const selected = cases.find((entry: any) =>
+        const selectedIndex = cases.findIndex((entry: any) =>
           evaluateCondition(entry.when ?? entry.condition, ctx)
         );
+        const selected = selectedIndex >= 0 ? cases[selectedIndex] : undefined;
+        const caseKey = (['steps', 'pipeline', 'then'] as const).find((k) => selected?.[k] != null);
         const branch = selected?.steps ?? selected?.pipeline ?? selected?.then ?? params.default;
         if (Array.isArray(branch)) {
-          const nested = await runBody(branch, ctx, 'core:switch branch failed');
+          const nested = await runBody(
+            branch,
+            ctx,
+            'core:switch branch failed',
+            'branch',
+            caseKey ? `cases.${selectedIndex}.${caseKey}` : 'default'
+          );
           return nested.context;
         }
         return skipAdfStep(ctx, 'core:switch selected no case and no default branch');
@@ -770,7 +796,7 @@ export async function runStepsInternal(
           const loopCtx = { ...workingCtx, [itemName]: item };
           const nested = await withExternalOperationOccurrence(
             `foreach:${currentStep?.id || 'core:foreach'}:${itemIndex}`,
-            () => runBody(subSteps, loopCtx, 'core:foreach item failed', String(itemIndex))
+            () => runBody(subSteps, loopCtx, 'core:foreach item failed', String(itemIndex), 'do')
           );
           workingCtx = { ...nested.context };
           if (originalItemValue === undefined) delete (workingCtx as any)[itemName];
@@ -842,7 +868,7 @@ export async function runStepsInternal(
             : 'collect';
         const originalItemValue = (ctx as any)[itemName];
         const originalSharedCtx = { ...ctx };
-        const preparedBody = prepareEngineSteps(subSteps);
+        const preparedBody = prepareEngineSteps(subSteps, nestedManifestPrefix(currentStep, 'do'));
         const perItemContexts: Array<Record<string, unknown>> = [];
         const perItemOutputs: Array<{
           index: number;
@@ -932,7 +958,8 @@ export async function runStepsInternal(
             subSteps,
             { ...ctx, [itemName]: task },
             'core:team_lead worker failed',
-            String(index)
+            String(index),
+            'do'
           );
           if (nested.status === 'failed') throw new Error(`team_lead task ${index + 1} failed`);
           outputs[index] = {
@@ -957,7 +984,10 @@ export async function runStepsInternal(
         // degrades the WHOLE batch to today's fully-serial behavior.
         const callSteps = params.calls as PipelineAdfStep[];
         if (!Array.isArray(callSteps) || callSteps.length === 0) return ctx;
-        const preparedCalls = prepareEngineSteps(callSteps);
+        const preparedCalls = prepareEngineSteps(
+          callSteps,
+          nestedManifestPrefix(dctx.currentStep, 'calls')
+        );
         const exportKey = resolveExportKey(
           { op: rawOp, params } as PipelineAdfStep,
           'last_parallel_calls'
@@ -1069,7 +1099,8 @@ export async function runStepsInternal(
           if (loopCount >= maxIterations) break;
           if (collected.length >= targetCount) break;
           const loopCtx = { ...originalSharedCtx, [itemName]: item };
-          const nested = await runBody(subSteps, loopCtx, `accumulate item ${index + 1} failed`);
+          const label = `accumulate item ${index + 1} failed`;
+          const nested = await runBody(subSteps, loopCtx, label, 'branch', 'do');
           const candidateValue = (nested.context as any)[collectKey] ?? nested.context ?? item;
           const fingerprint = (() => {
             try {
@@ -1492,7 +1523,8 @@ export async function runStepsInternal(
 
   try {
     const engineResult = await executeAdfSteps(
-      prepareEngineSteps(steps),
+      // '' tags the authored top level with Run Manifest entry ids.
+      prepareEngineSteps(steps, ''),
       initialCtx,
       {
         maxSteps,

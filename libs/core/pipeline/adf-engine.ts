@@ -107,6 +107,12 @@ export interface AdfRunOptions {
   sandboxPolicy?: SandboxPolicy;
   /** Completed node ids restored from a durable pipeline run journal. */
   resumeCompletedNodeIds?: ReadonlySet<string>;
+  /**
+   * Runs each step's handler dispatch (nested steps included) inside the
+   * caller's async context for that step — e.g. the browser actuator marks a
+   * native pipeline step's Run Manifest entry. Default: dispatch as is.
+   */
+  withStep?: <T>(step: AdfStep, dispatch: () => Promise<T>) => Promise<T>;
   /** Optional observer for durable DAG/run-graph artifacts. */
   onGraphNodeSettled?: (
     node: GraphNode<AdfStep>,
@@ -424,6 +430,8 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
     }
 
     hooks?.beforeStep?.(step, state.stepCount, ctx);
+    const inStep = <T>(dispatch: () => Promise<T>): Promise<T> =>
+      options.withStep ? options.withStep(step, dispatch) : dispatch();
     try {
       logger.debug(`  ${label} [Step ${state.stepCount}] ${step.type}:${step.op}...`);
       let terminalRequested = false;
@@ -435,12 +443,8 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
         if (loopOp) state.loopDepth += 1;
         let controlResult;
         try {
-          controlResult = await handlers.control(
-            step.op,
-            executionParams,
-            ctx,
-            runNestedSteps,
-            resolve
+          controlResult = await inStep(() =>
+            handlers.control!(step.op, executionParams, ctx, runNestedSteps, resolve)
           );
         } finally {
           if (loopOp) state.loopDepth -= 1;
@@ -456,11 +460,11 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
         ctx = controlResult;
         terminalRequested = ctx.__adf_terminal === true;
       } else if (step.type === 'capture') {
-        ctx = await handlers.capture(step.op, executionParams, ctx, resolve);
+        ctx = await inStep(() => handlers.capture(step.op, executionParams, ctx, resolve));
       } else if (step.type === 'transform') {
-        ctx = await handlers.transform(step.op, executionParams, ctx, resolve);
+        ctx = await inStep(() => handlers.transform(step.op, executionParams, ctx, resolve));
       } else if (step.type === 'apply') {
-        const nextCtx = await handlers.apply(step.op, executionParams, ctx, resolve);
+        const nextCtx = await inStep(() => handlers.apply(step.op, executionParams, ctx, resolve));
         if (isSkippedStep(nextCtx)) {
           ctx = nextCtx.context as Ctx;
           results.push({ op: step.op, status: 'skipped' });

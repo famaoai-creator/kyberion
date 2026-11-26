@@ -24,6 +24,14 @@ import {
   withResolvedOperationInterface,
 } from '@agent/core/governance/external-operation-runtime';
 import {
+  currentRunManifestBinding,
+  withoutRunManifestStep,
+  withRunManifestStep,
+} from '@agent/core/governance/external-operation-runtime';
+import { runtimeShapedAuthoredParams } from '@agent/core/pipeline/run-manifest';
+import { canonicalActuatorAction } from '@agent/core/pipeline/pipeline-op-aliases';
+import { withRunnerResolvedParams } from '@agent/core/actuator/actuator-sdk';
+import {
   withExternalOperationApprovalObserver,
   type ExternalOperationApprovalBlock,
 } from '@agent/core/governance/external-operation';
@@ -213,7 +221,45 @@ export function resolveEngineStepType(step: PipelineAdfStep): 'apply' | 'control
   return domain === 'core' && CONTROL_ACTIONS.has(action) ? 'control' : 'apply';
 }
 
-export function prepareEngineSteps(steps: PipelineAdfStep[]): AdfStep[] {
+/**
+ * Authored position of a prepared step in the Run Manifest step-path scheme
+ * ("3", "2.pipeline.0", "1.on_error.fallback.0") plus its authored —
+ * unresolved, pre-preparation — params (pipeline-run-manifest-model §3.3).
+ * Symbol-keyed so object spread carries it while JSON (journals, action
+ * input, repair payloads) can never carry or forge it.
+ */
+const MANIFEST_STEP = Symbol('kyberion.pipeline.manifest-step');
+
+export interface ManifestStepTag {
+  entryId: string;
+  authored: { params?: Record<string, unknown>; produces?: unknown };
+}
+
+export function manifestStepTag(step: unknown): ManifestStepTag | undefined {
+  return step && typeof step === 'object'
+    ? ((step as Record<symbol, unknown>)[MANIFEST_STEP] as ManifestStepTag | undefined)
+    : undefined;
+}
+
+/**
+ * Entry prefix of a nested body of `parent` (`<parent entry>.<bodyKey>`), or
+ * undefined when the parent has no authored position or the body is not part
+ * of the authored file (an include fragment).
+ */
+export function nestedManifestPrefix(
+  parent: unknown,
+  bodyKey: string | undefined
+): string | undefined {
+  const tag = manifestStepTag(parent);
+  return tag && bodyKey ? `${tag.entryId}.${bodyKey}` : undefined;
+}
+
+/**
+ * Engine-ready steps. `entryPrefix` ('' for the authored top level) tags each
+ * step with its manifest entry id; undefined leaves steps untagged (bodies the
+ * manifest does not cover keep per-step approval).
+ */
+export function prepareEngineSteps(steps: PipelineAdfStep[], entryPrefix?: string): AdfStep[] {
   return steps.map((step, stepIndex) => {
     const normalizedOp = normalizePipelineOp(step.op);
     const [domain, action] = normalizedOp.split(':');
@@ -226,7 +272,13 @@ export function prepareEngineSteps(steps: PipelineAdfStep[]): AdfStep[] {
     if (declaredTimeoutMs !== undefined && params.timeout_ms === undefined) {
       params.timeout_ms = declaredTimeoutMs;
     }
-    return {
+    const entryId =
+      entryPrefix === undefined
+        ? undefined
+        : entryPrefix
+          ? `${entryPrefix}.${stepIndex}`
+          : String(stepIndex);
+    const prepared = {
       ...step,
       id: step.id || `generated-step-${stepIndex + 1}`,
       params,
@@ -241,11 +293,27 @@ export function prepareEngineSteps(steps: PipelineAdfStep[]): AdfStep[] {
         ? {
             on_error: {
               ...step.on_error,
-              fallback: prepareEngineSteps(step.on_error.fallback) as unknown as PipelineAdfStep[],
+              fallback: prepareEngineSteps(
+                step.on_error.fallback,
+                entryId === undefined ? undefined : `${entryId}.on_error.fallback`
+              ) as unknown as PipelineAdfStep[],
             },
           }
         : {}),
     };
+    // The authored params are the step's own, before the timeout default and
+    // before any template resolution.
+    if (entryId !== undefined) {
+      const tag: ManifestStepTag = {
+        entryId,
+        authored: { params: step.params, produces: step.produces },
+      };
+      (prepared as Record<symbol, unknown>)[MANIFEST_STEP] = tag;
+    } else if (manifestStepTag(prepared)) {
+      // A re-prepared step outside an authored body never keeps a position.
+      delete (prepared as Record<symbol, unknown>)[MANIFEST_STEP];
+    }
+    return prepared;
   }) as unknown as AdfStep[];
 }
 
@@ -1358,6 +1426,33 @@ export async function dispatchLeafOp(
   );
 }
 
+/**
+ * Mark the leaf dispatch with its manifest entry and AUTHORED params so the
+ * external-operation gate can match it against the run's manifest charter
+ * (§3.2). Untagged steps (forwarded, include fragments, tool calls) and runs
+ * without a binding dispatch unchanged.
+ */
+export function withManifestStep<T>(
+  step: PipelineAdfStep,
+  domain: string,
+  action: string,
+  body: () => T
+): T {
+  if (!currentRunManifestBinding()) return body();
+  const tag = manifestStepTag(step);
+  // An untagged dispatch nested in a tagged one (e.g. inside its actuator)
+  // must not be matched against the outer step's grant.
+  if (!tag) return withoutRunManifestStep(body);
+  const operationId = `${domain}:${canonicalActuatorAction(domain, action)}`;
+  return withRunManifestStep(
+    {
+      entryId: tag.entryId,
+      authoredParams: runtimeShapedAuthoredParams(operationId, tag.authored),
+    },
+    body
+  );
+}
+
 async function dispatchResolvedActuatorOperation(
   step: PipelineAdfStep,
   domain: string,
@@ -1432,18 +1527,23 @@ async function dispatchResolvedActuatorOperation(
                 hasHuman: opts.hasHuman,
               },
               () =>
-                dispatch(
-                  action,
-                  {
-                    ...params,
-                    _reasoning_policy: stepPolicy,
-                    _facets: step.facets,
-                    _step_id: step.id || step.op,
-                  },
-                  ctx,
-                  effectiveType,
-                  opts.trace,
-                  stepPolicy
+                withManifestStep(step, domain, action, () =>
+                  // `params` were resolved above: the actuator must not resolve them again.
+                  withRunnerResolvedParams(() =>
+                    dispatch(
+                      action,
+                      {
+                        ...params,
+                        _reasoning_policy: stepPolicy,
+                        _facets: step.facets,
+                        _step_id: step.id || step.op,
+                      },
+                      ctx,
+                      effectiveType,
+                      opts.trace,
+                      stepPolicy
+                    )
+                  )
                 )
             )
         );

@@ -6,7 +6,7 @@
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "options": {
     "headless": false,
-    "user_data_dir": "active/shared/runtime/browser/profiles/my-evaluation-profile",
+    "user_data_dir": "active/shared/runtime/browser/profiles/public/shared/my-evaluation-profile",
     "browser_channel": "chrome",
     "timeout_ms": 120000,
     "viewport": { "width": 1280, "height": 800 }

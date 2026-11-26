@@ -1,6 +1,7 @@
 /** Human-only admission for opaque UI effects. Raw Playwright APIs are not sandboxed. */
 import { runExternalOperation } from '@agent/core/governance/external-operation';
 import { currentScopeEnvelope } from '@agent/core/scope-envelope';
+import { canonicalActuatorAction } from '@agent/core/pipeline/pipeline-op-aliases';
 import { resolveScopeContext } from '@agent/core/scope-context';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import type { BrowserRuntime } from './browser-pipeline-helpers.js';
@@ -13,23 +14,11 @@ import {
   ISOLATED_NAVIGATION_CAPABILITY,
 } from './browser-navigation-confinement.js';
 
-const READ_APPLY = new Set(['wait', 'wait_ref', 'log', 'list_profiles']);
-const MUTATING_CONTROL = new Set([
-  'open_tab',
-  'select_tab',
-  'select_tab_matching',
-  'setup_passkey_authenticator',
-  'remove_passkey_authenticator',
-]);
+import { browserOperationRequiresAdmission } from '@agent/core/foundation/authorization-registry';
 
-export function browserOperationRequiresAdmission(kind: string, op: string): boolean {
-  // `cdp` admits the same page-scoped power as `evaluate` (Runtime.evaluate,
-  // Input.dispatch*), so it needs the same human admission — the domain
-  // allowlist only bounds it further, never weakens it.
-  if (kind === 'capture') return ['goto', 'navigate', 'evaluate', 'cdp'].includes(op);
-  if (kind === 'apply') return !READ_APPLY.has(op);
-  return kind === 'control' && MUTATING_CONTROL.has(op);
-}
+// The classification lives in core so static tooling (the pipeline Run
+// Manifest compiler) shares it without importing the browser package.
+export { browserOperationRequiresAdmission };
 
 function resolvedEffect(value: unknown, resolve: Function, serializeFunctions = false): unknown {
   if (typeof value === 'function') return serializeFunctions ? String(value) : value;
@@ -91,7 +80,7 @@ export async function runBrowserMutation<T>(
     : undefined;
   return runExternalOperation(
     {
-      operationId: `browser:${input.op === 'navigate' ? 'goto' : input.op}`,
+      operationId: `browser:${canonicalActuatorAction('browser', input.op)}`,
       tenantSlug: (currentScopeEnvelope()?.identity ?? resolveScopeContext()).tenant_slug,
       effect: {
         session_scope: sessionScope,

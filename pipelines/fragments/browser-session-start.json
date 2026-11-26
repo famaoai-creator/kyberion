@@ -6,7 +6,7 @@
   "action": "pipeline",
   "options": {
     "headless": false,
-    "user_data_dir": "active/shared/runtime/browser/profiles/my-evaluation-profile",
+    "user_data_dir": "active/shared/runtime/browser/profiles/public/shared/my-evaluation-profile",
     "profile_directory": "Default",
     "browser_channel": "chrome",
     "timeout_ms": 60000

@@ -8,6 +8,16 @@ import {
   type CharterExternalOperationTarget,
 } from './external-operation-target.js';
 export type { ExternalOperationGrant } from './external-operation-target.js';
+import {
+  DEFAULT_RUN_PRINCIPAL_MODES,
+  MAX_RUN_MANIFEST_RUNS_PER_DAY,
+  parseRunManifestGrants,
+  parseRunPrincipalModes,
+  parseRunsPerDay,
+  type RunManifestGrant,
+  type RunPrincipalMode,
+} from './run-manifest-grant.js';
+export type { RunManifestGrant, RunPrincipalMode } from './run-manifest-grant.js';
 /**
  * Accountability charter — the pure decision core.
  *
@@ -42,14 +52,19 @@ export {
   CHARTER_SCOPE_KINDS,
   CHARTER_SCOPE_ORGANIZATION,
   CHARTER_SCOPE_PERSON,
+  CHARTER_SCOPE_RUN_MANIFEST,
+  RUN_MANIFEST_HASH_PATTERN,
   charterScopeTenantSlug,
   charterScopesEqual,
   isOrganizationCharterScope,
   isPersonalCharterScope,
+  isRunManifestCharterScope,
+  isTenantCharterScope,
+  type AuthorableCharterScope,
   type CharterScope,
   type CharterScopeKind,
 } from '../foundation/charter-scope.js';
-import { type CharterScope } from '../foundation/charter-scope.js';
+import { type CharterScope, isRunManifestCharterScope } from '../foundation/charter-scope.js';
 
 export type AuthorityBasisKind = 'owner' | 'officer' | 'delegated' | 'self';
 export type CharterHolderRole = MemberRole;
@@ -120,6 +135,25 @@ export interface MoneyLimits {
 
 export interface CharterEnvelope {
   external_operations?: CharterExternalOperationTarget[];
+  /**
+   * Per-entry grants of one approved pipeline Run Manifest. Only a
+   * `run_manifest` charter may carry them, and such a charter carries nothing
+   * else that admits an effect — the approval never widens into a general
+   * agent permission.
+   */
+  manifest_operations?: RunManifestGrant[];
+  /**
+   * Run principals a `run_manifest` charter admits (default `['attended']`).
+   * `unattended` exists only when the approver enabled it on the card.
+   */
+  principal_modes?: RunPrincipalMode[];
+  /**
+   * Runs a `run_manifest` charter binds per UTC day (counted from its
+   * `run_started` ledger entries, like `money.per_day`). Absent: the charter
+   * was issued from an approval that predates the cap and
+   * DEFAULT_RUN_MANIFEST_RUNS_PER_DAY applies.
+   */
+  runs_per_day?: number;
   money: MoneyLimits;
   data_tier: {
     read: string[]; // 'public' | 'confidential:<tenant>' | 'personal'
@@ -181,8 +215,21 @@ export interface CharterUsage {
   tripwires_hit: string[];
 }
 
+/** Action class of one effect admitted against a run-manifest charter entry. */
+export const RUN_MANIFEST_ACTION_CLASS = 'run_manifest_operation';
+
+/** The approved manifest entry an action claims; checked against the persisted grants. */
+export interface CharterManifestOperation {
+  manifest_hash: string;
+  entry_id: string;
+  operation_id: string;
+  principal_mode: RunPrincipalMode;
+}
+
 export interface CharterAction {
   external_operation?: CharterExternalOperationTarget;
+  /** Set only with action_class `run_manifest_operation`. */
+  manifest_operation?: CharterManifestOperation;
   /** The executing actor. Agents must name the accountable human (or a deputy) in `on_behalf_of`. */
   actor: ActorRef;
   action_class: string;
@@ -419,6 +466,62 @@ export interface CharterValidationContext {
   now: Date;
 }
 
+/**
+ * Grant isolation between run-manifest charters and every other charter:
+ * manifest grants live only in a `run_manifest` charter bound to the same
+ * manifest hash, and that charter delegates nothing else.
+ */
+function runManifestIsolationViolations(charter: Charter): string[] {
+  const { scope, envelope } = charter;
+  const manifestGrants = envelope.manifest_operations;
+  if (!isRunManifestCharterScope(scope)) {
+    const outside: string[] = [];
+    if (manifestGrants !== undefined)
+      outside.push('manifest_operations are only valid in a run_manifest charter');
+    if (envelope.principal_modes !== undefined)
+      outside.push('principal_modes are only valid in a run_manifest charter');
+    if (envelope.runs_per_day !== undefined)
+      outside.push('runs_per_day is only valid in a run_manifest charter');
+    return outside;
+  }
+  const violations: string[] = [];
+  if (envelope.principal_modes !== undefined && !parseRunPrincipalModes(envelope.principal_modes))
+    violations.push('principal_modes must be a non-empty list of distinct run principal modes');
+  if (
+    envelope.runs_per_day !== undefined &&
+    (typeof envelope.runs_per_day !== 'number' ||
+      parseRunsPerDay(envelope.runs_per_day) !== envelope.runs_per_day)
+  )
+    violations.push(`runs_per_day must be an integer from 1 to ${MAX_RUN_MANIFEST_RUNS_PER_DAY}`);
+  if (!/^[0-9a-f]{64}$/.test(scope.manifest_hash))
+    violations.push('run_manifest scope needs a sha256 manifest_hash');
+  const grants = parseRunManifestGrants(manifestGrants);
+  if (!grants || grants.length === 0) {
+    violations.push(
+      'manifest_operations must be a non-empty list of valid, distinct run-manifest grants'
+    );
+  } else if (grants.some((grant) => grant.manifest_hash !== scope.manifest_hash)) {
+    violations.push('manifest_operations must all name the charter scope manifest_hash');
+  }
+  if (envelope.external_operations?.length)
+    violations.push('a run_manifest charter cannot carry external_operations grants');
+  if (Object.keys(envelope.delegated_decisions ?? {}).length)
+    violations.push('a run_manifest charter cannot delegate decisions');
+  if (envelope.information_flow !== undefined)
+    violations.push('a run_manifest charter cannot delegate information flow');
+  if (envelope.supersedes_decision_rights === true)
+    violations.push('a run_manifest charter cannot supersede decision rights');
+  if (Object.values(envelope.external_effects ?? {}).some((policy) => policy !== 'forbid'))
+    violations.push('a run_manifest charter must forbid every external effect class');
+  if (
+    envelope.money.per_action !== 0 ||
+    envelope.money.per_day !== 0 ||
+    envelope.money.per_month !== 0
+  )
+    violations.push('a run_manifest charter cannot carry a money budget');
+  return violations;
+}
+
 export function validateCharter(charter: Charter, ctx: CharterValidationContext): string[] {
   const violations: string[] = [];
   const { accountable, envelope, appetite } = charter;
@@ -429,6 +532,8 @@ export function validateCharter(charter: Charter, ctx: CharterValidationContext)
     violations.push(
       `external_operations must contain valid exact operation targets: ${describeInvalidExternalOperationGrants(envelope.external_operations).join('; ')}`
     );
+
+  violations.push(...runManifestIsolationViolations(charter));
 
   if (!parseActorRef({ kind: 'human', id: accountable.actor })) {
     violations.push(`accountable.actor '${accountable.actor}' is not a valid human actor id`);
@@ -655,6 +760,27 @@ export function isCharterActive(charter: Charter, now: Date): boolean {
   );
 }
 
+/** Why a run-manifest action is not inside this charter, or undefined when it is. */
+function manifestOperationDenial(charter: Charter, action: CharterAction): string | undefined {
+  const { scope, envelope } = charter;
+  if (!isRunManifestCharterScope(scope))
+    return 'manifest operations are admitted only by a run_manifest charter';
+  const claim = action.manifest_operation;
+  if (action.action_class !== RUN_MANIFEST_ACTION_CLASS || !claim || action.external_operation)
+    return 'a run_manifest charter admits only its manifest operations';
+  if (claim.manifest_hash !== scope.manifest_hash)
+    return 'manifest operation names another manifest';
+  const grant = (parseRunManifestGrants(envelope.manifest_operations) ?? []).find(
+    (entry) => entry.entry_id === claim.entry_id
+  );
+  if (!grant || grant.operation_id !== claim.operation_id)
+    return 'manifest entry not granted by this charter';
+  const modes = parseRunPrincipalModes(envelope.principal_modes ?? DEFAULT_RUN_PRINCIPAL_MODES);
+  if (!modes?.includes(claim.principal_mode))
+    return `run principal '${claim.principal_mode}' not approved for this manifest`;
+  return undefined;
+}
+
 export function evaluateAgainstCharter(input: {
   charter: Charter;
   action: CharterAction;
@@ -717,6 +843,14 @@ export function evaluateAgainstCharter(input: {
       ]);
   }
 
+  // 4a. A run-manifest charter admits exactly its approved manifest entries,
+  // and a manifest entry is admitted by nothing but that charter.
+  const manifestAction =
+    action.action_class === RUN_MANIFEST_ACTION_CLASS || action.manifest_operation !== undefined;
+  if (isRunManifestCharterScope(charter.scope) || manifestAction) {
+    const denial = manifestOperationDenial(charter, action);
+    if (denial) return deny([denial]);
+  }
   // 4. Exact target delegation is separate from business-message delegation.
   if (action.action_class === 'target_scoped_external_operation' || action.external_operation) {
     const target = parseExternalOperationGrant(action.external_operation);

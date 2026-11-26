@@ -1108,11 +1108,19 @@ async function applyApprovalDecision(
   }
 }
 
-async function requestProjectTrust(inputPath: string, json = false): Promise<void> {
-  const { createProjectTrustApprovalRequest } = await import('@agent/core/project/project-trust');
+async function requestProjectTrust(
+  inputPath: string,
+  json = false,
+  options: { allowUnattended?: boolean; runsPerDay?: number } = {}
+): Promise<void> {
+  // A JSON pipeline's request carries its Run Manifest (v2), so one approval
+  // pre-approves its external steps; other files keep file-only (v1) trust.
+  const { requestPipelineFileTrust } = await import('@agent/core/pipeline/run-manifest');
   const { cliApprovalRequester } = await import('./lib/cli/cli-approval-requester.js');
-  const record = createProjectTrustApprovalRequest({
+  const { record, fileOnlyReason } = requestPipelineFileTrust({
     inputPath,
+    allowUnattended: options.allowUnattended === true,
+    ...(options.runsPerDay !== undefined ? { runsPerDay: options.runsPerDay } : {}),
     requester: cliApprovalRequester(undefined, resolveOperatorDisplayName()),
   });
   if (json) {
@@ -1120,12 +1128,19 @@ async function requestProjectTrust(inputPath: string, json = false): Promise<voi
     return;
   }
   printHeader();
-  printText(`${chalk.bold(record.id)} pending`);
+  printText(`${chalk.bold(record.id)} ${record.status}`);
   printText(record.title);
+  printText(record.summary);
+  if (fileOnlyReason)
+    printText(
+      `file-only trust (no run manifest): ${fileOnlyReason.replace(/^\[[A-Z_]+\]\s*/u, '')}`
+    );
+  // The card the approver will be shown (manifest lines for a v2 request).
+  for (const line of String(record.details ?? '').split('\n')) {
+    if (line.trim()) printText(`  ${line}`);
+  }
   printText(`storage channel: ${record.storageChannel}`);
-  printText(
-    `Approve after review with: pnpm kyberion approve ${record.id} ${record.storageChannel}`
-  );
+  printText(`Approve after review with: pnpm kyberion approvals --approve ${record.id}`);
   printText(
     `Run after approval with: pnpm pipeline --input ${inputPath} --project-trust-approval ${record.id}`
   );

@@ -71,6 +71,13 @@ export interface OperationAuthorization {
   readonly approvalExemptCleanup?: true;
   readonly authority: AuthorityRequirement;
   readonly delegable?: DelegationSpec;
+  /**
+   * True when a run-manifest-bound charter (one human approval of one exact
+   * pipeline file) may admit this operation per manifest entry. Separate from
+   * `delegable`, which keeps meaning "a standing charter may delegate this to
+   * an agent". Only code declarations count — see isManifestBindableOperation.
+   */
+  readonly manifestBindable?: boolean;
   /** Optional charter decision-vocabulary class (payment, sign_contract, …)
    * used for envelope pricing — separate axis from effectClass. */
   readonly actionClass?: string;
@@ -171,6 +178,7 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
       optionalFields: ['origin'],
       reputational_class: 'B',
     },
+    manifestBindable: true,
     protectedPaths: [['params', 'url']],
   },
   'browser:open_tab': {
@@ -181,7 +189,44 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
       optionalFields: ['origin'],
       reputational_class: 'B',
     },
+    manifestBindable: true,
     protectedPaths: [['params', 'url']],
+  },
+  // --- Page-scoped browser effects: never delegable to a standing charter;
+  // admitted only per step or by a run-manifest charter bound to the exact
+  // authored params and the approved page origins. ---
+  'browser:evaluate': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    manifestBindable: true,
+  },
+  'browser:fill': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    manifestBindable: true,
+  },
+  'browser:click': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    manifestBindable: true,
+  },
+  'browser:click_first_match': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    manifestBindable: true,
+  },
+  'browser:press': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    manifestBindable: true,
+  },
+  // A manifest-bound native browser run writing a step's file outside the
+  // run's own partition (pipeline-run-manifest-model §3.5): the run executes
+  // under the caller's identity, so each such write is a human's per-step
+  // decision on the exact path. Never pre-approved by a manifest.
+  'browser:write_file': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
   },
   // Logs in and reads one tenant approval queue inside an origin-set confined
   // browser; decisive buttons are refused by the op itself.
@@ -620,6 +665,20 @@ export function requiresApprovalAdmission(authorization: OperationAuthorization)
   }
 }
 
+/**
+ * Whether a run-manifest charter may admit this operation. Only reviewed code
+ * declarations count: an overlay or plugin entry can never widen what one
+ * human approval of a pipeline file covers.
+ */
+export function isManifestBindableOperation(operationId: string): boolean {
+  const authorization = operationAuthorization(operationId);
+  return (
+    authorization.declared &&
+    authorization.source === 'code' &&
+    authorization.manifestBindable === true
+  );
+}
+
 /** The code-owned declaration key space. Overlay loaders use this to reject
  * (and loudly warn about) data entries that collide with reviewed code —
  * the lookup already ignores them, the warning tells the author why. */
@@ -876,4 +935,38 @@ export function declaredAuthorizationEntries(): readonly DeclaredAuthorization[]
  * default policies instead of leaving fail-safes implicit. */
 export function subjectAxisFailSafe(axis: SubjectAxis): SubjectAxisEntry {
   return SUBJECT_FAILSAFE[axis];
+}
+
+// ---------------------------------------------------------------------------
+// Browser operations — which need human (external) admission. Pure
+// classification shared by the browser actuator's runtime gate and static
+// tooling (the pipeline Run Manifest compiler, `pipeline check`), which must
+// not import the browser package. `kind` is the browser op-catalog kind
+// (capture / apply / control), not the pipeline step's authored `type`.
+// ---------------------------------------------------------------------------
+
+/** Apply ops that never leave the page unchanged-to-the-outside. */
+export const BROWSER_READ_APPLY_OPS: ReadonlySet<string> = new Set([
+  'wait',
+  'wait_ref',
+  'log',
+  'list_profiles',
+]);
+
+/** Control ops that change which page/tab (or authenticator) later steps act on. */
+export const BROWSER_MUTATING_CONTROL_OPS: ReadonlySet<string> = new Set([
+  'open_tab',
+  'select_tab',
+  'select_tab_matching',
+  'setup_passkey_authenticator',
+  'remove_passkey_authenticator',
+]);
+
+export function browserOperationRequiresAdmission(kind: string, op: string): boolean {
+  // `cdp` admits the same page-scoped power as `evaluate` (Runtime.evaluate,
+  // Input.dispatch*), so it needs the same human admission — the domain
+  // allowlist only bounds it further, never weakens it.
+  if (kind === 'capture') return ['goto', 'navigate', 'evaluate', 'cdp'].includes(op);
+  if (kind === 'apply') return !BROWSER_READ_APPLY_OPS.has(op);
+  return kind === 'control' && BROWSER_MUTATING_CONTROL_OPS.has(op);
 }

@@ -206,6 +206,15 @@ code decide approvals, replace op resolution or move the governed clock). A
 manifest that declares one is a broken manifest; a registration attempt fails
 closed.
 
+### Built-in operations
+
+A plugin op may add a new action to any domain, but it may never take the
+name of a built-in actuator operation (an op the governed op registry declares
+for a built-in actuator domain, e.g. `browser:goto` or `service:api`). Such a
+registration fails closed with `[OP_REGISTRY_PLUGIN_CONFIG] <op> is a built-in
+actuator operation`, so built-in ops keep their governed implementation
+(input confinement, run sessions, run-manifest admission).
+
 ## Lifecycle and the apply ladder (EP-04)
 
 Long-running hosts manage one live activation per plugin

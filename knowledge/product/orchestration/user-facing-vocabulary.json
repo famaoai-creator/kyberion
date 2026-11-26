@@ -9440,6 +9440,16 @@
         "ja": "governed パイプラインを実行",
         "qps-ploc": "⟦Řůñ ȧ ɠőṽėřñėḓ ṗïṗėŀïñė ŀőřėɱ ï⟧"
       },
+      "cli_cmd_pipeline_runner_check": {
+        "en": "Check whether a pipeline can run: scope, trust, model, secrets, external effects and principal, each with the next command",
+        "ja": "パイプラインを実行できるか確認する（スコープ・信頼・モデル・secret・外部操作・実行主体と、それぞれの次のコマンド）",
+        "qps-ploc": "⟦Ƈħėƈķ ẇħėŧħėř ȧ ṗïṗėŀïñė ƈȧñ řůñ: şƈőṗė, ŧřůşŧ, ɱőḓėŀ, şėƈřėŧş, ėẋŧėřñȧŀ ėƒƒėƈŧş ȧñḓ ṗřïñƈïṗȧŀ, ėȧƈħ ẇïŧħ ŧħė ñėẋŧ ƈőɱɱȧñḓ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓï⟧"
+      },
+      "cli_cmd_pipeline_runner_fix": {
+        "en": "Rewrite a pipeline so more steps can be pre-approved (page script args, step files and profile in the run partition); dry run unless --write",
+        "ja": "事前承認できるステップが増えるようにパイプラインを書き換える（ページスクリプトを args 渡しに、ステップのファイルとブラウザのプロファイルを run のパーティションへ。--write を付けない限り書き換えない）",
+        "qps-ploc": "⟦Řėẇřïŧė ȧ ṗïṗėŀïñė şő ɱőřė şŧėṗş ƈȧñ ƀė ṗřė-ȧṗṗřőṽėḓ (ṗȧɠė şƈřïṗŧ ȧřɠş, şŧėṗ ƒïŀėş ȧñḓ ṗřőƒïŀė ïñ ŧħė řůñ ṗȧřŧïŧïőñ); ḓřẏ řůñ ůñŀėşş --ẇřïŧė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñ⟧"
+      },
       "cli_cmd_operator_readiness_vital": {
         "en": "Check operator readiness (vital signs)",
         "ja": "オペレータ準備状況 (バイタル) を確認",

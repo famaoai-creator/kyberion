@@ -4,11 +4,14 @@ import {
   buildUnknownActuatorOpError,
   determineActuatorStepType,
   getScenarioOpOverride,
+  isBuiltinActuatorOperation,
   isScenarioApprovalGranted,
   listKnownActuatorOps,
+  listPluginActuatorOperations,
   listRegisteredDomainOps,
   registerPluginActuatorOperation,
   registerScenarioOpOverride,
+  resetPluginActuatorOperationsForTests,
   resolveActuatorOperation,
   resolveScenarioOpOverride,
   resolveActuatorOperationTimeout,
@@ -176,6 +179,70 @@ describe('actuator-op-registry', () => {
     expect(() => determineActuatorStepType('orchestrator', 'execute_task_plan')).toThrow(
       /retired on 2026-11-14/
     );
+  });
+
+  it('refuses a plugin op that would shadow a built-in actuator op', () => {
+    const shadow = (domain: string, action: string) => () =>
+      registerPluginActuatorOperation({
+        domain,
+        action,
+        stepType: 'apply',
+        pluginId: 'shadow-plugin',
+        modulePath: 'plugins/shadow/index.js',
+        handler: async (_op, _params, ctx) => ({ handled: true, ctx }),
+      });
+    try {
+      // The domain's own ops and the shared ops a built-in domain serves.
+      for (const [domain, action] of [
+        ['browser', 'goto'],
+        ['browser', 'evaluate'],
+        ['browser', 'click'],
+        ['service', 'api'],
+      ]) {
+        expect(isBuiltinActuatorOperation(domain, action)).toBe(true);
+        expect(shadow(domain, action)).toThrow(
+          `[OP_REGISTRY_PLUGIN_CONFIG] ${domain}:${action} is a built-in actuator operation`
+        );
+        expect(resolveActuatorOperation(domain, action)?.source).toBe('actuator-op-registry');
+      }
+      // A new action on a built-in domain, and a shared action name on a plugin-owned domain, stay registrable.
+      expect(isBuiltinActuatorOperation('browser', 'shadow_plugin_probe')).toBe(false);
+      expect(isBuiltinActuatorOperation('shadowdomain', 'goto')).toBe(false);
+      shadow('browser', 'shadow_plugin_probe')();
+      shadow('shadowdomain', 'goto')();
+      expect(resolveActuatorOperation('browser', 'shadow_plugin_probe')?.source).toBe('plugin');
+      expect(resolveActuatorOperation('shadowdomain', 'goto')?.source).toBe('plugin');
+    } finally {
+      resetPluginActuatorOperationsForTests();
+    }
+  });
+
+  it('refuses a plugin op under an alias spelling the runner or compiler folds', () => {
+    const register = (domain: string, action: string) => () =>
+      registerPluginActuatorOperation({
+        domain,
+        action,
+        stepType: 'capture',
+        pluginId: 'alias-plugin',
+        modulePath: 'plugins/alias/index.js',
+        handler: async (_op, _params, ctx) => ({ handled: true, ctx }),
+      });
+    try {
+      // The Run Manifest shows browser:navigate as "Open <url>" (browser:goto):
+      // a plugin must not run under that navigation grant.
+      expect(isBuiltinActuatorOperation('browser', 'navigate')).toBe(true);
+      expect(register('browser', 'navigate')).toThrow(
+        '[OP_REGISTRY_PLUGIN_CONFIG] browser:navigate is an alias of browser:goto'
+      );
+      // Legacy qualified spellings fold elsewhere too.
+      expect(register('mission', 'list')).toThrow(
+        '[OP_REGISTRY_PLUGIN_CONFIG] mission:list is an alias of system:list_missions'
+      );
+      expect(register('mission', 'anything')).toThrow('is an alias of system:anything');
+      expect(listPluginActuatorOperations()).toHaveLength(0);
+    } finally {
+      resetPluginActuatorOperationsForTests();
+    }
   });
 
   it('resolves a registered operation with actuator provenance', () => {

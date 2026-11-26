@@ -15,9 +15,7 @@ import { parseSafeJsonObjectInput } from '@agent/core/foundation/safe-json';
 import { TraceContext, finalizeAndPersist } from '@agent/core/analysis/trace';
 import { logger } from '@agent/core/core';
 import { findMissionPath, missionEvidenceDir, pathResolver } from '@agent/core/path-resolver';
-import { pipelineBootstrapNeeds } from '@agent/core/reasoning/pipeline-bootstrap-needs';
 import { killSwitch } from '@agent/core/governance/kill-switch';
-import { runAdfLifecycle } from '@agent/core/pipeline/adf-lifecycle';
 import { getDefaultWorkerEventStream } from '@agent/core/workforce/worker-event-stream';
 import {
   fireLifecycleHooks,
@@ -69,13 +67,16 @@ import {
   type PipelineJournalScope,
 } from '@agent/core/pipeline/pipeline-run-journal';
 import { isBuiltinPipelineResource } from '@agent/core/trust-requiring-resources';
+import type { RunScope } from '@agent/core/pipeline/run-manifest';
+import {
+  pinPipelineSessionContext,
+  pipelineRunSessionOf,
+  warnDroppedBrowserOptions,
+} from './pipeline-execution-part-session.js';
 import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 
 import * as nodePath from 'node:path';
-import {
-  type PipelineAdfStep,
-  type PipelineStepResult,
-} from '@agent/core/pipeline/pipeline-contract';
+import { type PipelineStepResult } from '@agent/core/pipeline/pipeline-contract';
 import {
   formatPipelineFailure,
   logNextActionForPipelineFailure,
@@ -84,21 +85,17 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { currentProcessArgv, exitProcess, ScriptExitError } from '../lib/harness.js';
 import { readValidatedWorkflowAdf } from '../refactor/adf-input.js';
+import { withPipelineRunSession } from '@agent/core/actuator/actuator-sdk';
 import { withPlaygroundPathRole } from '../actuator/actuator_playground.js';
-import { runSteps } from './pipeline-execution-part-execution.js';
 
 import {
   assertPipelineExecutionCurrent,
   registeredEnv,
   tryPermissionFallback,
   finalizePipelineTrace,
-  validateFlow,
-  formatFlowValidationErrors,
   resolvePipelineHumanPresence,
-  normalizePipelineOp,
   PipelineSuspendedError,
 } from './pipeline-execution-part-bootstrap.js';
-import type { RunStepsOptions } from './pipeline-execution-part-bootstrap.js';
 import {
   withDelegatedExecutionFrame,
   withDelegatedExecutionOptions,
@@ -108,130 +105,24 @@ import {
   assertDiagnosticPipelineProfile,
   assertDiagnosticHooksAbsent,
   firePipelineLifecycleHooks,
-  DIAGNOSTIC_OPERATOR_GUIDANCE,
   type PipelineExecutionMode,
 } from './pipeline-diagnostic-profile.js';
 import { assertFrontDeskReceiptPipeline } from '@agent/core/surface/front-desk-execution-contract';
-/** Validate Typed Flow channel integrity before allowing any step side effects. */
-export class TypedFlowValidationError extends Error {
-  constructor(readonly flowErrors: ReturnType<typeof validateFlow>) {
-    super(formatFlowValidationErrors(flowErrors));
-    this.name = 'TypedFlowValidationError';
-  }
-}
+import {
+  bindRunManifest,
+  nestedPipelineRun,
+  openPipelineRunManifest,
+  runPipelineCheck,
+  runScopePayload,
+  installReasoningBackendsForSteps,
+  withDerivedRunScope,
+} from './pipeline-execution-part-manifest.js';
 
-export async function runValidatedSteps(
-  steps: PipelineAdfStep[],
-  initialCtx: Record<string, unknown> = {},
-  opts: RunStepsOptions = {}
-) {
-  assertDiagnosticPipelineProfile(opts.executionMode, opts.pipelinePath, steps);
-  try {
-    return (
-      await runAdfLifecycle({
-        draft: () => steps,
-        preflight: (draft) => {
-          const flowErrors = validateFlow(draft, initialCtx);
-          if (flowErrors.length > 0) throw new TypedFlowValidationError(flowErrors);
-          return draft;
-        },
-        // SX-11 / AGENTS.md: invalid pipeline contracts use the canonical
-        // repair agent as the lifecycle's one auto-repair hook. The one-shot
-        // guard prevents an unchanged repair from becoming a retry loop.
-        autoRepair:
-          opts.executionMode === undefined && opts.pipelinePath && !opts._adfRepairAttempted
-            ? async (draft, failure) => {
-                opts._adfRepairAttempted = true;
-                const { attemptAutonomousRepair } = await import('@agent/core/autonomous-repair');
-                const repaired = await attemptAutonomousRepair({
-                  failure: {
-                    category:
-                      failure instanceof TypedFlowValidationError ? 'typed_flow' : 'preflight',
-                    detail: failure instanceof Error ? failure.message : String(failure),
-                    repairAction: 'repair the typed pipeline flow and re-run preflight',
-                  },
-                  step: { op: 'core:validate_flow' },
-                  pipelinePath: opts.pipelinePath,
-                  trustResolved: opts.trustResolved,
-                  projectTrustApprovalId: opts.projectTrustApprovalId,
-                });
-                if (!repaired) {
-                  throw new TypedFlowValidationError(validateFlow(draft, initialCtx));
-                }
-                return (
-                  await readValidatedWorkflowAdf(opts.pipelinePath!, {
-                    trustResolved: opts.trustResolved,
-                    projectTrustApprovalId: opts.projectTrustApprovalId,
-                  })
-                ).steps;
-              }
-            : undefined,
-        commit: (prepared) => prepared,
-        execute: (committed) => runSteps(committed, initialCtx, opts),
-      })
-    ).result;
-  } catch (error) {
-    if (!(error instanceof TypedFlowValidationError)) throw error;
-
-    const message = error.message + (opts.executionMode ? '; ' + DIAGNOSTIC_OPERATOR_GUIDANCE : '');
-    for (const flowError of error.flowErrors) {
-      logger.warn(`[FLOW_VALIDATION] ${formatFlowValidationErrors([flowError])}.`);
-    }
-    opts.trace?.addEvent('pipeline.validation_failed', {
-      validation_type: 'typed_flow',
-      error: message,
-      error_count: error.flowErrors.length,
-    });
-    return {
-      status: 'failed' as const,
-      results: [{ op: 'flow:validate', status: 'failed' as const, error: message }],
-      context: { ...initialCtx },
-    };
-  }
-}
-
-async function installReasoningBackendsForSteps(
-  steps: readonly PipelineAdfStep[]
-): Promise<boolean> {
-  const needs = pipelineBootstrapNeeds(steps, normalizePipelineOp);
-  if (!needs.required) {
-    logger.debug(
-      '[pipeline] reasoning bootstrap skipped; no step requires reasoning, speech, or secrets'
-    );
-    return false;
-  }
-  logger.debug(`[pipeline] reasoning bootstrap required: ${needs.reasons.join(', ')}`);
-  const { installReasoningBackends } = await import('@agent/core/reasoning/reasoning-bootstrap');
-  // Playground / actuator-only drafts under a persisted tenant scope often
-  // "require" bootstrap only because unknown domain:op steps are classified
-  // conservatively — they do not need a model. When no reason is a reasoning /
-  // wisdom / voice / secret / core:* step, degrade to the stub chain instead of
-  // demanding a WorkItem credential binding just to run vcs:log / file:read.
-  const needsTenantCredentials = needs.reasons.some((reason) => {
-    const domain = reason.split(':')[0] ?? '';
-    return (
-      domain === 'reasoning' ||
-      domain === 'wisdom' ||
-      domain === 'voice' ||
-      domain === 'secret' ||
-      domain === 'core'
-    );
-  });
-  try {
-    installReasoningBackends();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!needsTenantCredentials && message.includes('CREDENTIAL_BINDING_REQUIRED')) {
-      logger.info(
-        '[pipeline] tenant credential binding absent — actuator-only draft continues on the stub reasoning chain'
-      );
-      installReasoningBackends({ credentialRequirement: 'degrading' });
-      return false;
-    }
-    throw error;
-  }
-  return true;
-}
+export {
+  TypedFlowValidationError,
+  runValidatedSteps,
+} from './pipeline-execution-part-validated.js';
+import { runValidatedSteps } from './pipeline-execution-part-validated.js';
 
 async function recordPipelineFeedback(
   pipelineId: string,
@@ -269,6 +160,11 @@ export interface ExecutePipelineFileOptions {
   collectorExecution?: { dot_id: string; attempt_id: string };
   /** Trusted caller's data tier for reasoning egress during this pipeline run. */
   payloadScope?: PipelinePayloadScopeInput;
+  /**
+   * Internal: false for a nested run (`core:run_pipeline`), which its parent's
+   * Run Manifest does not cover — the child never opens its own binding.
+   */
+  manifestBinding?: false;
 }
 
 /**
@@ -302,7 +198,11 @@ export async function executePipelineFile(
     // journal re-reads need the same actuator_playground_worker identity the
     // interactive record path already assumes.
     return await withPlaygroundPathRole(inputPath, () =>
-      executePipelineFileOnce(inputPath, options, progress)
+      // Location-derived run scope (pipeline-run-manifest-model P1): a nested
+      // run may only narrow the active envelope, never switch tenants.
+      withDerivedRunScope(inputPath, options.journalRunId ?? newPipelineRunId(), (runScope) =>
+        executePipelineFileOnce(inputPath, options, progress, runScope)
+      )
     );
   } catch (error) {
     const tagged = error instanceof Error ? error : new Error(String(error));
@@ -316,7 +216,8 @@ export async function executePipelineFile(
 async function executePipelineFileOnce(
   inputPath: string,
   options: ExecutePipelineFileOptions,
-  progress: { started: boolean }
+  progress: { started: boolean },
+  runScope?: RunScope
 ) {
   if (
     options.executionMode &&
@@ -401,6 +302,8 @@ async function executePipelineFileOnce(
   // strips those on the way down (`sanitizeNestedPipelineContext`); re-applying
   // `autoContext` last keeps the invariant for every library caller.
   let mergedContext = { ...baseContext, ...(options.context || {}), ...autoContext };
+  pinPipelineSessionContext(mergedContext, pipeline);
+  warnDroppedBrowserOptions(pipeline, runScope);
   const trace =
     options.trace ||
     new TraceContext(`pipeline:${pipelineId}`, {
@@ -456,52 +359,52 @@ async function executePipelineFileOnce(
     }
     return withDelegatedExecutionOptions({ workItem: options.delegatedWorkItem }, () =>
       withDelegatedExecutionFrame(pathResolver.toRepoRelative(inputPath), () =>
-        runValidatedSteps(steps, mergedContext, {
-          trace,
-          pipelinePath: inputPath,
-          executionMode: options.executionMode,
-          assertExecutionCurrent: options.assertExecutionCurrent,
-          ...(options.executionMode
-            ? {
-                validateDiagnosticEffect: () =>
-                  options.validateLoadedPipeline!(pipeline, diagnosticSource!),
-              }
-            : {}),
-          quiet: options.quiet,
-          hasHuman: options.hasHuman,
-          delegatedExecution: options.delegatedExecution,
-          runJournal: libraryJournal,
-          resumeState: options.resumeState,
-          runId: libraryJournal?.runId,
-          trustResolved: effectiveTrustResolved,
-          projectTrustApprovalId: options.projectTrustApprovalId,
-          runPipelineFile: (nestedPath, nestedOptions = {}) =>
-            executePipelineFile(nestedPath, {
-              ...nestedOptions,
-              collectorExecution: options.collectorExecution,
-              ...(options.collectorExecution ? { payloadScope: effectivePayloadScope } : {}),
-              assertExecutionCurrent: options.assertExecutionCurrent,
-              delegatedExecution: options.delegatedExecution,
-              delegatedWorkItem: options.delegatedWorkItem,
-              trustResolved: effectiveTrustResolved,
-              projectTrustApprovalId: options.projectTrustApprovalId,
-            }),
-        })
+        withPipelineRunSession(pipelineRunSessionOf(pipeline, runScope), () =>
+          runValidatedSteps(steps, mergedContext, {
+            trace,
+            pipelinePath: inputPath,
+            executionMode: options.executionMode,
+            assertExecutionCurrent: options.assertExecutionCurrent,
+            ...(options.executionMode
+              ? {
+                  validateDiagnosticEffect: () =>
+                    options.validateLoadedPipeline!(pipeline, diagnosticSource!),
+                }
+              : {}),
+            quiet: options.quiet,
+            hasHuman: options.hasHuman,
+            delegatedExecution: options.delegatedExecution,
+            runJournal: libraryJournal,
+            resumeState: options.resumeState,
+            runId: libraryJournal?.runId,
+            trustResolved: effectiveTrustResolved,
+            projectTrustApprovalId: options.projectTrustApprovalId,
+            runPipelineFile: (nestedPath, nestedOptions = {}) =>
+              nestedPipelineRun(() =>
+                executePipelineFile(nestedPath, {
+                  ...nestedOptions,
+                  collectorExecution: options.collectorExecution,
+                  ...(options.collectorExecution ? { payloadScope: effectivePayloadScope } : {}),
+                  assertExecutionCurrent: options.assertExecutionCurrent,
+                  delegatedExecution: options.delegatedExecution,
+                  delegatedWorkItem: options.delegatedWorkItem,
+                  trustResolved: effectiveTrustResolved,
+                  projectTrustApprovalId: options.projectTrustApprovalId,
+                  manifestBinding: false,
+                })
+              ),
+          })
+        )
       )
     );
   };
-  const missionTier = String(autoContext.mission_tier || '');
-  const payloadTier: 'public' | 'confidential' | 'personal' =
-    missionTier === 'personal'
-      ? 'personal'
-      : missionTier === 'confidential'
-        ? 'confidential'
-        : 'public';
+  const derivedPayload = runScopePayload(String(autoContext.mission_tier || ''), runScope);
+  const payloadTier = derivedPayload.tier;
   const effectivePayloadScope: ReasoningPayloadScope = withPipelineTrainingUse({
     purpose: `pipeline ${pipelineId}`,
     ...(options.payloadScope ?? {
       tier: payloadTier,
-      tenant_slug: registeredEnv('KYBERION_STANCE')?.trim() || undefined,
+      tenant_slug: derivedPayload.tenant_slug,
     }),
   });
   const tierRank = { public: 0, confidential: 1, personal: 2 };
@@ -545,6 +448,8 @@ async function executePipelineFileOnce(
           node.control_state_snapshot ?? {}
         );
       }
+      // The journal's context and restored channels are run data: pin again.
+      pinPipelineSessionContext(mergedContext, pipeline);
       libraryJournal = openPipelineRunJournal(options.resumeState);
       libraryJournal.append('run_resumed', { resumed_at: nowIso() });
     } else {
@@ -620,14 +525,28 @@ async function executePipelineFileOnce(
       { tier: journalTier, tenantSlug: scope.tenant_slug ?? effectivePayloadScope.tenant_slug }
     );
   }
+  // Run Manifest binding (§3.3). Diagnostic runs never perform browser effects;
+  // nested runs are not covered by their parent's manifest.
+  const manifestBinding =
+    options.executionMode || options.manifestBinding === false
+      ? undefined
+      : await openPipelineRunManifest({
+          runScope,
+          sourceText: loadedSource || undefined,
+          pipeline,
+          hasHuman: options.hasHuman,
+          runId: libraryJournal?.runId ?? options.journalRunId ?? newPipelineRunId(),
+          resumed: Boolean(options.resumeState),
+        });
+  const boundRun = () => bindRunManifest(manifestBinding, run);
   let result: Awaited<ReturnType<typeof run>>;
   try {
     result =
       effectivePayloadScope.tier === 'public'
-        ? await run()
+        ? await boundRun()
         : await (
             await import('@agent/core/reasoning/reasoning-egress-scope')
-          ).withReasoningPayloadScope(effectivePayloadScope, run);
+          ).withReasoningPayloadScope(effectivePayloadScope, boundRun);
   } catch (error) {
     if (!(error instanceof PipelineSuspendedError) || !libraryJournal) {
       if (libraryJournal)
@@ -963,6 +882,9 @@ export async function main(args?: string[], print: Print = () => undefined) {
   }
 
   const effectiveArgs = args ?? currentProcessArgv().slice(2);
+  // `pipeline fix <file>` (resolvePipelinePresetArgs → --input <file> --fix): its own flags.
+  if (effectiveArgs.includes('--fix'))
+    return (await import('./pipeline-fix-command.js')).runPipelineFixArgs(effectiveArgs, print);
   const argv = await createStandardYargs(['node', 'run_pipeline', ...effectiveArgs])
     .option('input', { alias: 'i', type: 'string', required: false })
     .option('dry-run', {
@@ -970,10 +892,22 @@ export async function main(args?: string[], print: Print = () => undefined) {
       default: false,
       describe: 'Statically assess the pipeline without dispatching tools or providers',
     })
+    .option('check', {
+      type: 'boolean',
+      default: false,
+      describe:
+        'Readiness check: answer every run gate (scope, trust, model, secrets, effects, principal) without running a step',
+    })
     .option('json', {
       type: 'boolean',
       default: false,
       describe: 'Emit a machine-readable JSON summary (dry-run report or run result) on stdout',
+    })
+    .option('suggest-args', {
+      type: 'boolean',
+      default: false,
+      describe:
+        'With --check: print, per templated browser:evaluate step, the script + args rewrite that passes values as data (stdout only; never writes the file)',
     })
     .option('resume', {
       type: 'string',
@@ -1063,6 +997,20 @@ export async function main(args?: string[], print: Print = () => undefined) {
   // pre-trust unless their exact human approval request is supplied.
   const inputIsBuiltin = isBuiltinPipelineResource(pathResolver.toRepoRelative(String(argv.input)));
   const trustResolved = inputIsBuiltin && !projectTrustApprovalId;
+  if (argv.check) {
+    // Before --delegated-trust: a check never spends a charter decision.
+    await runPipelineCheck({
+      inputPath: String(argv.input),
+      trustResolved,
+      projectTrustApprovalId,
+      delegatedTrustRequested:
+        argv['delegated-trust'] !== undefined && argv['delegated-trust'] !== false,
+      json: Boolean(argv.json),
+      suggestArgs: Boolean(argv['suggest-args']),
+      print,
+    });
+    return;
+  }
   // --delegated-trust: an accountability charter that delegates
   // 'pipeline_trust_grant' resolves the same trust decision without the human
   // round-trip. A denial only warns — the approval/builtin paths still apply.
@@ -1134,6 +1082,47 @@ export async function main(args?: string[], print: Print = () => undefined) {
     }
   }
 
+  // The file location, not KYBERION_TENANT, decides the run tenant. A derived
+  // tenant runs inside a minted scope envelope so every governed op (external
+  // review evidence, browser governance, journal) sees the same tenant.
+  return withDerivedRunScope(
+    String(argv.input),
+    resumeState?.run_id || newPipelineRunId(),
+    (runScope) =>
+      runPipelineInput({
+        argv: argv as PipelineInputRun['argv'],
+        print,
+        resumeState,
+        effectiveTrustResolved,
+        projectTrustApprovalId,
+        runScope,
+      })
+  );
+}
+
+interface PipelineInputRun {
+  argv: {
+    input: string;
+    context?: string;
+    quiet?: boolean;
+    json?: boolean;
+    failOnSuspend?: boolean;
+  };
+  print: Print;
+  resumeState?: PipelineRunJournalState;
+  effectiveTrustResolved: boolean;
+  projectTrustApprovalId?: string;
+  runScope: RunScope;
+}
+
+async function runPipelineInput({
+  argv,
+  print,
+  resumeState,
+  effectiveTrustResolved,
+  projectTrustApprovalId,
+  runScope,
+}: PipelineInputRun): Promise<void> {
   killSwitch.startMonitor(Number(registeredEnv('KYBERION_KILL_SWITCH_INTERVAL_MS') || 10000));
 
   // Safety guard: restore BlackHole mic routing on Ctrl+C or SIGTERM.
@@ -1230,6 +1219,8 @@ export async function main(args?: string[], print: Print = () => undefined) {
     Object.assign(mergedContext, node.output_channels_snapshot);
     Object.assign(mergedContext, node.control_state_snapshot || {});
   }
+  pinPipelineSessionContext(mergedContext, pipeline);
+  warnDroppedBrowserOptions(pipeline, runScope);
 
   logger.info(
     `🚀 [PIPELINE] Running ${argv.input.match(/\.(ts|js|mjs|cjs)$/u) ? 'workflow module' : 'ADF pipeline'}: ${pipeline.name || argv.input}`
@@ -1331,32 +1322,45 @@ export async function main(args?: string[], print: Print = () => undefined) {
     // call site individually would be missed the first time someone adds a new
     // one; the mission already knows its tier, so it is the honest place to say
     // it. A run with no mission stays unscoped (public work, previous behaviour).
-    const missionTier = String(autoContext.mission_tier || '');
-    const payloadTier: 'public' | 'confidential' | 'personal' =
-      missionTier === 'personal'
-        ? 'personal'
-        : missionTier === 'confidential'
-          ? 'confidential'
-          : 'public';
+    const payload = runScopePayload(String(autoContext.mission_tier || ''), runScope);
+    const payloadTier = payload.tier;
+    const hasHuman = resolvePipelineHumanPresence();
+    // Run Manifest (pipeline-run-manifest-model §3.3): an approved manifest of
+    // this exact content pre-approves its external steps for this run only.
+    const manifestBinding = await openPipelineRunManifest({
+      runScope,
+      sourceText: loadedSource,
+      pipeline,
+      hasHuman,
+      runId,
+      resumed: Boolean(resumeState),
+    });
     const runSteps = () =>
-      runValidatedSteps(stepsToRun, mergedContext, {
-        trace,
-        pipelinePath: argv.input as string,
-        quiet: argv.quiet as boolean,
-        hasHuman: resolvePipelineHumanPresence(),
-        runJournal: activeRunJournal,
-        resumeState,
-        runId,
-        trustResolved: effectiveTrustResolved,
-        projectTrustApprovalId,
-        runPipelineFile: (nestedPath, nestedOptions = {}) =>
-          executePipelineFile(nestedPath, {
-            ...nestedOptions,
-            // Nested runs cannot widen the parent's trust decision.
+      bindRunManifest(manifestBinding, () =>
+        withPipelineRunSession(pipelineRunSessionOf(pipeline, runScope), () =>
+          runValidatedSteps(stepsToRun, mergedContext, {
+            trace,
+            pipelinePath: argv.input as string,
+            quiet: argv.quiet as boolean,
+            hasHuman,
+            runJournal: activeRunJournal,
+            resumeState,
+            runId,
             trustResolved: effectiveTrustResolved,
             projectTrustApprovalId,
-          }),
-      });
+            runPipelineFile: (nestedPath, nestedOptions = {}) =>
+              nestedPipelineRun(() =>
+                executePipelineFile(nestedPath, {
+                  ...nestedOptions,
+                  // Nested runs cannot widen the parent's trust decision.
+                  trustResolved: effectiveTrustResolved,
+                  projectTrustApprovalId,
+                  manifestBinding: false,
+                })
+              ),
+          })
+        )
+      );
     const result =
       payloadTier === 'public'
         ? await runSteps()
@@ -1365,7 +1369,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
           ).withReasoningPayloadScope(
             {
               tier: payloadTier,
-              tenant_slug: registeredEnv('KYBERION_STANCE')?.trim() || undefined,
+              tenant_slug: payload.tenant_slug,
               purpose: `pipeline ${pipelineId}`,
               training_use: pipelinePayloadTrainingUse(payloadTier),
             },

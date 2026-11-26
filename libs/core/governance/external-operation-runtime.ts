@@ -7,6 +7,10 @@ import { computeApprovalPayloadHash } from './approval-presentation.js';
 import { charterInputForDecision } from './charter-call-site.js';
 import { currentExternalOperationOccurrence } from './external-operation-occurrence.js';
 import { writeScopedArtifact } from '../workforce/artifact-store.js';
+import {
+  currentRunManifestGateTenant,
+  withRunManifestGateStoreAccess,
+} from './run-manifest-gate-store.js';
 import { redactSensitiveValue } from '../network.js';
 import { agentActor } from '../contracts/actor.js';
 import { inspectInstalledOnboardingRuntime } from '../organization/onboarding-runtime-identity.js';
@@ -37,6 +41,31 @@ import {
   type ExternalOperationAuthorityResolver,
 } from './external-operation.js';
 import { STORAGE_DATA_TIERS } from '../storage-layout.js';
+import { createLogger } from '../logger.js';
+import {
+  currentRunManifestBinding,
+  resolveRunManifestCharterAuthority,
+} from './run-manifest-binding.js';
+// Run-manifest binding API (pipeline-run-manifest-model §3.3): the runner and
+// the browser actuator reach it through this existing runtime subpath.
+export {
+  currentRunManifestBinding,
+  currentRunManifestStep,
+  withoutRunManifestBinding,
+  withoutRunManifestStep,
+  withRunManifestBinding,
+  withRunManifestStep,
+  type RunManifestBindingInput,
+  type RunManifestStepInput,
+} from './run-manifest-binding.js';
+export {
+  parseRunManifestGrant,
+  runManifestGrantsFor,
+  verifyManifestEntryMatchesEffect,
+  type RunManifestGrant,
+} from './run-manifest-grant.js';
+
+const logger = createLogger('external-operation-runtime');
 
 export interface ExternalOperationRuntimeOptions {
   runId?: string;
@@ -288,18 +317,31 @@ export function createRuntimeExternalOperationAuthority(
       // Exact content stays inside the owning scope. Only this reference and
       // the original effect hash travel into the approval record/audit stream.
       const effectHash = computeApprovalPayloadHash(facts.effect);
-      const review = writeScopedArtifact({
+      const tier: 'personal' | 'confidential' =
+        scope.tier === 'personal' ? 'personal' : 'confidential';
+      const name = `external-operation-review/${authority.invocationId}-${effectHash}.json`;
+      // A manifest-bound run under surface_runtime writes its review through
+      // its own tenant's exact gate store grant (pipeline-run-manifest-model §3.5).
+      const gated = tier === 'confidential' && currentRunManifestGateTenant() === tenantSlug;
+      const root = `active/shared/artifacts/confidential/${tenantSlug}`;
+      const paths = [`${root}/evidence/${name}`, `${root}/artifacts-index.jsonl`];
+      const input = {
         scope: { tenant: tenantSlug },
-        tier: scope.tier === 'personal' ? 'personal' : 'confidential',
-        artifact_class: 'evidence',
-        name: `external-operation-review/${authority.invocationId}-${effectHash}.json`,
+        tier,
+        artifact_class: 'evidence' as const,
+        name,
         content: {
           operation_id: facts.operationId,
           invocation_id: authority.invocationId,
           effect_hash: effectHash,
           effect: redactSensitiveValue(facts.effect),
         },
-      });
+      };
+      const review = gated
+        ? writeScopedArtifact(input, (write) =>
+            withRunManifestGateStoreAccess('review-write', paths, paths, write)
+          )
+        : writeScopedArtifact(input);
       authority.review.artifactRefs.push(review.repo_relative_path);
     }
     if (!tenantSlug || !facts.delegable || !REPLY_OPERATIONS.has(facts.operationId))
@@ -349,12 +391,24 @@ export function withRuntimeExternalOperationAuthority<T>(
         : undefined;
     const execute = () =>
       withExternalOperationAuthority((facts) => {
-        if (!onboard) return base(facts);
-        const target = onboard(facts);
-        if (isDelegableExternalOperation(facts.operationId) && target?.charter) return target;
+        // Authority order (pipeline-run-manifest-model.md §3.2): embedding
+        // authority (above) → installed onboarding charter (delegable only) →
+        // run-manifest charter → per-step approval.
+        const target = onboard?.(facts);
+        if (onboard && isDelegableExternalOperation(facts.operationId) && target?.charter)
+          return target;
         // Preserve individual human approval and all existing Slack/meeting
         // delegation while carrying the independent installed standing stop.
-        return { ...base(facts), standingScope: target?.standingScope };
+        const authority = onboard
+          ? { ...base(facts), standingScope: target?.standingScope }
+          : base(facts);
+        if (!facts.requiresApproval || !currentRunManifestBinding()) return authority;
+        const manifest = resolveRunManifestCharterAuthority(facts, authority.tenantSlug);
+        if ('charter' in manifest) return { ...authority, charter: manifest.charter };
+        logger.debug(
+          `[run-manifest] ${facts.operationId} falls back to per-step approval — ${manifest.reason}`
+        );
+        return authority;
       }, dispatch);
     return installed.ready &&
       'agentActive' in installed &&

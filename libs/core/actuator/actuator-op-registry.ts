@@ -1,6 +1,7 @@
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { suggestClosestStrings } from '../pipeline/op-suggestions.js';
+import { canonicalActuatorAction, normalizePipelineOp } from '../pipeline/pipeline-op-aliases.js';
 import { isSafeActuatorId, loadActuatorManifestCatalog } from './actuator-manifest-index.js';
 import { assertCapabilityAllowed } from '../governance/capability-restriction-policy.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
@@ -93,6 +94,24 @@ export function registerPluginActuatorOperation(input: {
   if (buildRetiredActuatorOpError(domain, action))
     throw new Error(
       `[OP_REGISTRY_PLUGIN_CONFIG] ${key} is a retired operation and cannot be registered by a plugin`
+    );
+  // A built-in op keeps its governed implementation: a plugin cannot shadow
+  // it (e.g. a plugin `browser:goto` would bypass the browser catalog's input
+  // confinement and the run-manifest assumptions). New actions are fine.
+  // An op spelling the runner or the Run Manifest compiler folds into another
+  // op (browser:navigate → browser:goto, mission:x → system:x) is never
+  // dispatched under its own name: a plugin registered there would either be
+  // dead or run under the canonical op's approval.
+  const folded = normalizePipelineOp(key);
+  if (folded !== key || canonicalActuatorAction(domain, action) !== action)
+    throw new Error(
+      `[OP_REGISTRY_PLUGIN_CONFIG] ${key} is an alias of ${
+        folded !== key ? folded : `${domain}:${canonicalActuatorAction(domain, action)}`
+      } — a plugin cannot register it | next: register the plugin op under an action or domain the built-in op registry does not declare`
+    );
+  if (isBuiltinActuatorOperation(domain, action))
+    throw new Error(
+      `[OP_REGISTRY_PLUGIN_CONFIG] ${key} is a built-in actuator operation — a plugin cannot shadow it | next: register the plugin op under an action or domain the built-in op registry does not declare`
     );
   if (pluginOperations.has(key)) {
     throw new Error(`[OP_REGISTRY_PLUGIN_CONFIG] duplicate plugin operation: ${key}`);
@@ -217,9 +236,8 @@ export function buildUnknownActuatorOpError(
   );
 }
 
-export function determineActuatorStepType(domain: string, action: string): PipelineStepType {
-  const plugin = pluginOperations.get(`${domain}:${action}`);
-  if (plugin) return plugin.stepType;
+/** Step type of an op from the governed op registry alone (plugins ignored). */
+function declaredStepType(domain: string, action: string): PipelineStepType | undefined {
   const { shared_capture_ops, shared_transform_ops, shared_apply_ops, domains } =
     loadActuatorOpRegistry();
   const registry = domains[domain];
@@ -231,7 +249,29 @@ export function determineActuatorStepType(domain: string, action: string): Pipel
   if (shared_capture_ops.includes(action)) return 'capture';
   if (shared_transform_ops.includes(action)) return 'transform';
   if (shared_apply_ops.includes(action)) return 'apply';
+  return undefined;
+}
 
+/**
+ * Whether `domain:action` resolves to a built-in actuator without any plugin:
+ * the domain is a built-in actuator domain (declared in the op registry or
+ * backed by an actuator manifest) and the registry declares the action for it
+ * (its own ops or the shared ops every built-in domain serves).
+ */
+export function isBuiltinActuatorOperation(domain: string, action: string): boolean {
+  // An alias spelling (browser:navigate) is the built-in op it folds into.
+  const canonical = canonicalActuatorAction(domain, action);
+  if (declaredStepType(domain, canonical) === undefined) return false;
+  if (loadActuatorOpRegistry().domains[domain]) return true;
+  const expectedIds = new Set([`${domain}-actuator`, domain]);
+  return loadActuatorManifestCatalog().some((entry) => expectedIds.has(entry.n));
+}
+
+export function determineActuatorStepType(domain: string, action: string): PipelineStepType {
+  const plugin = pluginOperations.get(`${domain}:${action}`);
+  if (plugin) return plugin.stepType;
+  const declared = declaredStepType(domain, action);
+  if (declared) return declared;
   throw buildUnknownActuatorOpError(domain, action);
 }
 

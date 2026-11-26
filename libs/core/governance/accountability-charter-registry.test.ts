@@ -3,10 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as pathResolver from '../path-resolver.js';
 import { agentActor, humanActor } from '../contracts/actor.js';
-import { safeRmSync } from '../secure-io.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import type { Charter } from './accountability-charter.js';
+import { compileRunManifest } from '../pipeline/run-manifest.js';
+import { runManifestGrantsFor } from './run-manifest-grant.js';
 import {
   acceptCharter,
+  charterDir,
+  listRunManifestCharterScopes,
   clearTripwire,
   decideUnderCharter,
   findActiveCharter,
@@ -521,5 +525,115 @@ describe('accountability-charter-registry', () => {
     );
     retireCharter(cur, humanActor('carol'), 'stop delegating', opts(), NOW);
     expect(findActiveCharter(scope, NOW, opts())).toBeNull(); // legacy approval gate applies again
+  });
+
+  it('stores run-manifest charters per manifest hash beside, not instead of, the organization charter', () => {
+    const options = { rootDir: path.join(root, 'run-manifest') };
+    const manifest = compileRunManifest(
+      [
+        { op: 'browser:goto', params: { url: 'https://g.example.com/' } },
+        { op: 'browser:click', params: { selector: '#ok' } },
+      ],
+      {
+        inputPath: 'knowledge/confidential/acme/scenarios/x.json',
+        contentSha256: 'c'.repeat(64),
+        scope: { tier: 'confidential', tenantSlug: 'acme' },
+      }
+    );
+    const scope = {
+      kind: 'run_manifest',
+      tenant_slug: 'acme',
+      manifest_hash: manifest.manifest_hash,
+    } as const;
+    expect(charterDir(scope, options)).toBe(
+      path.join(
+        options.rootDir,
+        'knowledge/confidential/acme/charters/run-manifests',
+        manifest.manifest_hash
+      )
+    );
+    expect(() => charterDir({ ...scope, manifest_hash: '../x' }, options)).toThrow(
+      /invalid run manifest hash/
+    );
+    acceptCharter(
+      {
+        draft: { ...draft('chr-acme-org'), scope: SCOPE },
+        statement: 'Organization charter.',
+        acceptedBy: humanActor('owner'),
+        validation: { holder_role: 'owner' },
+        now: NOW,
+      },
+      options
+    );
+    const runDraft: AcceptCharterInput['draft'] = {
+      ...draft('chr-acme-run'),
+      scope,
+      envelope: {
+        manifest_operations: runManifestGrantsFor(manifest),
+        money: { currency: 'JPY', per_action: 0, per_day: 0, per_month: 0 },
+        data_tier: { read: [], write: [] },
+        external_effects: {},
+        irreversible: 'forbid',
+      },
+      appetite: { ...draft().appetite, max_loss_per_incident: 0 },
+    };
+    // A run-manifest charter is never "accepted" by a claimed human actor; it
+    // is issued only from a verified project-trust approval record.
+    expect(() =>
+      acceptCharter(
+        {
+          draft: runDraft,
+          statement: 'Run this approved pipeline.',
+          acceptedBy: humanActor('owner'),
+          validation: { holder_role: 'owner' },
+          now: NOW,
+        },
+        options
+      )
+    ).toThrow(/issued only from an approved project-trust record/);
+    // Seed the persisted shape directly to exercise the storage layout.
+    const accepted: Charter = {
+      ...runDraft,
+      accountable: {
+        ...runDraft.accountable,
+        accepted_at: NOW.toISOString(),
+        statement_sha256: 'a'.repeat(64),
+      },
+    };
+    safeMkdir(charterDir(scope, options), { recursive: true });
+    safeWriteFile(
+      path.join(charterDir(scope, options), 'chr-acme-run.json'),
+      JSON.stringify(accepted, null, 2)
+    );
+    // Separate namespaces: both are the one active charter of their own scope.
+    expect(findActiveCharter(SCOPE, NOW, options)?.charter_id).toBe('chr-acme-org');
+    expect(findActiveCharter(scope, NOW, options)?.charter_id).toBe(accepted.charter_id);
+    expect(listCharterIds(SCOPE, options)).toEqual(['chr-acme-org']);
+    expect(listRunManifestCharterScopes('acme', options)).toEqual([scope]);
+    // Organization/person consumers (digest, reports, trust delegation) never
+    // see a run-manifest charter unless they ask for that namespace.
+    safeMkdir(path.join(options.rootDir, 'knowledge', 'personal', 'tenants'), { recursive: true });
+    safeWriteFile(
+      path.join(options.rootDir, 'knowledge', 'personal', 'tenants', 'acme.json'),
+      JSON.stringify({
+        tenant_slug: 'acme',
+        display_name: 'Acme',
+        status: 'active',
+        assigned_role: 'owner',
+      })
+    );
+    expect(listActiveCharters(NOW, options).map((charter) => charter.charter_id)).toEqual([
+      'chr-acme-org',
+    ]);
+    expect(
+      listActiveCharters(NOW, { ...options, includeRunManifests: true }).map(
+        (charter) => charter.charter_id
+      )
+    ).toEqual(['chr-acme-org', 'chr-acme-run']);
+    // A charter file is only readable under the exact manifest hash it declares.
+    expect(readCharter({ ...scope, manifest_hash: 'd'.repeat(64) }, 'chr-acme-run', options)).toBe(
+      null
+    );
+    expect(readCharter(scope, 'chr-acme-run', options)?.scope).toEqual(scope);
   });
 });

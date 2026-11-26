@@ -981,9 +981,12 @@ function requestResourceDenial(
       allowed: false,
       reason: '[MEMORY_PROVENANCE_AUTHORITY] Lineage is outside worker-mutable state',
     };
-  // G2: a live PR publication or person charter store grant (no role) narrows every I/O made
-  // inside it, over every literal and canonical candidate of the path.
-  const storeDenial = storeGrantNarrowingDenial(['pr-publication', 'person-charter'], grantInput);
+  // G2: a live PR publication, person charter or run-manifest gate store grant (no role) narrows
+  // every I/O made inside it, over every literal and canonical candidate of the path.
+  const storeDenial = storeGrantNarrowingDenial(
+    ['pr-publication', 'person-charter', 'run-manifest-gate'],
+    grantInput
+  );
   if (storeDenial) return { allowed: false, reason: storeDenial };
   // `shared` is the personal storage marker, never a tenant credential. An
   // unbound tenant-store reader must not reinterpret this owner namespace.

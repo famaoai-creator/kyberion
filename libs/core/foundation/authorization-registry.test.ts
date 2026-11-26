@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import {
   declaredOperationPatterns,
   declaredSubjectKeys,
+  isManifestBindableOperation,
   operationAuthorization,
   setAuthorizationOverlayProvider,
   setSubjectAxisBridge,
@@ -90,6 +91,36 @@ describe('authorization-registry overlays', () => {
     const prefixed = operationAuthorization('acme:report:monthly');
     expect(prefixed.declared).toBe(true);
     expect(operationAuthorization('acme:other').declared).toBe(false);
+  });
+
+  it('only code declarations make an operation run-manifest bindable', () => {
+    for (const op of [
+      'browser:goto',
+      'browser:open_tab',
+      'browser:evaluate',
+      'browser:fill',
+      'browser:click',
+      'browser:click_first_match',
+      'browser:press',
+    ]) {
+      expect(isManifestBindableOperation(op)).toBe(true);
+    }
+    // manifestBindable is a separate axis: page-scoped ops stay non-delegable.
+    expect(operationAuthorization('browser:evaluate').delegable).toBeUndefined();
+    expect(isManifestBindableOperation('vcs:push')).toBe(false);
+    expect(isManifestBindableOperation('browser:cdp')).toBe(false);
+    restore = setAuthorizationOverlayProvider(() => [
+      overlay({
+        operations: {
+          'acme:browser_like': {
+            effectClass: 'external_mutation',
+            authority: admission,
+            manifestBindable: true,
+          },
+        },
+      }),
+    ]);
+    expect(isManifestBindableOperation('acme:browser_like')).toBe(false);
   });
 
   it('code declarations always beat overlay declarations (no weakening)', () => {

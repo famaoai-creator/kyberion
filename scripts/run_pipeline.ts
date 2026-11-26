@@ -54,6 +54,12 @@ export const PIPELINE_PRESETS: Readonly<Record<string, string>> = Object.freeze(
 /** Expand a governed preset without changing the existing --input contract. */
 export function resolvePipelinePresetArgs(args: readonly string[]): string[] {
   const first = args[0];
+  // `pipeline check <file>`: readiness report for any pipeline file.
+  if (first === 'check' && args[1] && !args[1].startsWith('-'))
+    return ['--input', args[1], '--check', ...args.slice(2)];
+  // `pipeline fix <file>`: mechanical rewrites toward pre-approval (dry run unless --write).
+  if (first === 'fix' && args[1] && !args[1].startsWith('-'))
+    return ['--input', args[1], '--fix', ...args.slice(2)];
   const input = first ? PIPELINE_PRESETS[first] : undefined;
   if (!input || first.startsWith('-')) return [...args];
   return ['--input', input, ...args.slice(1)];

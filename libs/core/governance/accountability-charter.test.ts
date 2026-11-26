@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { agentActor, humanActor } from '../contracts/actor.js';
+import { compileRunManifest } from '../pipeline/run-manifest.js';
+import { runManifestGrantsFor } from './run-manifest-grant.js';
 import {
+  charterScopesEqual,
   envelopeExceeds,
   evaluateAgainstCharter,
   isCharterActive,
@@ -469,5 +472,167 @@ describe('information-flow delegation', () => {
     expect(run(act({ ...action, information_flow: flow }), { charter: charter() }).decision).toBe(
       'allow'
     );
+  });
+});
+
+describe('run_manifest charters — grant isolation', () => {
+  const ctx = { holder_role: 'owner' as const, now: NOW };
+  const manifest = compileRunManifest(
+    [
+      { op: 'browser:goto', params: { url: 'https://g.example.com/' } },
+      { op: 'browser:click', params: { selector: '#ok' } },
+    ],
+    {
+      inputPath: 'knowledge/confidential/acme/scenarios/x.json',
+      contentSha256: 'c'.repeat(64),
+      scope: { tier: 'confidential', tenantSlug: 'acme' },
+    }
+  );
+  const grants = runManifestGrantsFor(manifest);
+  const runCharter = (over: Partial<Charter['envelope']> = {}, hash = manifest.manifest_hash) =>
+    charter({
+      scope: { kind: 'run_manifest', tenant_slug: 'acme', manifest_hash: hash },
+      envelope: {
+        manifest_operations: grants,
+        money: { currency: 'JPY', per_action: 0, per_day: 0, per_month: 0 },
+        data_tier: { read: [], write: [] },
+        external_effects: {},
+        irreversible: 'forbid',
+        ...over,
+      },
+      appetite: { ...charter().appetite, max_loss_per_incident: 0 },
+    });
+
+  it('accepts manifest grants bound to the scope manifest hash', () => {
+    expect(grants.map((grant) => grant.entry_id)).toEqual(['0', '1']);
+    expect(validateCharter(runCharter(), ctx)).toEqual([]);
+  });
+
+  it('rejects manifest grants outside a run_manifest charter', () => {
+    const c = charter();
+    c.envelope.manifest_operations = grants;
+    expect(validateCharter(c, ctx)).toContain(
+      'manifest_operations are only valid in a run_manifest charter'
+    );
+  });
+
+  it('rejects other grants and delegations inside a run_manifest charter', () => {
+    expect(
+      validateCharter(runCharter({ external_operations: [{ operation_id: 'browser:goto' }] }), ctx)
+    ).toContain('a run_manifest charter cannot carry external_operations grants');
+    expect(validateCharter(runCharter({ external_effects: { payment: 'allow' } }), ctx)).toContain(
+      'a run_manifest charter must forbid every external effect class'
+    );
+    expect(
+      validateCharter(runCharter({ delegated_decisions: { pipeline_trust_grant: 'allow' } }), ctx)
+    ).toContain('a run_manifest charter cannot delegate decisions');
+  });
+
+  it('requires manifest hash equality with the scope and at least one grant', () => {
+    expect(validateCharter(runCharter({}, 'e'.repeat(64)), ctx)).toContain(
+      'manifest_operations must all name the charter scope manifest_hash'
+    );
+    expect(validateCharter(runCharter({ manifest_operations: [] }), ctx)[0]).toMatch(
+      /non-empty list/
+    );
+    // A non-bindable op (or a forged field) never parses as a manifest grant.
+    expect(
+      validateCharter(
+        runCharter({ manifest_operations: [{ ...grants[0], operation_id: 'vcs:push' }] }),
+        ctx
+      )[0]
+    ).toMatch(/valid, distinct run-manifest grants/);
+  });
+
+  it('validates principal modes only inside a run_manifest charter', () => {
+    expect(
+      validateCharter(runCharter({ principal_modes: ['attended', 'unattended'] }), ctx)
+    ).toEqual([]);
+    expect(validateCharter(runCharter({ principal_modes: [] }), ctx)).toContain(
+      'principal_modes must be a non-empty list of distinct run principal modes'
+    );
+    const c = charter();
+    c.envelope.principal_modes = ['attended'];
+    expect(validateCharter(c, ctx)).toContain(
+      'principal_modes are only valid in a run_manifest charter'
+    );
+  });
+
+  describe('evaluation', () => {
+    const manifestAct = (
+      over: Partial<NonNullable<CharterAction['manifest_operation']>> = {},
+      action: Partial<CharterAction> = {}
+    ) =>
+      act({
+        action_class: 'run_manifest_operation',
+        manifest_operation: {
+          manifest_hash: manifest.manifest_hash,
+          entry_id: '1',
+          operation_id: 'browser:click',
+          principal_mode: 'attended',
+          ...over,
+        },
+        data: { tier: 'confidential', tenant_slug: 'acme', mode: 'read' },
+        reversible: false,
+        irreversible_action_name: 'browser:click',
+        ...action,
+      });
+    const manifestCharter = (over: Partial<Charter['envelope']> = {}) =>
+      runCharter({
+        data_tier: { read: ['confidential:acme'], write: [] },
+        irreversible: 'named_actions_only',
+        irreversible_named_actions: ['browser:click', 'browser:goto'],
+        ...over,
+      });
+
+    it('allows exactly a granted entry for an approved principal', () => {
+      expect(run(manifestAct(), { charter: manifestCharter() }).decision).toBe('allow');
+    });
+
+    it('denies an ungranted entry, another operation, another manifest or principal', () => {
+      const c = manifestCharter();
+      expect(run(manifestAct({ entry_id: '7' }), { charter: c }).reasons).toEqual([
+        'manifest entry not granted by this charter',
+      ]);
+      expect(run(manifestAct({ operation_id: 'browser:goto' }), { charter: c }).decision).toBe(
+        'deny'
+      );
+      expect(run(manifestAct({ manifest_hash: 'd'.repeat(64) }), { charter: c }).reasons).toEqual([
+        'manifest operation names another manifest',
+      ]);
+      expect(run(manifestAct({ principal_mode: 'unattended' }), { charter: c }).reasons).toEqual([
+        "run principal 'unattended' not approved for this manifest",
+      ]);
+      expect(
+        run(manifestAct({ principal_mode: 'unattended' }), {
+          charter: manifestCharter({ principal_modes: ['attended', 'unattended'] }),
+        }).decision
+      ).toBe('allow');
+    });
+
+    it('never lets a run_manifest charter admit any other action, nor others admit manifest actions', () => {
+      expect(run(act(), { charter: manifestCharter() }).reasons).toEqual([
+        'a run_manifest charter admits only its manifest operations',
+      ]);
+      expect(run(manifestAct()).reasons).toEqual([
+        'manifest operations are admitted only by a run_manifest charter',
+      ]);
+    });
+
+    it('still stops on a standing tripwire', () => {
+      expect(
+        run(manifestAct(), {
+          charter: manifestCharter(),
+          usage: { ...USAGE, tripwires_hit: ['audit-chain-gap'] },
+        }).decision
+      ).toBe('stop');
+    });
+  });
+
+  it('compares run_manifest scopes by tenant and manifest hash', () => {
+    const a = { kind: 'run_manifest', tenant_slug: 'acme', manifest_hash: 'a'.repeat(64) } as const;
+    expect(charterScopesEqual(a, { ...a })).toBe(true);
+    expect(charterScopesEqual(a, { ...a, manifest_hash: 'b'.repeat(64) })).toBe(false);
+    expect(charterScopesEqual(a, { kind: 'organization', tenant_slug: 'acme' })).toBe(false);
   });
 });

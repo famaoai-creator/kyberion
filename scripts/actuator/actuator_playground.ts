@@ -902,8 +902,9 @@ async function defaultFindTrustApproval(adfRepoPath: string): Promise<string | n
 async function defaultRequestTrustApproval(
   adfRepoPath: string
 ): Promise<{ id: string; storageChannel: string }> {
-  const { createProjectTrustApprovalRequest } = await import('@agent/core/project/project-trust');
-  const record = createProjectTrustApprovalRequest({
+  // Carries the draft's Run Manifest (v2) so the approval also pre-approves its external steps.
+  const { requestPipelineFileTrust } = await import('@agent/core/pipeline/run-manifest');
+  const { record } = requestPipelineFileTrust({
     inputPath: adfRepoPath,
     requestedBy: 'actuator-playground',
   });

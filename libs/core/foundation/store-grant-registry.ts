@@ -26,6 +26,7 @@ export const STORE_GRANT_IDS = [
   'asset-derivation',
   'memory-provenance',
   'pr-publication',
+  'run-manifest-gate',
   'person-charter',
   'personal-approval',
   'task-source-workspace',

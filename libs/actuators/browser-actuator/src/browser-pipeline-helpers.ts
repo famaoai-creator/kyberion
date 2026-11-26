@@ -1,4 +1,5 @@
 import { logger } from '@agent/core/core';
+import { currentPipelineRunSession } from '@agent/core/actuator/actuator-sdk';
 import {
   assertSafeRepositoryPath,
   safeMkdir,
@@ -22,6 +23,13 @@ import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { assertExternalOperationBatchResumable } from '@agent/core/governance/external-operation';
 import { withExternalOperationOccurrence } from '@agent/core/governance/external-operation-occurrence';
 import { countBrowserExternalEffects } from './browser-external-governance.js';
+import {
+  claimNativeBrowserRun,
+  confineNativeRunWritePath,
+  withNativeWriteApproval,
+} from './browser-native-run-manifest.js';
+import { canonicalActuatorAction } from '@agent/core/pipeline/pipeline-op-aliases';
+import { withoutRunManifestStep } from '@agent/core/governance/external-operation-runtime';
 import { runLocalSessionProbe } from './browser-local-session-probe.js';
 import { runApprovalQueueInspect } from './approval-queue-inspect.js';
 import {
@@ -88,7 +96,7 @@ export async function executePipeline(
   const steps = inputSteps.map((step) => {
     if (!step || typeof step.op !== 'string') return step;
     const op = step.op.startsWith('browser:') ? step.op.slice('browser:'.length) : step.op;
-    return { ...step, op: op === 'navigate' ? 'goto' : op };
+    return { ...step, op: canonicalActuatorAction('browser', op) };
   });
   if (steps.some((step) => step.op === 'local_session_probe')) {
     if (steps.length !== 1 || steps[0].type !== 'capture') {
@@ -106,6 +114,15 @@ export async function executePipeline(
     }
     return runApprovalQueueInspect(steps[0].params || {}, initialCtx);
   }
+  // A bound native pipeline file (browser-native-run-manifest.ts): its own
+  // steps carry manifest entry ids and run with the run's confined options;
+  // any other execution inside that run carries no manifest step.
+  const native = claimNativeBrowserRun();
+  if (native.claim) {
+    inputOptions = native.claim.options;
+    inputSessionId = native.claim.sessionId ?? inputSessionId;
+  }
+  const engineSteps = native.claim ? native.claim.tagSteps(steps) : steps;
   assertExternalOperationBatchResumable(() => countBrowserExternalEffects(steps));
   const isolated = inputOptions?.onboarding_isolated_navigation === true;
   if (
@@ -331,23 +348,44 @@ export async function executePipeline(
   let externalOccurrence = 0;
   const runStep = <T>(op: string, execute: () => Promise<T>) =>
     withExternalOperationOccurrence(`browser-substep:${externalOccurrence++}:${op}`, execute);
-  try {
-    engineResult = await runAdfActuatorPipeline({
+  const runEngine = () =>
+    runAdfActuatorPipeline({
       actuatorId: 'browser',
-      steps,
+      steps: engineSteps,
       context: ctx,
-      options: { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
+      options: {
+        maxSteps: MAX_STEPS,
+        timeoutMs: TIMEOUT,
+        ...(native.claim ? { withStep: native.claim.withStep } : {}),
+      },
+      // A runner-dispatched leaf step arrives resolved: resolving it again
+      // against the runner context it also receives would expand page-derived
+      // text such as "{{password}}" into a secret.
+      honorRunnerResolvedParams: true,
+      // A bound native run's step that writes outside its partition asks
+      // per step (withNativeWriteApproval is a no-op for every other step).
       handlers: {
         capture: (op, params, stepCtx, resolveFn) =>
-          runStep(op, () => opCapture(op, params, runtime, stepCtx, resolveFn)),
-        transform: (op, params, stepCtx, resolveFn) => opTransform(op, params, stepCtx, resolveFn),
+          runStep(op, () =>
+            withNativeWriteApproval(op, params, () =>
+              opCapture(op, params, runtime, stepCtx, resolveFn)
+            )
+          ),
+        transform: (op, params, stepCtx, resolveFn) =>
+          withNativeWriteApproval(op, params, () => opTransform(op, params, stepCtx, resolveFn)),
         apply: (op, params, stepCtx, resolveFn) =>
-          runStep(op, () => opApply(op, params, runtime, stepCtx, resolveFn)),
+          runStep(op, () =>
+            withNativeWriteApproval(op, params, () =>
+              opApply(op, params, runtime, stepCtx, resolveFn)
+            )
+          ),
         control: (op, params, stepCtx, runSteps, resolveFn) =>
           runStep(op, () => opControl(op, params, runtime, stepCtx, runSteps, resolveFn)),
       },
       hooks,
     });
+  try {
+    engineResult = await (native.nested ? withoutRunManifestStep(runEngine) : runEngine());
     ctx = engineResult.context;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
@@ -399,16 +437,12 @@ export async function executePipeline(
     }
     ctx.browser_tabs = await browserRuntimeHelpers.summarizeTabs(runtime);
     ctx.active_tab_id = runtime.activeTabId;
-    // A single-op sub-pipeline dispatched by the actuator SDK carries the
-    // outer pipeline's options on ctx.__pipeline_options; honour its
-    // keep_alive/lease so leased sessions survive between outer steps.
-    const outerOptions =
-      ctx.__pipeline_options && typeof ctx.__pipeline_options === 'object'
-        ? (ctx.__pipeline_options as {
-            keep_alive?: unknown;
-            lease_ms?: unknown;
-          })
-        : undefined;
+    // A single-op sub-pipeline dispatched under a pipeline runner honours the
+    // outer run's keep_alive/lease so leased sessions survive between outer
+    // steps. Read from the out-of-band run session, never the step context
+    // (a step can export into `__pipeline_options`).
+    const outerOptions = currentPipelineRunSession()?.options as
+      { keep_alive?: unknown; lease_ms?: unknown } | undefined;
     const keepAlive =
       options.keep_alive === true ||
       Number(options.lease_ms || 0) > 0 ||
@@ -1026,7 +1060,9 @@ function browserOpSupport(): BrowserOpSupport {
     opApply,
     recordedRefTargetFromParams,
     recordedSecretDomPath,
-    resolveBrowserRepositoryPath,
+    // Step-authored paths: confined to the run partition in a bound native run.
+    resolveBrowserRepositoryPath: (ref: unknown, allowMissingLeaf?: boolean) =>
+      confineNativeRunWritePath(resolveBrowserRepositoryPath(ref, allowMissingLeaf)),
   };
 }
 

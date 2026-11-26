@@ -272,7 +272,8 @@ describe('terminal-actuator direct actions', () => {
       },
     } as unknown as Parameters<typeof handleAction>[0]);
     const calls = vi.mocked(ptyEngine.spawn).mock.calls;
-    expect(calls[calls.length - 1]?.[3]).toEqual({ FOO: 'bar' });
+    // The agent-driven PTY is always marked; a caller cannot remove the marker.
+    expect(calls[calls.length - 1]?.[3]).toEqual({ FOO: 'bar', KYBERION_RUN_ORIGIN: 'agent' });
   });
 
   it('list action returns all sessions', async () => {

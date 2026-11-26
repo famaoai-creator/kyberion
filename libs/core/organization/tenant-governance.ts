@@ -42,7 +42,10 @@ import {
   externalOperationGrantMatches,
   parseExternalOperationGrant,
 } from '../governance/external-operation-target.js';
-import type { CharterScope, CharterScopeKind } from '../governance/accountability-charter.js';
+import type {
+  AuthorableCharterScope,
+  CharterScopeKind,
+} from '../governance/accountability-charter.js';
 import { resolveIdentityContext } from '../authority.js';
 import { currentActor } from '../authn/actor-context.js';
 import { pathResolver } from '../path-resolver.js';
@@ -933,7 +936,7 @@ export function findProviderAttestationGrantAuthority(
     })
   );
   if (!target) return undefined;
-  const scopes: CharterScope[] = [
+  const scopes: AuthorableCharterScope[] = [
     { kind: 'organization', tenant_slug: input.slug },
     { kind: 'person' },
   ];

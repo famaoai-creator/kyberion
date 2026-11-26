@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { buildUnknownActuatorOpError, type PipelineStepType } from './actuator-op-registry.js';
 import { createAjv } from '../foundation/ajv.js';
 import { createGovernedRetryOptionsBuilder } from '../pipeline/recovery-policy.js';
@@ -240,6 +241,90 @@ export async function runActuatorPipeline<
   return options.sandboxPolicy ? withSandboxPolicy(options.sandboxPolicy, run) : run();
 }
 
+const runnerResolvedParams = new AsyncLocalStorage<true>();
+
+/**
+ * Run one leaf actuator dispatch whose params the pipeline runner has ALREADY
+ * template-resolved (runner only). Resolving them again inside the actuator
+ * would turn a page-derived value such as "{{password}}" into a secret from
+ * the runner context the actuator also receives.
+ */
+export function withRunnerResolvedParams<T>(body: () => T): T {
+  return runnerResolvedParams.run(true, body);
+}
+
+/** True inside {@link withRunnerResolvedParams}: one-step actuator pipelines must not re-resolve. */
+export function runnerResolvedParamsActive(): boolean {
+  return runnerResolvedParams.getStore() === true;
+}
+
+/** The authored `session_id` and `options` of the pipeline a runner is executing. */
+export interface PipelineRunSession {
+  readonly session_id?: string;
+  readonly options: Readonly<Record<string, unknown>>;
+  /**
+   * The run's location-derived scope (run-scope.ts), when the runner derived
+   * one. Actuators confine what the options write to disk to this scope —
+   * never to the ambient tenant.
+   */
+  readonly scope?: Readonly<{ tier: string; tenant_slug?: string }>;
+}
+
+const pipelineRunSession = new AsyncLocalStorage<PipelineRunSession>();
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  }
+  return value;
+}
+
+/**
+ * Run a pipeline's steps with its authored session and options carried out of
+ * band (runner only). The step context also holds `__pipeline_options`, but a
+ * step can export into any context key — so per-step actuator dispatch reads
+ * the session and options from here, a frozen copy of the pipeline file's own
+ * values, never from the mutable context.
+ */
+export function withPipelineRunSession<T>(
+  pipeline: {
+    session_id?: unknown;
+    options?: unknown;
+    /** The run's location-derived scope, when the runner derived one. */
+    scope?: { tier: string; tenant_slug?: string };
+  },
+  body: () => T
+): T {
+  const scope = pipeline.scope;
+  const options =
+    pipeline.options && typeof pipeline.options === 'object' && !Array.isArray(pipeline.options)
+      ? (structuredClone(pipeline.options) as Record<string, unknown>)
+      : {};
+  return pipelineRunSession.run(
+    deepFreeze({
+      ...(typeof pipeline.session_id === 'string' && pipeline.session_id
+        ? { session_id: pipeline.session_id }
+        : {}),
+      options,
+      ...(scope
+        ? {
+            scope: {
+              tier: scope.tier,
+              ...(scope.tenant_slug ? { tenant_slug: scope.tenant_slug } : {}),
+            },
+          }
+        : {}),
+    }),
+    body
+  );
+}
+
+/** The session/options of the pipeline run in this async context, if a runner set one. */
+export function currentPipelineRunSession(): PipelineRunSession | undefined {
+  return pipelineRunSession.getStore();
+}
+
 export interface RunAdfActuatorPipelineOptions<Context extends Record<string, unknown>> {
   actuatorId: string;
   steps: readonly AdfStep[];
@@ -250,6 +335,12 @@ export interface RunAdfActuatorPipelineOptions<Context extends Record<string, un
   sandboxPolicy?: SandboxPolicy;
   handlers: AdfStepHandlers<Context>;
   hooks?: AdfStepHooks<Context>;
+  /**
+   * Inside {@link withRunnerResolvedParams}, a one-step, non-control pipeline
+   * (a runner leaf dispatch) uses its params as given — never resolved again
+   * against the context. Actuators that receive the runner context opt in.
+   */
+  honorRunnerResolvedParams?: boolean;
 }
 
 /**
@@ -260,6 +351,11 @@ export interface RunAdfActuatorPipelineOptions<Context extends Record<string, un
 export async function runAdfActuatorPipeline<Context extends Record<string, unknown>>(
   options: RunAdfActuatorPipelineOptions<Context>
 ): Promise<AdfRunResult<Context>> {
+  const resolvedLeaf =
+    options.honorRunnerResolvedParams === true &&
+    runnerResolvedParamsActive() &&
+    options.steps.length === 1 &&
+    options.steps[0]?.type !== 'control';
   return executeAdfSteps(
     [...options.steps],
     options.context,
@@ -267,6 +363,7 @@ export async function runAdfActuatorPipeline<Context extends Record<string, unkn
       maxSteps: options.options?.maxSteps ?? DEFAULT_MAX_PIPELINE_STEPS,
       timeoutMs: options.options?.timeoutMs ?? DEFAULT_PIPELINE_TIMEOUT_MS,
       ...options.options,
+      ...(resolvedLeaf ? { resolveVars: (value: unknown) => value } : {}),
       ...(options.sandboxPolicy ? { sandboxPolicy: options.sandboxPolicy } : {}),
       label: `[${options.actuatorId}]`,
     },
@@ -688,8 +785,13 @@ export function defineCatalogBackedActuator(options: {
             // a throwaway profile, losing the login it had just performed.
             // Actuators that declare `actionInput` shape their own input and are
             // left untouched.
-            const sessionId = context.__pipeline_session_id;
-            const sessionOptions = context.__pipeline_options;
+            // Under a runner the out-of-band copy is authoritative: a step may
+            // have exported into the `__pipeline_*` context keys.
+            const runSession = currentPipelineRunSession();
+            const sessionId = runSession ? runSession.session_id : context.__pipeline_session_id;
+            const sessionOptions = runSession
+              ? structuredClone(runSession.options)
+              : context.__pipeline_options;
             const result = await options.handleAction(
               (options.actionInput
                 ? options.actionInput(

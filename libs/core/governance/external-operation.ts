@@ -10,9 +10,11 @@ import { computeApprovalPayloadHash } from './approval-presentation.js';
 import { auditChain } from './audit-chain.js';
 import { createLogger } from '../logger.js';
 import {
+  isManifestBindableOperation,
   operationAuthorization,
   requiresApprovalAdmission,
 } from '../foundation/authorization-registry.js';
+import { isRunManifestAdmissionVerified } from './run-manifest-binding.js';
 import './authorization-overlay.js';
 import {
   recordCharterExecutionOutcome,
@@ -493,13 +495,29 @@ function charterForExternalApproval(
   requiresExactApproval: boolean,
   hasDelegatedServiceProof: boolean
 ): ApprovalGateCharterInput | undefined {
-  const declaredCharter = input.delegable ? authority?.charter : undefined;
+  // A run-manifest charter stands in only for the exact approved manifest
+  // entry this binding verified; any other charter needs a delegable op.
+  const offered = authority?.charter;
+  const manifestBound =
+    offered?.scope.kind === 'run_manifest' &&
+    isManifestBindableOperation(input.operationId) &&
+    isRunManifestAdmissionVerified(input.operationId, input.effect, offered);
+  const declaredCharter =
+    offered?.scope.kind === 'run_manifest'
+      ? manifestBound
+        ? offered
+        : undefined
+      : input.delegable
+        ? offered
+        : undefined;
   const target = resolveCharterExternalOperationTarget(input.operationId, input.effect);
   const matchesCharterTarget =
     target &&
     declaredCharter?.action.external_operation &&
     externalOperationGrantMatches(declaredCharter.action.external_operation, target);
-  const needsExactApproval = requiresExactApproval && !matchesCharterTarget;
+  // The approved manifest entry is the exact human approval of these
+  // authored arguments (and, for navigation, of the destination).
+  const needsExactApproval = requiresExactApproval && !matchesCharterTarget && !manifestBound;
   // A broad delegation is not proof of the origin of a new destination.
   if (hasDelegatedServiceProof && needsExactApproval)
     stopExternalGovernance(

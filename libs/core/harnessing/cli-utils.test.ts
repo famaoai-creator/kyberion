@@ -154,6 +154,44 @@ describe('cli-utils', () => {
     expect(logSpy).toHaveBeenCalledWith(JSON.stringify({ echoed: { message: 'hello' } }, null, 2));
   });
 
+  it('runs the --input dispatch inside withInputFile with the exact file it read', async () => {
+    safeMkdir(TMP_DIR, { recursive: true });
+    const inputPath = `${TMP_DIR}/bound.json`;
+    const text = JSON.stringify({ action: 'pipeline', steps: [] }, null, 2);
+    safeWriteFile(inputPath, text);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const seen: Array<{ inputPath: string; sourceText: string; input: unknown }> = [];
+    const handleAction = vi.fn(async () => ({ status: 'succeeded' }));
+    await runActuatorCli({
+      name: 'test-actuator',
+      args: ['node', 'script', '--input', inputPath],
+      handleAction,
+      withInputFile: async (file, dispatch) => {
+        seen.push(file);
+        expect(handleAction).not.toHaveBeenCalled();
+        return dispatch();
+      },
+    });
+    expect(seen).toEqual([
+      {
+        inputPath: pathResolver.toRepoRelative(inputPath),
+        sourceText: text,
+        input: { action: 'pipeline', steps: [] },
+      },
+    ]);
+    expect(handleAction).toHaveBeenCalledOnce();
+
+    // --dry-run never enters the file context.
+    await runActuatorCli({
+      name: 'test-actuator',
+      args: ['node', 'script', '--input', inputPath, '--dry-run'],
+      handleAction,
+      withInputFile: async () => {
+        throw new Error('not for dry runs');
+      },
+    });
+  });
+
   it.each([
     { status: 'failed', results: [{ status: 'failed', error: 'stale reference' }] },
     { status: 'denied', error: 'viewer scope denied', context: { audited: true } },

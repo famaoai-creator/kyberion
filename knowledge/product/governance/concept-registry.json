@@ -642,42 +642,51 @@
       ],
       "not_to_confuse_with": ["member-role", "authority-role", "entity-scope"]
     },
-  {
-    "id": "policy-category",
-    "term": "Policy Category",
-    "aliases": [
-      "actuator policy category"
-    ],
-    "category": "governance",
-    "definition": "The kind of effect an actuator operation may attempt; evaluated to allow, ask, or deny with a stable reason code before Grant and approval-store decisions.",
-    "glossary_anchor": "policy-category",
-    "canonical_doc": "knowledge/product/architecture/pibot-absorption-model.md",
-    "owner_modules": [
-      "knowledge/product/architecture/pibot-absorption-model.md"
-    ],
-    "not_to_confuse_with": [
-      "grant",
-      "routing-decision"
-    ]
-  },
-  {
-    "id": "workflow-disposition",
-    "term": "Workflow Disposition",
-    "aliases": [
-      "blocked-step disposition"
-    ],
-    "category": "governance",
-    "definition": "The fixed human choice on a blocked child WorkItem after acceptance or execution failure: retry, skip, reassign, or accept.",
-    "glossary_anchor": "workflow-disposition",
-    "canonical_doc": "knowledge/product/architecture/pibot-absorption-model.md",
-    "owner_modules": [
-      "knowledge/product/architecture/pibot-absorption-model.md"
-    ],
-    "not_to_confuse_with": [
-      "grant",
-      "work-item",
-      "routing-decision"
-    ]
-  }
+    {
+      "id": "policy-category",
+      "term": "Policy Category",
+      "aliases": ["actuator policy category"],
+      "category": "governance",
+      "definition": "The kind of effect an actuator operation may attempt; evaluated to allow, ask, or deny with a stable reason code before Grant and approval-store decisions.",
+      "glossary_anchor": "policy-category",
+      "canonical_doc": "knowledge/product/architecture/pibot-absorption-model.md",
+      "owner_modules": ["knowledge/product/architecture/pibot-absorption-model.md"],
+      "not_to_confuse_with": ["grant", "routing-decision"]
+    },
+    {
+      "id": "workflow-disposition",
+      "term": "Workflow Disposition",
+      "aliases": ["blocked-step disposition"],
+      "category": "governance",
+      "definition": "The fixed human choice on a blocked child WorkItem after acceptance or execution failure: retry, skip, reassign, or accept.",
+      "glossary_anchor": "workflow-disposition",
+      "canonical_doc": "knowledge/product/architecture/pibot-absorption-model.md",
+      "owner_modules": ["knowledge/product/architecture/pibot-absorption-model.md"],
+      "not_to_confuse_with": ["grant", "work-item", "routing-decision"]
+    },
+    {
+      "id": "run-manifest",
+      "term": "Run Manifest",
+      "aliases": ["Effect Manifest"],
+      "category": "execution",
+      "definition": "The statically compiled answer to what one pipeline run may do: scope derived from the file's location, model/secret requirements, and the Effect Manifest of external operations a human approves once; a manifest-bound Accountability Charter admits exactly those effects at run time.",
+      "glossary_anchor": "run-manifest",
+      "canonical_doc": "knowledge/product/architecture/pipeline-run-manifest-model.md",
+      "owner_modules": [
+        "libs/core/pipeline/run-manifest.ts",
+        "libs/core/governance/run-manifest-grant.ts"
+      ],
+      "not_to_confuse_with": ["pipeline", "grant"]
+    },
+    {
+      "id": "run-principal",
+      "term": "Run Principal",
+      "category": "governance",
+      "definition": "Who a pipeline run executes as: attended (an active Member is present at the terminal) or unattended (dispatched worker or standing Dot); it selects how out-of-manifest effects are approved and never grants a credential exception.",
+      "glossary_anchor": "run-principal",
+      "canonical_doc": "knowledge/product/architecture/pipeline-run-manifest-model.md",
+      "owner_modules": ["libs/core/pipeline/run-principal.ts"],
+      "not_to_confuse_with": ["member-role", "credential-custody"]
+    }
   ]
 }

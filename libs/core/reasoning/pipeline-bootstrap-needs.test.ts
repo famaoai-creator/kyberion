@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pipelineBootstrapNeeds } from './pipeline-bootstrap-needs.js';
+import { bootstrapReasonNeedsModel, pipelineBootstrapNeeds } from './pipeline-bootstrap-needs.js';
 import { readJson } from '../foundation/json.js';
 
 describe('pipelineBootstrapNeeds', () => {
@@ -9,7 +9,11 @@ describe('pipelineBootstrapNeeds', () => {
       const pipeline = readJson<{ steps: Parameters<typeof pipelineBootstrapNeeds>[0] }>(
         `pipelines/${id}.json`
       );
-      expect(pipelineBootstrapNeeds(pipeline.steps)).toEqual({ required: false, reasons: [] });
+      expect(pipelineBootstrapNeeds(pipeline.steps)).toEqual({
+        required: false,
+        reasons: [],
+        model: false,
+      });
     }
   );
   it.each([
@@ -23,17 +27,26 @@ describe('pipelineBootstrapNeeds', () => {
     const pipeline = readJson<{ steps: Parameters<typeof pipelineBootstrapNeeds>[0] }>(
       `pipelines/${id}.json`
     );
-    expect(pipelineBootstrapNeeds(pipeline.steps)).toEqual({ required: false, reasons: [] });
+    expect(pipelineBootstrapNeeds(pipeline.steps)).toEqual({
+      required: false,
+      reasons: [],
+      model: false,
+    });
   });
   it('lets baseline report readiness without bootstrapping tenant credentials', () => {
     const baseline = [
       { op: 'system:baseline_check', params: { export_as: 'baseline_check' } },
       { op: 'system:log', params: { message: '{{baseline_check.status}}' } },
     ];
-    expect(pipelineBootstrapNeeds(baseline)).toEqual({ required: false, reasons: [] });
+    expect(pipelineBootstrapNeeds(baseline)).toEqual({
+      required: false,
+      reasons: [],
+      model: false,
+    });
     expect(pipelineBootstrapNeeds([...baseline, { op: 'reasoning:query', params: {} }])).toEqual({
       required: true,
       reasons: ['reasoning:query'],
+      model: true,
     });
   });
   it('does not discover provider credentials for deterministic logging and transforms', () => {
@@ -43,7 +56,7 @@ describe('pipelineBootstrapNeeds', () => {
         { op: 'core:transform', params: { input: 21, script: 'return Number(input) * 2;' } },
         { op: 'system:log', params: { message: 'after' } },
       ])
-    ).toEqual({ required: false, reasons: [] });
+    ).toEqual({ required: false, reasons: [], model: false });
   });
   it('skips the bootstrap for volatile GC', () => {
     const needs = pipelineBootstrapNeeds([
@@ -65,7 +78,7 @@ describe('pipelineBootstrapNeeds', () => {
           on_error: { fallback: [{ op: 'reasoning:query' }] },
         },
       ])
-    ).toEqual({ required: true, reasons: ['reasoning:query'] });
+    ).toEqual({ required: true, reasons: ['reasoning:query'], model: true });
   });
 
   it('requires the bootstrap for an unclassified op', () => {
@@ -154,5 +167,63 @@ describe('pipelineBootstrapNeeds', () => {
 
   it('requires core:include because the fragment is not visible yet', () => {
     expect(pipelineBootstrapNeeds([{ op: 'core:include', params: {} }]).required).toBe(true);
+  });
+});
+
+describe('bootstrapReasonNeedsModel', () => {
+  it('lets a keychain-and-browser scenario run without a tenant reasoning credential', () => {
+    const needs = pipelineBootstrapNeeds([
+      { op: 'secret:get', params: { service: 'garoon', account: 'user' } },
+      {
+        op: 'core:while',
+        params: { do: [{ op: 'browser:evaluate' }, { op: 'system:wait' }] },
+      },
+      { op: 'core:if', params: { then: [{ op: 'browser:click_first_match' }] } },
+    ]);
+    expect(needs.required).toBe(true);
+    expect(needs.reasons.some(bootstrapReasonNeedsModel)).toBe(false);
+    expect(needs.model).toBe(false);
+  });
+
+  it('detects a model step after more distinct reasons than the display cap', () => {
+    const browserOps = [
+      'goto',
+      'click',
+      'fill',
+      'evaluate',
+      'press',
+      'select',
+      'hover',
+      'check',
+      'uncheck',
+    ].map((op) => ({ op: `browser:${op}`, params: {} }));
+    const needs = pipelineBootstrapNeeds([...browserOps, { op: 'reasoning:analyze', params: {} }]);
+    expect(needs.reasons).toHaveLength(8);
+    expect(needs.reasons).not.toContain('reasoning:analyze');
+    expect(needs.model).toBe(true);
+  });
+
+  it('treats browser:llm_decide (a model call outside a model domain) as a model need', () => {
+    expect(pipelineBootstrapNeeds([{ op: 'browser:llm_decide', params: {} }]).model).toBe(true);
+    // Bare ops inside a browser control body are browser ops.
+    expect(
+      pipelineBootstrapNeeds([
+        { op: 'browser:if', params: { then: [{ op: 'llm_decide', params: {} }] } },
+      ]).model
+    ).toBe(true);
+  });
+
+  it.each(['reasoning:query', 'wisdom:analyze', 'voice:speak', 'core:judge_route', 'core:unknown'])(
+    'keeps %s on the credentialed path',
+    (reason) => expect(bootstrapReasonNeedsModel(reason)).toBe(true)
+  );
+
+  it('keeps the depth-limit reason conservative', () => {
+    const deep: { op: string; params?: Record<string, unknown> } = { op: 'system:log' };
+    let step = deep;
+    for (let i = 0; i < 40; i += 1) step = { op: 'core:if', params: { then: [step] } };
+    const needs = pipelineBootstrapNeeds([step]);
+    expect(needs.reasons.some(bootstrapReasonNeedsModel)).toBe(true);
+    expect(needs.model).toBe(true);
   });
 });

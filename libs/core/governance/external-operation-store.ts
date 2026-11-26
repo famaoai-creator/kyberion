@@ -18,6 +18,10 @@ import {
 import { currentInstalledPersonCharterRuntime } from './person-charter-runtime.js';
 import { withPersonReservationAccess } from './person-charter-store-access.js';
 import {
+  currentRunManifestGateTenant,
+  withRunManifestGateStoreAccess,
+} from './run-manifest-gate-store.js';
+import {
   externalOperationProviderReference,
   type ExternalOperationReservation,
 } from './external-operation-occurrence.js';
@@ -116,6 +120,9 @@ function writeOperationRecord(
       : publication.tenant_slug === input.tenantSlug)
   )
     withPrPublicationStoreAccess('reservation-write', [], [relative], write);
+  else if (input.tenantSlug && currentRunManifestGateTenant() === input.tenantSlug)
+    // A manifest-bound run's own reservation (pipeline-run-manifest-model §3.5).
+    withRunManifestGateStoreAccess('reservation-write', [], [relative], write);
   else if (!input.tenantSlug && currentInstalledPersonCharterRuntime())
     withPersonReservationAccess(relative, write);
   else write();
