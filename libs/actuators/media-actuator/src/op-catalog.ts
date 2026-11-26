@@ -108,6 +108,7 @@ const MEDIA_MIGRATION_SCHEMA: InputSchema = {
     skip_zero: { type: 'boolean' },
     sketch: { type: 'string' },
     slides: { type: 'array' },
+    slides_from: { type: 'string' },
     source: { type: 'string' },
     storyline_from: { type: 'string' },
     manifest_path: { type: 'string' },
@@ -119,6 +120,7 @@ const MEDIA_MIGRATION_SCHEMA: InputSchema = {
     template_index: { type: 'integer', minimum: 1 },
     tenant_slug: { type: 'string' },
     text: { type: 'string' },
+    text_fit: { type: 'string', enum: ['error', 'warn', 'never'] },
     theme: {},
     theme_from: { type: 'string' },
     theme_id: { type: 'string' },
@@ -156,6 +158,7 @@ const MEDIA_EXTRA_OPS = [
   'pptx_extract',
   'pptx_package_check',
   'pptx_package_diff',
+  'pptx_render_check',
   'pptx_slide_text',
   'xlsx_extract',
   'apply_pattern',
@@ -178,6 +181,7 @@ const MEDIA_EXTRA_OPS = [
   'pdf_to_pptx_design',
   'pdf_to_xlsx_design',
   'pptx_diff',
+  'pptx_inherit_template',
   'pptx_layout_preflight',
   'proposal_content_from_storyline',
   'proposal_storyline_from_brief',
@@ -221,6 +225,7 @@ const MEDIA_REQUIRED_INPUTS: Record<string, string[]> = {
   pptx_extract: ['path'],
   pptx_package_check: ['path'],
   pptx_package_diff: ['before', 'after'],
+  pptx_render_check: ['path'],
   pptx_slide_text: ['path'],
   xlsx_extract: ['path'],
   apply_pattern: ['pattern_path'],
@@ -236,6 +241,8 @@ const MEDIA_REQUIRED_INPUTS: Record<string, string[]> = {
 const MEDIA_ANY_OF_INPUTS: Record<string, string[]> = {
   deck_from_html: ['html', 'path', 'from'],
   document_digest: ['path', 'from'],
+  // pptx_inherit_template takes the new slides inline (slides) or from a ctx channel (slides_from).
+  pptx_inherit_template: ['slides', 'slides_from'],
   register_artifact: [
     'tenant_slug',
     'organization_id',
@@ -290,6 +297,9 @@ const MEDIA_EXTRA_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
   pptx_package_diff: [
     { before: 'active/shared/tmp/deck-before.pptx', after: 'active/shared/tmp/deck-after.pptx' },
   ],
+  pptx_render_check: [
+    { path: 'active/shared/tmp/deck.pptx', design_from: 'last_pptx_design', fail_on: 'error' },
+  ],
   pptx_slide_text: [{ path: 'active/shared/tmp/deck.pptx' }],
   xlsx_extract: [{ path: 'active/shared/tmp/data.xlsx' }],
   apply_pattern: [{ pattern_path: 'active/shared/tmp/pattern.json' }],
@@ -311,7 +321,19 @@ const MEDIA_EXTRA_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
   pdf_to_pptx_design: [{ from: 'pdf' }],
   pdf_to_xlsx_design: [{ from: 'pdf' }],
   pptx_diff: [{ before: 'before.pptx', after: 'after.pptx' }],
-  pptx_layout_preflight: [{ from: 'deck' }],
+  pptx_inherit_template: [
+    {
+      from: 'template_design',
+      slides: [
+        {
+          layout_from_slide: 2,
+          elements: [{ type: 'text', pos: { x: 0.5, y: 1.5, w: 9, h: 1 }, text: 'New body' }],
+        },
+      ],
+      export_as: 'last_pptx_design',
+    },
+  ],
+  pptx_layout_preflight: [{ from: 'deck', text_fit: 'error' }],
   proposal_content_from_storyline: [{ from: 'storyline' }],
   proposal_storyline_from_brief: [{ from: 'brief' }],
   set: [{ key: 'theme', value: {} }],
@@ -373,6 +395,7 @@ const CAPTURE_OPS = [
   'pptx_extract',
   'pptx_package_check',
   'pptx_package_diff',
+  'pptx_render_check',
   'pptx_slide_text',
   'xlsx_extract',
 ] as const;
@@ -398,6 +421,7 @@ const TRANSFORM_OPS = [
   'pdf_to_pptx_design',
   'pdf_to_xlsx_design',
   'pptx_diff',
+  'pptx_inherit_template',
   'pptx_layout_preflight',
   'proposal_content_from_storyline',
   'proposal_storyline_from_brief',

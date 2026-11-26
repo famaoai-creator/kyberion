@@ -453,6 +453,7 @@
         "pptx_extract",
         "pptx_package_check",
         "pptx_package_diff",
+        "pptx_render_check",
         "pptx_slide_text",
         "xlsx_extract"
       ],
@@ -477,6 +478,7 @@
         "pdf_to_pptx_design",
         "pdf_to_xlsx_design",
         "pptx_diff",
+        "pptx_inherit_template",
         "pptx_layout_preflight",
         "proposal_content_from_storyline",
         "proposal_storyline_from_brief",

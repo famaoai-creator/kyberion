@@ -1067,3 +1067,96 @@ describe('speaker notes', () => {
     }
   });
 });
+
+describe('Template-inheritance regressions', () => {
+  it('applies the computed pPr (align/spacing/bullet) to EVERY paragraph split from one element', () => {
+    const el: PptxElement = {
+      type: 'text',
+      pos: { x: 0, y: 0, w: 4, h: 1 },
+      text: 'Line one\nLine two\n\nLine four',
+      style: {
+        align: 'center',
+        lineSpacing: 1.2,
+        spaceBefore: 4,
+        spaceAfter: 6,
+        bullet: { type: 'char', char: '-' },
+      },
+    };
+    const xml = buildShape(el, 20);
+    const paragraphs = xml.match(/<a:p>[\s\S]*?<\/a:p>/g) || [];
+    expect(paragraphs.length).toBe(4);
+    for (const p of paragraphs) {
+      expect(p).toContain('algn="ctr"');
+      expect(p).toContain('<a:lnSpc><a:spcPct val="120000"/></a:lnSpc>');
+      expect(p).toContain('<a:spcBef><a:spcPts val="400"/></a:spcBef>');
+      expect(p).toContain('<a:spcAft><a:spcPts val="600"/></a:spcAft>');
+      expect(p).toContain('<a:buChar char="-"/>');
+    }
+  });
+
+  it('applies alignment to every paragraph across multiple textRuns', () => {
+    const el: PptxElement = {
+      type: 'text',
+      pos: { x: 0, y: 0, w: 4, h: 1 },
+      textRuns: [{ text: 'Alpha\n' }, { text: 'Beta' }],
+      style: { align: 'right' },
+    };
+    const paragraphs = buildShape(el, 21).match(/<a:p>[\s\S]*?<\/a:p>/g) || [];
+    expect(paragraphs.length).toBe(2);
+    for (const p of paragraphs) expect(p).toContain('algn="r"');
+  });
+
+  it('keeps sldMasterId unique against inherited sldLayoutId values', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pptx-master-id-'));
+    try {
+      const ns =
+        'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
+      const spTree =
+        '<p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld>';
+      // Synthetic inherited master whose first layout id is 2147483649 — the
+      // value the engine used to hand to the first sldMasterId.
+      const masterXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldMaster ${ns}>${spTree}<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/><p:sldLayoutId id="2147483650" r:id="rId2"/></p:sldLayoutIdLst></p:sldMaster>`;
+      const layoutXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldLayout ${ns}>${spTree}</p:sldLayout>`;
+      const protocol = createTestProtocol();
+      protocol.rawMasters = [{ xml: masterXml }];
+      protocol.rawLayouts = [
+        { name: 'Layout A', xml: layoutXml },
+        { name: 'Layout B', xml: layoutXml },
+      ];
+      const out = path.join(tmpDir, 'inherit.pptx');
+      await generateNativePptx(protocol, out);
+      const files = extractPptx(out);
+      const pres = files.get('ppt/presentation.xml')!;
+      const masterIds = [...pres.matchAll(/sldMasterId id="(\d+)"/g)].map((m) => Number(m[1]));
+      const layoutIds = [
+        ...files.get('ppt/slideMasters/slideMaster1.xml')!.matchAll(/sldLayoutId id="(\d+)"/g),
+      ].map((m) => Number(m[1]));
+      expect(masterIds.length).toBe(1);
+      const all = [...masterIds, ...layoutIds];
+      expect(new Set(all).size).toBe(all.length);
+      for (const id of masterIds) expect(id).toBeGreaterThanOrEqual(2147483648);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('distillPptxDesign reads a 4:3 sldSz that carries a type attribute', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pptx-sldsz-'));
+    try {
+      const zip = new AdmZip();
+      zip.addFile(
+        'ppt/presentation.xml',
+        Buffer.from(
+          '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldIdLst/><p:sldSz cx="9144000" cy="6858000" type="screen4x3"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>',
+          'utf8'
+        )
+      );
+      const src = path.join(tmpDir, 'synthetic-4x3.pptx');
+      zip.writeZip(src);
+      const design = await distillPptxDesign(src);
+      expect(design.canvas).toEqual({ w: 10, h: 7.5 });
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});

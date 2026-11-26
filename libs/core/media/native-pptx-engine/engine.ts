@@ -17,7 +17,7 @@ import {
   generateLayoutRels,
   generateMasterRels,
 } from './rels.js';
-import { generatePresentation } from './presentation.js';
+import { collectSldLayoutIds, generatePresentation } from './presentation.js';
 import { generateTheme } from './theme.js';
 import { buildShape, buildConnector, buildImage, buildTable, buildSmartArt } from './builders.js';
 import { applyPptxDesignDefaults } from './design-cascade.js';
@@ -217,6 +217,19 @@ export async function generateNativePptx(
   );
 
   // 2. Presentation Root
+  // sldMasterId values must not collide with any sldLayoutId written by the
+  // masters below (inherited masters carry their own layout IDs; the generated
+  // master uses 2147483650 + i).
+  const usesRawMasters = Boolean(
+    (protocol.rawMasters?.length || protocol.rawMasterXml) && protocol.rawLayouts
+  );
+  const reservedLayoutIds = usesRawMasters
+    ? collectSldLayoutIds(
+        protocol.rawMasters?.length
+          ? protocol.rawMasters.map((m) => m.xml)
+          : [protocol.rawMasterXml]
+      )
+    : Array.from({ length: layoutCount }, (_, i) => 2147483650 + i);
   zip.addFile(
     'ppt/presentation.xml',
     Buffer.from(
@@ -226,7 +239,8 @@ export async function generateNativePptx(
         Math.round(protocol.canvas.w * 914400),
         Math.round(protocol.canvas.h * 914400),
         protocol.extensions,
-        hasNotes
+        hasNotes,
+        reservedLayoutIds
       ),
       'utf8'
     )

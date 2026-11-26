@@ -44,8 +44,17 @@ export interface PptxStyle {
   opacity?: number;
   margin?: [number, number, number, number];
   shadow?: PptxShadow;
-  cornerRadius?: number; // EMU
-  lineSpacing?: number; // percentage (e.g. 115 = 115%)
+  /**
+   * roundRect corner adjust — NOT EMU. Either a fraction of the shorter side
+   * (0 < r <= 1, e.g. 0.08 = 8%) or raw OOXML guide units (> 1, 50000 = 50% =
+   * fully rounded). Rounded to an integer and clamped to 0..50000.
+   */
+  cornerRadius?: number;
+  /**
+   * Line spacing. Values <= 10 are a multiplier (1.3 = 130%); values > 10 are a
+   * percent (130 = 130%). Both forms appear across existing protocols.
+   */
+  lineSpacing?: number;
   spaceBefore?: number; // points
   spaceAfter?: number; // points
   bullet?: {

@@ -14,8 +14,11 @@ const FALLBACK_SANS_STACK =
   "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif";
 const FALLBACK_MONO_STACK = "'JetBrains Mono', monospace";
 const FALLBACK_LATIN_FONT = 'Helvetica Neue';
+// Families that carry CJK glyphs. A family named in CJK script (e.g. "BIZ UDPゴシック",
+// "游ゴシック", "メイリオ") is always East Asian; without that, a deck's Japanese
+// font lands only in <a:latin> and PowerPoint sets the Japanese text in <a:ea>'s fallback.
 const EAST_ASIAN_FONT_RE =
-  /noto sans jp|hiragino|yu gothic|meiryo|ms gothic|source han sans|pingfang|apple sd gothic/i;
+  /noto (sans|serif) (jp|cjk)|hiragino|yu (gothic|mincho)|meiryo|ms p?(gothic|mincho)|biz ud|ud (digi|shin)|ipa(ex)?(p)?(gothic|mincho)|source han (sans|serif)|pingfang|apple sd gothic|[぀-ヿ㐀-鿿]/i;
 
 let cachedBrandTokens: BrandTokens | null = null;
 
