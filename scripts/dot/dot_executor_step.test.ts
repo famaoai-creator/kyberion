@@ -1,7 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DotCharter } from '@agent/core/dot/dot-charter';
 import type { WorkItem } from '@agent/core/workforce/work-coordination-types';
-import { safeRmSync } from '@agent/core/secure-io';
+import {
+  clearWorkCoordinationNamespace,
+  clearWorkCoordinationStore,
+  createWorkItem,
+  expireWorkItemLeases,
+  getWorkItem,
+  releaseWorkItem,
+  setWorkCoordinationNamespace,
+} from '@agent/core/workforce/work-coordination';
+import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContextAsync } from '@agent/core/authority';
 import {
   stubReasoningBackend,
@@ -666,6 +675,258 @@ describe('dot-executor supervisor step', () => {
       },
     ]);
     expect(rows[0]?.summary).toContain('cited: 1');
+  });
+
+  it('denies task_session tool execution when the real WorkItem lease is revoked mid-turn', async () => {
+    const stepRoot = 'active/shared/tmp/dot-executor-step-tests';
+    setWorkCoordinationNamespace(`dot-step-lease-${process.pid}`);
+    clearWorkCoordinationStore();
+    try {
+      const created = createWorkItem({
+        title: 'Task session lease revocation test',
+        description: 'Verify live lease check against real work coordination store',
+        status: 'ready',
+        context: {},
+        metadata: {
+          dot_id: 'step-dot',
+          action_ref: 'dact-lease-revoked',
+          requested_work_shape: 'task_session',
+        },
+      });
+
+      const writeArtifact = vi.fn();
+      const goalDriver = vi.fn(async (opts: Record<string, unknown>) => {
+        const executeTool = opts.executeTool as (call: {
+          name: string;
+          input: Record<string, unknown>;
+        }) => Promise<unknown>;
+        const live = getWorkItem(created.item_id)!;
+        releaseWorkItem({
+          itemId: created.item_id,
+          leaseId: live.lease_id!,
+          actorPeerId: 'dot:step-dot',
+          nextStatus: 'ready',
+          summary: 'revoked mid-turn',
+        });
+        await executeTool({
+          name: 'dot_write_scoped_deliverable',
+          input: { name: 'late.md', content: '# Should Not Write\n' },
+        });
+        return {
+          goalId: 'g',
+          finalState: 'complete',
+          goal: {},
+          turnsRun: 1,
+          rewindCount: 0,
+          persisted: null,
+          finalReport: 'unreachable',
+        };
+      });
+
+      const rows = await runDotExecutorStep(
+        new Date('2026-10-04T10:00:00Z'),
+        [
+          {
+            path: 'dots/step-dot.json',
+            charter: {
+              ...CHARTER,
+              authority: {
+                ...CHARTER.authority,
+                allowed_execution_shapes: ['task_session', 'pipeline'],
+              },
+            },
+          },
+        ],
+        {
+          rootDir: stepRoot,
+          backend: toolBackend,
+          goalDriver: goalDriver as never,
+          throttle: () => 'normal',
+          tokenCapReached: () => false,
+          reap: () => ({ expired: [], recovered: [], parked: [], replayed: [] }),
+          appendInbox: () => {},
+          audit: () => {},
+          taskToolDeps: {
+            writeArtifact: writeArtifact as never,
+            audit: vi.fn(),
+          },
+        }
+      );
+
+      expect(writeArtifact).not.toHaveBeenCalled();
+      expect(rows).toMatchObject([
+        {
+          work_item_id: created.item_id,
+          status: 'skipped',
+          summary: expect.stringContaining('stale attempt'),
+        },
+      ]);
+    } finally {
+      clearWorkCoordinationStore();
+      clearWorkCoordinationNamespace();
+      safeRmSync(stepRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('denies task_session tool execution when the real WorkItem lease expires or charter pauses mid-turn', async () => {
+    const stepRoot = 'active/shared/tmp/dot-executor-step-tests';
+    setWorkCoordinationNamespace(`dot-step-expire-${process.pid}`);
+    clearWorkCoordinationStore();
+    try {
+      const created = createWorkItem({
+        title: 'Task session lease expiry test',
+        description: 'Verify live lease expiry check against real work coordination store',
+        status: 'ready',
+        context: {},
+        metadata: {
+          dot_id: 'step-dot',
+          action_ref: 'dact-lease-expired',
+          requested_work_shape: 'task_session',
+        },
+      });
+
+      const writeArtifact = vi.fn();
+      const goalDriver = vi.fn(async (opts: Record<string, unknown>) => {
+        const executeTool = opts.executeTool as (call: {
+          name: string;
+          input: Record<string, unknown>;
+        }) => Promise<unknown>;
+        const expired = expireWorkItemLeases(
+          new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+        );
+        expect(expired.some((lease) => lease.item_id === created.item_id)).toBe(true);
+        await executeTool({
+          name: 'dot_write_scoped_deliverable',
+          input: { name: 'expired.md', content: '# Expired Lease\n' },
+        });
+        return {
+          goalId: 'g',
+          finalState: 'complete',
+          goal: {},
+          turnsRun: 1,
+          rewindCount: 0,
+          persisted: null,
+          finalReport: 'unreachable',
+        };
+      });
+
+      const expiredRows = await runDotExecutorStep(
+        new Date('2026-10-04T10:00:00Z'),
+        [
+          {
+            path: 'dots/step-dot.json',
+            charter: {
+              ...CHARTER,
+              authority: {
+                ...CHARTER.authority,
+                allowed_execution_shapes: ['task_session', 'pipeline'],
+              },
+            },
+          },
+        ],
+        {
+          rootDir: stepRoot,
+          backend: toolBackend,
+          goalDriver: goalDriver as never,
+          throttle: () => 'normal',
+          tokenCapReached: () => false,
+          reap: () => ({ expired: [], recovered: [], parked: [], replayed: [] }),
+          appendInbox: () => {},
+          audit: () => {},
+          taskToolDeps: {
+            writeArtifact: writeArtifact as never,
+            audit: vi.fn(),
+          },
+        }
+      );
+
+      expect(writeArtifact).not.toHaveBeenCalled();
+      expect(expiredRows).toMatchObject([
+        {
+          work_item_id: created.item_id,
+          status: 'skipped',
+          summary: expect.stringContaining('expired or inactive'),
+        },
+      ]);
+
+      clearWorkCoordinationStore();
+      safeMkdir(`${stepRoot}/dots`, { recursive: true });
+      const activeCharter: DotCharter = {
+        ...CHARTER,
+        authority: {
+          ...CHARTER.authority,
+          allowed_execution_shapes: ['task_session', 'pipeline'],
+        },
+      };
+      safeWriteFile(
+        `${stepRoot}/dots/step-dot.json`,
+        `${JSON.stringify(activeCharter, null, 2)}\n`
+      );
+      const charterItem = createWorkItem({
+        title: 'Task session charter pause test',
+        description: 'Verify persisted charter active/shape re-check',
+        status: 'ready',
+        context: {},
+        metadata: {
+          dot_id: 'step-dot',
+          action_ref: 'dact-charter-paused',
+          requested_work_shape: 'task_session',
+        },
+      });
+      const pauseDriver = vi.fn(async (opts: Record<string, unknown>) => {
+        const executeTool = opts.executeTool as (call: {
+          name: string;
+          input: Record<string, unknown>;
+        }) => Promise<unknown>;
+        safeWriteFile(
+          `${stepRoot}/dots/step-dot.json`,
+          `${JSON.stringify({ ...activeCharter, status: 'paused' }, null, 2)}\n`
+        );
+        await executeTool({
+          name: 'dot_write_scoped_deliverable',
+          input: { name: 'paused.md', content: '# Charter Paused\n' },
+        });
+        return {
+          goalId: 'g',
+          finalState: 'complete',
+          goal: {},
+          turnsRun: 1,
+          rewindCount: 0,
+          persisted: null,
+          finalReport: 'unreachable',
+        };
+      });
+      const pausedRows = await runDotExecutorStep(
+        new Date('2026-10-04T10:00:00Z'),
+        [{ path: 'dots/step-dot.json', charter: activeCharter }],
+        {
+          rootDir: stepRoot,
+          backend: toolBackend,
+          goalDriver: pauseDriver as never,
+          throttle: () => 'normal',
+          tokenCapReached: () => false,
+          reap: () => ({ expired: [], recovered: [], parked: [], replayed: [] }),
+          appendInbox: () => {},
+          audit: () => {},
+          taskToolDeps: {
+            writeArtifact: writeArtifact as never,
+            audit: vi.fn(),
+          },
+        }
+      );
+      expect(writeArtifact).not.toHaveBeenCalled();
+      expect(pausedRows).toMatchObject([
+        {
+          work_item_id: charterItem.item_id,
+          status: 'skipped',
+          summary: expect.stringContaining('no longer active for task_session'),
+        },
+      ]);
+    } finally {
+      clearWorkCoordinationStore();
+      clearWorkCoordinationNamespace();
+      safeRmSync(stepRoot, { recursive: true, force: true });
+    }
   });
 
   it('is registered after key-result measurement', () => {

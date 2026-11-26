@@ -17,6 +17,11 @@ import {
 } from '../knowledge/knowledge-feedback-loop.js';
 import type { MemoryScopeEnvelope } from '../knowledge/memory-scope.js';
 import {
+  assertKnowledgePathInScope,
+  resolveKnowledgeScopeSet,
+  type KnowledgeScopeSet,
+} from '../knowledge/knowledge-scope.js';
+import {
   findRelevantPromotedKnowledge,
   type PromotedKnowledgeEntry,
 } from '../knowledge/promoted-knowledge-retrieval.js';
@@ -109,19 +114,49 @@ function buildReaderScope(charter: DotCharter): ScopeContext {
     ...(charter.scope.tenant_slug ? { tenant_slug: charter.scope.tenant_slug } : {}),
     ...(charter.scope.organization_id ? { organization_id: charter.scope.organization_id } : {}),
     ...(charter.scope.project_id ? { project_id: charter.scope.project_id } : {}),
+    ...(charter.scope.owner_nhi ? { nhi_id: charter.scope.owner_nhi } : {}),
   };
 }
 
-function allowedReadPrefixes(charter: DotCharter): string[] {
-  const prefixes = ['knowledge/public/', 'knowledge/product/'];
-  if (charter.scope.tier === 'confidential' && charter.scope.tenant_slug) {
-    prefixes.push(`knowledge/confidential/${charter.scope.tenant_slug}/`);
+function assertScopeMatchesItem(charter: DotCharter, item: WorkItem): void {
+  if (charter.scope.tier === 'confidential' && !charter.scope.tenant_slug?.trim()) {
+    throw new Error('[DOT_TASK_TOOL_SCOPE_DENIED] confidential charter requires tenant_slug');
   }
+  if (charter.scope.tier === 'personal' && !charter.scope.owner_nhi?.trim()) {
+    throw new Error('[DOT_TASK_TOOL_SCOPE_DENIED] personal charter requires owner_nhi');
+  }
+  const ctx = item.context;
+  if (!ctx) return;
+  if (ctx.tenant_slug && ctx.tenant_slug !== charter.scope.tenant_slug) {
+    throw new Error('[DOT_TASK_TOOL_SCOPE_DENIED] item tenant differs from charter scope');
+  }
+  if (ctx.organization_id && ctx.organization_id !== charter.scope.organization_id) {
+    throw new Error('[DOT_TASK_TOOL_SCOPE_DENIED] item organization differs from charter scope');
+  }
+  const explicitItemProject = ctx.project_id && item.context_origin?.project_id !== 'default';
+  if (explicitItemProject && ctx.project_id !== charter.scope.project_id) {
+    throw new Error('[DOT_TASK_TOOL_SCOPE_DENIED] item project differs from charter scope');
+  }
+  if (
+    charter.scope.tier === 'personal' &&
+    item.assignee_user_id &&
+    item.assignee_user_id !== charter.scope.owner_nhi
+  ) {
+    throw new Error('[DOT_TASK_TOOL_SCOPE_DENIED] item owner differs from charter scope');
+  }
+}
+
+function allowedReadPrefixes(
+  charter: DotCharter,
+  readerScope: ScopeContext
+): { prefixes: string[]; knowledgeScopeSet: KnowledgeScopeSet } {
+  const knowledgeScopeSet = resolveKnowledgeScopeSet(readerScope, { includeCommon: false });
+  const prefixes = knowledgeScopeSet.roots.map((root) => `knowledge/${root}/`);
   const ownState = dotStatePath(charter).replaceAll('\\', '/').replace(/\/+$/u, '');
   if (ownState) {
     prefixes.push(`${ownState}/`);
   }
-  return prefixes;
+  return { prefixes, knowledgeScopeSet };
 }
 
 function normalizeRepoRelative(rawPath: string): string {
@@ -260,9 +295,10 @@ export function createDotTaskSessionToolRuntime(
   const deliverables: DotTaskDeliverableRecord[] = [];
   let toolCalls = 0;
 
+  assertScopeMatchesItem(ctx.charter, ctx.item);
   const memoryScope = buildMemoryScope(ctx.charter);
   const readerScope = buildReaderScope(ctx.charter);
-  const prefixes = allowedReadPrefixes(ctx.charter);
+  const { prefixes, knowledgeScopeSet } = allowedReadPrefixes(ctx.charter, readerScope);
   const missionId = ctx.item.context?.mission_id ?? `dot:${ctx.charter.dot_id}`;
 
   const recordToolAudit = (
@@ -292,7 +328,11 @@ export function createDotTaskSessionToolRuntime(
   async function executeReadFile(args: Record<string, unknown>): Promise<GoalToolExecution> {
     const rawPath = typeof args.path === 'string' ? args.path : '';
     const relPath = normalizeRepoRelative(rawPath);
-    if (!prefixes.some((prefix) => relPath.startsWith(prefix))) {
+    if (
+      !prefixes.some((prefix) => relPath.startsWith(prefix)) ||
+      (relPath.startsWith('knowledge/') &&
+        !assertKnowledgePathInScope(relPath.slice('knowledge/'.length), knowledgeScopeSet))
+    ) {
       throw new Error(
         `[DOT_TASK_TOOL_SCOPE_DENIED] path '${relPath}' is outside charter read scope`
       );
@@ -314,7 +354,9 @@ export function createDotTaskSessionToolRuntime(
     if (
       realRel.startsWith('..') ||
       path.isAbsolute(realRel) ||
-      !prefixes.some((prefix) => realRel.startsWith(prefix))
+      !prefixes.some((prefix) => realRel.startsWith(prefix)) ||
+      (realRel.startsWith('knowledge/') &&
+        !assertKnowledgePathInScope(realRel.slice('knowledge/'.length), knowledgeScopeSet))
     ) {
       throw new Error('[DOT_TASK_TOOL_SCOPE_DENIED] resolved path escapes charter read scope');
     }
@@ -394,6 +436,11 @@ export function createDotTaskSessionToolRuntime(
     }
     if (format === 'json') {
       JSON.parse(content);
+    }
+    if (ctx.charter.scope.tier === 'personal' && !ctx.charter.scope.owner_nhi?.trim()) {
+      throw new Error(
+        '[DOT_TASK_TOOL_SCOPE_DENIED] personal deliverables require charter.scope.owner_nhi'
+      );
     }
     const scopedName = sanitizeDeliverableName(rawName, ctx.charter, ctx.item);
     const written = writeArtifact({

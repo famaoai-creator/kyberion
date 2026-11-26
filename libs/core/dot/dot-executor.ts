@@ -78,6 +78,7 @@ import { withUsageAttribution } from '../finance/usage-accounting.js';
 import {
   claimWorkItem,
   getWorkItem,
+  listActiveWorkLeases,
   listWorkItems,
   reapExpiredWorkLeases,
   releaseWorkItem,
@@ -511,7 +512,7 @@ async function routeItem(
   const assertTaskTurnCurrent = () => {
     signal.throwIfAborted();
     if (!deps.claim && !deps.listItems) {
-      const current = getWorkItem(item.item_id, { rootDir: deps.rootDir });
+      const current = getWorkItem(item.item_id);
       if (
         !current ||
         !item.current_attempt_id ||
@@ -522,6 +523,14 @@ async function routeItem(
       ) {
         throw new DotExecutorStaleAttemptError(
           `dot task_session attempt for ${item.item_id} is no longer current`
+        );
+      }
+      const leaseLive = listActiveWorkLeases().some(
+        (lease) => lease.lease_id === item.lease_id && lease.item_id === item.item_id
+      );
+      if (!leaseLive) {
+        throw new DotExecutorStaleAttemptError(
+          `dot task_session lease for ${item.item_id} is expired or inactive`
         );
       }
     }
