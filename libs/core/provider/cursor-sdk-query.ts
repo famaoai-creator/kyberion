@@ -38,6 +38,7 @@ import { recordCliUsage, type CliUsageReport } from './cli-usage-metering.js';
 
 export const CURSOR_SDK_API_KEY_ENV = 'CURSOR_API_KEY';
 export const CURSOR_SDK_MODEL_ENV = 'KYBERION_CURSOR_SDK_MODEL';
+export const CURSOR_SDK_TIMEOUT_ENV = 'KYBERION_CURSOR_SDK_TIMEOUT_MS';
 export const CURSOR_SDK_DEFAULT_MODEL = 'composer-2.5';
 export const CURSOR_SDK_DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 export const CURSOR_SDK_DEFAULT_SESSION_IDLE_TTL_MS = 15 * 60 * 1000;
@@ -125,7 +126,7 @@ export interface CursorSdkQueryParams {
    * feature reject the run only after ~20s of SDK-internal retries, so the
    * native path is opt-in for accounts known to have it enabled. Stateless
    * calls only — a continued conversation always folds the system prompt
-   * into its first message.
+   * into its messages (first message, and again whenever it changes).
    */
   nativeSystemPrompt?: boolean;
   /**
@@ -255,8 +256,24 @@ export class CursorSdkSession {
     this.pending += 1;
     this.clearIdleTimer();
     try {
-      await previous;
       if (signal?.aborted) throw new CursorSdkQueryError('[cursor-sdk] aborted before start');
+      if (signal) {
+        // A queued turn must not wait out the running turn after its caller
+        // aborted — losing this race still releases the tail correctly below.
+        let rejectAborted!: () => void;
+        const aborted = new Promise<never>((_resolve, reject) => {
+          rejectAborted = () =>
+            reject(new CursorSdkQueryError('[cursor-sdk] aborted before start'));
+        });
+        signal.addEventListener('abort', rejectAborted, { once: true });
+        try {
+          await Promise.race([previous, aborted]);
+        } finally {
+          signal.removeEventListener('abort', rejectAborted);
+        }
+      } else {
+        await previous;
+      }
       return await fn();
     } finally {
       this.pending -= 1;
@@ -273,7 +290,7 @@ export class CursorSdkSession {
   /** Must run inside `exclusive`. Creates the agent and its scratch directories. */
   async start(
     runtime: CursorSdkRuntime,
-    options: { apiKey: string; model: string; timeoutMs: number }
+    options: { apiKey: string; model: string; timeoutMs: number; signal?: AbortSignal }
   ): Promise<CursorSdkSessionState> {
     const workspace = createScratchWorkspace({});
     const storeWorkspace = createScratchWorkspace({});
@@ -286,7 +303,8 @@ export class CursorSdkSession {
           cwd: workspace.path,
           storeDir: storeWorkspace.path,
         },
-        options.timeoutMs
+        options.timeoutMs,
+        options.signal
       );
       this.state = { agent, workspace, storeWorkspace, model: options.model };
       return this.state;
@@ -351,7 +369,7 @@ async function waitForRun(
   if (params.signal?.aborted) onAbort();
   try {
     return await Promise.race([
-      run.wait(),
+      run.wait().catch(asSdkError('run.wait')),
       new Promise<never>((_resolve, reject) => {
         timer = setTimeout(() => {
           void run.cancel().catch(() => undefined);
@@ -371,39 +389,128 @@ function remainingMs(deadline: number): number {
   return Math.max(deadline - Date.now(), 1);
 }
 
+/** SDK-origin rejections get the typed, greppable surface; our own errors pass through. */
+function asSdkError(op: string) {
+  return (error: unknown): never => {
+    if (error instanceof CursorSdkQueryError) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    const code =
+      error && typeof error === 'object' && typeof (error as { code?: unknown }).code === 'string'
+        ? (error as { code: string }).code
+        : undefined;
+    throw new CursorSdkQueryError(`[cursor-sdk] ${op} failed: ${message}`, code);
+  };
+}
+
+/**
+ * Races `pending` against a millisecond budget and an optional abort signal.
+ * `sweep` runs exactly once when the race is lost — it cleans up whatever the
+ * abandoned promise may still deliver (a late agent is closed, a late run is
+ * cancelled). Both surfaces produce a typed, prefixed error.
+ */
+async function withinDeadline<T>(
+  pending: Promise<T>,
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+  sweep: () => void,
+  timeoutMessage: string
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let won = false;
+  let lost = false;
+  let lose!: (error: CursorSdkQueryError) => void;
+  const race = new Promise<never>((_resolve, reject) => {
+    lose = (error) => {
+      if (won || lost) return;
+      lost = true;
+      try {
+        sweep();
+      } finally {
+        reject(error);
+      }
+    };
+    timer = setTimeout(() => lose(new CursorSdkQueryError(timeoutMessage)), timeoutMs);
+  });
+  // Mark `pending` settled so a late lose() can't sweep a resource the caller
+  // already owns (a closed agent / cancelled run would be handed back).
+  const tracked = pending.then(
+    (value) => {
+      won = true;
+      return value;
+    },
+    (error: unknown) => {
+      won = true;
+      throw error;
+    }
+  );
+  const onAbort = (): void => lose(new CursorSdkQueryError('[cursor-sdk] aborted'));
+  signal?.addEventListener('abort', onAbort, { once: true });
+  // addEventListener never fires for an already-aborted signal.
+  if (signal?.aborted) onAbort();
+  try {
+    return await Promise.race([tracked, race]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
+  }
+}
+
 /**
  * `Agent.create` is a network handshake — without a bound it can stall the
- * call (and, inside a session, the whole FIFO) forever. When the budget wins
- * the race, the pending create is swept: a late-resolving agent is closed so
- * no SDK agent leaks.
+ * call (and, inside a session, the whole FIFO) forever. When the budget or an
+ * abort wins the race, the pending create is swept: a late-resolving agent is
+ * closed so no SDK agent leaks.
  */
 async function createAgentWithin(
   runtime: CursorSdkRuntime,
   options: CursorSdkCreateAgentOptions,
-  timeoutMs: number
+  timeoutMs: number,
+  signal?: AbortSignal
 ): Promise<CursorSdkAgent> {
   const create = runtime.createAgent(options);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      create,
-      new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => {
-          void create
-            .then(
-              (agent) => agent.close(),
-              () => undefined
-            )
-            .catch(() => undefined);
-          reject(
-            new CursorSdkQueryError(`[cursor-sdk] Agent.create timed out after ${timeoutMs}ms`)
-          );
-        }, timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+  return withinDeadline(
+    create.catch(asSdkError('Agent.create')),
+    timeoutMs,
+    signal,
+    () => {
+      void create
+        .then(
+          (agent) => agent.close(),
+          () => undefined
+        )
+        .catch(() => undefined);
+    },
+    `[cursor-sdk] Agent.create timed out after ${timeoutMs}ms`
+  );
+}
+
+/**
+ * `agent.send` crosses into the SDK runtime and can stay pending the same way
+ * `Agent.create` can — it is covered by the shared call deadline and abort.
+ * When the race is lost, the late-arriving run is cancelled so nothing keeps
+ * running provider-side.
+ */
+async function sendWithin(
+  agent: CursorSdkAgent,
+  message: string,
+  params: Pick<CursorSdkQueryParams, 'signal'>,
+  timeoutMs: number
+): Promise<CursorSdkRun> {
+  const send = agent.send(message);
+  return withinDeadline(
+    send.catch(asSdkError('send')),
+    timeoutMs,
+    params.signal,
+    () => {
+      void send
+        .then(
+          (run) => run.cancel(),
+          () => undefined
+        )
+        .catch(() => undefined);
+    },
+    `[cursor-sdk] send timed out after ${timeoutMs}ms`
+  );
 }
 
 /** SDK phrasings for an unusable model id — kept loose on purpose so the
@@ -419,7 +526,7 @@ function unwrapRunResult(result: CursorSdkRunResult): string {
   if (result.status === 'error') {
     const detail = result.error?.message ?? 'unknown error';
     const next = MODEL_UNAVAILABLE_PATTERN.test(detail)
-      ? ` | next: set ${CURSOR_SDK_MODEL_ENV} to one of the available models listed above`
+      ? ` | next: set ${CURSOR_SDK_MODEL_ENV} to a valid model id — list options with Cursor.models.list()`
       : '';
     throw new CursorSdkQueryError(`[cursor-sdk] run failed: ${detail}${next}`, result.error?.code);
   }
@@ -498,6 +605,7 @@ async function runSessionTurn(
       apiKey: ctx.apiKey,
       model: ctx.model,
       timeoutMs: remainingMs(deadline),
+      signal: params.signal,
     });
 
     // The system prompt rides in the conversation once; resend only if it changed.
@@ -508,7 +616,7 @@ async function runSessionTurn(
     // R5: the prompt leaves the process at send(); every check above is pre-start.
     markDelegationExecutionStarted();
     requestSent = true;
-    const run = await state.agent.send(message);
+    const run = await sendWithin(state.agent, message, params, remainingMs(deadline));
     const settled = await waitForRun(run, params, remainingMs(deadline));
     usage = settled.usage;
     const text = unwrapRunResult(settled);
@@ -556,7 +664,8 @@ async function runOneShot(params: CursorSdkQueryParams, ctx: TurnContext): Promi
           cwd: workspace.path,
           storeDir: storeWorkspace.path,
         },
-        remainingMs(deadline)
+        remainingMs(deadline),
+        params.signal
       );
       const message = nativeSystemPrompt
         ? params.userPrompt
@@ -564,7 +673,7 @@ async function runOneShot(params: CursorSdkQueryParams, ctx: TurnContext): Promi
       // R5: the prompt leaves the process at send(); every check above is pre-start.
       markDelegationExecutionStarted();
       requestSent = true;
-      const run = await agent.send(message);
+      const run = await sendWithin(agent, message, params, remainingMs(deadline));
       const settled = await waitForRun(run, params, remainingMs(deadline));
       if (
         nativeSystemPrompt &&
@@ -588,8 +697,15 @@ async function runOneShot(params: CursorSdkQueryParams, ctx: TurnContext): Promi
       if (!useNativeSystemPrompt || !isSystemPromptRejected(error)) throw error;
       systemPromptAccepted = false;
       logger.debug('[cursor-sdk] systemPrompt not enabled for this account; folding into prompt');
-      agent?.close();
+      // Clear-then-close so a throwing close() neither masks the retry nor
+      // double-closes in finally.
+      const stale = agent;
       agent = undefined;
+      try {
+        stale?.close();
+      } catch {
+        /* disposal is best-effort */
+      }
       result = await attempt(false);
     }
     usage = result.usage;

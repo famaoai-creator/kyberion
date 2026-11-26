@@ -16,7 +16,8 @@
         "CURSOR_API_KEY",
         "KYBERION_CURSOR_SDK_MODEL",
         "KYBERION_CURSOR_SDK_NATIVE_SYSTEM_PROMPT",
-        "KYBERION_CURSOR_SDK_SESSION_IDLE_TTL_MS"
+        "KYBERION_CURSOR_SDK_SESSION_IDLE_TTL_MS",
+        "KYBERION_CURSOR_SDK_TIMEOUT_MS"
       ],
       "secret_refs": [
         { "service_id": "cursor", "secret_key": "API_KEY", "env_keys": ["CURSOR_API_KEY"] }

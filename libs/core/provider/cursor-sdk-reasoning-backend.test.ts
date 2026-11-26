@@ -438,8 +438,10 @@ describe('cursor-sdk-reasoning-backend', () => {
       },
     };
     const backend = new CursorSdkReasoningBackend({ runtime, apiKey: 'k' });
-    await expect(backend.prompt('x', { signal: controller.signal })).rejects.toThrow(/cancelled/u);
-    expect(cancelled).toBe(1);
+    // The abort lands inside the send window — the typed abort surfaces and
+    // the late-arriving run is still swept with cancel().
+    await expect(backend.prompt('x', { signal: controller.signal })).rejects.toThrow(/aborted/u);
+    await vi.waitFor(() => expect(cancelled).toBe(1));
   });
 
   it('times out a stalled createAgent and closes the late-resolving agent', async () => {
@@ -516,6 +518,167 @@ describe('cursor-sdk-reasoning-backend', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('times out a stalled send and cancels the late-arriving run', async () => {
+    vi.useFakeTimers();
+    try {
+      let cancelled = 0;
+      const runtime: CursorSdkRuntime = {
+        async createAgent() {
+          return {
+            send() {
+              return new Promise((resolve) =>
+                setTimeout(
+                  () =>
+                    resolve({
+                      wait: () => Promise.resolve(finished('late')),
+                      async cancel() {
+                        cancelled += 1;
+                      },
+                    }),
+                  100
+                )
+              );
+            },
+            close() {
+              return undefined;
+            },
+          };
+        },
+      };
+      const backend = new CursorSdkReasoningBackend({
+        runtime,
+        apiKey: 'k',
+        timeoutMs: 20,
+      });
+      const pending = backend.prompt('x');
+      const assertion = expect(pending).rejects.toThrow(/send timed out/u);
+      await vi.advanceTimersByTimeAsync(30);
+      await assertion;
+      // The late run is swept: cancelled rather than left running provider-side.
+      await vi.advanceTimersByTimeAsync(100);
+      expect(cancelled).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds a stalled send inside a continued session too', async () => {
+    vi.useFakeTimers();
+    try {
+      let created = 0;
+      const runtime: CursorSdkRuntime = {
+        async createAgent() {
+          created += 1;
+          return {
+            send: () => new Promise<never>(() => undefined),
+            close() {
+              return undefined;
+            },
+          };
+        },
+      };
+      const backend = new CursorSdkReasoningBackend({
+        runtime,
+        apiKey: 'k',
+        timeoutMs: 20,
+      });
+      const pending = backend.prompt('x', { context_mode: 'continue' });
+      const assertion = expect(pending).rejects.toThrow(/send timed out/u);
+      await vi.advanceTimersByTimeAsync(30);
+      await assertion;
+      // Fail closed: the wedged conversation is dropped, so the next turn
+      // starts a new agent instead of queueing behind the stuck send.
+      const second = backend.prompt('y', { context_mode: 'continue' });
+      const secondAssertion = expect(second).rejects.toThrow(/send timed out/u);
+      await vi.advanceTimersByTimeAsync(30);
+      await secondAssertion;
+      expect(created).toBe(2);
+      await backend.resetSession();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('aborts while Agent.create is in flight and closes the late-resolving agent', async () => {
+    const controller = new AbortController();
+    let closed = 0;
+    const runtime: CursorSdkRuntime = {
+      createAgent() {
+        return new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                async send() {
+                  return {
+                    wait: () => Promise.resolve(finished('late')),
+                    async cancel() {},
+                  };
+                },
+                close() {
+                  closed += 1;
+                },
+              }),
+            50
+          )
+        );
+      },
+    };
+    const backend = new CursorSdkReasoningBackend({ runtime, apiKey: 'k' });
+    const pending = backend.prompt('x', { signal: controller.signal });
+    setTimeout(() => controller.abort(), 10);
+    await expect(pending).rejects.toThrow(/aborted/u);
+    await vi.waitFor(() => expect(closed).toBe(1));
+  });
+
+  it('aborts while send is in flight and cancels the late-arriving run', async () => {
+    const controller = new AbortController();
+    let cancelled = 0;
+    const runtime: CursorSdkRuntime = {
+      async createAgent() {
+        return {
+          send() {
+            return new Promise((resolve) =>
+              setTimeout(
+                () =>
+                  resolve({
+                    wait: () => Promise.resolve(finished('late')),
+                    async cancel() {
+                      cancelled += 1;
+                    },
+                  }),
+                50
+              )
+            );
+          },
+          close() {
+            return undefined;
+          },
+        };
+      },
+    };
+    const backend = new CursorSdkReasoningBackend({ runtime, apiKey: 'k' });
+    const pending = backend.prompt('x', { signal: controller.signal });
+    setTimeout(() => controller.abort(), 10);
+    await expect(pending).rejects.toThrow(/aborted/u);
+    await vi.waitFor(() => expect(cancelled).toBe(1));
+  });
+
+  it('wraps raw SDK rejections in the prefixed error surface', async () => {
+    const fake = fakeRuntime([new Error('socket reset')]);
+    const backend = new CursorSdkReasoningBackend({ runtime: fake.runtime, apiKey: 'k' });
+    await expect(backend.prompt('x')).rejects.toThrow(
+      /\[cursor-sdk\] run\.wait failed: socket reset/u
+    );
+  });
+
+  it('reads the call timeout from the governed env accessor', () => {
+    expect(buildCursorSdkOptionsFromEnv({ KYBERION_CURSOR_SDK_TIMEOUT_MS: '45000' })).toEqual({
+      timeoutMs: 45000,
+    });
+    expect(buildCursorSdkOptionsFromEnv({ KYBERION_CURSOR_SDK_TIMEOUT_MS: 'nope' })).toEqual({});
+    expect(buildCursorSdkOptionsFromEnv({ KYBERION_CURSOR_SDK_TIMEOUT_MS: '0' })).toEqual({});
   });
 
   it('fails before any SDK call when no API key resolves', async () => {

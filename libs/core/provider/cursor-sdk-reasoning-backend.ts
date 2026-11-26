@@ -296,10 +296,15 @@ export function buildCursorSdkOptionsFromEnv(
     .toLowerCase();
   const ttl = getRegisteredEnvText('KYBERION_CURSOR_SDK_SESSION_IDLE_TTL_MS', { env })?.trim();
   const ttlMs = ttl ? Number(ttl) : undefined;
+  const timeout = getRegisteredEnvText('KYBERION_CURSOR_SDK_TIMEOUT_MS', { env })?.trim();
+  const timeoutMs = timeout ? Number(timeout) : undefined;
   return {
     ...(model ? { model } : {}),
     ...(ttlMs !== undefined && Number.isFinite(ttlMs) && ttlMs >= 0
       ? { sessionIdleTtlMs: ttlMs }
+      : {}),
+    ...(timeoutMs !== undefined && Number.isFinite(timeoutMs) && timeoutMs > 0
+      ? { timeoutMs }
       : {}),
     ...(native === '1' || native === 'true' ? { nativeSystemPrompt: true } : {}),
   };
