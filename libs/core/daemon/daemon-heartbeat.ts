@@ -30,6 +30,8 @@ export interface HeartbeatOptions {
   rootDir?: string;
   now?: Date;
   staleAfterMs?: number;
+  /** Optional per-daemon staleness overrides (e.g. active dot max_idle_wake_ms). */
+  staleAfterMsByDaemonId?: ReadonlyMap<string, number>;
 }
 
 const DEFAULT_STALE_AFTER_MS = 3 * 60 * 1000;
@@ -64,6 +66,11 @@ function daemonHeartbeatCatalogAtPath(filePath: string) {
     path: filePath,
     schema: DAEMON_HEARTBEAT_SCHEMA_PATH,
   });
+}
+
+/** Heartbeat directory for a given repository checkout root. */
+export function repoHeartbeatDir(repoRoot: string): string {
+  return path.join(repoRoot, 'active', 'shared', 'runtime', 'heartbeats');
 }
 
 function heartbeatRoot(rootDir?: string): string {
@@ -137,7 +144,10 @@ export function readDaemonHeartbeat(
       return { daemon_id: daemonId, status: 'malformed', reason: 'timestamp is invalid' };
     }
     const ageMs = now - timestamp;
-    const staleAfterMs = options.staleAfterMs ?? DEFAULT_STALE_AFTER_MS;
+    const staleAfterMs =
+      options.staleAfterMsByDaemonId?.get(daemonId) ??
+      options.staleAfterMs ??
+      DEFAULT_STALE_AFTER_MS;
     // A daemon that reports `stale_code` knows its loaded build is older than
     // the current dist — heartbeats may still be fresh, but the process must
     // be recycled onto the new build, so it counts as unhealthy.
