@@ -167,7 +167,29 @@ function literalRepoPath(value: string): string | undefined {
   if (!value.trim() || path.posix.isAbsolute(value) || /^[A-Za-z]:|\\/u.test(value))
     return undefined;
   const normalized = path.posix.normalize(value.trim());
-  return normalized.startsWith('..') ? undefined : normalized.replace(/\/+$/u, '');
+  return normalized.startsWith('..') ? undefined : stripTrailingSlashes(normalized);
+}
+
+// Linear scans instead of regexes: these run on authored pipeline text
+// (CodeQL js/polynomial-redos).
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') end -= 1;
+  return value.slice(0, end);
+}
+
+/** True when a `{{` template opened in `value` contains a path separator before its first `}`. */
+function templateSpansSeparator(value: string): boolean {
+  let from = value.indexOf('{{');
+  while (from >= 0) {
+    let i = from + 2;
+    for (; i < value.length && value[i] !== '}'; i += 1) {
+      if (value[i] === '/' || value[i] === '\\') return true;
+    }
+    // Every `{{` before position i shares the same separator-free span.
+    from = value.indexOf('{{', i);
+  }
+  return false;
 }
 
 export interface NativeWritePath {
@@ -207,7 +229,7 @@ export function nativeWritePath(
     : undefined;
   const confined =
     relative !== undefined &&
-    !/\{\{[^}]*[/\\]/u.test(name) &&
+    !templateSpansSeparator(name) &&
     roots.some((root) => withinRoot(relative, root) && relative !== root);
   return { path: authored, confined, suggested_path: `${roots[1]}/${name}` };
 }
