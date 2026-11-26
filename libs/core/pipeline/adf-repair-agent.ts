@@ -23,7 +23,10 @@ import {
 } from '../workforce/delegated-task-observability.js';
 import { createGapRecorder } from '../analysis/gap-phase.js';
 import { findRelevantPromotedKnowledge } from '../knowledge/promoted-knowledge-retrieval.js';
-import { recordKnowledgeDelivery } from '../knowledge/knowledge-feedback-loop.js';
+import {
+  recordKnowledgeDelivery,
+  recordKnowledgeUsageFeedback,
+} from '../knowledge/knowledge-feedback-loop.js';
 import { readHintsByCategory } from '../knowledge/feedback-loop.js';
 import { isLocalReasoningBackend } from '../reasoning/reasoning-egress-scope.js';
 import {
@@ -307,6 +310,13 @@ function validateRepairTarget(
  * knowledge section and falls back to `baseContext`, same fail-open shape
  * as the catch below.
  */
+interface AdfRepairKnowledgeContext {
+  context: string;
+  deliveredPaths: string[];
+  missionId: string;
+  taskId: string;
+}
+
 async function buildAdfRepairKnowledgeContext(
   adfPath: string,
   schemaName: string,
@@ -314,11 +324,18 @@ async function buildAdfRepairKnowledgeContext(
   hints: string,
   backendName: string,
   tenantSlug?: string
-): Promise<string> {
+): Promise<AdfRepairKnowledgeContext> {
   const baseContext = `ADF Repair: ${adfPath}`;
+  const missionId = `adf-repair:${schemaName}`;
+  const empty: AdfRepairKnowledgeContext = {
+    context: baseContext,
+    deliveredPaths: [],
+    missionId,
+    taskId: adfPath,
+  };
   try {
     const topic = [schemaName, errorSummary, hints].filter(Boolean).join(' ').slice(0, 2_000);
-    if (!topic.trim()) return baseContext;
+    if (!topic.trim()) return empty;
     // No mission here, so the reader is a public, tenantless scope: only
     // product/public promoted records can be admitted (D8).
     const entries = await findRelevantPromotedKnowledge({
@@ -326,7 +343,7 @@ async function buildAdfRepairKnowledgeContext(
       limit: ADF_REPAIR_KNOWLEDGE_HINT_LIMIT,
       minScore: 0.08,
     });
-    if (entries.length === 0) return baseContext;
+    if (entries.length === 0) return empty;
 
     if (!isLocalReasoningBackend(backendName)) {
       const providerId = providerIdForReasoningIdentifier(backendName);
@@ -341,7 +358,7 @@ async function buildAdfRepairKnowledgeContext(
           logger.warn(
             `[KP-02][XP-03] ADF repair knowledge egress denied for provider=${providerId} tier=${dataTier}: ${egressCheck.reason}`
           );
-          return baseContext;
+          return empty;
         }
       }
     }
@@ -354,19 +371,47 @@ async function buildAdfRepairKnowledgeContext(
       ),
     ];
     recordKnowledgeDelivery({
-      missionId: `adf-repair:${schemaName}`,
+      missionId,
       taskId: adfPath,
       recipientKind: 'adf_repair_agent',
       refs: entries.map((entry) => ({ path: entry.path, score: entry.score, title: entry.title })),
     });
-    return `${baseContext}\n\n${lines.join('\n')}`;
+    return {
+      context: `${baseContext}\n\n${lines.join('\n')}`,
+      deliveredPaths: entries.map((entry) => entry.path),
+      missionId,
+      taskId: adfPath,
+    };
   } catch (error) {
     logger.warn(
       `[KP-02] ADF repair knowledge lookup failed, delegating without knowledge context: ${
         error instanceof Error ? error.message : String(error)
       }`
     );
-    return baseContext;
+    return empty;
+  }
+}
+
+function recordAdfRepairKnowledgeOutcome(
+  knowledge: AdfRepairKnowledgeContext,
+  repaired: boolean,
+  resultId: string
+): void {
+  if (knowledge.deliveredPaths.length === 0) return;
+  try {
+    recordKnowledgeUsageFeedback({
+      missionId: knowledge.missionId,
+      taskId: knowledge.taskId,
+      resultId,
+      outcome: repaired ? 'worker_report_complete' : 'incomplete',
+      feedback: {
+        used: repaired ? knowledge.deliveredPaths : [],
+        not_used: repaired ? [] : knowledge.deliveredPaths,
+        missing_topics: [],
+      },
+    });
+  } catch {
+    /* fail-open: telemetry never blocks ADF repair */
   }
 }
 
@@ -450,7 +495,7 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
     assertAdfRepairFile(adfPath);
     const workItem = options.workItemId ? getWorkItem(options.workItemId) : null;
     const tenantSlug = workItem?.context?.tenant_slug?.trim();
-    const repairContext = await gaps.measure('knowledge_slice', () =>
+    const repairKnowledge = await gaps.measure('knowledge_slice', () =>
       buildAdfRepairKnowledgeContext(
         adfPath,
         schemaName,
@@ -460,6 +505,7 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
         tenantSlug
       )
     );
+    const repairContext = repairKnowledge.context;
     const report = await gaps.measure('backend_dispatch', async () => {
       if (!options.workItemId) {
         return backend.delegateTask(instruction, repairContext, advisoryOptions);
@@ -519,11 +565,13 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
       )
         throw new Error('[REPAIR_ASSURANCE] committed candidate failed read-back validation');
       logger.success(`[adf-repair] Host committed validated candidate for ${adfPath}.`);
+      recordAdfRepairKnowledgeOutcome(repairKnowledge, true, trace.trace_id);
       completeDelegatedTaskTrace(trace, { resultSummary: report, gapPhases: gaps.samples() });
       return { repaired: true, report };
     }
 
     const finalErrors = finalValidation.errors.map((e) => `${e.field}: ${e.message}`);
+    recordAdfRepairKnowledgeOutcome(repairKnowledge, false, trace.trace_id);
     completeDelegatedTaskTrace(trace, {
       resultSummary: `repair completed but validation still failed: ${finalErrors.join('; ')}`,
       gapPhases: gaps.samples(),

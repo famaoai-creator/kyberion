@@ -348,6 +348,36 @@
       "band": "act"
     },
     {
+      "name": "kyberion.knowledge.recall",
+      "description": "Recall relevant promoted knowledge records for an interactive MCP session and record scoped delivery telemetry.",
+      "category": "knowledge",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public", "confidential", "personal"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "discover"
+    },
+    {
+      "name": "kyberion.knowledge.cite",
+      "description": "Record used, not_used, or missing_topics usage feedback for promoted knowledge delivered to an interactive MCP session.",
+      "category": "knowledge",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public", "confidential", "personal"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "act"
+    },
+    {
+      "name": "kyberion.knowledge.capture_correction",
+      "description": "Capture a conversational rule or preference correction (IL-05) with secret/PII scrubbing inside the resolved scope.",
+      "category": "knowledge",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public", "confidential", "personal"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "act"
+    },
+    {
       "name": "kyberion.skill.list",
       "description": "List transferable first-party Kyberion skills (SKILL.md) for MCP clients.",
       "category": "skill",

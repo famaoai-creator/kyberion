@@ -20,6 +20,7 @@ export {
   writeKnowledgeUsageAggregateAtPath,
 } from './knowledge-usage-aggregate.js';
 export * from './knowledge-weight-recalculation.js';
+export * from './memory-loop-session.js';
 export * from './memory-notebook.js';
 export * from './memory-promotion-git.js';
 export * from './memory-promotion-queue.js';

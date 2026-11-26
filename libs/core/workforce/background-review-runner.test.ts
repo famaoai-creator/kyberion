@@ -31,7 +31,10 @@ import {
 } from '../surface/surface-coordination-store.js';
 import { resolveSurfaceApprovalReply } from '../surface/surface-approval-ui.js';
 import { findRelevantPromotedKnowledge } from '../knowledge/promoted-knowledge-retrieval.js';
-import { knowledgeDeliveryLogDir } from '../knowledge/knowledge-feedback-loop.js';
+import {
+  knowledgeDeliveryLogDir,
+  loadKnowledgeUsageAggregate,
+} from '../knowledge/knowledge-feedback-loop.js';
 import { getReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
 import {
   runBackgroundReviewFork,
@@ -626,6 +629,61 @@ describe('background-review-runner', () => {
           title: 'Delivery test doc',
         })
       );
+    });
+
+    it('records cited delivered paths as used and uncited delivered paths as not_used', async () => {
+      const usagePath = pathResolver.sharedTmp(`kp02-bgr-usage-${process.pid}/usage.json`);
+      const feedbackDir = pathResolver.sharedTmp(`kp02-bgr-feedback-${process.pid}`);
+      const prevUsage = process.env.KYBERION_KNOWLEDGE_USAGE_PATH;
+      const prevFeedback = process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR;
+      process.env.KYBERION_KNOWLEDGE_USAGE_PATH = usagePath;
+      process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR = feedbackDir;
+      safeRmSync(path.dirname(usagePath), { recursive: true, force: true });
+      safeRmSync(feedbackDir, { recursive: true, force: true });
+
+      try {
+        const sessionId = `runner-knowledge-usage-${process.pid}-${Date.now()}`;
+        sessionIds.add(sessionId);
+        const usedDoc = 'knowledge/product/evolution/patterns/generated/mem-BGR-USED.md';
+        const unusedDoc = 'knowledge/product/evolution/patterns/generated/mem-BGR-UNUSED.md';
+        vi.mocked(findRelevantPromotedKnowledge).mockResolvedValueOnce([
+          { path: usedDoc, title: 'Used doc', tags: [], excerpt: 'Used.', score: 0.7 },
+          { path: unusedDoc, title: 'Unused doc', tags: [], excerpt: 'Unused.', score: 0.4 },
+        ]);
+
+        const res = await runBackgroundReviewFork({
+          sessionId,
+          surface: 'slack',
+          snapshot: 'Review checklist repetition.',
+          backend: {
+            delegateTask: async () =>
+              JSON.stringify({
+                action: 'no_action',
+                used_knowledge_paths: [usedDoc],
+              }),
+          },
+        });
+
+        expect(res.status).toBe('no_action');
+        const aggregate = loadKnowledgeUsageAggregate();
+        expect(aggregate.find((e) => e.document_path === usedDoc)).toMatchObject({
+          delivered_count: 1,
+          used_count: 1,
+          not_used_count: 0,
+        });
+        expect(aggregate.find((e) => e.document_path === unusedDoc)).toMatchObject({
+          delivered_count: 1,
+          used_count: 0,
+          not_used_count: 1,
+        });
+      } finally {
+        if (prevUsage === undefined) delete process.env.KYBERION_KNOWLEDGE_USAGE_PATH;
+        else process.env.KYBERION_KNOWLEDGE_USAGE_PATH = prevUsage;
+        if (prevFeedback === undefined) delete process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR;
+        else process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR = prevFeedback;
+        safeRmSync(path.dirname(usagePath), { recursive: true, force: true });
+        safeRmSync(feedbackDir, { recursive: true, force: true });
+      }
     });
   });
 });

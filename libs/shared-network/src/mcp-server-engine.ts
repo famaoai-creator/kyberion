@@ -102,6 +102,7 @@ import type { McpRequestContext } from './mcp-request-context.js';
 import { parseMcpTextPayload, parseSafeJsonObject } from './mcp-json.js';
 import { registerKyberionServiceCaptureTool } from './mcp-service-capture-tool.js';
 import { registerMcpFacadeDiscoverTools } from './mcp-facade-discover.js';
+import { registerMcpFacadeMemoryLoopTools } from './mcp-facade-memory-loop.js';
 import { registerMcpFacadeWorkspaceTools } from './mcp-facade-workspace.js';
 import { registerMcpFacadeActTools } from './mcp-facade-act.js';
 import {
@@ -791,6 +792,7 @@ export function createKyberionMcpServer(): McpServer {
 
   // ── discover-band facade tools (scope.current, skill.list/.get, resource) ──
   registerMcpFacadeDiscoverTools({ server, catalog, registerGovernedTool });
+  registerMcpFacadeMemoryLoopTools({ server, catalog, registerGovernedTool });
   registerMcpFacadeWorkspaceTools({ server, catalog, registerGovernedTool });
   registerMcpMissionLifecycleTools({
     server,

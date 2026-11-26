@@ -146,4 +146,5 @@ export * from './secret/account-broker.js';
 export * from './dot/dot-task-session-tools.js';
 export * from './governance/autonomous-loop-readiness.js';
 export * from './knowledge/conversational-correction-learning.js';
+export * from './knowledge/memory-loop-session.js';
 export * from './surface/attention-triage.js';

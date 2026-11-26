@@ -235,6 +235,9 @@ const governedToolNames = [
   'kyberion.pipeline.run',
   'kyberion.pipeline.job_status',
   'kyberion.knowledge.search',
+  'kyberion.knowledge.recall',
+  'kyberion.knowledge.cite',
+  'kyberion.knowledge.capture_correction',
   'kyberion.capability.list',
   'kyberion.capability.search',
   'kyberion.skill.list',
@@ -307,6 +310,9 @@ describe('createKyberionMcpServer()', () => {
     expect(registeredTools.has('kyberion.pipeline.list')).toBe(true);
     expect(registeredTools.has('kyberion.pipeline.run')).toBe(true);
     expect(registeredTools.has('kyberion.knowledge.search')).toBe(true);
+    expect(registeredTools.has('kyberion.knowledge.recall')).toBe(true);
+    expect(registeredTools.has('kyberion.knowledge.cite')).toBe(true);
+    expect(registeredTools.has('kyberion.knowledge.capture_correction')).toBe(true);
     expect(registeredTools.has('kyberion.capability.list')).toBe(true);
     expect(registeredTools.has('kyberion.capability.search')).toBe(true);
     expect(registeredTools.has('kyberion.skill.list')).toBe(true);
