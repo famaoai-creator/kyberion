@@ -45,7 +45,9 @@ import {
 import {
   resetCursorSdkCapabilityCache,
   runCursorSdkText,
+  type CursorSdkAgent,
   type CursorSdkCreateAgentOptions,
+  type CursorSdkRun,
   type CursorSdkRunResult,
   type CursorSdkRuntime,
 } from './cursor-sdk-query.js';
@@ -388,9 +390,11 @@ describe('cursor-sdk-reasoning-backend', () => {
             return {
               wait: () =>
                 new Promise<CursorSdkRunResult>((resolve) => {
-                  controller.signal.addEventListener('abort', () =>
-                    resolve({ status: 'cancelled' })
-                  );
+                  // Deterministic ordering: abort fires exactly when wait
+                  // begins, so waitForRun's listener is already attached and
+                  // the cancel path is exercised without a wall-clock delay.
+                  controller.abort();
+                  resolve({ status: 'cancelled' });
                 }),
               async cancel() {
                 cancelled += 1;
@@ -404,9 +408,7 @@ describe('cursor-sdk-reasoning-backend', () => {
       },
     };
     const backend = new CursorSdkReasoningBackend({ runtime, apiKey: 'k' });
-    const pending = backend.prompt('x', { signal: controller.signal });
-    setTimeout(() => controller.abort(), 10);
-    await expect(pending).rejects.toThrow(/cancelled/u);
+    await expect(backend.prompt('x', { signal: controller.signal })).rejects.toThrow(/cancelled/u);
     expect(cancelled).toBe(1);
   });
 
@@ -420,10 +422,7 @@ describe('cursor-sdk-reasoning-backend', () => {
             // Abort lands after send() resolves but before waitForRun can
             // attach its listener — the run must still be cancelled.
             const run = {
-              wait: () =>
-                new Promise<CursorSdkRunResult>((resolve) =>
-                  setTimeout(() => resolve({ status: 'cancelled' }), 5)
-                ),
+              wait: () => new Promise<CursorSdkRunResult>(() => undefined),
               async cancel() {
                 cancelled += 1;
               },
@@ -448,25 +447,13 @@ describe('cursor-sdk-reasoning-backend', () => {
     vi.useFakeTimers();
     try {
       let closed = 0;
+      let releaseCreate!: (agent: CursorSdkAgent) => void;
       const runtime: CursorSdkRuntime = {
         createAgent() {
-          return new Promise((resolve) =>
-            setTimeout(
-              () =>
-                resolve({
-                  async send() {
-                    return {
-                      wait: () => Promise.resolve(finished('late')),
-                      async cancel() {},
-                    };
-                  },
-                  close() {
-                    closed += 1;
-                  },
-                }),
-              100
-            )
-          );
+          // Held open until the test releases it — deterministic late resolve.
+          return new Promise<CursorSdkAgent>((resolve) => {
+            releaseCreate = resolve;
+          });
         },
       };
       const backend = new CursorSdkReasoningBackend({
@@ -479,7 +466,18 @@ describe('cursor-sdk-reasoning-backend', () => {
       await vi.advanceTimersByTimeAsync(30);
       await assertion;
       // The create resolves later than the deadline — the agent is closed, not leaked.
-      await vi.advanceTimersByTimeAsync(100);
+      releaseCreate({
+        async send() {
+          return {
+            wait: () => Promise.resolve(finished('late')),
+            async cancel() {},
+          };
+        },
+        close() {
+          closed += 1;
+        },
+      });
+      await vi.advanceTimersByTimeAsync(0);
       expect(closed).toBe(1);
     } finally {
       vi.useRealTimers();
@@ -524,22 +522,15 @@ describe('cursor-sdk-reasoning-backend', () => {
     vi.useFakeTimers();
     try {
       let cancelled = 0;
+      let releaseSend!: (run: CursorSdkRun) => void;
       const runtime: CursorSdkRuntime = {
         async createAgent() {
           return {
             send() {
-              return new Promise((resolve) =>
-                setTimeout(
-                  () =>
-                    resolve({
-                      wait: () => Promise.resolve(finished('late')),
-                      async cancel() {
-                        cancelled += 1;
-                      },
-                    }),
-                  100
-                )
-              );
+              // Held open until the test releases it — deterministic late resolve.
+              return new Promise<CursorSdkRun>((resolve) => {
+                releaseSend = resolve;
+              });
             },
             close() {
               return undefined;
@@ -557,7 +548,13 @@ describe('cursor-sdk-reasoning-backend', () => {
       await vi.advanceTimersByTimeAsync(30);
       await assertion;
       // The late run is swept: cancelled rather than left running provider-side.
-      await vi.advanceTimersByTimeAsync(100);
+      releaseSend({
+        wait: () => Promise.resolve(finished('late')),
+        async cancel() {
+          cancelled += 1;
+        },
+      });
+      await vi.advanceTimersByTimeAsync(0);
       expect(cancelled).toBe(1);
     } finally {
       vi.useRealTimers();
@@ -604,53 +601,50 @@ describe('cursor-sdk-reasoning-backend', () => {
   it('aborts while Agent.create is in flight and closes the late-resolving agent', async () => {
     const controller = new AbortController();
     let closed = 0;
+    let releaseCreate!: (agent: CursorSdkAgent) => void;
     const runtime: CursorSdkRuntime = {
       createAgent() {
-        return new Promise((resolve) =>
-          setTimeout(
-            () =>
-              resolve({
-                async send() {
-                  return {
-                    wait: () => Promise.resolve(finished('late')),
-                    async cancel() {},
-                  };
-                },
-                close() {
-                  closed += 1;
-                },
-              }),
-            50
-          )
-        );
+        // Held open so the abort lands deterministically inside the create
+        // window; the test releases it after the rejection.
+        return new Promise<CursorSdkAgent>((resolve) => {
+          releaseCreate = resolve;
+        });
       },
     };
     const backend = new CursorSdkReasoningBackend({ runtime, apiKey: 'k' });
     const pending = backend.prompt('x', { signal: controller.signal });
-    setTimeout(() => controller.abort(), 10);
+    // The create is definitively in flight before the abort lands.
+    await vi.waitFor(() => expect(releaseCreate).toBeTruthy());
+    controller.abort();
     await expect(pending).rejects.toThrow(/aborted/u);
+    // The create resolves after the abort — the agent is closed, not leaked.
+    releaseCreate({
+      async send() {
+        return {
+          wait: () => Promise.resolve(finished('late')),
+          async cancel() {},
+        };
+      },
+      close() {
+        closed += 1;
+      },
+    });
     await vi.waitFor(() => expect(closed).toBe(1));
   });
 
   it('aborts while send is in flight and cancels the late-arriving run', async () => {
     const controller = new AbortController();
     let cancelled = 0;
+    let releaseSend!: (run: CursorSdkRun) => void;
     const runtime: CursorSdkRuntime = {
       async createAgent() {
         return {
           send() {
-            return new Promise((resolve) =>
-              setTimeout(
-                () =>
-                  resolve({
-                    wait: () => Promise.resolve(finished('late')),
-                    async cancel() {
-                      cancelled += 1;
-                    },
-                  }),
-                50
-              )
-            );
+            // Held open so the abort lands deterministically inside the send
+            // window; the test releases it after the rejection.
+            return new Promise<CursorSdkRun>((resolve) => {
+              releaseSend = resolve;
+            });
           },
           close() {
             return undefined;
@@ -660,8 +654,17 @@ describe('cursor-sdk-reasoning-backend', () => {
     };
     const backend = new CursorSdkReasoningBackend({ runtime, apiKey: 'k' });
     const pending = backend.prompt('x', { signal: controller.signal });
-    setTimeout(() => controller.abort(), 10);
+    // The send is definitively in flight before the abort lands.
+    await vi.waitFor(() => expect(releaseSend).toBeTruthy());
+    controller.abort();
     await expect(pending).rejects.toThrow(/aborted/u);
+    // The run arrives after the abort — it is cancelled, not left running.
+    releaseSend({
+      wait: () => Promise.resolve(finished('late')),
+      async cancel() {
+        cancelled += 1;
+      },
+    });
     await vi.waitFor(() => expect(cancelled).toBe(1));
   });
 
