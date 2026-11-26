@@ -14,6 +14,7 @@ import {
   safeExistsSync,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import { inheritPptxTemplate } from '@agent/core/media/pptx-utils';
 import { missionPathOrNull } from '@agent/core/mission-lookup';
 import {
   detectRasterCapabilities,
@@ -40,6 +41,7 @@ import {
 import { recognizeDocumentImage } from './media-ocr.js';
 import {
   assertMediaProtocolLayoutReady,
+  enforceMediaPptxTextFit,
   summarizeMediaPptxLayout,
 } from './media-document-pipeline-helpers.js';
 import {
@@ -424,6 +426,27 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       }
       return nextCtx;
     },
+    pptx_inherit_template: async () => {
+      const fromKey = resolve(params.from) || 'last_pptx_design';
+      const slidesKey = params.slides_from ? String(resolve(params.slides_from)) : undefined;
+      if (params.slides !== undefined && slidesKey) {
+        throw new Error(
+          `pptx_inherit_template: both slides and slides_from were given — the slide source is ambiguous | next: pass one of them | evidence: slides_from=${slidesKey}`
+        );
+      }
+      const design = ctx[fromKey];
+      if (!design) {
+        throw new Error(
+          `pptx_inherit_template could not find context key: ${fromKey} — the template design is missing | next: run media:pptx_extract first or set params.from | evidence: from=${fromKey}`
+        );
+      }
+      const slides = slidesKey ? ctx[slidesKey] : resolve(params.slides);
+      const result = inheritPptxTemplate(design, slides);
+      return {
+        ...ctx,
+        [params.export_as || 'last_pptx_design']: result.design,
+      };
+    },
     proposal_storyline_from_brief: async () => {
       const fromKey = resolve(params.from) || 'last_json';
       const rawBrief = ctx[fromKey];
@@ -663,11 +686,16 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       assertMediaProtocolLayoutReady(protocol, {
         allowLayoutOverflow: params.allow_layout_overflow === true,
       });
+      const textFit = enforceMediaPptxTextFit(protocol, {
+        op: 'pptx_layout_preflight',
+        level: resolve(params.text_fit),
+        allowLayoutOverflow: params.allow_layout_overflow === true,
+      });
       const diagnostics =
         protocol?.metadata?.layoutDiagnostics || summarizeMediaPptxLayout(protocol);
       return {
         ...ctx,
-        [params.export_as || 'media_layout_diagnostics']: diagnostics,
+        [params.export_as || 'media_layout_diagnostics']: { ...diagnostics, textFit },
       };
     },
     lock_media_brief: async () => {

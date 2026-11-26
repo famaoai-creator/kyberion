@@ -309,6 +309,59 @@ export function rasterizeDocument(input: RasterizeDocumentInput): RasterResult {
     };
   }
 
+  const converted = convertDocumentToPdf(input);
+  if (!converted.available || !converted.pdfPath || !converted.workDir) {
+    return { available: false, images: [], unavailable_reason: converted.unavailable_reason };
+  }
+  const { pdfPath, workDir } = converted;
+  const pdfName = path.basename(pdfPath);
+
+  const pagePrefix = path.join(workDir, 'page');
+  const args = ['-png', '-r', String(input.dpi ?? 150)];
+  if (input.maxPages) args.push('-f', '1', '-l', String(input.maxPages));
+  args.push(pdfPath, pagePrefix);
+  try {
+    safeExec('pdftoppm', args, { timeoutMs: 180_000, cwd: pathResolver.rootDir() });
+  } catch (error: any) {
+    return {
+      available: false,
+      images: [],
+      unavailable_reason: `pdftoppm could not rasterize ${pdfName}: ${error?.message || error}`,
+    };
+  }
+  return collectPageImages(workDir, pdfName);
+}
+
+export interface ConvertDocumentToPdfInput {
+  /** Path to the .pptx/.docx to convert (project-relative or absolute). */
+  sourcePath: string;
+  /** Label used for the working directory; keep it slug-like. */
+  label: string;
+  /** Mission-local output directory (required for non-public tiers). */
+  workDir?: string;
+  tier?: VisualReviewTier;
+  tenantSlug?: string;
+  missionId?: string;
+}
+
+export interface ConvertDocumentToPdfResult {
+  available: boolean;
+  /** Absolute path of the produced PDF, when available. */
+  pdfPath?: string;
+  /** Run directory the PDF was written to. */
+  workDir?: string;
+  unavailable_reason?: string;
+}
+
+/**
+ * Convert an office document to PDF with LibreOffice, headless and offline.
+ *
+ * `soffice` runs with an isolated user profile so a check never touches the
+ * operator's real LibreOffice state. Missing LibreOffice or a failed
+ * conversion is a degradation (available: false + reason), never an
+ * exception: a check that could not render must not take down the pipeline.
+ */
+export function convertDocumentToPdf(input: ConvertDocumentToPdfInput): ConvertDocumentToPdfResult {
   const scoped = assertVisualReviewPathScope({
     artifactPath: input.sourcePath,
     workDir: input.workDir,
@@ -317,19 +370,22 @@ export function rasterizeDocument(input: RasterizeDocumentInput): RasterResult {
     missionId: input.missionId,
   });
   const sourcePath = scoped.artifactPath;
-  if (!safeExistsSync(sourcePath)) {
+  const sofficeResolved = resolveSofficeBinary();
+  if (!sofficeResolved) {
     return {
       available: false,
-      images: [],
-      unavailable_reason: `source artifact not found: ${sourcePath}`,
+      unavailable_reason: `cannot convert ${path.basename(sourcePath)} to PDF on this host: missing soffice. Install ${rasterInstallHint(['soffice'])} to enable it.`,
     };
+  }
+  if (!safeExistsSync(sourcePath)) {
+    return { available: false, unavailable_reason: `source artifact not found: ${sourcePath}` };
   }
 
   const workDir = resolveWorkDir(input.label, scoped.workDir);
   const profileDir = path.join(workDir, 'lo-profile');
   safeMkdir(profileDir, { recursive: true });
 
-  const sofficeBin = resolveSofficeBinary() ?? 'soffice';
+  const sofficeBin = sofficeResolved;
   // A conversion failure is a degradation, not a crash: the caller asked for a
   // review and must get back "could not look at it", not an exception that
   // takes down the surrounding pipeline.
@@ -351,7 +407,7 @@ export function rasterizeDocument(input: RasterizeDocumentInput): RasterResult {
   } catch (error: any) {
     return {
       available: false,
-      images: [],
+      workDir,
       unavailable_reason: `LibreOffice could not convert ${path.basename(sourcePath)}: ${error?.message || error}`,
     };
   }
@@ -361,25 +417,14 @@ export function rasterizeDocument(input: RasterizeDocumentInput): RasterResult {
   if (!safeExistsSync(pdfPath)) {
     return {
       available: false,
-      images: [],
+      workDir,
       unavailable_reason: `LibreOffice produced no PDF for ${path.basename(sourcePath)}`,
     };
   }
+  return { available: true, pdfPath, workDir };
+}
 
-  const pagePrefix = path.join(workDir, 'page');
-  const args = ['-png', '-r', String(input.dpi ?? 150)];
-  if (input.maxPages) args.push('-f', '1', '-l', String(input.maxPages));
-  args.push(pdfPath, pagePrefix);
-  try {
-    safeExec('pdftoppm', args, { timeoutMs: 180_000, cwd: pathResolver.rootDir() });
-  } catch (error: any) {
-    return {
-      available: false,
-      images: [],
-      unavailable_reason: `pdftoppm could not rasterize ${pdfName}: ${error?.message || error}`,
-    };
-  }
-
+function collectPageImages(workDir: string, pdfName: string): RasterResult {
   const images = safeReaddir(workDir)
     .filter((name: string) => name.startsWith('page') && name.endsWith('.png'))
     .sort((a: string, b: string) => {

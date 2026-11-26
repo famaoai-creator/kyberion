@@ -252,6 +252,84 @@ export function buildShape(
     };
     const align = alignMap[el.style?.align || 'left'];
 
+    // Every paragraph produced from this element (one per "\n" split) shares
+    // the same computed pPr, so it is built once here — before any paragraph is
+    // emitted. Building it after the run loop applied align/spacing/bullets only
+    // to the first paragraph and left lines 2+ with the bare base pPr.
+    let finalPPr = basePPr;
+    if (align) {
+      finalPPr = finalPPr.includes(' algn="')
+        ? finalPPr.replace(/ algn="[^"]*"/, ` algn="${align}"`)
+        : finalPPr.replace('<a:pPr', `<a:pPr algn="${align}"`);
+    }
+    // Each child below is inserted at its schema-correct slot via
+    // insertInSchemaOrder rather than a bare append, so the result is correct
+    // regardless of which of these blocks happens to run first \u2014 see the
+    // PPR_CHILD_ORDER comment above for why call-order was never safe to rely on.
+    if (el.style?.lineSpacing && !finalPPr.includes('<a:lnSpc>')) {
+      const spcXml = `<a:lnSpc><a:spcPct val="${lineSpacingPctValue(el.style.lineSpacing)}"/></a:lnSpc>`;
+      finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', spcXml, 'a:lnSpc', PPR_CHILD_ORDER);
+    }
+    if (el.style?.spaceBefore && !finalPPr.includes('<a:spcBef>')) {
+      const spcXml = `<a:spcBef><a:spcPts val="${Math.round(el.style.spaceBefore * 100)}"/></a:spcBef>`;
+      finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', spcXml, 'a:spcBef', PPR_CHILD_ORDER);
+    }
+    if (el.style?.spaceAfter && !finalPPr.includes('<a:spcAft>')) {
+      const spcXml = `<a:spcAft><a:spcPts val="${Math.round(el.style.spaceAfter * 100)}"/></a:spcAft>`;
+      finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', spcXml, 'a:spcAft', PPR_CHILD_ORDER);
+    }
+    // Add bullet properties if specified and not already in pPr
+    if (
+      el.style?.bullet &&
+      !finalPPr.includes('<a:buChar') &&
+      !finalPPr.includes('<a:buAutoNum') &&
+      !finalPPr.includes('<a:buNone')
+    ) {
+      const bu = el.style.bullet;
+      // Add indent level attribute
+      if (bu.level !== undefined && !finalPPr.includes(' lvl="')) {
+        finalPPr = finalPPr.replace('<a:pPr', `<a:pPr lvl="${bu.level}"`);
+      }
+      // Add marL (indent in inches -> EMU)
+      if (bu.indent !== undefined && !finalPPr.includes(' marL="')) {
+        finalPPr = finalPPr.replace('<a:pPr', `<a:pPr marL="${inToEmu(bu.indent)}"`);
+      }
+      if (bu.color) {
+        const buClrXml = `<a:buClr><a:srgbClr val="${bu.color.replace('#', '')}"/></a:buClr>`;
+        finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', buClrXml, 'a:buClr', PPR_CHILD_ORDER);
+      }
+      if (bu.size !== undefined) {
+        const buSzXml = `<a:buSzPct val="${Math.round(bu.size * 1000)}"/>`;
+        finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', buSzXml, 'a:buSzPct', PPR_CHILD_ORDER);
+      }
+      if (bu.font) {
+        const buFontXml = `<a:buFont typeface="${bu.font}"/>`;
+        finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', buFontXml, 'a:buFont', PPR_CHILD_ORDER);
+      }
+      if (bu.type === 'char') {
+        const buCharXml = `<a:buChar char="${bu.char || '\u2022'}"/>`;
+        finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', buCharXml, 'a:buChar', PPR_CHILD_ORDER);
+      } else if (bu.type === 'autoNum') {
+        const startAttr = bu.startAt !== undefined ? ` startAt="${bu.startAt}"` : '';
+        const buAutoNumXml = `<a:buAutoNum type="${bu.numFormat || 'arabicPeriod'}"${startAttr}/>`;
+        finalPPr = insertInSchemaOrder(
+          finalPPr,
+          'a:pPr',
+          buAutoNumXml,
+          'a:buAutoNum',
+          PPR_CHILD_ORDER
+        );
+      } else if (bu.type === 'none') {
+        finalPPr = insertInSchemaOrder(
+          finalPPr,
+          'a:pPr',
+          '<a:buNone/>',
+          'a:buNone',
+          PPR_CHILD_ORDER
+        );
+      }
+    }
+
     const runs = el.textRuns || [{ text: el.text || '' }];
     let pContent = '';
     // Counts paragraph breaks owed across run boundaries — needed because a
@@ -339,9 +417,9 @@ export function buildShape(
         if (pendingBreaks > 0 && hasEmittedContent) {
           pContent += '</a:p>';
           for (let i = 0; i < pendingBreaks - 1; i++) {
-            pContent += `<a:p>${basePPr}<a:endParaRPr lang="${locale}"/></a:p>`;
+            pContent += `<a:p>${finalPPr}<a:endParaRPr lang="${locale}"/></a:p>`;
           }
-          pContent += `<a:p>${basePPr}`;
+          pContent += `<a:p>${finalPPr}`;
         }
         pendingBreaks = 0;
         hasEmittedContent = true;
@@ -353,80 +431,6 @@ export function buildShape(
         pContent += `<a:r>${rPr}${textNode}</a:r>`;
       });
     });
-
-    let finalPPr = basePPr;
-    if (align) {
-      finalPPr = finalPPr.includes(' algn="')
-        ? finalPPr.replace(/ algn="[^"]*"/, ` algn="${align}"`)
-        : finalPPr.replace('<a:pPr', `<a:pPr algn="${align}"`);
-    }
-    // Each child below is inserted at its schema-correct slot via
-    // insertInSchemaOrder rather than a bare append, so the result is correct
-    // regardless of which of these blocks happens to run first \u2014 see the
-    // PPR_CHILD_ORDER comment above for why call-order was never safe to rely on.
-    if (el.style?.lineSpacing && !finalPPr.includes('<a:lnSpc>')) {
-      const spcXml = `<a:lnSpc><a:spcPct val="${lineSpacingPctValue(el.style.lineSpacing)}"/></a:lnSpc>`;
-      finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', spcXml, 'a:lnSpc', PPR_CHILD_ORDER);
-    }
-    if (el.style?.spaceBefore && !finalPPr.includes('<a:spcBef>')) {
-      const spcXml = `<a:spcBef><a:spcPts val="${Math.round(el.style.spaceBefore * 100)}"/></a:spcBef>`;
-      finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', spcXml, 'a:spcBef', PPR_CHILD_ORDER);
-    }
-    if (el.style?.spaceAfter && !finalPPr.includes('<a:spcAft>')) {
-      const spcXml = `<a:spcAft><a:spcPts val="${Math.round(el.style.spaceAfter * 100)}"/></a:spcAft>`;
-      finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', spcXml, 'a:spcAft', PPR_CHILD_ORDER);
-    }
-    // Add bullet properties if specified and not already in pPr
-    if (
-      el.style?.bullet &&
-      !finalPPr.includes('<a:buChar') &&
-      !finalPPr.includes('<a:buAutoNum') &&
-      !finalPPr.includes('<a:buNone')
-    ) {
-      const bu = el.style.bullet;
-      // Add indent level attribute
-      if (bu.level !== undefined && !finalPPr.includes(' lvl="')) {
-        finalPPr = finalPPr.replace('<a:pPr', `<a:pPr lvl="${bu.level}"`);
-      }
-      // Add marL (indent in inches -> EMU)
-      if (bu.indent !== undefined && !finalPPr.includes(' marL="')) {
-        finalPPr = finalPPr.replace('<a:pPr', `<a:pPr marL="${inToEmu(bu.indent)}"`);
-      }
-      if (bu.color) {
-        const buClrXml = `<a:buClr><a:srgbClr val="${bu.color.replace('#', '')}"/></a:buClr>`;
-        finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', buClrXml, 'a:buClr', PPR_CHILD_ORDER);
-      }
-      if (bu.size !== undefined) {
-        const buSzXml = `<a:buSzPct val="${Math.round(bu.size * 1000)}"/>`;
-        finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', buSzXml, 'a:buSzPct', PPR_CHILD_ORDER);
-      }
-      if (bu.font) {
-        const buFontXml = `<a:buFont typeface="${bu.font}"/>`;
-        finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', buFontXml, 'a:buFont', PPR_CHILD_ORDER);
-      }
-      if (bu.type === 'char') {
-        const buCharXml = `<a:buChar char="${bu.char || '\u2022'}"/>`;
-        finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', buCharXml, 'a:buChar', PPR_CHILD_ORDER);
-      } else if (bu.type === 'autoNum') {
-        const startAttr = bu.startAt !== undefined ? ` startAt="${bu.startAt}"` : '';
-        const buAutoNumXml = `<a:buAutoNum type="${bu.numFormat || 'arabicPeriod'}"${startAttr}/>`;
-        finalPPr = insertInSchemaOrder(
-          finalPPr,
-          'a:pPr',
-          buAutoNumXml,
-          'a:buAutoNum',
-          PPR_CHILD_ORDER
-        );
-      } else if (bu.type === 'none') {
-        finalPPr = insertInSchemaOrder(
-          finalPPr,
-          'a:pPr',
-          '<a:buNone/>',
-          'a:buNone',
-          PPR_CHILD_ORDER
-        );
-      }
-    }
 
     textBody = `<p:txBody>${bodyPr}${lstStyle}<a:p>${finalPPr}${pContent}<a:endParaRPr lang="${locale}"/></a:p></p:txBody>`;
   }

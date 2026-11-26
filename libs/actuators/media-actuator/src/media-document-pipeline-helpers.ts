@@ -1,4 +1,9 @@
 import { pickStructuredSectionFields } from './media-structured-content.js';
+import { logger } from '@agent/core/core';
+import {
+  checkPptxTextFit,
+  type PptxTextFitReport,
+} from '@agent/shared-media/native-pptx-engine/protocol-text-fit';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { defineCatalog, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -174,6 +179,57 @@ export function assertMediaProtocolLayoutReady(
     `[MEDIA_LAYOUT] PPTX layout overflow detected in ${slides}. ` +
       'Shorten the brief or split the content, or explicitly set allow_layout_overflow=true for review-only output.'
   );
+}
+
+export type MediaTextFitLevel = 'error' | 'warn' | 'never';
+
+/**
+ * Measure every text box of a protocol (protocol-text-fit) and gate on it.
+ *
+ * The builder-recorded layoutDiagnostics only exist for brief / HTML decks; a
+ * hand-authored or template-derived protocol has none, which is how labels
+ * that wrapped and body text that ran out of its box passed pptx_render. This
+ * measures any protocol from its elements. `level` follows package_check:
+ * error = fail on overflow, warn = fail on overflow or unexpected_wrap,
+ * never = report only. Issues are always logged; allow_layout_overflow keeps
+ * its meaning (review-only output never fails).
+ */
+export function enforceMediaPptxTextFit(
+  protocol: unknown,
+  options: { op: string; level?: unknown; allowLayoutOverflow?: boolean }
+): PptxTextFitReport {
+  const level = String(options.level ?? 'never');
+  if (!['error', 'warn', 'never'].includes(level)) {
+    throw new Error(
+      `${options.op}: text_fit '${level}' is not supported — the gate level is ambiguous | next: use error, warn or never | evidence: text_fit=${level}`
+    );
+  }
+  const report = checkPptxTextFit(protocol as PptxDesignProtocol);
+  for (const issue of report.issues.slice(0, 12)) {
+    logger.warn(
+      `[MEDIA_TEXT_FIT] ${options.op}: slide ${issue.slideIndex} element ${issue.elementIndex}${issue.elementName ? ` (${issue.elementName})` : ''} ${issue.kind} "${issue.excerpt}" — ${issue.detail} | next: shorten the text, widen / heighten the box or lower the size | evidence: ${issue.shapeType} ${issue.fontSizePt}pt`
+    );
+  }
+  if (report.issues.length > 12) {
+    logger.warn(
+      `[MEDIA_TEXT_FIT] ${options.op}: ${report.issues.length - 12} more text-fit issue(s)`
+    );
+  }
+  const failing = report.issues.filter((issue) =>
+    level === 'never' ? false : level === 'warn' ? true : issue.severity === 'error'
+  );
+  if (failing.length > 0 && options.allowLayoutOverflow !== true) {
+    throw new Error(
+      `[MEDIA_TEXT_FIT] ${options.op}: ${failing.length} text box(es) at or above '${level}' do not hold their text — the rendered deck would wrap or overflow | next: shorten the text, enlarge the box or lower the size; rerun with text_fit: never (or allow_layout_overflow: true) to inspect | evidence: ${failing
+        .slice(0, 6)
+        .map(
+          (issue) =>
+            `slide ${issue.slideIndex} element ${issue.elementIndex} ${issue.kind} "${issue.excerpt}"`
+        )
+        .join('; ')}`
+    );
+  }
+  return report;
 }
 
 export function summarizeMediaPptxLayout(protocol: {

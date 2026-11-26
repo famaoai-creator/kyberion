@@ -9533,6 +9533,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -9564,6 +9567,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -9887,6 +9894,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -9918,6 +9928,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -10234,6 +10248,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -10265,6 +10282,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -10581,6 +10602,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -10612,6 +10636,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -10929,6 +10957,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -10960,6 +10991,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -11277,6 +11312,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -11308,6 +11346,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -11624,6 +11666,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -11655,6 +11700,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -11972,6 +12021,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -12003,6 +12055,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -12319,6 +12375,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -12350,6 +12409,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -12666,6 +12729,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -12697,6 +12763,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -13014,6 +13084,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -13045,6 +13118,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -13362,6 +13439,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -13393,6 +13473,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -13710,6 +13794,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -13741,6 +13828,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -14058,6 +14149,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -14089,6 +14183,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -14406,6 +14504,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -14437,6 +14538,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -14753,6 +14858,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -14784,6 +14892,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -15101,6 +15213,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -15132,6 +15247,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -15185,6 +15304,362 @@
             {
               "before": "active/shared/tmp/deck-before.pptx",
               "after": "active/shared/tmp/deck-after.pptx"
+            }
+          ]
+        },
+        {
+          "op": "pptx_render_check",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "after": {},
+              "after_from": {
+                "type": "string"
+              },
+              "allow_external_egress": {
+                "type": "boolean"
+              },
+              "allow_layout_overflow": {
+                "type": "boolean"
+              },
+              "angle": {
+                "type": "number"
+              },
+              "artifact_kind": {
+                "type": "string"
+              },
+              "artifact_path": {
+                "type": "string"
+              },
+              "aesthetic": {
+                "type": "string"
+              },
+              "aspect": {
+                "type": "string"
+              },
+              "backend": {},
+              "background_color": {
+                "type": "string"
+              },
+              "before": {},
+              "before_from": {
+                "type": "string"
+              },
+              "brief": {},
+              "brief_from": {
+                "type": "string"
+              },
+              "brand_name": {
+                "type": "string"
+              },
+              "bind": {},
+              "canvas": {},
+              "content": {},
+              "content_data": {},
+              "data": {},
+              "deck_css": {
+                "type": "string"
+              },
+              "delete": {
+                "type": "array"
+              },
+              "design_defaults": {},
+              "design_from": {
+                "type": "string"
+              },
+              "design_system_id": {
+                "type": "string"
+              },
+              "dpi": {
+                "type": "number"
+              },
+              "export_as": {
+                "type": "string"
+              },
+              "export_master_as": {
+                "type": "string"
+              },
+              "fail_on": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
+              },
+              "font": {
+                "type": "string"
+              },
+              "from": {
+                "type": "string"
+              },
+              "geometry": {},
+              "hints": {},
+              "height": {
+                "type": "number"
+              },
+              "html_paths": {
+                "type": "array"
+              },
+              "html": {
+                "type": "string"
+              },
+              "icon_map_path": {
+                "type": "string"
+              },
+              "icon_root": {
+                "type": "string"
+              },
+              "input_path": {
+                "type": "string"
+              },
+              "inputs": {
+                "type": "array"
+              },
+              "keep_indices": {
+                "type": "array"
+              },
+              "keep_indices_from": {
+                "type": "string"
+              },
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "layout": {
+                "type": "string"
+              },
+              "layout_from": {
+                "type": "string"
+              },
+              "lock_media_brief": {
+                "type": "boolean"
+              },
+              "message": {
+                "type": "string"
+              },
+              "mission_id": {
+                "type": "string"
+              },
+              "logo_url": {
+                "type": "string"
+              },
+              "match_mode": {
+                "type": "string"
+              },
+              "matchers": {
+                "type": "array"
+              },
+              "max_pages": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "artifact_class": {
+                "type": "string"
+              },
+              "organization_id": {
+                "type": "string"
+              },
+              "project_id": {
+                "type": "string"
+              },
+              "task_id": {
+                "type": "string"
+              },
+              "session_id": {
+                "type": "string"
+              },
+              "system": {
+                "type": "boolean"
+              },
+              "role": {
+                "type": "string"
+              },
+              "edits": {
+                "type": "array"
+              },
+              "if_exists": {
+                "type": "string"
+              },
+              "meta": {},
+              "ocr": {
+                "type": "boolean"
+              },
+              "options": {},
+              "order": {
+                "type": "array"
+              },
+              "output_format": {
+                "type": "string"
+              },
+              "output_path": {
+                "type": "string"
+              },
+              "owner_labels": {
+                "type": "array"
+              },
+              "owner_labels_from": {
+                "type": "string"
+              },
+              "out": {},
+              "out_dir": {
+                "type": "string"
+              },
+              "pad": {
+                "type": "number"
+              },
+              "pages": {
+                "type": "array"
+              },
+              "package_check": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
+              },
+              "paragraph_replacements": {},
+              "parts": {},
+              "path": {
+                "type": "string"
+              },
+              "pattern_path": {
+                "type": "string"
+              },
+              "password": {
+                "type": "string"
+              },
+              "prefix": {
+                "type": "string"
+              },
+              "profile": {},
+              "profile_id": {
+                "type": "string"
+              },
+              "profile_path": {
+                "type": "string"
+              },
+              "range": {
+                "type": "string"
+              },
+              "registry_path": {
+                "type": "string"
+              },
+              "replacements": {},
+              "replacements_from": {
+                "type": "string"
+              },
+              "replace_index": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "render_target": {
+                "type": "string"
+              },
+              "run_shape": {},
+              "set": {},
+              "sheet": {
+                "type": "string"
+              },
+              "skip_zero": {
+                "type": "boolean"
+              },
+              "sketch": {
+                "type": "string"
+              },
+              "slides": {
+                "type": "array"
+              },
+              "slides_from": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "storyline_from": {
+                "type": "string"
+              },
+              "manifest_path": {
+                "type": "string"
+              },
+              "pptx_from": {
+                "type": "string"
+              },
+              "story": {},
+              "stamp": {
+                "type": "string"
+              },
+              "subtitle_shape": {
+                "type": ["string", "integer"]
+              },
+              "target_path": {
+                "type": "string"
+              },
+              "template_index": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "tenant_slug": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
+              },
+              "theme": {},
+              "theme_from": {
+                "type": "string"
+              },
+              "theme_id": {
+                "type": "string"
+              },
+              "value": {},
+              "tier": {
+                "type": "string"
+              },
+              "timeout_ms": {
+                "type": "number"
+              },
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "user_password": {
+                "type": "string"
+              },
+              "owner_password": {
+                "type": "string"
+              },
+              "values_only": {
+                "type": "boolean"
+              },
+              "viewport_px": {
+                "type": "number"
+              },
+              "width": {
+                "type": "number"
+              },
+              "work_dir": {
+                "type": "string"
+              },
+              "web_from": {
+                "type": "string"
+              },
+              "web_theme_from": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": ["path"]
+          },
+          "examples": [
+            {
+              "path": "active/shared/tmp/deck.pptx",
+              "design_from": "last_pptx_design",
+              "fail_on": "error"
             }
           ]
         },
@@ -15449,6 +15924,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -15480,6 +15958,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -15796,6 +16278,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -15827,6 +16312,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -16143,6 +16632,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -16174,6 +16666,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -16490,6 +16986,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -16521,6 +17020,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -16836,6 +17339,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -16867,6 +17373,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -17182,6 +17692,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -17213,6 +17726,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -17528,6 +18045,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -17559,6 +18079,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -17885,6 +18409,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -17916,6 +18443,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -18231,6 +18762,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -18262,6 +18796,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -18577,6 +19115,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -18608,6 +19149,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -18923,6 +19468,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -18954,6 +19502,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -19269,6 +19821,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -19300,6 +19855,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -19615,6 +20174,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -19646,6 +20208,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -19961,6 +20527,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -19992,6 +20561,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -20307,6 +20880,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -20338,6 +20914,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -20654,6 +21234,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -20685,6 +21268,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -21000,6 +21587,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -21031,6 +21621,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -21346,6 +21940,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -21377,6 +21974,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -21692,6 +22293,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -21723,6 +22327,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -22034,6 +22642,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -22065,6 +22676,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -22380,6 +22995,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -22411,6 +23029,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -22726,6 +23348,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -22757,6 +23382,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -22810,6 +23439,385 @@
             {
               "before": "before.pptx",
               "after": "after.pptx"
+            }
+          ]
+        },
+        {
+          "op": "pptx_inherit_template",
+          "kind": "transform",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "after": {},
+              "after_from": {
+                "type": "string"
+              },
+              "allow_external_egress": {
+                "type": "boolean"
+              },
+              "allow_layout_overflow": {
+                "type": "boolean"
+              },
+              "angle": {
+                "type": "number"
+              },
+              "artifact_kind": {
+                "type": "string"
+              },
+              "artifact_path": {
+                "type": "string"
+              },
+              "aesthetic": {
+                "type": "string"
+              },
+              "aspect": {
+                "type": "string"
+              },
+              "backend": {},
+              "background_color": {
+                "type": "string"
+              },
+              "before": {},
+              "before_from": {
+                "type": "string"
+              },
+              "brief": {},
+              "brief_from": {
+                "type": "string"
+              },
+              "brand_name": {
+                "type": "string"
+              },
+              "bind": {},
+              "canvas": {},
+              "content": {},
+              "content_data": {},
+              "data": {},
+              "deck_css": {
+                "type": "string"
+              },
+              "delete": {
+                "type": "array"
+              },
+              "design_defaults": {},
+              "design_from": {
+                "type": "string"
+              },
+              "design_system_id": {
+                "type": "string"
+              },
+              "dpi": {
+                "type": "number"
+              },
+              "export_as": {
+                "type": "string"
+              },
+              "export_master_as": {
+                "type": "string"
+              },
+              "fail_on": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
+              },
+              "font": {
+                "type": "string"
+              },
+              "from": {
+                "type": "string"
+              },
+              "geometry": {},
+              "hints": {},
+              "height": {
+                "type": "number"
+              },
+              "html_paths": {
+                "type": "array"
+              },
+              "html": {
+                "type": "string"
+              },
+              "icon_map_path": {
+                "type": "string"
+              },
+              "icon_root": {
+                "type": "string"
+              },
+              "input_path": {
+                "type": "string"
+              },
+              "inputs": {
+                "type": "array"
+              },
+              "keep_indices": {
+                "type": "array"
+              },
+              "keep_indices_from": {
+                "type": "string"
+              },
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "layout": {
+                "type": "string"
+              },
+              "layout_from": {
+                "type": "string"
+              },
+              "lock_media_brief": {
+                "type": "boolean"
+              },
+              "message": {
+                "type": "string"
+              },
+              "mission_id": {
+                "type": "string"
+              },
+              "logo_url": {
+                "type": "string"
+              },
+              "match_mode": {
+                "type": "string"
+              },
+              "matchers": {
+                "type": "array"
+              },
+              "max_pages": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "artifact_class": {
+                "type": "string"
+              },
+              "organization_id": {
+                "type": "string"
+              },
+              "project_id": {
+                "type": "string"
+              },
+              "task_id": {
+                "type": "string"
+              },
+              "session_id": {
+                "type": "string"
+              },
+              "system": {
+                "type": "boolean"
+              },
+              "role": {
+                "type": "string"
+              },
+              "edits": {
+                "type": "array"
+              },
+              "if_exists": {
+                "type": "string"
+              },
+              "meta": {},
+              "ocr": {
+                "type": "boolean"
+              },
+              "options": {},
+              "order": {
+                "type": "array"
+              },
+              "output_format": {
+                "type": "string"
+              },
+              "output_path": {
+                "type": "string"
+              },
+              "owner_labels": {
+                "type": "array"
+              },
+              "owner_labels_from": {
+                "type": "string"
+              },
+              "out": {},
+              "out_dir": {
+                "type": "string"
+              },
+              "pad": {
+                "type": "number"
+              },
+              "pages": {
+                "type": "array"
+              },
+              "package_check": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
+              },
+              "paragraph_replacements": {},
+              "parts": {},
+              "path": {
+                "type": "string"
+              },
+              "pattern_path": {
+                "type": "string"
+              },
+              "password": {
+                "type": "string"
+              },
+              "prefix": {
+                "type": "string"
+              },
+              "profile": {},
+              "profile_id": {
+                "type": "string"
+              },
+              "profile_path": {
+                "type": "string"
+              },
+              "range": {
+                "type": "string"
+              },
+              "registry_path": {
+                "type": "string"
+              },
+              "replacements": {},
+              "replacements_from": {
+                "type": "string"
+              },
+              "replace_index": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "render_target": {
+                "type": "string"
+              },
+              "run_shape": {},
+              "set": {},
+              "sheet": {
+                "type": "string"
+              },
+              "skip_zero": {
+                "type": "boolean"
+              },
+              "sketch": {
+                "type": "string"
+              },
+              "slides": {
+                "type": "array"
+              },
+              "slides_from": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "storyline_from": {
+                "type": "string"
+              },
+              "manifest_path": {
+                "type": "string"
+              },
+              "pptx_from": {
+                "type": "string"
+              },
+              "story": {},
+              "stamp": {
+                "type": "string"
+              },
+              "subtitle_shape": {
+                "type": ["string", "integer"]
+              },
+              "target_path": {
+                "type": "string"
+              },
+              "template_index": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "tenant_slug": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
+              },
+              "theme": {},
+              "theme_from": {
+                "type": "string"
+              },
+              "theme_id": {
+                "type": "string"
+              },
+              "value": {},
+              "tier": {
+                "type": "string"
+              },
+              "timeout_ms": {
+                "type": "number"
+              },
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "user_password": {
+                "type": "string"
+              },
+              "owner_password": {
+                "type": "string"
+              },
+              "values_only": {
+                "type": "boolean"
+              },
+              "viewport_px": {
+                "type": "number"
+              },
+              "width": {
+                "type": "number"
+              },
+              "work_dir": {
+                "type": "string"
+              },
+              "web_from": {
+                "type": "string"
+              },
+              "web_theme_from": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "required": ["slides"]
+              },
+              {
+                "required": ["slides_from"]
+              }
+            ]
+          },
+          "examples": [
+            {
+              "from": "template_design",
+              "slides": [
+                {
+                  "layout_from_slide": 2,
+                  "elements": [
+                    {
+                      "type": "text",
+                      "pos": {
+                        "x": 0.5,
+                        "y": 1.5,
+                        "w": 9,
+                        "h": 1
+                      },
+                      "text": "New body"
+                    }
+                  ]
+                }
+              ],
+              "export_as": "last_pptx_design"
             }
           ]
         },
@@ -23074,6 +24082,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -23105,6 +24116,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -23155,7 +24170,8 @@
           },
           "examples": [
             {
-              "from": "deck"
+              "from": "deck",
+              "text_fit": "error"
             }
           ]
         },
@@ -23420,6 +24436,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -23451,6 +24470,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -23766,6 +24789,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -23797,6 +24823,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -24112,6 +25142,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -24143,6 +25176,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -24459,6 +25496,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -24490,6 +25530,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -24805,6 +25849,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -24836,6 +25883,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -25151,6 +26202,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -25182,6 +26236,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -25497,6 +26555,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -25528,6 +26589,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -25843,6 +26908,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -25874,6 +26942,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -26190,6 +27262,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -26221,6 +27296,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -26536,6 +27615,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -26567,6 +27649,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -26882,6 +27968,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -26913,6 +28002,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -27229,6 +28322,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -27260,6 +28356,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -27575,6 +28675,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -27606,6 +28709,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -27921,6 +29028,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -27952,6 +29062,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -28267,6 +29381,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -28298,6 +29415,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -28615,6 +29736,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -28646,6 +29770,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -28963,6 +30091,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -28994,6 +30125,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -29311,6 +30446,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -29342,6 +30480,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -29657,6 +30799,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -29688,6 +30833,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -30018,6 +31167,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -30049,6 +31201,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -30390,6 +31546,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -30421,6 +31580,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -30736,6 +31899,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -30767,6 +31933,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -31084,6 +32254,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -31115,6 +32288,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -31440,6 +32617,9 @@
               "slides": {
                 "type": "array"
               },
+              "slides_from": {
+                "type": "string"
+              },
               "source": {
                 "type": "string"
               },
@@ -31471,6 +32651,10 @@
               },
               "text": {
                 "type": "string"
+              },
+              "text_fit": {
+                "type": "string",
+                "enum": ["error", "warn", "never"]
               },
               "theme": {},
               "theme_from": {
@@ -39920,41 +41104,12 @@
           "kind": "control",
           "input_schema": {
             "type": "object",
-            "required": ["conditions"],
-            "properties": {
-              "conditions": {
-                "type": "array",
-                "minItems": 1,
-                "items": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    {
-                      "type": "object"
-                    }
-                  ]
-                }
-              },
-              "message": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "additionalProperties": false
+            "title": "system:assert",
+            "description": "Open legacy parameter contract for system:assert (control); replace with typed fields during operation migration.",
+            "additionalProperties": true,
+            "x-kyberion-contract": "inferred-legacy"
           },
-          "examples": [
-            {
-              "conditions": [
-                {
-                  "from": "input.tenant",
-                  "operator": "not_empty"
-                }
-              ],
-              "message": "tenant is required"
-            }
-          ]
+          "examples": [{}]
         },
         {
           "op": "if",

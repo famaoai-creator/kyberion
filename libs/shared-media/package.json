@@ -244,6 +244,10 @@
       "types": "./dist/native-pptx-engine/layout-primitives.d.ts",
       "default": "./dist/native-pptx-engine/layout-primitives.js"
     },
+    "./native-pptx-engine/protocol-text-fit": {
+      "types": "./dist/native-pptx-engine/protocol-text-fit.d.ts",
+      "default": "./dist/native-pptx-engine/protocol-text-fit.js"
+    },
     "./native-pptx-engine/text-metrics": {
       "types": "./dist/native-pptx-engine/text-metrics.d.ts",
       "default": "./dist/native-pptx-engine/text-metrics.js"

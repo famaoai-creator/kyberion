@@ -45,6 +45,18 @@ KYBERION_BASE_ROLE=sovereign node_modules/.bin/tsx scripts/html-to-pptx/convert.
 
 デザイン色は入力HTMLの最初の `:root{ --bg/--accent/--crit/... }` から取得するため、同じトークン規約のHTMLは自動でオンブランドになります。
 
+## 既存デッキのマスター/レイアウトを継承して新しいスライドを作る場合
+
+`media:pptx_extract`（`distillPptxDesign`）で既存デッキのデザインを取り出し、要素を書き換えて `media:pptx_render` に渡すときの注意点です。
+
+- **`media:pptx_inherit_template` を使う**。以下の手順（`rawParts` の削除、元スライドの除去、`pXmlLst` の除去、レイアウト番号の指定）をこの op がまとめて行います。パイプラインは `pptx_extract` → `pptx_inherit_template`（`slides: [{ elements, layout_from_slide | layoutIndex | layout_name }]`）→ `pptx_render` → `pptx_package_check` です。スクリプトからは `@agent/core/media/pptx-utils` の `inheritPptxTemplate(design, slides)` を呼びます。元のスライドをそのまま残すことはできません（`rawParts` がないとエンジンはすべてのスライドを `elements` から書くため）。元のスライドを残す場合は `pptx_filter_slides` または `pptx_replace_slides` を使います。
+- **`rawParts` を必ず削除する**。`pptx_extract` の結果には元ZIPの全パーツ（`rawParts`）が入っています。`rawParts` が残っていると、エンジンは元ZIPをそのまま再構成し、既存スライドの `<a:t>` テキストを順番に置き換えるだけになります。追加・編集した要素は無視され、`rawSlideXml` のない新しいスライドは出力されません。マスター/レイアウトを継承するには `rawMasters` / `rawLayouts` / `rawThemeXml` / `masterMedia` を残し、`rawParts` だけを削除します。新しく作るスライドからは `rawSlideXml` と `pXmlLst` も外します。
+- **キャンバスの寸法**は `presentation.xml` の `<p:sldSz>` から読みます。4:3 のデッキ（`cx="9144000" cy="6858000" type="screen4x3"`）は `canvas: { w: 10, h: 7.5 }` になります。2026-11-26 より前のエンジンは `type` 属性付きの `sldSz` を読めず、幅を 0 にしていました。
+- **マスターID**は、継承したマスターに含まれる `sldLayoutId` と重ならない値をエンジンが割り当てます。重なると PowerPoint が修復を求めます（2026-11-26 に修正）。
+- **段落の書式**: `\n` で区切ったテキストは複数の `<a:p>` になり、`align` / `lineSpacing` / `spaceBefore` / `spaceAfter` / `bullet` はすべての段落に付きます。2026-11-26 より前のエンジンは最初の段落にしか付けず、2行目以降が左揃えになっていました。
+- **文字の収まりを確かめる**: `pptx_layout_preflight` と `pptx_render` は、手で組んだプロトコルでもすべてのテキストボックスを測ります（全角＝1em、和欧間の約 1/4em の空き、bodyPr の内側余白〔既定は左右 0.1in・上下 0.05in〕、chevron / homePlate / roundRect / ellipse などの文字領域、行の高さ＝サイズ×1.2×行間）。結果は `overflow`（文字が枠の外に出る）と `unexpected_wrap`（ラベル・中央揃えの行・行数ぴったりの枠で、改行を入れていない段落が折り返す）に分けて報告します。既定は報告だけです。止めるときは `text_fit: "error"`（overflow で失敗）または `"warn"`（両方で失敗）を指定します。描画後は `media:pptx_render_check`（`path` と、描画に使ったプロトコルの `design_from`）が LibreOffice で PDF に変換し、各ボックスの実際の行数と位置を比べます。`fail_on` の既定は `error` です。LibreOffice がない環境では `status: "unavailable"` を返し、事前の見積りだけを添えます。BIZ UD 系のフォントは欧文が約 1.25 倍広いため、`fontFamily` からこれを見分けます。和名（例: `BIZ UDPゴシック`）は LibreOffice が見つけられず別のフォントで描くことがあるので、LibreOffice で確かめるときは英名で指定します。
+- **単位**: `cornerRadius` は EMU ではありません。0〜1 の値は短辺に対する割合（0.08 = 8%）、1 を超える値は OOXML のガイド値（50000 = 完全な角丸）として扱います。`lineSpacing` は 10 以下なら倍率（1.3 = 130%）、10 を超えるなら百分率（130 = 130%）です。
+
 ## 設計メモ・限界（v1）
 
 - **規約ベースの意味変換**であり、ピクセル忠実なブラウザ変換ではない（＝編集可能で軽量・オンブランド、汎用HTMLは対象外）。
