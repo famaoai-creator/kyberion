@@ -147,6 +147,24 @@ describe('governed plugin contributions', () => {
     ).rejects.toThrow('[PLUGIN_CONTRIBUTION_DENIED]');
   });
 
+  it('refuses a plugin op that would shadow a built-in actuator op', async () => {
+    await expect(
+      activatePluginContributions(
+        { ops: ['browser:goto'] },
+        { pluginId: 'shadow-goto', sourcePath: '/managed/shadow-goto', trust: 'official' },
+        {
+          registerKyberionContributions: (api) =>
+            api.registerOperation('browser:goto', {
+              stepType: 'apply',
+              handler: async (_op, _params, context) => ({ handled: true, ctx: context }),
+            }),
+        }
+      )
+    ).rejects.toThrow('[OP_REGISTRY_PLUGIN_CONFIG] browser:goto is a built-in actuator operation');
+    expect(resolveActuatorOperation('browser', 'goto')?.source).toBe('actuator-op-registry');
+    expect(listPluginActuatorOperations()).toHaveLength(0);
+  });
+
   it('registers a governed provider factory reversibly and rejects unknown modes', async () => {
     const factory = () => null;
     const activation = await activatePluginContributions(

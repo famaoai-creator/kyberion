@@ -23,6 +23,16 @@ export interface BrowserActuatorResult {
 
 export interface BrowserActuatorHandle {
   handleAction: (input: Record<string, unknown>) => Promise<BrowserActuatorResult>;
+  /**
+   * Run `dispatch` (the caller's `handleAction` call for a native pipeline
+   * file) bound to the file's approved Run Manifest when there is one
+   * (browser-native-run-manifest.ts); `bound` tells the caller which.
+   */
+  runNativePipelineFile?: (
+    file: { inputPath: string; sourceText: string; pipeline: Record<string, unknown> },
+    dispatch: (bound: boolean) => Promise<BrowserActuatorResult>,
+    options: { hasHuman: boolean | undefined; optionOverrides?: Record<string, unknown> }
+  ) => Promise<BrowserActuatorResult>;
 }
 
 export interface BrowserPipelineRunOptions {
@@ -93,11 +103,17 @@ export async function loadBrowserActuator(
     const load = importer ?? ((url: string) => import(url));
     const mod = (await load(pathToFileURL(actuatorPath).href)) as {
       handleAction?: BrowserActuatorHandle['handleAction'];
+      runNativePipelineFile?: BrowserActuatorHandle['runNativePipelineFile'];
     };
     if (typeof mod.handleAction !== 'function') {
       throw new Error('handleAction export missing from browser-actuator');
     }
-    return { handleAction: mod.handleAction };
+    return {
+      handleAction: mod.handleAction,
+      ...(typeof mod.runNativePipelineFile === 'function'
+        ? { runNativePipelineFile: mod.runNativePipelineFile }
+        : {}),
+    };
   } catch (error) {
     if (error instanceof Error && error.message.includes('browser-actuator is unavailable')) {
       throw error;

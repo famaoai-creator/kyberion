@@ -115,6 +115,16 @@ const BROWSER_CAPTURE_OP_HANDLERS_SHARED_0: BrowserCaptureOpHandler = async ({
   );
 };
 /** Op handlers keyed by op name (RS-07: mechanical replacement of the former switch). */
+/**
+ * A string `script` evaluated WITH `args` is function source. Playwright only
+ * invokes a function-typed page function (it ships `String(fn)` marked as a
+ * function); a plain string is evaluated as an expression and the function
+ * itself comes back as `undefined`. No source is compiled in this process.
+ */
+export function pageFunctionSource(source: string): () => unknown {
+  return Object.assign(() => undefined, { toString: () => source });
+}
+
 const RAW_CAPTURE_HANDLERS: Record<string, BrowserCaptureOpHandler> = {
   navigate: BROWSER_CAPTURE_OP_HANDLERS_SHARED_0,
   goto: BROWSER_CAPTURE_OP_HANDLERS_SHARED_0,
@@ -327,7 +337,10 @@ const RAW_CAPTURE_HANDLERS: Record<string, BrowserCaptureOpHandler> = {
     return browserRuntimeHelpers.recordBrowserAction(
       {
         ...ctx,
-        [params.export_as || 'last_capture']: await page.evaluate(params.script),
+        [params.export_as || 'last_capture']:
+          params.args === undefined
+            ? await page.evaluate(params.script)
+            : await page.evaluate(pageFunctionSource(String(params.script)), params.args),
       },
       {
         kind: 'capture',
@@ -547,7 +560,7 @@ export const BROWSER_TRANSFORM_OP_HANDLERS: Readonly<Record<string, BrowserTrans
     safeWriteFile(outPath, JSON.stringify(adf, null, 2));
     return { ...ctx, [params.export_as || 'adf_path']: outPath };
   },
-  export_failure_bundle: async ({ params, ctx, resolve }) => {
+  export_failure_bundle: async ({ params, ctx, resolve, resolveBrowserRepositoryPath }) => {
     const trail = browserRuntimeHelpers.readRecordedActions(ctx, params.from).slice(-200);
     const bundle = {
       schema_version: 'browser-failure-bundle.v1',
@@ -563,10 +576,17 @@ export const BROWSER_TRANSFORM_OP_HANDLERS: Readonly<Record<string, BrowserTrans
       network_events: Array.isArray(ctx.network_events) ? ctx.network_events.slice(-50) : [],
       action_trail: trail,
     };
+    const sessionId = String(ctx.session_id || 'default');
+    // A step-supplied (or default) path goes through the step path resolver,
+    // which confines it in a bound native run like every other step file.
     const outPath = browserRuntimeHelpers.saveFailureBundle(
-      ctx.session_id || 'default',
+      sessionId,
       bundle,
-      params.path ? resolve(params.path) : undefined
+      resolveBrowserRepositoryPath(
+        params.path
+          ? resolve(params.path)
+          : `active/shared/tmp/browser/${sessionId.replace(/[^a-zA-Z0-9._-]/g, '_')}-failure-bundle.json`
+      )
     );
     return {
       ...ctx,

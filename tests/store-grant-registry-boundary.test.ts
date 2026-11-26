@@ -18,6 +18,7 @@ const registrants = [
   'libs/core/foundation/personal-approval-io-capability.ts',
   'libs/core/foundation/pipeline-journal-capability.ts',
   'libs/core/foundation/pr-publication-store-capability.ts',
+  'libs/core/foundation/run-manifest-gate-store-capability.ts',
   'libs/core/foundation/task-source-workspace-capability.ts',
   'libs/core/governance/person-charter-runtime.ts',
   'libs/core/information-assets/asset-derivation-read-capability.ts',

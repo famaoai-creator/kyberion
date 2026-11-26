@@ -195,6 +195,19 @@ This path tells users what is available and lets them run an actuator.
 
 Runtime/package hygiene for this layer is enforced by `pnpm run check -- --scope pr --only esm`.
 
+Running a project-local (tenant) pipeline goes through the Run Manifest path
+([pipeline-run-manifest-model](../knowledge/product/architecture/pipeline-run-manifest-model.md)):
+
+- `libs/core/pipeline/run-scope.ts` (run tenant derived from the file location), `run-principal.ts` (attended / unattended)
+- `libs/core/pipeline/run-manifest.ts` (static compiler: model need, secret refs, external effects; `pipeline-template.ts` scans `{{…}}`)
+- `libs/core/pipeline/run-manifest-session.ts` (compile the exact file, open the v2 trust request, decide the run's binding at run start)
+- `libs/core/pipeline/pipeline-readiness.ts` (`pnpm pipeline check`: every gate before the run; extends `pipeline-dry-run.ts`)
+- `libs/core/project/project-trust.ts` + `project-trust-binding.ts` (v1 file / v2 manifest approvals)
+- `libs/core/governance/run-manifest-charter.ts`, `run-manifest-grant.ts`, `run-manifest-binding.ts` (charter from the approval; per-step admission at the external-operation gate)
+- `libs/core/reasoning/pipeline-bootstrap-needs.ts` (whether a run needs a model / credential binding at all; `model` is decided over every step, `MODEL_OPS` lists model-calling ops outside the model domains)
+- Public entry points: `@agent/core/pipeline/run-manifest` (`run-manifest-api.ts` re-exports compiler, session, scope, principal, readiness) and `@agent/core/governance/external-operation-runtime` (binding and grant API)
+- Runner wiring: `scripts/pipeline/pipeline-execution-part-manifest.ts` (run scope envelope, model bootstrap, manifest binding, `pipeline check`) and `pipeline-execution-part-validated.ts` (typed-flow validated step execution)
+
 ### 4. Channel ingress and interactive control
 
 - `satellites/slack-bridge/`

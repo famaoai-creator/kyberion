@@ -367,6 +367,141 @@ describe('browser-actuator v3 contract', () => {
     });
   });
 
+  it('runs a runner-dispatched step on the pipeline session with the pipeline options', async () => {
+    const { actuator } = await import('./index');
+    // The shared page double keeps its URL across tests; leave it untouched.
+    mocks.page.goto.mockImplementationOnce(async () => undefined);
+    const runnerContext = {
+      __pipeline_session_id: 'pipeline-declared-session',
+      __pipeline_options: {
+        headless: false,
+        keep_alive: true,
+        navigation_policy: { allow_private_network: true },
+      },
+    };
+    const opened = await actuator.dispatch(
+      'goto',
+      { url: 'http://127.0.0.1:8080/form' },
+      runnerContext
+    );
+    expect(opened.ok, opened.error).toBe(true);
+    expect(mocks.launchPersistentContext).toHaveBeenCalledTimes(1);
+    expect(mocks.launchPersistentContext).toHaveBeenCalledWith(
+      expect.stringMatching(/pipeline-declared-session$/u),
+      expect.objectContaining({ headless: false })
+    );
+    // The next step of the same run reuses the kept-alive session.
+    const clicked = await actuator.dispatch('click', { selector: '#submit' }, runnerContext);
+    expect(clicked.ok, clicked.error).toBe(true);
+    expect(mocks.launchPersistentContext).toHaveBeenCalledTimes(1);
+    expect(runnerContext.__pipeline_options).toEqual({
+      headless: false,
+      keep_alive: true,
+      navigation_policy: { allow_private_network: true },
+    });
+  });
+
+  it('keeps the default private-network fence when the pipeline declares no navigation policy', async () => {
+    const { actuator } = await import('./index');
+    const blocked = await actuator.dispatch(
+      'goto',
+      { url: 'http://127.0.0.1:8080/form' },
+      { __pipeline_options: { headless: true } }
+    );
+    expect(blocked.ok).toBe(false);
+    expect(blocked.error).toContain('BROWSER_NAVIGATION_BLOCKED');
+  });
+
+  it('under a runner, takes session and options from the run session, not the mutable context', async () => {
+    const { actuator } = await import('./index');
+    const { withPipelineRunSession } = await import('@agent/core/actuator/actuator-sdk');
+    // A step exported page data over the context keys; the run session wins.
+    const poisoned = {
+      __pipeline_session_id: 'attacker-session',
+      __pipeline_options: { navigation_policy: { allow_private_network: true } },
+    };
+    const blocked = await withPipelineRunSession(
+      { session_id: 'run-session', options: { headless: true } },
+      () => actuator.dispatch('goto', { url: 'http://127.0.0.1:8080/form' }, poisoned)
+    );
+    expect(blocked.ok).toBe(false);
+    expect(blocked.error).toContain('BROWSER_NAVIGATION_BLOCKED');
+    expect(mocks.launchPersistentContext).toHaveBeenCalledWith(
+      expect.stringMatching(/run-session$/u),
+      expect.anything()
+    );
+  });
+
+  it('drops (never applies) a launch override or an unconfined profile from the pipeline options', async () => {
+    const { actuator } = await import('./index');
+    const { withPipelineRunSession } = await import('@agent/core/actuator/actuator-sdk');
+    const opened = await withPipelineRunSession(
+      {
+        session_id: 'dropped-overrides',
+        options: {
+          cdp_url: 'http://127.0.0.1:9222',
+          launch_args: ['--proxy-server=http://evil.example'],
+          record_trace: false,
+          user_data_dir: 'active/shared/runtime/browser/profiles/confidential/other/x',
+        },
+        scope: { tier: 'confidential', tenant_slug: 'acme' },
+      },
+      () => actuator.dispatch('goto', { url: 'https://example.com' }, {})
+    );
+    expect(opened.ok, opened.error).toBe(true);
+    expect(mocks.connectOverCDP).not.toHaveBeenCalled();
+    const [userDataDir, launchOptions] = mocks.launchPersistentContext.mock.calls[0];
+    expect(String(userDataDir)).toMatch(/runtime\/browser\/dropped-overrides$/u);
+    expect(JSON.stringify(launchOptions)).not.toContain('evil.example');
+  });
+
+  it('applies a profile inside the run partition derived from the file location', async () => {
+    const { actuator } = await import('./index');
+    const { withPipelineRunSession } = await import('@agent/core/actuator/actuator-sdk');
+    const profile = 'active/shared/runtime/browser/profiles/confidential/acme/approve';
+    const opened = await withPipelineRunSession(
+      {
+        session_id: 'confined-profile',
+        options: { user_data_dir: profile },
+        scope: { tier: 'confidential', tenant_slug: 'acme' },
+      },
+      () => actuator.dispatch('goto', { url: 'https://example.com' }, {})
+    );
+    expect(opened.ok, opened.error).toBe(true);
+    expect(String(mocks.launchPersistentContext.mock.calls[0][0])).toMatch(
+      /runtime\/browser\/profiles\/confidential\/acme\/approve$/u
+    );
+  });
+
+  it('under a run-manifest binding without a run session, ignores the context session and options', async () => {
+    const { actuator } = await import('./index');
+    const { withRunManifestBinding } =
+      await import('@agent/core/governance/external-operation-runtime');
+    const { compileRunManifest } = await import('@agent/core/pipeline/run-manifest');
+    const manifest = compileRunManifest([], {
+      inputPath: 'knowledge/confidential/acme/scenarios/x.json',
+      contentSha256: 'c'.repeat(64),
+      scope: { tier: 'confidential', tenantSlug: 'acme' },
+    });
+    const blocked = await withRunManifestBinding(
+      { manifest, charterId: 'charter-x', principal: 'attended', runId: 'run-x' },
+      () =>
+        actuator.dispatch(
+          'goto',
+          { url: 'http://127.0.0.1:8080/form' },
+          {
+            __pipeline_session_id: 'context-session',
+            __pipeline_options: { navigation_policy: { allow_private_network: true } },
+          }
+        )
+    );
+    expect(blocked.ok).toBe(false);
+    expect(blocked.error).toContain('BROWSER_NAVIGATION_BLOCKED');
+    expect(String(mocks.launchPersistentContext.mock.calls[0]?.[0])).not.toContain(
+      'context-session'
+    );
+  });
+
   it('rejects a browser profile path outside the repository before launching', async () => {
     const { handleAction } = await import('./index');
     await expect(

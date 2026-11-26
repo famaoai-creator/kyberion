@@ -4,6 +4,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { printHelp } from './cli-presentation.js';
 import { formatCliManifestHelp } from '../lib/cli/cli-help.js';
 import { ScriptExitError } from '../lib/harness.js';
+import { parseProjectTrustRequestArgs } from './cli-project-trust-args.js';
 import type { SupportedLocale } from '@agent/core/locale';
 import type { ActuatorRecord } from '../cli.js';
 
@@ -49,7 +50,11 @@ export interface CliCommandDeps {
   printArtifactInfo: (targetPath: string) => void;
   openArtifact: (targetPath: string) => void;
   printInteractionPacketFile: (targetPath: string) => void;
-  requestProjectTrust: (inputPath: string, json?: boolean) => Promise<void>;
+  requestProjectTrust: (
+    inputPath: string,
+    json?: boolean,
+    options?: { allowUnattended?: boolean; runsPerDay?: number }
+  ) => Promise<void>;
   runActuator: (
     actuators: ActuatorRecord[],
     actuatorName: string | undefined,
@@ -347,10 +352,11 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
     'project-trust': async (ctx) => {
       const { firstArg, restArgs } = ctx;
 
-      if (firstArg !== 'request' || !restArgs[0]) {
-        throw new Error('Usage: pnpm kyberion project-trust request <pipeline-path> [--json]');
-      }
-      await requestProjectTrust(restArgs[0], restArgs.includes('--json'));
+      const parsed = parseProjectTrustRequestArgs(firstArg, restArgs);
+      await requestProjectTrust(parsed.inputPath, parsed.json, {
+        allowUnattended: parsed.allowUnattended,
+        ...(parsed.runsPerDay !== undefined ? { runsPerDay: parsed.runsPerDay } : {}),
+      });
       return;
     },
     email: async (ctx) => {

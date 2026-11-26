@@ -43,6 +43,8 @@ import './browser-automation-runtime-lightpanda.js';
 import { completeBrowserOperatorApproval } from './browser-approval-records.js';
 import { parseChromeCdpVersionResponse } from './browser-cdp-response.js';
 import { summarizeWatchdog } from './browser-watchdog.js';
+import { confineNativeRunReadPath } from './browser-native-run-manifest.js';
+import { currentRunManifestBinding } from '@agent/core/governance/external-operation-runtime';
 import {
   assertBrowserSessionOwner,
   assertPersistedBrowserSessionOwner,
@@ -503,6 +505,15 @@ function loadBrowserActionTrail(sessionId: string): BrowserRecordedAction[] {
     return [];
   }
 }
+/**
+ * Whether this browser session may attach to an external browser over CDP
+ * (explicit options or a persisted endpoint). Never under a run-manifest
+ * binding: its approval covers a confined browser only.
+ */
+export function externalBrowserAttachAllowed(): boolean {
+  return !currentRunManifestBinding();
+}
+
 function saveFailureBundle(
   sessionId: string,
   bundle: Record<string, unknown>,
@@ -960,10 +971,13 @@ async function resolveSessionHandoff(
     const filePath = assertSafeRepositoryPath(pathResolver.rootResolve(resolve(params.path)), {
       allowMissingLeaf: true,
     });
-    if (!isExistingRegularFile(filePath)) {
+    // Under a run-manifest binding, only from the run's own partition — checked
+    // before the file is even looked at.
+    const confined = confineNativeRunReadPath(filePath);
+    if (!isExistingRegularFile(confined)) {
       throw new Error(`import_session_handoff path must be an existing regular file: ${filePath}`);
     }
-    return readJson(filePath);
+    return readJson(confined);
   }
 
   if (params.handoff && typeof params.handoff === 'object') {
@@ -1336,6 +1350,10 @@ export const browserRuntimeHelpers = {
       );
     if (existing) {
       assertBrowserSessionOwner(existing.scopeFingerprint, scopeFingerprint);
+      if (!externalBrowserAttachAllowed() && existing.externalConnection)
+        throw new Error(
+          `[BROWSER_BOUND_SESSION_EXTERNAL] session ${sessionId} is attached to an external browser over CDP — a run-manifest-bound run uses only a confined browser | next: end that session (a close_session step) or give the pipeline another session_id`
+        );
       logger.info(`♻️ [BROWSER] Reusing leased session: ${sessionId}`);
       return existing.runtime.context;
     }
@@ -1373,7 +1391,9 @@ export const browserRuntimeHelpers = {
       !options.connect_over_cdp &&
       persistedCdpUrl &&
       persistedMetadata?.retained &&
-      persistedMetadata.lease_status === 'active'
+      persistedMetadata.lease_status === 'active' &&
+      // A bound run drops CDP options; it never reattaches a persisted CDP endpoint either.
+      externalBrowserAttachAllowed()
     ) {
       try {
         logger.info(`🔁 [BROWSER] Reattaching to persisted session via CDP: ${persistedCdpUrl}`);
@@ -1405,6 +1425,11 @@ export const browserRuntimeHelpers = {
     }
 
     if (options.connect_over_cdp) {
+      // Bound runs never receive CDP options (the classifier drops them); refuse defensively.
+      if (!externalBrowserAttachAllowed())
+        throw new Error(
+          '[BROWSER_BOUND_SESSION_EXTERNAL] a run-manifest-bound run cannot attach to an external browser over CDP | next: remove the CDP options'
+        );
       const discoveredEndpoint =
         options.cdp_url || options.cdp_port ? null : await discoverChromeCdpEndpoint();
       const cdpUrl =

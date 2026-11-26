@@ -1189,6 +1189,28 @@
       ]
     },
     {
+      "id": "pipeline-runner.check",
+      "command": "pipeline check",
+      "noun": "pipeline",
+      "verb": "check",
+      "entry": "pipeline-runner",
+      "audience": "operator",
+      "description": "cli_cmd_pipeline_runner_check",
+      "group": "operate",
+      "effect": "readiness"
+    },
+    {
+      "id": "pipeline-runner.fix",
+      "command": "pipeline fix",
+      "noun": "pipeline",
+      "verb": "fix",
+      "entry": "pipeline-runner",
+      "audience": "operator",
+      "description": "cli_cmd_pipeline_runner_fix",
+      "group": "operate",
+      "effect": "state_change"
+    },
+    {
       "id": "operator-readiness.vital",
       "command": "vital",
       "noun": "vital",
@@ -1493,7 +1515,7 @@
     {
       "id": "pipeline-runner",
       "module": "scripts/run_pipeline.ts",
-      "commands": ["pipeline"]
+      "commands": ["pipeline check", "pipeline fix", "pipeline"]
     },
     {
       "id": "operator-readiness",

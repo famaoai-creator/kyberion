@@ -8,9 +8,12 @@
  * process that still runs as one through SYSTEM_ROLE / MISSION_ROLE env gets no
  * I/O at all (tier-guard). dot_lifecycle_writer is retired after decomposition
  * into the facade-owned charter and lifecycle-runtime stores, not an issuance right.
+ * run_manifest_gate_store never was a role: it is listed so the issuance right of
+ * the run-manifest gate store grant can never be assumed as one either.
  */
 export const RETIRED_STORE_ROLE_NAMES: ReadonlySet<string> = new Set([
   'pr_publication_store',
+  'run_manifest_gate_store',
   'autonomy_learning_store',
   'pipeline_journal_store',
   'credential_material_reader',

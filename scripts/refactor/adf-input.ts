@@ -5,6 +5,7 @@ import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation/safe-json';
 import { readTextFile } from '@agent/core/foundation/text';
 import { validatePipelineAdf } from '@agent/core/pipeline/pipeline-contract';
+import { isNativeBrowserPipelineDocument } from '@agent/core/pipeline/run-manifest';
 import {
   validatePipelineGuardrails,
   type AdfScriptWrapperBaselineEntry,
@@ -269,11 +270,33 @@ export function readValidatedPipelineAdf<T = any>(
   });
 }
 
+/**
+ * A browser actuator native pipeline (`{action:'pipeline', steps:[{type,
+ * op:'goto'}]}`) is not an ADF: read as one, its bare ops would resolve to
+ * other domains (`system:goto`). Refuse it with the command that runs it.
+ */
+function assertNotNativeBrowserPipeline(inputPath: string): void {
+  let parsed: unknown;
+  try {
+    parsed = parseSafeJsonInput(
+      readAdfInputTextFile(resolveAdfInputPath(inputPath)),
+      'pipeline file'
+    );
+  } catch {
+    return; // Unreadable or not JSON: the ADF loader reports it.
+  }
+  if (isNativeBrowserPipelineDocument(parsed))
+    throw new Error(
+      `[PIPELINE_NATIVE_BROWSER] ${inputPath} is a browser actuator native pipeline (bare op names dispatched by step type), not a pipeline ADF — pnpm pipeline would misread its ops | next: pnpm kyberion browser run --adf ${inputPath}`
+    );
+}
+
 export async function readValidatedWorkflowAdf<T = any>(
   inputPath: string,
   options: AdfInputOptions = {}
 ): Promise<T> {
   return withPlaygroundPathRole(inputPath, async () => {
+    if (!isWorkflowModulePath(inputPath)) assertNotNativeBrowserPipeline(inputPath);
     assertPipelineResourceTrust(inputPath, options);
     if (options.onValidatedInput && isWorkflowModulePath(inputPath))
       throw new Error('A bounded JSON pipeline snapshot is required');

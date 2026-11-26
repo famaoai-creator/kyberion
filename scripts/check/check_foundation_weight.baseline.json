@@ -124,6 +124,7 @@
     "foundation/resource-access-scope": 1,
     "foundation/retired-store-roles": 0,
     "foundation/role-narrowing-denial": 12,
+    "foundation/run-manifest-gate-store-capability": 6,
     "foundation/runtime-state-roots": 2,
     "foundation/runtime-tuning-defaults": 0,
     "foundation/safe-json": 0,

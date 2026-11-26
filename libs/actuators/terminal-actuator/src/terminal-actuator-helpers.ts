@@ -139,7 +139,12 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
       const args = params.args || [];
       const cwd = resolveTerminalCwd(rootDir, params.cwd);
       // Caller-supplied env may not set execution authority (SYSTEM_ROLE, delegated role, …).
-      const env = stripAuthorityEnvOverrides(params.env) as Record<string, string>;
+      // The PTY is driven by an agent: mark it so nothing inside it (e.g. a
+      // pipeline run's Run Principal) mistakes the agent's TTY for a human.
+      const env = {
+        ...(stripAuthorityEnvOverrides(params.env) as Record<string, string>),
+        KYBERION_RUN_ORIGIN: 'agent',
+      };
       const sessionId = ptyEngine.spawn(shell, args, cwd, env, params.threadId);
       return { status: 'created', sessionId };
     },

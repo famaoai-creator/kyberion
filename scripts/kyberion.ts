@@ -438,7 +438,7 @@ export async function main(
     }
     case 'pipeline-runner': {
       const { main: pipelineMain, resolvePipelinePresetArgs } = await import('./run_pipeline.js');
-      await pipelineMain(resolvePipelinePresetArgs(normalizedArgs.slice(1)));
+      await pipelineMain(resolvePipelinePresetArgs(normalizedArgs.slice(1)), print);
       return;
     }
     case 'operator-readiness': {

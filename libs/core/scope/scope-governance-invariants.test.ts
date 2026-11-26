@@ -52,7 +52,12 @@ describe('scope governance invariants', () => {
           // A resident dot step is a claimed dispatch boundary: it mints from
           // the immutable standing lineage (never ambient env), identical to
           // the WorkItem path in coordinated-agent-execution-port.
-          !line.startsWith('libs/core/dot/dot-standing-binding.ts:')
+          !line.startsWith('libs/core/dot/dot-standing-binding.ts:') &&
+          // A pipeline run is a dispatch boundary: run-scope mints only from the
+          // tenant the file location derives (registry-validated, ambient may
+          // only confirm it), and a tenant- or mission-anchored parent is only
+          // narrowed. Exercised by run-scope.test.ts / pipeline-run-scope.test.ts.
+          !line.startsWith('libs/core/pipeline/run-scope.ts:')
       );
     expect(offenders).toEqual([]);
   });

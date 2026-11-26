@@ -42,6 +42,24 @@ import {
 } from '../harnessing/external-hook-bridge.js';
 import { parseSafeJsonObjectInput } from '../foundation/json.js';
 import { t } from '../localization/t.js';
+import {
+  computeRunManifestHash,
+  describeRunManifest,
+  type RunManifest,
+} from '../pipeline/run-manifest.js';
+import type { RunPrincipalMode } from '../governance/run-manifest-grant.js';
+import {
+  PROJECT_TRUST_APPROVAL_CHANNEL,
+  expectedProjectTrustPayloadHash,
+  projectTrustBindingOf,
+  projectTrustBindingPayloadV1,
+  projectTrustBindingPayloadV2,
+  projectTrustEffectBinding,
+  projectTrustRequestedEffects,
+  requestedPrincipalModes,
+  requestedRunsPerDay,
+  type ProjectTrustManifestBinding,
+} from './project-trust-binding.js';
 
 /**
  * What the approver is trusting. The binding (path + content hash) is the
@@ -51,7 +69,7 @@ import { t } from '../localization/t.js';
 export type ProjectTrustResource =
   { kind: 'pipeline' } | { kind: 'external-hook-config'; source: ExternalHookSource };
 
-export const PROJECT_TRUST_APPROVAL_CHANNEL = 'project-trust';
+export { PROJECT_TRUST_APPROVAL_CHANNEL, projectTrustBindingOf };
 
 function normalizeRelativePath(inputPath: string): { absolute: string; relative: string } {
   const absolute = path.resolve(pathResolver.rootResolve(inputPath));
@@ -120,12 +138,73 @@ function hookCommandLines(raw: string, source: ExternalHookSource): string[] {
   }
 }
 
+/** What a v2 pipeline request shows: the manifest in plain language, hashes in one footer line. */
+export interface ProjectTrustManifestCard {
+  manifest: RunManifest;
+  principalModes: RunPrincipalMode[];
+  /** Daily run cap bound by the request (shown in plain language). */
+  runsPerDay: number;
+  /**
+   * The steps of the exact file content being bound, so lines can name
+   * selectors (never values). Parsed here from that content — never taken
+   * from the caller, who could otherwise show other selectors than it binds.
+   */
+  steps?: readonly unknown[];
+}
+
+/** Steps of the trusted file content for the card; undefined when it is not a JSON pipeline. */
+function cardStepsOf(raw: string): readonly unknown[] | undefined {
+  try {
+    const parsed = parseSafeJsonObjectInput(raw, 'pipeline file');
+    return Array.isArray(parsed?.steps) ? parsed.steps : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function manifestCardText(
+  relative: string,
+  hash: string,
+  card: ProjectTrustManifestCard
+): ApprovalCardText {
+  const { manifest, principalModes } = card;
+  const effects = manifest.requirements.effects;
+  const bindable = effects.filter((entry) => entry.bindable).length;
+  const origins = [...new Set(effects.flatMap((entry) => entry.origins))].sort();
+  const unattended = principalModes.includes('unattended');
+  const plural = (count: number, one: string, many: string) =>
+    `${count} ${count === 1 ? one : many}`;
+  return {
+    title: `Approve project-local pipeline: ${relative}`,
+    summary:
+      `Runs ${plural(effects.length, 'external operation', 'external operations')} on ` +
+      `${plural(origins.length, 'site', 'sites')}; ${bindable} run without asking again. ` +
+      (unattended
+        ? 'UNATTENDED RUNS ENABLED: workers may run it without you at the terminal.'
+        : 'Only you, at the terminal, can run it under this approval.'),
+    details: [
+      `Path: ${relative}`,
+      unattended
+        ? 'Who may run it: you at the terminal, AND unattended workers without you'
+        : 'Who may run it: you at the terminal only',
+      `How often: at most ${plural(card.runsPerDay, 'run', 'runs')} per day (UTC); later runs that day ask step by step`,
+      ...describeRunManifest(manifest, { steps: card.steps, hashFooter: false }),
+      `Binding: content SHA-256 ${hash} · manifest SHA-256 ${manifest.manifest_hash}`,
+    ].join('\n'),
+    reason:
+      'Project-local pipeline content and the external operations it performs require a durable human trust decision.',
+  };
+}
+
 function approvalCardText(
   resource: ProjectTrustResource,
   relative: string,
   hash: string,
-  raw: string
+  raw: string,
+  manifestCard?: ProjectTrustManifestCard
 ): ApprovalCardText {
+  if (manifestCard && resource.kind === 'pipeline')
+    return manifestCardText(relative, hash, manifestCard);
   const binding = `Path: ${relative}\nContent SHA-256: ${hash}`;
   if (resource.kind === 'external-hook-config') {
     const commands = hookCommandLines(raw, resource.source);
@@ -151,13 +230,7 @@ function approvalCardText(
   };
 }
 
-function effectBinding(relativePath: string): string {
-  return `project-trust:${relativePath}`;
-}
-
-function bindingPayload(relativePath: string, hash: string): Record<string, string> {
-  return { input_path: relativePath, content_hash: hash };
-}
+const effectBinding = projectTrustEffectBinding;
 
 function isProjectTrustRequest(record: ApprovalRequestRecord, relativePath: string): boolean {
   return (
@@ -165,6 +238,50 @@ function isProjectTrustRequest(record: ApprovalRequestRecord, relativePath: stri
     record.requestedByContext?.actorRole === 'project-trust' &&
     record.accountability?.effectBinding === effectBinding(relativePath)
   );
+}
+
+/**
+ * The v2 binding of one compiled manifest to the file it claims to describe.
+ * A manifest compiled from other content, another path or edited after
+ * compilation never reaches a human card.
+ */
+function manifestBindingFor(
+  manifest: RunManifest,
+  relative: string,
+  hash: string,
+  principalModes: readonly RunPrincipalMode[] | undefined,
+  runsPerDay: number | undefined
+): ProjectTrustManifestBinding {
+  if (computeRunManifestHash(manifest) !== manifest.manifest_hash) {
+    throw new Error(
+      '[PROJECT_TRUST_MANIFEST] run manifest hash does not match its body — compiled manifest was altered | next: recompile it with compileRunManifest'
+    );
+  }
+  if (manifest.source.input_path !== relative || manifest.source.content_sha256 !== hash) {
+    throw new Error(
+      `[PROJECT_TRUST_MANIFEST] run manifest was compiled from another file or content than ${relative} | next: recompile it from the current file with its repository-relative path`
+    );
+  }
+  return {
+    manifest_hash: manifest.manifest_hash,
+    principal_modes: requestedPrincipalModes(principalModes),
+    runs_per_day: requestedRunsPerDay(runsPerDay),
+  };
+}
+
+/**
+ * Runner entry point for a v2 trust request: same as
+ * createProjectTrustApprovalRequest with the compiled manifest required.
+ */
+export function requestPipelineTrustWithManifest(params: {
+  inputPath: string;
+  manifest: RunManifest;
+  principalModes?: readonly RunPrincipalMode[];
+  runsPerDay?: number;
+  requester?: ApprovalRequesterInput;
+  requestedBy?: string;
+}): ApprovalRequestRecord {
+  return createProjectTrustApprovalRequest({ ...params, resource: { kind: 'pipeline' } });
 }
 
 /** Open or reuse the human approval request for one exact pipeline resource. */
@@ -175,6 +292,16 @@ export function createProjectTrustApprovalRequest(params: {
   requester?: ApprovalRequesterInput;
   /** Defaults to a project-local pipeline. */
   resource?: ProjectTrustResource;
+  /**
+   * v2: the Run Manifest compiled from this exact file. The card then lists
+   * the manifest in plain language and an approval can issue a run-manifest
+   * charter. Omitted: a v1 (file-only) trust request.
+   */
+  manifest?: RunManifest;
+  /** v2 only. Defaults to ['attended']; 'unattended' must be asked for explicitly. */
+  principalModes?: readonly RunPrincipalMode[];
+  /** v2 only. Daily run cap of the charter; defaults to DEFAULT_RUN_MANIFEST_RUNS_PER_DAY. */
+  runsPerDay?: number;
 }): ApprovalRequestRecord {
   const resolved = normalizeRelativePath(params.inputPath);
   if (isBuiltinPipelineResource(resolved.relative)) {
@@ -184,14 +311,49 @@ export function createProjectTrustApprovalRequest(params: {
   }
   const raw = readTrustedResource(resolved.absolute);
   const hash = hashContent(raw);
-  const payload = bindingPayload(resolved.relative, hash);
+  if (params.manifest && params.resource && params.resource.kind !== 'pipeline') {
+    throw new Error(
+      '[PROJECT_TRUST_MANIFEST] a run manifest binds only a pipeline resource | next: omit the manifest for this resource'
+    );
+  }
+  const manifestBinding = params.manifest
+    ? manifestBindingFor(
+        params.manifest,
+        resolved.relative,
+        hash,
+        params.principalModes,
+        params.runsPerDay
+      )
+    : undefined;
+  if (!params.manifest && params.principalModes !== undefined) {
+    throw new Error(
+      '[PROJECT_TRUST_PRINCIPAL] principal modes need a run manifest | next: pass the compiled manifest with them'
+    );
+  }
+  if (!params.manifest && params.runsPerDay !== undefined) {
+    throw new Error(
+      '[PROJECT_TRUST_RUN_LIMIT] a daily run cap needs a run manifest | next: pass the compiled manifest with it'
+    );
+  }
+  const payload = manifestBinding
+    ? projectTrustBindingPayloadV2(resolved.relative, hash, manifestBinding)
+    : projectTrustBindingPayloadV1(resolved.relative, hash);
   const payloadHash = computeApprovalPayloadHash(payload);
   const binding = effectBinding(resolved.relative);
   const card = approvalCardText(
     params.resource ?? { kind: 'pipeline' },
     resolved.relative,
     hash,
-    raw
+    raw,
+    params.manifest && manifestBinding
+      ? {
+          manifest: params.manifest,
+          principalModes: manifestBinding.principal_modes,
+          runsPerDay: manifestBinding.runs_per_day ?? requestedRunsPerDay(undefined),
+          // Selector names come from the bytes the manifest hash binds.
+          steps: cardStepsOf(raw),
+        }
+      : undefined
   );
   const existing = listApprovalRequests({
     storageChannels: [PROJECT_TRUST_APPROVAL_CHANNEL],
@@ -230,7 +392,7 @@ export function createProjectTrustApprovalRequest(params: {
     },
     justification: {
       reason: card.reason,
-      requestedEffects: [binding],
+      requestedEffects: projectTrustRequestedEffects(resolved.relative, manifestBinding),
     },
     risk: { level: 'high', restartScope: 'none', requiresStrongAuth: true },
     accountability: {
@@ -275,8 +437,10 @@ export function assertProjectTrustApproval(requestId: string, inputPath: string)
   }
   assertApprovalUsable(record, { consumer: 'project_trust' });
   const hash = contentHash(resolved.absolute);
-  const expectedPayloadHash = computeApprovalPayloadHash(bindingPayload(resolved.relative, hash));
-  if (record.accountability.payloadHash !== expectedPayloadHash) {
+  // v1 and v2 records are both valid trust for this exact content; the binding
+  // the record declares is recomputed from the current file, never read back.
+  const expectedPayloadHash = expectedProjectTrustPayloadHash(record, resolved.relative, hash);
+  if (!expectedPayloadHash || record.accountability.payloadHash !== expectedPayloadHash) {
     throw new Error(
       `[TRUST_REQUIRED] project-local pipeline changed after approval: ${resolved.relative}`
     );
@@ -307,6 +471,40 @@ export function findValidProjectTrustApproval(inputPath: string): string | null 
       return record.id;
     } catch {
       // Stale (content changed), expired or not a human decision — keep looking.
+    }
+  }
+  return null;
+}
+
+/**
+ * Newest approved v2 project-trust request valid for the CURRENT content and
+ * bound to exactly this manifest hash, or null. The runner passes its id to
+ * ensureRunManifestCharter; a v1 record never matches.
+ */
+export function findValidRunManifestTrustApproval(
+  inputPath: string,
+  manifestHash: string
+): string | null {
+  const resolved = normalizeRelativePath(inputPath);
+  if (isBuiltinPipelineResource(resolved.relative)) return null;
+  const candidates = listApprovalRequests({
+    storageChannels: [PROJECT_TRUST_APPROVAL_CHANNEL],
+    status: 'approved',
+  })
+    .filter((record) => {
+      if (!isProjectTrustRequest(record, resolved.relative)) return false;
+      const binding = projectTrustBindingOf(record);
+      return binding.version === 2 && binding.manifest_hash === manifestHash;
+    })
+    .sort((a, b) =>
+      String(b.decidedAt ?? b.requestedAt) < String(a.decidedAt ?? a.requestedAt) ? -1 : 1
+    );
+  for (const record of candidates) {
+    try {
+      assertProjectTrustApproval(record.id, resolved.relative);
+      return record.id;
+    } catch {
+      // Stale, expired, unusable or not a human decision — keep looking.
     }
   }
   return null;

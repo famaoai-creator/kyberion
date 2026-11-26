@@ -4524,6 +4524,10 @@
       "types": "./dist/pipeline/retry-utils.d.ts",
       "default": "./dist/pipeline/retry-utils.js"
     },
+    "./pipeline/run-manifest": {
+      "types": "./dist/pipeline/run-manifest-api.d.ts",
+      "default": "./dist/pipeline/run-manifest-api.js"
+    },
     "./platform": {
       "types": "./dist/platform.d.ts",
       "default": "./dist/platform.js"

@@ -85,7 +85,13 @@ const BROWSER_EXTRA_CONTRACTS: Record<string, InputSchema> = {
   evaluate: {
     type: 'object',
     required: ['script'],
-    properties: { export_as: { type: 'string' }, script: { type: 'string' } },
+    properties: {
+      export_as: { type: 'string' },
+      script: { type: 'string' },
+      // Data passed to a function-valued `script` as its single argument, so
+      // step outputs never become script text (keeps the script manifest-bindable).
+      args: {},
+    },
     additionalProperties: false,
   },
   export_session_handoff: {

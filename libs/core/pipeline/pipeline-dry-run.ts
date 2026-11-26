@@ -19,6 +19,10 @@ export interface PipelineDryRunCheck {
   status: 'pass' | 'warning' | 'blocked';
   message: string;
   step_id?: string;
+  /** Command or action that clears a non-passing check (readiness checks). */
+  next?: string;
+  /** Extra per-step lines under a readiness check (e.g. evaluate args suggestions). */
+  details?: string[];
 }
 
 export interface PipelineDryRunReport {
@@ -67,7 +71,11 @@ const CONTROL_OPS = new Set([
   'system:assert',
 ]);
 
-function collectSteps(steps: PipelineAdfStep[], output: PipelineAdfStep[] = []): PipelineAdfStep[] {
+/** Every step of a pipeline, nested bodies and on_error fallbacks included. */
+export function collectSteps(
+  steps: PipelineAdfStep[],
+  output: PipelineAdfStep[] = []
+): PipelineAdfStep[] {
   for (const step of steps) {
     output.push(step);
     const params = step.params || {};

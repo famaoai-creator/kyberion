@@ -6,6 +6,26 @@
  * validator's verdict matches what the engine actually dispatches.
  */
 
+/**
+ * Actuator action aliases: per domain, an action spelling folded into its
+ * canonical action everywhere — the runtime dispatcher (via
+ * QUALIFIED_OP_ALIASES), the Run Manifest compiler and the plugin
+ * registration check. `browser:navigate` runs as `browser:goto`, so the
+ * manifest's "Open <url>" entry and the dispatched op are the same op, and no
+ * plugin can register the alias spelling.
+ */
+export const ACTUATOR_ACTION_ALIASES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  browser: { navigate: 'goto' },
+};
+
+/** The canonical action of `domain:action` (itself when it is not an alias). */
+export function canonicalActuatorAction(domain: string, action: string): string {
+  return Object.hasOwn(ACTUATOR_ACTION_ALIASES, domain) &&
+    Object.hasOwn(ACTUATOR_ACTION_ALIASES[domain], action)
+    ? ACTUATOR_ACTION_ALIASES[domain][action]
+    : action;
+}
+
 /** Qualified op aliases: legacy `domain:action` spellings → canonical op. */
 export const QUALIFIED_OP_ALIASES: Record<string, string> = {
   'mission:list': 'system:list_missions',
@@ -16,6 +36,14 @@ export const QUALIFIED_OP_ALIASES: Record<string, string> = {
   'agent:list_manifests': 'agent:list_manifests',
   'agent:list-runtimes': 'agent:list_runtimes',
   'agent:list_runtimes': 'agent:list_runtimes',
+  ...Object.fromEntries(
+    Object.entries(ACTUATOR_ACTION_ALIASES).flatMap(([domain, actions]) =>
+      Object.entries(actions).map(([alias, canonical]) => [
+        `${domain}:${alias}`,
+        `${domain}:${canonical}`,
+      ])
+    )
+  ),
 };
 
 /** Bare control-flow aliases → canonical core:* ops. */

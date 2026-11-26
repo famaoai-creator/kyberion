@@ -13,6 +13,8 @@ import {
   runActuatorPipeline,
   runActuatorStepSequence,
   withCatalogInputContract,
+  withPipelineRunSession,
+  withRunnerResolvedParams,
 } from './actuator-sdk.js';
 import { registerOpPreflightListener } from '../pipeline/op-preflight.js';
 import { resolveSandboxPolicy } from '../shell/sandbox-policy.js';
@@ -197,6 +199,37 @@ describe('actuator SDK', () => {
       op: 'fail',
       error: 'invalid input',
     });
+  });
+
+  it('forwards the out-of-band run session over a context a step overwrote', async () => {
+    const seen: Array<{ session_id?: string; options?: Record<string, unknown> }> = [];
+    const actuator = defineCatalogBackedActuator({
+      id: 'session-demo',
+      describeOps: () => [{ op: 'touch', kind: 'apply' }],
+      handleAction: (input) => {
+        seen.push(input);
+        return { status: 'ok' };
+      },
+    });
+    const pipeline = { session_id: 'authored', options: { nested: { flag: false } } };
+    await withPipelineRunSession(pipeline, () =>
+      actuator.dispatch(
+        'touch',
+        {},
+        { __pipeline_session_id: 'exported', __pipeline_options: { nested: { flag: true } } }
+      )
+    );
+    expect(seen[0]).toMatchObject({
+      session_id: 'authored',
+      options: { nested: { flag: false } },
+    });
+    // The handler gets a copy: neither the frozen run session nor the file's
+    // object can be changed through it.
+    (seen[0].options!.nested as { flag: boolean }).flag = true;
+    expect(pipeline.options.nested.flag).toBe(false);
+    // Outside a runner the caller's context is the caller's own input.
+    await actuator.dispatch('touch', {}, { __pipeline_session_id: 'direct' });
+    expect(seen[1]).toMatchObject({ session_id: 'direct' });
   });
 
   it('enforces authored catalog schemas before dispatching the legacy handler', async () => {
@@ -454,6 +487,35 @@ describe('actuator SDK', () => {
       total_steps: 2,
     });
     expect(observed).toEqual(['uppercase', 'store']);
+  });
+
+  it('never resolves a runner-resolved leaf step a second time', async () => {
+    // The runner already resolved `text`; the page returned the literal
+    // "{{secret_var}}". The actuator receives the runner context (with the
+    // secret) and must not turn page text into the secret.
+    const run = () =>
+      runAdfActuatorPipeline({
+        actuatorId: 'demo-browser',
+        steps: [{ type: 'apply' as const, op: 'fill', params: { text: '{{secret_var}}' } }],
+        context: { secret_var: 'S3CRET' } as Record<string, unknown>,
+        honorRunnerResolvedParams: true,
+        handlers: {
+          capture: async (_op, _params, context) => context,
+          transform: async (_op, _params, context) => context,
+          apply: async (_op, params, context, resolve) => ({
+            ...context,
+            typed: params.text,
+            typed_again: resolve(params.text),
+          }),
+        },
+      });
+    const resolvedByRunner = await withRunnerResolvedParams(run);
+    expect(resolvedByRunner.context).toMatchObject({
+      typed: '{{secret_var}}',
+      typed_again: '{{secret_var}}',
+    });
+    // Outside a runner dispatch (direct actuator pipelines) templates still resolve.
+    expect((await run()).context).toMatchObject({ typed_again: 'S3CRET' });
   });
 
   it('does not execute a step when shared preflight blocks it', async () => {

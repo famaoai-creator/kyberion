@@ -4,7 +4,7 @@ category: Orchestration
 tags: [actuator, playground, collaboration, adf, pipeline-promote, procedure, trust]
 importance: 8
 author: Kyberion
-last_updated: 2026-11-09
+last_updated: 2026-11-25
 role_affinity: [ecosystem_architect, mission_controller, operator, researcher]
 phase_affinity: [alignment, execution, review]
 ---
@@ -223,6 +223,56 @@ unless approved (`pnpm kyberion project-trust request <path>` → human
 `--project-trust-approval <id>`). Any edit invalidates the approval.
 Schedules additionally need a `schedule{id,cron,timezone,enabled}` block and
 `pnpm kyberion schedule register`.
+
+### One approval for a tenant browser scenario (Run Manifest)
+
+```bash
+P=knowledge/confidential/<tenant>/scenarios/<name>.json
+pnpm pipeline check $P                                  # every gate up front, no side effects
+pnpm pipeline fix $P [--write] [--move-profile]         # owner terminal: rewrite what is mechanical (dry run by default)
+pnpm kyberion project-trust request $P [--allow-unattended] [--runs-per-day N]
+pnpm kyberion approvals --approve <request-id>          # the tenant owner, at the terminal
+pnpm pipeline --input $P --project-trust-approval <request-id>
+```
+
+- The approval card lists in plain language what the run does (sites it
+  opens, every distinct page script with an excerpt and its own SHA-256, which
+  secret is typed into which selector on which site). Approving it
+  pre-approves every bindable external step of this exact file for runs the
+  approving owner starts from a plain terminal — an agent session (Claude
+  Code, Codex, terminal-actuator PTY, …) is never "attended", and neither is
+  another member at the terminal; run start logs one line,
+  `run manifest: N/M external steps pre-approved (charter …)`
+  ([pipeline-run-manifest-model](../architecture/pipeline-run-manifest-model.md)).
+- `--allow-unattended` also lets workers / Dot (no one at the terminal) run
+  it under the same approval. The default is attended only.
+- The approval binds at most N runs per UTC day (default 20; choose 1–1000
+  with `--runs-per-day N`; it is on the card and cannot change after
+  approval). Later runs that day are not stopped — every external step asks
+  for its own approval. `pnpm pipeline check` shows today's count on the
+  `trust` line, e.g. `3/20 runs today`.
+- Still asked per step: a host decided at run time, an evaluate whose
+  `script` text contains `{{…}}` or is longer than 2000 characters, ref
+  clicks, unbounded loops, steps after a `core:judge_route`, a secret typed
+  before any fixed site is opened or into a templated / frame-piercing
+  selector (`>>`, `internal:control=enter-frame`), bodies run inside the
+  browser actuator (`browser:while`), `core:include` / `core:run_pipeline`,
+  and `--resume`d runs. A secret may only be typed on the site of the
+  navigation that precedes it. `pnpm pipeline check` lists them
+  with reasons on its `effects` row.
+- Keep a page script static and pass run-time values as data in `args`:
+  `{"op":"browser:evaluate","params":{"script":"(a) => a.rows.length","args":{"rows":"{{rows}}"}}}`.
+  A `{{…}}` inside `script` makes the step unbindable (it would be code
+  injection).
+- `pnpm pipeline fix $P` does the mechanical part for you: templated page
+  scripts → `(a) => …` + `args`, step files outside the run partition → the
+  confined path, `options.user_data_dir` → the tenant profile partition. It
+  prints a diff and the coverage before/after; `--write` (from the owner's
+  own terminal) keeps a backup on the tenant artifact floor and refuses if the
+  file changed meanwhile; `--move-profile` moves the old profile along.
+  Anything it cannot rewrite safely (credentials, unknown script shapes) is
+  listed as `manual`. A rewritten file needs a new `project-trust request`.
+- One changed byte changes the manifest: request again.
 
 The last crystallization rung is the accepted binding
 (`libs/core/pipeline/accepted-pipeline-bindings.ts`): a promoted pipeline + a

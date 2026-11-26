@@ -158,6 +158,13 @@ Two legal ways to execute browser work through Kyberion:
    `node dist/libs/actuators/browser-actuator/src/index.js --input …`. Use it for
    examples and engineering repros, not for unreviewed recordings.
 
+   A tenant scenario in this native shape can be pre-approved as a whole:
+   `pnpm kyberion project-trust request <file>` shows its Run Manifest, and both
+   entries above then run its approved external steps without per-step prompts.
+   An unapproved or changed file runs exactly as before. Check coverage with
+   `pnpm pipeline check <file>`. See
+   [pipeline-run-manifest-model §3.5](./pipeline-run-manifest-model.md).
+
 Attach to an already-running Chrome only when you pass `--cdp-url` / `--cdp-port`
 (and optionally `--tab-id`). Otherwise Playwright launches its own Chromium.
 

@@ -24,12 +24,14 @@ import {
   resolveAllowlistedRecordingRef,
 } from '@agent/core/knowledge/procedure-registry';
 import { pathResolver } from '@agent/core/path-resolver';
-import { assertSafeRepositoryPath } from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { readTextFile } from '@agent/core/foundation';
+import { parseSafeJsonObjectInput } from '@agent/core/foundation/safe-json';
+import { terminalHumanPresence } from '@agent/core/pipeline/run-manifest';
 import type { BrowserExtensionRecording } from '@agent/core/browser/browser-extension-bridge';
 import type { ProcedureEntry } from '@agent/core/knowledge/procedure-types';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { readSafeJsonFile } from './lib/json-input.js';
 import {
   assertSupportedNodeEngine,
   createExecuteBrowserPipeline,
@@ -210,8 +212,17 @@ export async function main(
     const abs = assertSafeRepositoryPath(pathResolver.rootResolve(adfPath), {
       allowMissingLeaf: true,
     });
-    const readAdf = deps.readAdf ?? readSafeJsonFile<Record<string, unknown>>;
-    const adf = readAdf(abs, 'browser ADF');
+    // The exact text is kept so a native pipeline file can be bound to its
+    // approved Run Manifest (compiled from these bytes).
+    let sourceText: string | undefined;
+    const adf = deps.readAdf
+      ? deps.readAdf(abs, 'browser ADF')
+      : (() => {
+          if (!safeExistsSync(abs) || !safeLstat(abs).isFile())
+            throw new Error('browser ADF must be a regular file');
+          sourceText = String(readTextFile(abs));
+          return parseSafeJsonObjectInput(sourceText, 'browser ADF') ?? {};
+        })();
     if (isCompiledRecordingDraft(adf)) {
       throw new ScriptExitError(
         1,
@@ -225,26 +236,45 @@ export async function main(
       );
     }
     const actuator = await (deps.loadActuator ?? loadBrowserActuator)();
-    // Same governed identity as procedure runs (evidence/browser writes).
-    const result = await withExecutionContextAsync('surface_runtime', () =>
-      actuator.handleAction({
-        ...adf,
-        options: {
-          ...((adf.options as Record<string, unknown> | undefined) || {}),
-          headless: headed ? false : true,
-          connect_over_cdp: connectOverCdp,
-          ...(cdpUrl ? { cdp_url: cdpUrl } : {}),
-          ...(cdpPort ? { cdp_port: cdpPort } : {}),
-          ...(browserRuntime ? { browser_runtime: browserRuntime } : {}),
-          ...(browserPurpose ? { runtime_purpose: browserPurpose } : {}),
-        },
-        context: {
-          ...((adf.context as Record<string, unknown> | undefined) || {}),
-          source: 'run-browser-procedure',
-          mission_id: missionId,
-        },
-      })
-    );
+    const flagOptions = {
+      headless: headed ? false : true,
+      connect_over_cdp: connectOverCdp,
+      ...(cdpUrl ? { cdp_url: cdpUrl } : {}),
+      ...(cdpPort ? { cdp_port: cdpPort } : {}),
+      ...(browserRuntime ? { browser_runtime: browserRuntime } : {}),
+      ...(browserPurpose ? { runtime_purpose: browserPurpose } : {}),
+    };
+    const input = {
+      ...adf,
+      options: {
+        ...((adf.options as Record<string, unknown> | undefined) || {}),
+        ...flagOptions,
+      },
+      context: {
+        ...((adf.context as Record<string, unknown> | undefined) || {}),
+        source: 'run-browser-procedure',
+        mission_id: missionId,
+      },
+    };
+    // Same governed identity as procedure runs (evidence/browser writes). A
+    // native pipeline file read here runs bound to its approved Run Manifest
+    // when there is one; otherwise exactly as before.
+    // The binding is decided here, in the context that read the file. Bound
+    // or not, the run dispatches under the surface identity: a bound run's
+    // external-operation gate reads and records its own tenant's governance
+    // state through the session's exact gate store grant, so binding never
+    // widens what the run can read or write.
+    const dispatch = () =>
+      withExecutionContextAsync('surface_runtime', () => actuator.handleAction(input));
+    const runNative = actuator.runNativePipelineFile;
+    const result =
+      sourceText !== undefined && runNative
+        ? await runNative(
+            { inputPath: pathResolver.toRepoRelative(abs), sourceText, pipeline: adf },
+            dispatch,
+            { hasHuman: terminalHumanPresence(), optionOverrides: flagOptions }
+          )
+        : await dispatch();
     const payload = {
       mode: 'adf',
       mission_id: missionId,

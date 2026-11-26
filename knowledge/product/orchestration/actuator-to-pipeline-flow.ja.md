@@ -4,7 +4,7 @@ category: Orchestration
 tags: [actuator, playground, collaboration, adf, pipeline-promote, procedure, trust]
 importance: 8
 author: Kyberion
-last_updated: 2026-11-09
+last_updated: 2026-11-25
 role_affinity: [ecosystem_architect, mission_controller, operator, researcher]
 phase_affinity: [alignment, execution, review]
 ---
@@ -186,6 +186,25 @@ Trust: `pipelines/` と templates 以外は `[TRUST_REQUIRED]` で失敗しま�
 付きで実行。編集で承認は無効化されます。
 スケジュールは `schedule{id,cron,timezone,enabled}` ブロックと
 `pnpm kyberion schedule register` が別途必要です。
+
+### tenant のブラウザシナリオを 1 回の承認で流す（Run Manifest）
+
+```bash
+P=knowledge/confidential/<tenant>/scenarios/<name>.json
+pnpm pipeline check $P                                  # 全ゲートを事前に確認（副作用なし）
+pnpm pipeline fix $P [--write] [--move-profile]         # owner の端末で、機械的に直せる箇所を書き換える（既定は dry run）
+pnpm kyberion project-trust request $P [--allow-unattended] [--runs-per-day N]
+pnpm kyberion approvals --approve <request-id>          # tenant owner が端末で決裁
+pnpm pipeline --input $P --project-trust-approval <request-id>
+```
+
+- 承認カードには、この run が行うこと（開くサイト、ページスクリプトごとの抜粋と SHA-256、どの secret をどのサイトのどのセレクタへ入力するか）が平文で出ます。承認すると、このファイルの束縛可能な外部ステップは、承認した owner 本人が普通の端末から実行したときに個別承認なしで動きます。エージェントのセッション（Claude Code、Codex、terminal-actuator の PTY など）や、別のメンバーの端末からの実行は attended になりません。実行開始時に `run manifest: N/M external steps pre-approved (charter …)` が 1 行出ます。
+- `--allow-unattended` を付けたときだけ、ワーカー / Dot（端末に本人がいない実行）も同じ承認で動きます。既定は attended のみです。
+- 1 日に束縛する run の数には上限があります（既定 20、`--runs-per-day N` で 1〜1000 を指定。カードに出て、決裁後は変えられません）。日の区切りは UTC です。上限に達した日のそれ以降の run は止まらず、外部ステップごとに承認を求めます。`pnpm pipeline check` の `trust` 行に `3/20 runs today` のように当日の数が出ます。
+- 引き続きステップごとに承認を求めるもの: 実行時に決まるホストの URL、`script` の本文に `{{…}}` を含むか 2000 文字を超える evaluate、ref クリック、上限のないループ、`core:judge_route` より後のステップ、固定サイトを開く前やテンプレート化 / フレーム越え（`>>`、`internal:control=enter-frame`）のセレクタへ secret を入力するステップ、ブラウザ actuator 内部のボディ（`browser:while` など）、`core:include` / `core:run_pipeline`、`--resume` した run。secret は直前の遷移先のサイトでだけ入力できます。`pnpm pipeline check` の `effects` 行に理由付きで出ます。
+- evaluate はスクリプトを固定し、実行時の値は `args` でデータとして渡します。例: `{"op":"browser:evaluate","params":{"script":"(a) => a.rows.length","args":{"rows":"{{rows}}"}}}`。`script` の中に `{{…}}` を書くと、そのステップは束縛できません（コード注入になるため）。
+- `pnpm pipeline fix $P` は、機械的に直せる箇所を書き換えます: テンプレートを埋め込んだページスクリプト → `(a) => …` と `args`、run のパーティション外に書くステップのファイル → 閉じ込めたパス、`options.user_data_dir` → テナントのプロファイルのパーティション。差分と前後の網羅率を出します。`--write`（owner 本人の端末から）はテナントの artifact フロアにバックアップを取り、読んだ後にファイルが変わっていれば書きません。`--move-profile` は元のプロファイルも移します。安全に書き換えられないもの（資格情報、未知の形のスクリプト）は `manual` として出ます。書き換えたファイルは `project-trust request` からやり直します。
+- ファイルを 1 バイトでも変えると manifest が変わるので、request からやり直します。
 
 ## 5. Dispatch ABI（入力と出力）
 

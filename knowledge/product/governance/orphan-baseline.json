@@ -267,10 +267,6 @@
       "reason": "Step of its own examples/android-runtime-webview-handoff-template.json (own-actuator files do not count) and of mobile-device-pipeline.schema.json; the name is shared with ios, so bare literals elsewhere cannot be attributed. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
-      "id": "android:llm_decide",
-      "reason": "Generic pipeline step `llm_decide` (also registered by browser, network, system and terminal) that the android runner accepts inside actuator-scoped ADFs; no ADF or android test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make android ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
-    },
-    {
       "id": "artifact:list",
       "reason": "Generic pipeline step `list` (also registered by agent, file, process, secret, terminal and working-memory) that the artifact runner accepts inside actuator-scoped ADFs; no ADF or artifact test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make artifact ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
@@ -345,10 +341,6 @@
     {
       "id": "modeling:write_file",
       "reason": "Lost its last ADF caller in this branch's governance-pipeline retirement wave; kept registered as the modeling actuator's file sink."
-    },
-    {
-      "id": "network:llm_decide",
-      "reason": "Generic pipeline step `llm_decide` (also registered by android, browser, system and terminal) that the network runner accepts inside actuator-scoped ADFs; no ADF or network test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make network ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
       "id": "network:write_artifact",

@@ -77,6 +77,26 @@ describe('pipeline preset routing', () => {
     ]);
     expect(resolvePipelinePresetArgs(['unknown-preset'])).toEqual(['unknown-preset']);
   });
+
+  it('routes `check <file>` to the readiness report', () => {
+    expect(resolvePipelinePresetArgs(['check', 'pipelines/x.json', '--json'])).toEqual([
+      '--input',
+      'pipelines/x.json',
+      '--check',
+      '--json',
+    ]);
+    expect(resolvePipelinePresetArgs(['check'])).toEqual(['check']);
+  });
+
+  it('routes `fix <file>` to the fix command (dry run unless --write)', () => {
+    expect(resolvePipelinePresetArgs(['fix', 'pipelines/x.json', '--write'])).toEqual([
+      '--input',
+      'pipelines/x.json',
+      '--fix',
+      '--write',
+    ]);
+    expect(resolvePipelinePresetArgs(['fix'])).toEqual(['fix']);
+  });
 });
 
 describe('findStepByIdRecursive', () => {

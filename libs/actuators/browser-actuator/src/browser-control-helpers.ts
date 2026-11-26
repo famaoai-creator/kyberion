@@ -10,6 +10,7 @@ import {
 } from './browser-passkey-helpers.js';
 import type { Page } from '@playwright/test';
 import type { BrowserRuntime } from './browser-pipeline-helpers.js';
+import { confineNativeRunContinueFile } from './browser-native-run-manifest.js';
 import {
   browserOperationRequiresAdmission,
   runBrowserMutation,
@@ -183,11 +184,13 @@ async function executeControl(
         resolve(params.message || 'Operator input required. Press Enter to continue.')
       );
       const continueFile = params.continue_file
-        ? assertSafeRepositoryPath(
-            pathResolver.rootResolve(String(resolve(params.continue_file))),
-            {
-              allowMissingLeaf: true,
-            }
+        ? confineNativeRunContinueFile(
+            assertSafeRepositoryPath(
+              pathResolver.rootResolve(String(resolve(params.continue_file))),
+              {
+                allowMissingLeaf: true,
+              }
+            )
           )
         : pathResolver.shared(`runtime/browser/${sessionId}.continue`);
       const approval = browserRuntimeHelpers.beginOperatorApproval({

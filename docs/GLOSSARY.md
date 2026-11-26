@@ -696,6 +696,14 @@ and inspect `signal_triage` for the latest proposed and applied routes. →
 
 A tenant-scoped standing declaration of the accountable human, authority envelope (spend limits, deputies, validity) and loss appetite (`libs/core/governance/accountability-charter*.ts`). The charter bounds delegation of existing authority. An eligible action within an active charter may run with accountable-human attribution and no per-action approval. A delegation miss can fall back to individual approval when the policy and execution boundary allow it. A hard stop blocks execution. See the [external-operation decision table](../knowledge/product/architecture/scope-governance-plane.md#外部操作1件の認可). Owners sign it in Concierge Settings › Organization and members; `approval_inbox charter` reports what ran under it. Distinct from a dot charter and from the Charter (`AGENTS.md`).
 
+### Run Manifest
+
+The statically compiled answer to what one pipeline run may do (`libs/core/pipeline/run-manifest.ts`): the scope derived from where the pipeline file lives, the model and secret requirements, and the **Effect Manifest** — the external operations the run can perform, each with its target, allowed page origins, argument origins and occurrence bound. The project-trust approval card shows it in plain language; approving it issues a manifest-bound Accountability Charter (scope kind `run_manifest`) that admits exactly those effects at run time, still with a review artifact, once-only commit and audit per step. Any file edit changes the manifest hash and voids it. Not a [Plan](#plan) (a user-facing summary). → [pipeline-run-manifest-model](../knowledge/product/architecture/pipeline-run-manifest-model.md)
+
+### Run Principal
+
+Who a pipeline run executes as: `attended` (a TTY is present and it resolves to an active Member) or `unattended` (a dispatched worker or standing Dot). It decides whether out-of-manifest effects are asked interactively or suspended for approval. It is not a credential exception: model credentials still follow [Credential Custody](#credential-custody). → [pipeline-run-manifest-model](../knowledge/product/architecture/pipeline-run-manifest-model.md)
+
 ### Scope Envelope
 
 The two-layer record (`identity` snapshot + attenuable `policy`) minted at dispatch boundaries so a delegation can only narrow, never enlarge, its parent's scope. → [scope-governance-plane](../knowledge/product/architecture/scope-governance-plane.md)
