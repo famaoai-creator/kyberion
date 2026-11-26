@@ -99,6 +99,10 @@ adds queue-level dependencies. During `dispatch`, a missing prerequisite keeps
 the entry pending and lets the same sweep examine the next candidate.
 
 Preview scope and prerequisites with `pnpm mission start <ID> --dry-run --json`.
+`pnpm mission workflow-select <ID>` reports `machine_gate_preview` for the planned
+template or the selected catalog template. It lists named entry and exit checks
+that `gate-pass --machine-only` refuses. Use the actual gate preflight for
+audit-recorded holds, runtime prerequisites and evidence.
 Use `input.preflight.ready` to decide whether to start. Use
 `pnpm mission gate-pass <ID> <GATE_ID> --machine-only --dry-run --json` to preview
 startup and the stored gate definition. The actual machine gate evaluates its

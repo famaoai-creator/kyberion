@@ -8,6 +8,7 @@ import {
 } from './openrouter-backend.js';
 import { safeExecShellScript } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
+import * as reasoningEgress from '../reasoning/reasoning-egress-scope.js';
 
 vi.mock('../secure-io.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../secure-io.js')>();
@@ -49,6 +50,32 @@ describe('openrouter-backend', () => {
 
     const backend = buildOpenRouterBackendFromEnv();
     expect(backend?.name).toBe('openrouter');
+  });
+
+  it('does not forward a capped completion request through redirects', async () => {
+    const egress = vi.spyOn(reasoningEgress, 'assertReasoningEgressAllowedAtEndpoint');
+    egress.mockImplementation(() => undefined);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'done' } }] })
+        )
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const backend = new OpenRouterBackend({
+      apiKey: 'or-test-key',
+      model: 'meta-llama/llama-3-70b-instruct',
+    });
+
+    await expect(
+      reasoningEgress.withReasoningTrainingUseCap('no_training', () => backend.prompt('probe'))
+    ).resolves.toBe('done');
+    expect(egress).toHaveBeenCalledWith('openrouter', 'https://openrouter.ai/api/v1/');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://openrouter.ai/api/v1/chat/completions',
+      expect.objectContaining({ redirect: 'error' })
+    );
   });
 
   it('sends OpenRouter headers and redacts prompt context', async () => {

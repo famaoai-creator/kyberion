@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readJson } from '../foundation/json.js';
 import * as pathResolver from '../path-resolver.js';
+import { withReasoningTrainingUseCap } from '../reasoning/reasoning-egress-scope.js';
 
 // checkProviderEgress raises an ops-alert on every denial; keep the shared
 // ops-alerts sink untouched by these tests.
@@ -551,6 +552,31 @@ describe('runAdaptiveStructuredLlmProfile provider egress gate', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     while (disposers.length) disposers.pop()?.();
+  });
+
+  it('rejects direct profiles under a strict cap before probing or invoking fallbacks', async () => {
+    const probe = vi.fn(() => ({ available: true }));
+    const egress = { dataTier: 'public' as const };
+    await withReasoningTrainingUseCap('no_training', async () => {
+      await expect(
+        runAdaptiveStructuredLlmProfile('distill', 'public prompt', schema, {
+          egress,
+          policy,
+          isCommandAvailable: probe,
+        })
+      ).rejects.toThrow(/cannot enforce training_use 'no_training'/);
+      await expect(
+        runStructuredLlmProfile(policy.profiles.heavy, 'public prompt', schema, { egress })
+      ).rejects.toThrow(/cannot enforce training_use 'no_training'/);
+      expect(() => invokeLlm('public prompt', 'distill', policy, { egress })).toThrow(
+        /cannot enforce training_use 'no_training'/
+      );
+      expect(() => invokeShellProfile('public prompt', policy.profiles.heavy)).toThrow(
+        /cannot enforce training_use 'no_training'/
+      );
+    });
+    expect(probe).not.toHaveBeenCalled();
+    expect(calls).toEqual([]);
   });
 
   it('never invokes a non-attested provider for confidential material', async () => {

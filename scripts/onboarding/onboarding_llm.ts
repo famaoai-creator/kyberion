@@ -36,6 +36,7 @@ import {
   attestTenantProvider,
   assertPrintableCommandValue,
   captureAttestationInvoker,
+  previewTenantProviderAttestation,
   providerAttestationApplyArgs,
   requestTenantProviderAttestationApproval,
   shellQuoteArg,
@@ -59,7 +60,9 @@ import {
 } from '@agent/core/provider/provider-egress-gate';
 import { loadReasoningRoutePolicy } from '@agent/core/reasoning/reasoning-route-resolver';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
+import { hasCliFlag } from '@agent/core/cli-guard';
 import { guardCliArgsNormalized, type CliGuardSpec } from '../lib/cli/cli-guard.js';
+import { ScriptExitError } from '../lib/harness.js';
 import {
   defaultEnvLocalPath,
   listReasoningBackendChoices,
@@ -77,10 +80,25 @@ export interface OnboardingLlmOptions {
   tenantRegistryRootDir?: string;
 }
 
-const VERBS = ['show', 'select', 'attest'] as const;
+const VERBS = ['show', 'select', 'attest', 'probe-local', 'account'] as const;
 type Verb = (typeof VERBS)[number];
 
 const SPECS: Record<Verb, CliGuardSpec> = {
+  account: {
+    command: 'pnpm onboarding llm account',
+    manifestId: 'script.onboarding',
+    options: [{ flag: '--json' }],
+  },
+  'probe-local': {
+    command: 'pnpm onboarding llm probe-local',
+    manifestId: 'script.onboarding',
+    options: [
+      { flag: '--url', value: '<loopback-url>' },
+      { flag: '--model', value: '<model-id>' },
+      { flag: '--timeout-ms', value: '<milliseconds>' },
+      { flag: '--json' },
+    ],
+  },
   show: {
     command: 'pnpm onboarding llm show',
     manifestId: 'script.onboarding',
@@ -120,11 +138,16 @@ const SPECS: Record<Verb, CliGuardSpec> = {
 
 export function onboardingLlmUsage(): string {
   return [
-    'Usage: pnpm onboarding llm <show|select|attest> [options]',
+    'Usage: pnpm onboarding llm <show|select|attest|probe-local|account> [options]',
+    '  account [--json]  Check the active local Codex account type and reported plan.',
     '  show   [--tenant <slug>] [--json]',
     '         Current backend/model selection and, per data tier, which providers may receive',
     '         material for LLM work and why the others are denied (--tenant, else the active',
     '         tenant scope).',
+    '  probe-local [--url <loopback-url>] [--model <model-id>] [--timeout-ms <milliseconds>] [--json]',
+    '         Delegate a synthetic calculation to loopback Ollama using local_only.',
+    '         Uses the configured Ollama URL/model unless overridden. No tools or fallback.',
+    '         The probe cannot inspect the server’s cloud settings.',
     '  select --backend <mode> [--model <model-id>] [--apply] [--json]',
     '         Record the reasoning backend (reasoning-backend-policy allowed_modes) and model',
     '         (model registry) in the operator LLM selection. Dry-run without --apply.',
@@ -398,7 +421,30 @@ export function attestationDelegationGrant(
 }
 
 const DELEGATION_HINT =
-  'To let the installed agent apply this exact claim (including renewals), grant it to a charter: put delegation_grant into {scope_kind:"person",mode:"grant",grants:[…]} and run `pnpm onboarding authority preview --file <plan>` → request → approve → apply.';
+  'Delegate exact claims and their renewals in Concierge Settings → Authority. To review several providers together, put their delegation_grant entries into one charter plan and run `pnpm onboarding authority preview --file <plan>`.';
+
+function previewProviderAttestation(input: ProviderAttestationInput) {
+  return withExecutionContext(
+    'sovereign_concierge',
+    () => previewTenantProviderAttestation(toCoreAttestation(input)),
+    undefined,
+    input.tenant
+  );
+}
+
+function tenantAttestationApplyCommand(input: ProviderAttestationInput, approvalId?: string) {
+  return [
+    'pnpm',
+    'onboarding',
+    'llm',
+    'attest',
+    '--tenant',
+    input.tenant,
+    ...providerAttestationApplyArgs(input, approvalId),
+  ]
+    .map(shellQuoteArg)
+    .join(' ');
+}
 
 /** Open (or reuse) the human approval a `training_use: none` attestation needs. */
 export function requestProviderAttestationApproval(
@@ -784,31 +830,30 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
   const { json } = flags;
 
   if (flags.requestApproval) {
+    const decision = previewProviderAttestation(input);
+    if (decision.status === 'delegated') {
+      const applyCommand = tenantAttestationApplyCommand(input);
+      print(
+        json
+          ? JSON.stringify(
+              {
+                decision,
+                approval_created: false,
+                apply_command: applyCommand,
+                apply_command_shell: 'posix',
+              },
+              null,
+              2
+            )
+          : `Delegated by charter ${decision.delegation.charter_id}. Apply with: ${applyCommand}`
+      );
+      return;
+    }
     const request = requestProviderAttestationApproval(input);
     // Print every bound value verbatim and shell-quoted: the approval is
     // hash-bound to plan/basis/attested_by/valid_for_days, so the command
     // must apply as-is when pasted.
-    const applyCommand = [
-      'pnpm',
-      'onboarding',
-      'llm',
-      'attest',
-      '--tenant',
-      tenant,
-      ...providerAttestationApplyArgs(
-        {
-          provider,
-          training_use: trainingUse,
-          plan,
-          basis,
-          attested_by: attestedBy,
-          valid_for_days: validForDays,
-        },
-        request.request_id
-      ),
-    ]
-      .map(shellQuoteArg)
-      .join(' ');
+    const applyCommand = tenantAttestationApplyCommand(input, request.request_id);
     const delegationGrant = attestationDelegationGrant(input);
     print(
       json
@@ -842,11 +887,24 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
   }
   if (!apply) {
     const availability = availabilityFor(effectiveTenant(tenant), options);
-    const needsApproval = trainingUse === 'none' && !approvalRequestId;
+    const decision = previewProviderAttestation(input);
+    const delegationGrant = attestationDelegationGrant(input);
+    const applyCommand =
+      decision.status === 'direct' || decision.status === 'delegated'
+        ? tenantAttestationApplyCommand(input, approvalRequestId)
+        : undefined;
     const preview = {
       dry_run: true,
       attestation: { ...input, invoker: undefined },
-      ...(needsApproval ? { needs_approval: 'run with --request-approval first' } : {}),
+      decision,
+      ...(applyCommand ? { apply_command: applyCommand, apply_command_shell: 'posix' } : {}),
+      ...(decision.status === 'interactive'
+        ? {
+            needs_approval:
+              'Use --request-approval for this claim or authorize its exact target in an accountability charter.',
+            ...(delegationGrant ? { delegation_grant: delegationGrant } : {}),
+          }
+        : {}),
       current_availability: availability,
     };
     print(
@@ -855,9 +913,21 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
         : [
             `[dry-run] would attest tenant=${tenant} provider=${provider} training_use=${trainingUse}`,
             ...formatAvailability(availability),
-            needsApproval
-              ? 'training_use none opens confidential egress: run with --request-approval, have a human approve it, then --apply --accept --approval-request-id <id>.'
-              : 'Re-run with --apply --accept to record it.',
+            ...(decision.status === 'blocked'
+              ? [`Blocked: ${decision.reason}`]
+              : decision.status === 'interactive'
+                ? [
+                    preview.needs_approval,
+                    ...(delegationGrant
+                      ? [DELEGATION_HINT, `delegation_grant: ${JSON.stringify(delegationGrant)}`]
+                      : []),
+                  ]
+                : [
+                    ...(decision.status === 'delegated'
+                      ? [`Delegated by charter ${decision.delegation.charter_id}.`]
+                      : []),
+                    `Apply with: ${applyCommand}`,
+                  ]),
           ].join('\n')
     );
     return;
@@ -893,7 +963,7 @@ export function main(
   argv: string[] = [],
   print: Print = () => undefined,
   options: OnboardingLlmOptions = {}
-): void {
+): void | Promise<void> {
   const verb = argv[0];
   if (!verb || !(VERBS as readonly string[]).includes(verb)) {
     if (verb && verb !== 'help' && verb !== '--help' && verb !== '-h') {
@@ -906,5 +976,38 @@ export function main(
   if (handled) return;
   if (verb === 'show') return show(rest, print, options);
   if (verb === 'select') return select(rest, print, options);
+  if (verb === 'probe-local') return probeLocal(rest, print);
+  if (verb === 'account') return showCodexAccount(rest, print);
   return attest(rest, print, options);
+}
+
+async function showCodexAccount(argv: readonly string[], print: Print): Promise<void> {
+  const { inspectCodexAccount } = await import('./onboarding_codex_account.js');
+  const account = await inspectCodexAccount();
+  print(
+    hasCliFlag(argv, '--json')
+      ? JSON.stringify(account, null, 2)
+      : [
+          account.status === 'available'
+            ? `Codex account: ${account.account_type ?? 'unavailable'}, plan: ${account.plan ?? 'unavailable'}`
+            : 'Codex account check unavailable. Check CLI installation, login, and process permissions.',
+          'Training use remains unknown. Confirm the applicable data controls separately.',
+        ].join('\n')
+  );
+  if (account.status === 'unavailable') throw new ScriptExitError(1);
+}
+
+async function probeLocal(argv: readonly string[], print: Print): Promise<void> {
+  const { probeLocalDelegation } = await import('./onboarding_llm_probe_local.js');
+  const result = await probeLocalDelegation({
+    url: optionValue(argv, '--url'),
+    model: optionValue(argv, '--model'),
+    timeoutMs: optionValue(argv, '--timeout-ms'),
+  });
+  print(
+    hasCliFlag(argv, '--json')
+      ? JSON.stringify(result, null, 2)
+      : `Local delegation: ${result.status} (${result.provider})\n${result.next_step}`
+  );
+  if (result.status !== 'passed') throw new ScriptExitError(1);
 }

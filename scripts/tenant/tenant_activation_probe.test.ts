@@ -172,6 +172,9 @@ describe('tenant activation probe', () => {
 
     expect(result.passed).toBe(true);
     expect(result.activate_command).toContain(`--probe-ref isolation_probe=${result.evidence_ref}`);
+    expect(result.activate_command).not.toContain('<human:owner>');
+    expect(result.activate_args).toContain(rootDir);
+    expect(result.activation_status).toBe('ready');
     const evidence = JSON.parse(
       String(safeReadFile(path.join(rootDir, result.evidence_ref), { encoding: 'utf8' }))
     );
@@ -197,6 +200,21 @@ describe('tenant activation probe', () => {
     }).record;
     expect(record.blockers).toEqual([]);
     expect(record.status).toBe('ready');
+  });
+
+  it('does not offer activation from passing probes without an accountable human', async () => {
+    seed();
+    const result = await runScopedTenantActivationProbes(
+      { ...scope, ownerId: 'agent:worker', nhiIds: [nhiId], serviceIds: [], rootDir },
+      deps()
+    );
+    expect(result.passed).toBe(true);
+    expect(result.activate_command).toBeNull();
+    expect(result.activate_args).toBeNull();
+    expect(result.activation_status).toBe('validating');
+    expect(result.activation_blockers).toContain(
+      'accountable_human must be an explicit human:* resource'
+    );
   });
 
   it("keeps other tenants out of this tenant's registry-failure evidence", async () => {

@@ -28,6 +28,8 @@ import {
   reasoningBackendEndpoint,
   reasoningEgressDenialNext,
   withReasoningPayloadScope,
+  withReasoningTrainingUseCap,
+  getReasoningTrainingUseCap,
   type ReasoningPayloadScope,
 } from './reasoning-egress-scope.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
@@ -75,6 +77,91 @@ afterEach(() => {
   delete process.env.KYBERION_EGRESS_POLICY_PATH;
   _resetEgressPolicyCacheForTests();
   _setReasoningTenantRegistryRootForTests(undefined);
+});
+
+describe('reasoning training-use caps', () => {
+  it.each(['local_only', 'no_training'] as const)(
+    'requires actual loopback endpoint evidence for a local backend under %s',
+    (cap) => {
+      expect(() => assertReasoningEgressAllowed('ollama')).not.toThrow();
+      withReasoningTrainingUseCap(cap, () => {
+        expect(() => assertReasoningEgressAllowed('ollama')).toThrow(/explicit loopback endpoint/);
+        for (const wrongEndpoint of [
+          'https://model-gateway.example',
+          'http://127.example.com:11434',
+          'http://10.example.com',
+          'http://10.0.0.2',
+          'http://0.0.0.0:11434',
+          'ftp://127.0.0.1:11434',
+        ]) {
+          expect(() => assertReasoningEgressAllowedAtEndpoint('ollama', wrongEndpoint)).toThrow(
+            /must use a local endpoint/
+          );
+        }
+        for (const loopback of [
+          'http://127.0.0.1:11434/v1',
+          'http://[::1]:11434/v1',
+          'http://localhost:11434/v1',
+        ]) {
+          expect(() => assertReasoningEgressAllowedAtEndpoint('ollama', loopback)).not.toThrow();
+        }
+      });
+    }
+  );
+
+  it('applies to unscoped sends and every candidate tried during asynchronous fallback', async () => {
+    await withReasoningTrainingUseCap('local_only', async () => {
+      await Promise.resolve();
+      expect(() =>
+        assertReasoningEgressAllowedAtEndpoint('anthropic', 'https://api.anthropic.com')
+      ).toThrow(/local_only/);
+      withReasoningPayloadScope({ tier: 'public', training_use: 'training_eligible' }, () => {
+        expect(getReasoningPayloadScope()?.training_use).toBe('local_only');
+        expect(() =>
+          assertReasoningEgressAllowedAtEndpoint(
+            'openai-compatible',
+            'https://model-gateway.example'
+          )
+        ).toThrow(/local_only/);
+        expect(() =>
+          assertReasoningEgressAllowedAtEndpoint('openai-compatible', 'http://127.0.0.1:11434/v1')
+        ).not.toThrow();
+      });
+    });
+    expect(getReasoningTrainingUseCap()).toBeUndefined();
+  });
+
+  it('keeps nested and concurrent restrictions isolated and monotonic', async () => {
+    await Promise.all([
+      withReasoningTrainingUseCap('local_only', () =>
+        withReasoningTrainingUseCap('no_training', async () => {
+          await Promise.resolve();
+          expect(getReasoningTrainingUseCap()).toBe('local_only');
+        })
+      ),
+      withReasoningTrainingUseCap('no_training', async () => {
+        await Promise.resolve();
+        expect(getReasoningTrainingUseCap()).toBe('no_training');
+        withReasoningPayloadScope({ tier: 'public' }, () => {
+          expect(getReasoningPayloadScope()?.training_use).toBe('no_training');
+          expect(() =>
+            assertReasoningEgressAllowedAtEndpoint('anthropic', 'https://api.anthropic.com')
+          ).toThrow(/no.training/);
+        });
+        withReasoningPayloadScope({ tier: 'public', training_use: 'zero_retention' }, () => {
+          expect(getReasoningPayloadScope()?.training_use).toBe('zero_retention');
+        });
+        const invalidWireScope = { tier: 'public', training_use: 'unrecognized' };
+        withReasoningPayloadScope(invalidWireScope as ReasoningPayloadScope, () => {
+          expect(getReasoningPayloadScope()?.training_use).toBe('no_training');
+          expect(() =>
+            assertReasoningEgressAllowedAtEndpoint('anthropic', 'https://api.anthropic.com')
+          ).toThrow(/no.training/);
+        });
+      }),
+    ]);
+    expect(getReasoningTrainingUseCap()).toBeUndefined();
+  });
 });
 
 function installProcessorCharter(tenant = 'approved-tenant') {

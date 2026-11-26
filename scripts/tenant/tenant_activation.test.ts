@@ -12,7 +12,7 @@ vi.mock('@agent/core/organization/tenant-activation', async (importOriginal) => 
     ...actual,
     resolveTenantActivation: () => {
       observed.tenantSlugs.push(resolveIdentityContext().tenantSlug);
-      return { mode: 'dry_run' };
+      return { mode: 'dry_run', record: { status: 'validating', checks: { registry: true } } };
     },
   };
 });
@@ -97,6 +97,7 @@ describe('tenant activation plan shows LLM availability per data tier', () => {
     );
     const plan = JSON.parse(String(output[0]));
     expect(plan.mode).toBe('dry_run');
+    expect(plan.next_action).toMatchObject({ kind: 'resolve_check', check: 'context_binding' });
     const tiers = plan.llm_availability.tiers as Array<{
       tier: string;
       usable: Array<{ provider: string }>;

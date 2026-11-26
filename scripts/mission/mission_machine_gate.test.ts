@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { runMachineOnlyMissionGate, type MachineMissionGatePorts } from './mission_machine_gate.js';
+import {
+  previewMachineGateCompatibility,
+  runMachineOnlyMissionGate,
+  type MachineMissionGatePorts,
+} from './mission_machine_gate.js';
 import type { StoredGateEvaluationResult } from '@agent/core/mission/mission-process-planning';
 
 function harness(
@@ -44,6 +48,28 @@ function harness(
 const input = { missionId: 'msn-machine-test', gateId: 'EXECUTION_DONE' };
 
 describe('machine-only mission gate', () => {
+  it('previews both entry and exit checks without assuming runtime readiness', () => {
+    expect(previewMachineGateCompatibility(undefined).status).toBe('unknown');
+    expect(previewMachineGateCompatibility([{ id: 'work' }]).status).toBe('no_confirmation_checks');
+    expect(
+      previewMachineGateCompatibility([
+        {
+          id: 'review',
+          entry_gate: { id: 'REVIEW', checks: [{ kind: 'reviewer_approved' }] },
+          exit_gate: {
+            id: 'SIGNOFF',
+            checks: [{ kind: 'evidence_exists' }, { kind: 'human_override' }],
+          },
+        },
+      ])
+    ).toEqual({
+      status: 'confirmation_required',
+      blockers: [
+        { phase: 'review', gate_id: 'REVIEW', check: 'reviewer_approved' },
+        { phase: 'review', gate_id: 'SIGNOFF', check: 'human_override' },
+      ],
+    });
+  });
   it('evaluates stored checks without manufacturing human confirmation, then advances in order', async () => {
     const h = harness();
     expect(await runMachineOnlyMissionGate(input, h.ports)).toEqual({

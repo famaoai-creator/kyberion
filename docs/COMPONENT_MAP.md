@@ -22,6 +22,8 @@ For a layer-oriented view of the concepts themselves, read:
 
 The Mission CLI binds the selected tenant for lifecycle commands and their cleanup. The shared authorization registry and operation preflight resolve operations, resources, and egress before execution. The approval store records decisions from the terminal and Concierge, and the Grant store verifies and consumes the decision when issuing a Grant. The [scope governance design](../knowledge/product/architecture/scope-governance-plane.md) describes where each check runs.
 
+`libs/core/governance/autonomous-loop-readiness.ts` reports operational blockers and learning warnings with a prioritized diagnostic. Within one process, callers can opt into a reasoning data-use restriction in `libs/core/reasoning/reasoning-egress-scope.ts`. The endpoint gate applies it across nested calls, and `libs/core/mission/mission-llm.ts` refuses direct profiles while that restriction is active.
+
 ```text
 Sovereign intent
   -> AGENTS.md governance and 5-phase lifecycle

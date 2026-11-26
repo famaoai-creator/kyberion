@@ -57,7 +57,11 @@ import {
   runStructuredReasoningOp,
   structuredReasoningSpecs,
 } from '../reasoning/structured-reasoning.js';
-import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning/reasoning-egress-scope.js';
+import {
+  assertReasoningEgressAllowedAtEndpoint,
+  getReasoningTrainingUseCap,
+} from '../reasoning/reasoning-egress-scope.js';
+import { isLocalReasoningEndpoint } from '../reasoning/reasoning-provider-registry.js';
 import {
   computeCompletionTokenBudget,
   estimateRequestInputTokens,
@@ -460,6 +464,12 @@ function buildAbortSignal(
   return controller.signal;
 }
 
+function reasoningRedirectPolicy(endpoint: string): RequestRedirect | undefined {
+  // A redirect would send the request to a destination the egress gate did
+  // not inspect. In particular, 307 and 308 can resend the full POST body.
+  return getReasoningTrainingUseCap() || isLocalReasoningEndpoint(endpoint) ? 'error' : undefined;
+}
+
 function extractTextContent(content: ChatMessage['content']): string {
   if (typeof content === 'string') return content;
   if (content === null || content === undefined) return '';
@@ -846,6 +856,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
+      redirect: reasoningRedirectPolicy(this.baseURL),
       signal: buildAbortSignal(this.timeoutMs, opts.signal),
     });
 
@@ -890,6 +901,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
+      redirect: reasoningRedirectPolicy(this.baseURL),
       signal: buildAbortSignal(this.timeoutMs, signal),
     });
     if (!response.ok) {

@@ -14,6 +14,7 @@ import {
   sumChatCompletionUsage,
 } from './openai-compatible-backend.js';
 import { delegateStructured } from '../reasoning/reasoning-backend.js';
+import * as reasoningEgress from '../reasoning/reasoning-egress-scope.js';
 import { z } from 'zod';
 import { safeExecShellScript } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
@@ -113,6 +114,28 @@ describe('openai-compatible-backend', () => {
 
     const backend = buildNemotronBackendFromEnv();
     expect(backend?.name).toBe('openai-compatible');
+  });
+
+  it('disallows redirects after the gate admits a remote call with a no-training cap', async () => {
+    const egress = vi.spyOn(reasoningEgress, 'assertReasoningEgressAllowedAtEndpoint');
+    egress.mockImplementation(() => undefined);
+    const fetchMock = vi.fn(async () => okTextResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'https://integrate.api.nvidia.com/v1',
+      apiKey: 'not-needed',
+      model: 'synthetic-model',
+      endpointPolicy: 'public',
+    });
+
+    await expect(
+      reasoningEgress.withReasoningTrainingUseCap('no_training', () => backend.prompt('probe'))
+    ).resolves.toBe('ok');
+    expect(egress).toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://integrate.api.nvidia.com/v1/chat/completions',
+      expect.objectContaining({ redirect: 'error' })
+    );
   });
 
   it('rejects a public endpoint when constructing a local runtime', () => {

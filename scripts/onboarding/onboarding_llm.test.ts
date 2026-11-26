@@ -37,6 +37,7 @@ import {
   captureAttestationInvoker,
   PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
 } from '@agent/core/organization/tenant-governance';
+import * as tenantGovernance from '@agent/core/organization/tenant-governance';
 import { CUSTODY_PROVIDER_ATTESTATION_APPROVAL_CHANNEL } from '@agent/core/provider/custody-provider-attestation-governance';
 import {
   CUSTODY_PROVIDER_ATTESTATION_ROOT,
@@ -275,6 +276,49 @@ describe('pnpm onboarding llm', () => {
       safeRmSync(approvalStoreRoots().tenantApprovals, { recursive: true, force: true });
     });
 
+    it.each(['claude', 'codex'])(
+      'previews the exact grant for %s without opening egress',
+      (provider) => {
+        const flags = args.map((arg) => (arg === 'claude' ? provider : arg));
+        const preview = JSON.parse(run([...flags, '--json'])[0]!);
+        expect(preview).toMatchObject({
+          decision: { status: 'interactive' },
+          delegation_grant: { tenant_slug: 'acme', provider, training_use: 'none' },
+        });
+        expect(record).not.toHaveBeenCalled();
+      }
+    );
+
+    it('does not open an approval request for a delegated claim', () => {
+      const preview = vi
+        .spyOn(tenantGovernance, 'previewTenantProviderAttestation')
+        .mockReturnValue({
+          status: 'delegated',
+          delegation: {
+            charter_id: 'charter-acme',
+            scope_kind: 'organization',
+            grant_hash: 'hash',
+          },
+        });
+      const request = vi.spyOn(tenantGovernance, 'requestTenantProviderAttestationApproval');
+      try {
+        const result = JSON.parse(run([...args, '--request-approval', '--json'])[0]!);
+        expect(result).toMatchObject({
+          decision: { status: 'delegated' },
+          approval_created: false,
+          apply_command_shell: 'posix',
+        });
+        expect(result.apply_command).toContain("'Claude Team'");
+        expect(result.apply_command).toContain('--apply');
+        expect(result.apply_command).toContain('--accept');
+        expect(result.apply_command).not.toContain('--approval-request-id');
+        expect(request).not.toHaveBeenCalled();
+      } finally {
+        preview.mockRestore();
+        request.mockRestore();
+      }
+    });
+
     it('training_use none: request approval, a human approves, then apply — audited with the approver', () => {
       // Default deny, and the dry-run shows the consequence and the approval step.
       expect(egress('acme')).toBe(false);
@@ -298,6 +342,13 @@ describe('pnpm onboarding llm', () => {
       expect(record).not.toHaveBeenCalled();
 
       humanApproves(request.request_id);
+      const approvedPreview = JSON.parse(
+        run([...args, '--approval-request-id', request.request_id, '--json'])[0]!
+      );
+      expect(approvedPreview).toMatchObject({
+        decision: { status: 'direct', authorization: 'approved_request' },
+        apply_command: expect.stringContaining(request.request_id),
+      });
       const applied = JSON.parse(
         run([
           ...args,
@@ -312,6 +363,11 @@ describe('pnpm onboarding llm', () => {
         request_id: request.request_id,
         approved_by: 'human-owner',
       });
+      const consumedPreview = JSON.parse(
+        run([...args, '--approval-request-id', request.request_id, '--json'])[0]!
+      );
+      expect(consumedPreview.decision.status).toBe('blocked');
+      expect(consumedPreview).not.toHaveProperty('apply_command');
       expect(record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'tenant.attest_provider',

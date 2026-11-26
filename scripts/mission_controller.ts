@@ -1160,7 +1160,26 @@ async function selectMissionWorkflow(
     intentId,
     taskType,
   });
-  printOutput(JSON.stringify({ mission_id: upperId, classification, workflow }, null, 2));
+  const { previewMachineGateCompatibility } = await import('./mission/mission_machine_gate.js');
+  const persisted = !intentId && !taskType ? state.process_template : undefined;
+  printOutput(
+    JSON.stringify(
+      {
+        mission_id: upperId,
+        classification,
+        workflow,
+        machine_gate_preview: {
+          source: persisted ? 'planned_template' : 'catalog_selection',
+          workflow_id: persisted?.workflow_id ?? workflow.workflow_id,
+          ...previewMachineGateCompatibility(
+            persisted ? persisted.phase_specs : workflow.phase_specs
+          ),
+        },
+      },
+      null,
+      2
+    )
+  );
 }
 
 async function reviewWorkerOutput(
