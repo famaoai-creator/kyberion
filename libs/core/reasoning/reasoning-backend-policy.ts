@@ -16,6 +16,7 @@ export type ReasoningBackendMode =
   | 'grok-api'
   | 'copilot'
   | 'cursor-cli'
+  | 'cursor-sdk'
   | 'opencode-cli'
   | 'devin-cli'
   | 'local'
@@ -43,7 +44,7 @@ export const CREDENTIAL_SERVICE_BACKENDS: Readonly<
   openai: Object.freeze(['openai-api', 'codex-cli'] as const),
   gemini: Object.freeze(['gemini-api', 'gemini-cli', 'agy-cli'] as const),
   grok: Object.freeze(['grok-api'] as const),
-  cursor: Object.freeze(['cursor-cli'] as const),
+  cursor: Object.freeze(['cursor-cli', 'cursor-sdk'] as const),
 });
 
 export interface ReasoningBackendSelectionRule {

@@ -10,6 +10,7 @@ import './claude-cli.js';
 import './codex-cli.js';
 import './copilot.js';
 import './cursor-cli.js';
+import './cursor-sdk.js';
 import './devin-cli.js';
 import './gemini-cli.js';
 import './grok-cli.js';

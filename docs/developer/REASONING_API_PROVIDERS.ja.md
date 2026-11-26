@@ -62,6 +62,24 @@ DNSは `dns_failed`、401/403/404/429やtimeoutも固定コードで区別しま
 Grant・承認・期限・claim・キーのバージョンを再検証します。送信済みのAPIリクエストは取り消しません。
 外部resolverと起動済みCLIプロセスの失効は、それぞれの管理境界に従います。
 
+## Cursor SDK backend（`cursor-sdk`）
+
+`cursor-sdk` は HTTP の API proof ではなく `@cursor/sdk` で Cursor を呼ぶ任意利用の backend です。そのため `reasoning credentials register|verify` の対象ではなく、キーは既存の `secret introduce` で登録します。
+
+```bash
+pnpm kyberion secret introduce cursor API_KEY
+KYBERION_REASONING_BACKEND=cursor-sdk pnpm kyberion ...
+```
+
+- 自動選択はされません。`CURSOR_API_KEY` だけがある場合は従来どおり `cursor-cli` が選ばれます。
+- ツールなし・空の scratch workspace で動くテキスト推論専用です。ファイル操作や実行を伴う作業は `cursor-cli` を使います。
+- モデルは `KYBERION_CURSOR_SDK_MODEL`（既定 `composer-2.5`）。無効なモデルを指定すると、利用可能なモデル一覧付きのエラーになります。アカウントで使えるモデルは `Cursor.models.list` で確認できます。
+- system prompt は既定でユーザーメッセージへ織り込みます。アカウントが Cursor のネイティブ `systemPrompt` を許可していない場合、拒否されるまでに約20秒かかるためです。許可済みのアカウントは `KYBERION_CURSOR_SDK_NATIVE_SYSTEM_PROMPT=1` で切り替えられます。
+- 呼び出しは既定でステートレス（毎回新しい Agent と scratch）です。`context_mode`（`'fresh'` / `'continue'`）を指定した呼び出しだけが、backend instance が持つ 1 つの会話に参加します。`'fresh'` は会話を捨てて新しく始め、`'continue'` は続けます。未指定の呼び出しは会話に触れません。
+- 継続中の会話は FIFO で直列化され、最後のターンから `KYBERION_CURSOR_SDK_SESSION_IDLE_TTL_MS`（既定 900000 = 15 分、`0` で無効）が過ぎると Agent と scratch を解放します。失敗・タイムアウト・中断・モデル変更・`'fresh'`・`resetSession()`（failover 時に呼ばれます）のいずれでも会話を破棄します。継続のターンは約 1.8 秒で、新規呼び出し（約 4 秒）より速くなります。
+- 構造化出力は prompt で JSON を強制し Zod で検証します。不正な場合は検証エラーを添えて1回だけ再依頼します。
+- operator 専用です。tenant・personal に束縛された実行は `[CREDENTIAL_NATIVE_UNSUPPORTED]` で拒否します。
+
 ## 既存 API 形式の provider を追加する
 
 別のレジストリは作りません。正準定義は既存の `knowledge/product/governance/reasoning-providers/*.json` です。`secret_refs` の先頭が登録・実証するキーの identity、`model_env_keys` がモデル設定、追加の `api_proof` が実証 protocol と固定 URL です。

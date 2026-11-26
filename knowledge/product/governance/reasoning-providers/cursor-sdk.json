@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "providers": [
+    {
+      "mode": "cursor-sdk",
+      "provider": "cursor",
+      "module": "./reasoning/reasoning-cli-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": true,
+        "input_modalities": ["text"]
+      },
+      "env_keys": ["CURSOR_API_KEY", "KYBERION_CURSOR_SDK_MODEL"],
+      "secret_refs": [
+        { "service_id": "cursor", "secret_key": "API_KEY", "env_keys": ["CURSOR_API_KEY"] }
+      ],
+      "cost_tier": "metered",
+      "transport": "sdk",
+      "data_egress": "external-api",
+      "adapter": "cursor-sdk",
+      "profile": {
+        "streaming": false,
+        "tool_calling": false,
+        "native_subagent": false,
+        "thinking_levels": {},
+        "supports_strict_tools": false,
+        "supports_grammar_tools": false,
+        "utility_fit": ["judge", "classify", "summarize", "divergent"]
+      },
+      "endpoint": "https://api2.cursor.sh",
+      "egress_provider_id": "cursor",
+      "model_env_keys": ["KYBERION_CURSOR_SDK_MODEL"],
+      "setup_hint": "Register a Cursor API key with `pnpm kyberion secret introduce cursor API_KEY` (or set CURSOR_API_KEY), then set KYBERION_REASONING_BACKEND=cursor-sdk. The SDK runs tool-less text reasoning; use cursor-cli for agentic work."
+    }
+  ]
+}
