@@ -22,6 +22,7 @@ import {
 } from '@agent/shared-media/media-contracts';
 import {
   assertMediaProtocolLayoutReady,
+  enforceMediaPptxTextFit,
   summarizeMediaPptxLayout,
 } from './media-document-pipeline-helpers.js';
 import {
@@ -261,6 +262,11 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       assertMediaProtocolLayoutReady(protocol, {
         allowLayoutOverflow: params.allow_layout_overflow === true,
       });
+      const textFit = enforceMediaPptxTextFit(protocol, {
+        op: 'pptx_render',
+        level: resolve(params.text_fit),
+        allowLayoutOverflow: params.allow_layout_overflow === true,
+      });
       const outPath = resolveMediaRepositoryPath(
         rootDir,
         params.path || params.output_path,
@@ -286,8 +292,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       logger.info(`✅ [MEDIA] PPTX rendered at: ${outPath} (${stats.size} bytes).`);
       return {
         ...ctx,
-        [params.export_as || 'media_render_diagnostics']:
-          protocol?.metadata?.layoutDiagnostics || summarizeMediaPptxLayout(protocol),
+        [params.export_as || 'media_render_diagnostics']: {
+          ...(protocol?.metadata?.layoutDiagnostics || summarizeMediaPptxLayout(protocol)),
+          textFit,
+        },
       };
     },
     pptx_patch: async () => {

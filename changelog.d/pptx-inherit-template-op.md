@@ -1,0 +1,5 @@
+---
+category: Added
+---
+
+- **`media:pptx_inherit_template` builds new slides on an existing deck's masters and layouts.** Give it the result of `pptx_extract` (`from`, default `last_pptx_design`) and the new slides (`slides`, or `slides_from` for a context key). Each slide is `{ elements, layoutIndex | layout_from_slide | layout_name, notes? }`; `layout_from_slide` reuses the layout of a 1-based slide of the template. The op removes `rawParts` and every source slide, strips `pXmlLst` from the given elements, and keeps the masters, layouts, theme and master/layout media, so the logo, footer and page number come from the template. A pipeline is `pptx_extract` → `pptx_inherit_template` → `pptx_render` → `pptx_package_check`, without a hand-written script. A missing design, an empty slide list or a layout the template does not have fails the step; the layout error lists the valid layouts. Scripts can call the same logic as `inheritPptxTemplate` from `@agent/core/media/pptx-utils`. Source slides cannot be kept as they are: without `rawParts` the engine writes every slide from `elements`. Use `pptx_filter_slides` or `pptx_replace_slides` to keep the original slides.

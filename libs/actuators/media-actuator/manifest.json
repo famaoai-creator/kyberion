@@ -1,7 +1,7 @@
 {
   "actuator_id": "media-actuator",
-  "version": "1.3.0",
-  "description": "Document and asset generation engine. Reads pdf/pptx/docx/xlsx with the native engines (document_digest, pdf_extract, pptx_slide_text, docx_extract, xlsx_extract; opt-in local OCR for embedded images) and includes pptx_filter_slides for template-inheriting partial-update workflows.",
+  "version": "1.5.0",
+  "description": "Document and asset generation engine. Reads pdf/pptx/docx/xlsx with the native engines (document_digest, pdf_extract, pptx_slide_text, docx_extract, xlsx_extract; opt-in local OCR for embedded images) and includes pptx_filter_slides for template-inheriting partial-update workflows and pptx_inherit_template for new slides on an existing deck's masters and layouts; pptx_layout_preflight / pptx_render measure every text box (overflow, unexpected_wrap) and pptx_render_check compares the LibreOffice render with the authored boxes.",
   "contract_schema": "knowledge/product/schemas/media-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
@@ -30,6 +30,10 @@
         "pptx_package_diff": {
           "effect": "read",
           "resource_ref_from": "after"
+        },
+        "pptx_render_check": {
+          "effect": "read",
+          "resource_ref_from": "path"
         }
       }
     }
@@ -84,6 +88,10 @@
       {
         "op": "pptx_package_diff",
         "note": "Compare params.before and params.after (two .pptx paths) part by part: only_in_before / only_in_after, changed[] ordered by relevance (package structure, then slides/layouts/masters, then the rest) with LCS-aligned tag diffs, and summary { counts, significant_parts }. noise_only marks attribute-order, xmlns / mc:Ignorable, docProps/* and embedded font subset changes; params.parts filters by glob. Repair triage: diff your output against the PowerPoint-repaired copy; ignore noise_only parts; the first significant_parts (usually a slide or a .rels) show what the repair changed — fix that writer, then confirm with pptx_package_check."
+      },
+      {
+        "op": "pptx_render_check",
+        "note": "Post-render text fit. Converts the .pptx at path to PDF with LibreOffice (headless, isolated profile), reads each text run's position (pdf.js from pdf-parse) and compares it with the authored boxes of the protocol at design_from (default last_pptx_design; params.design_defaults as for pptx_render): overflow = rendered ink leaves the box (error), unexpected_wrap = a label, centred line or box sized to its authored lines renders on more lines than authored (warn). params.fail_on = error (default) | warn | never; tier / tenant_slug / mission_id / work_dir scope the PDF like visual_review. Result { path, pdf_path, rendered, status, issues[] (slideIndex, elementIndex, excerpt, detail), boxes[] (predictedLines vs renderedLines), model } lands in export_as (default pptx_render_check). Without LibreOffice the op logs a warning and returns status unavailable with the pre-render model findings; it never reads as a pass."
       }
     ],
     "transform": [
@@ -116,6 +124,10 @@
         "note": "Derive a reusable theme from an extracted PPTX design (for master-theme reuse across decks)."
       },
       {
+        "op": "pptx_inherit_template",
+        "note": "Build NEW slides on an extracted deck's masters, layouts, theme and master/layout media (logo, footer, page number). params.from = ctx key of the pptx_extract result (default last_pptx_design); params.slides (or slides_from, a ctx key) = [{ elements, layoutIndex | layout_from_slide (1-based template slide whose layout to reuse) | layout_name, notes? }]. Drops rawParts and every source slide (the engine cannot carry a source slide verbatim without rawParts; use pptx_filter_slides / pptx_replace_slides to keep originals) and strips pXmlLst from the given elements; an unknown layout fails naming the valid range. Result lands in export_as (default last_pptx_design). Pipeline: pptx_extract -> pptx_inherit_template -> pptx_render -> pptx_package_check."
+      },
+      {
         "op": "proposal_storyline_from_brief",
         "note": "Generate a narrative outline from a proposal brief."
       },
@@ -141,7 +153,7 @@
       },
       {
         "op": "pptx_layout_preflight",
-        "note": "Validate compiled PPTX layout diagnostics before any render; overflow requires explicit review-only opt-in."
+        "note": "Validate compiled PPTX layout diagnostics before any render; overflow requires explicit review-only opt-in. Also measures every text box of the protocol (CJK-aware widths, bodyPr insets, preset-shape text rectangles, line height) and logs overflow / unexpected_wrap; params.text_fit = never (default; report only) | error (fail on overflow) | warn (fail on any). The report lands in the exported diagnostics as textFit."
       },
       {
         "op": "visual_review",
@@ -163,7 +175,7 @@
       },
       {
         "op": "pptx_render",
-        "note": "Render last_pptx_design to a .pptx file. Supports text, shape, image (imagePath or imageData), table, line, and smartart elements. For a rawParts protocol the original package is the baseline, so only new defects block. Writes pass the package gate: params.package_check = error (default; refuses structural defects this write introduces) | warn (log and write) | never; defects inherited from the source deck are written through with a logged warning."
+        "note": "Render last_pptx_design to a .pptx file. Supports text, shape, image (imagePath or imageData), table, line, and smartart elements. For a rawParts protocol the original package is the baseline, so only new defects block. Writes pass the package gate: params.package_check = error (default; refuses structural defects this write introduces) | warn (log and write) | never; defects inherited from the source deck are written through with a logged warning. Before writing, every text box is measured as in pptx_layout_preflight: params.text_fit = never (default; log only) | error (fail on overflow) | warn (fail on any issue); the report is exported as media_render_diagnostics.textFit."
       },
       {
         "op": "pptx_filter_slides",

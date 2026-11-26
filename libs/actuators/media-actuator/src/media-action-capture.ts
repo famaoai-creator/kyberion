@@ -16,7 +16,17 @@ import {
   extractPptxSlides,
   protocolToMarkdown,
 } from '@agent/shared-media/media-contracts';
-import { rasterizeVectorImage, VECTOR_IMAGE_EXTENSIONS } from '@agent/core/visual-raster';
+import {
+  convertDocumentToPdf,
+  rasterizeVectorImage,
+  VECTOR_IMAGE_EXTENSIONS,
+} from '@agent/core/visual-raster';
+import {
+  checkPptxTextFit,
+  compareRenderedTextRuns,
+  extractPdfTextRuns,
+  predictPptxTextBoxes,
+} from '@agent/shared-media/native-pptx-engine/protocol-text-fit';
 import { recognizeDocumentImage } from './media-ocr.js';
 import {
   inferDocumentFormat,
@@ -337,6 +347,111 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       return {
         ...ctx,
         [params.export_as || 'pptx_package_check']: { path: sourcePath, ...report },
+      };
+    },
+    pptx_render_check: async () => {
+      // Post-render text fit: let LibreOffice lay the deck out, then compare
+      // where each authored box's lines actually landed. The protocol that
+      // produced the deck is the reference for the boxes (design_from).
+      const sourcePath = resolveMediaInputPath(params.path, resolve, 'pptx_render_check');
+      const failOn = String(resolve(params.fail_on) ?? 'error');
+      if (!['error', 'warn', 'never'].includes(failOn)) {
+        throw new Error(
+          `pptx_render_check: fail_on '${failOn}' is not supported — the gate level is ambiguous | next: use error, warn or never | evidence: fail_on=${failOn}`
+        );
+      }
+      const designKey = String(resolve(params.design_from) || 'last_pptx_design');
+      const baseProtocol = ctx[designKey];
+      if (!baseProtocol || !Array.isArray(baseProtocol.slides)) {
+        throw new Error(
+          `pptx_render_check: no PptxDesignProtocol at ctx.${designKey} — the authored boxes are the reference the render is compared with | next: pass design_from = the context key pptx_render rendered | evidence: design_from=${designKey}`
+        );
+      }
+      const protocol =
+        params.design_defaults !== undefined
+          ? { ...baseProtocol, designDefaults: params.design_defaults }
+          : baseProtocol;
+      const tier = String(resolve(params.tier) || 'public');
+      const missionId = params.mission_id ? String(resolve(params.mission_id)) : undefined;
+      const tenantSlug = params.tenant_slug ? String(resolve(params.tenant_slug)) : undefined;
+      const workDir = params.work_dir
+        ? String(resolve(params.work_dir))
+        : tier !== 'public' && missionId
+          ? path.join('active', 'missions', tier, missionId, 'render-check')
+          : undefined;
+
+      const { boxes, skipped } = predictPptxTextBoxes(protocol);
+      const model = checkPptxTextFit(protocol);
+      const modelSummary = {
+        status: model.status,
+        overflowCount: model.overflowCount,
+        unexpectedWrapCount: model.unexpectedWrapCount,
+      };
+      const converted = convertDocumentToPdf({
+        sourcePath,
+        label: 'pptx-render-check',
+        ...(workDir ? { workDir } : {}),
+        tier: tier as any,
+        ...(tenantSlug ? { tenantSlug } : {}),
+        ...(missionId ? { missionId } : {}),
+      });
+      let unavailableReason = converted.unavailable_reason;
+      let rendered: ReturnType<typeof compareRenderedTextRuns> | undefined;
+      if (converted.available && converted.pdfPath) {
+        try {
+          const { runs } = await extractPdfTextRuns(
+            safeReadFile(converted.pdfPath, { encoding: null }) as Buffer
+          );
+          rendered = compareRenderedTextRuns(boxes, runs, skipped.length);
+        } catch (error: any) {
+          unavailableReason = `could not read the rendered PDF: ${error?.message || error}`;
+        }
+      }
+      if (!rendered) {
+        // A check that could not look at the render must not read as a pass:
+        // status is 'unavailable' and the model-only findings ride along.
+        logger.warn(
+          `[MEDIA_TEXT_FIT] pptx_render_check: ${path.basename(sourcePath)} was not rendered — ${unavailableReason} | next: install LibreOffice to compare against the real layout; the pre-render model found ${model.overflowCount} overflow / ${model.unexpectedWrapCount} unexpected wrap(s) | evidence: ${sourcePath}`
+        );
+        return {
+          ...ctx,
+          [params.export_as || 'pptx_render_check']: {
+            path: sourcePath,
+            status: 'unavailable',
+            rendered: false,
+            unavailable_reason: unavailableReason,
+            model,
+          },
+        };
+      }
+      for (const issue of rendered.issues.slice(0, 12)) {
+        logger.warn(
+          `[MEDIA_TEXT_FIT] pptx_render_check: slide ${issue.slideIndex} element ${issue.elementIndex}${issue.elementName ? ` (${issue.elementName})` : ''} ${issue.kind} "${issue.excerpt}" — ${issue.detail} | next: shorten the text, widen / heighten the box or lower the size | evidence: ${issue.shapeType} ${issue.fontSizePt}pt`
+        );
+      }
+      const failing = rendered.issues.filter((issue) =>
+        failOn === 'never' ? false : failOn === 'warn' ? true : issue.severity === 'error'
+      );
+      if (failing.length > 0) {
+        throw new Error(
+          `pptx_render_check: ${sourcePath} has ${failing.length} text box(es) at or above '${failOn}' that do not hold their text in the rendered deck | next: shorten the text, enlarge the box or lower the size, or rerun with fail_on: never to inspect | evidence: ${failing
+            .slice(0, 6)
+            .map(
+              (issue) =>
+                `slide ${issue.slideIndex} element ${issue.elementIndex} ${issue.kind} "${issue.excerpt}"`
+            )
+            .join('; ')}`
+        );
+      }
+      return {
+        ...ctx,
+        [params.export_as || 'pptx_render_check']: {
+          path: sourcePath,
+          pdf_path: converted.pdfPath,
+          rendered: true,
+          ...rendered,
+          model: modelSummary,
+        },
       };
     },
     pptx_package_diff: async () => {

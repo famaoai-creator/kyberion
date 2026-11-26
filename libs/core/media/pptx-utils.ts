@@ -740,8 +740,14 @@ export async function distillPptxDesign(
 
   const presEntry = zip.getEntry('ppt/presentation.xml');
   const presXml = presEntry?.getData().toString('utf8') || '';
-  const sldSz = presXml.match(/<p:sldSz cx="(\d+)" cy="(\d+)"\/>/);
-  const canvas = { w: emuToIn(sldSz?.[1]), h: emuToIn(sldSz?.[2]) || 7.5 };
+  // Read cx/cy independently: real decks commonly carry extra attributes such as
+  // type="screen4x3" (and attribute order is not fixed), which an exact
+  // `<p:sldSz cx=".." cy=".."/>` match missed — yielding a 0in canvas width.
+  const sldSzTag = presXml.match(/<p:sldSz\b[^>]*>/)?.[0] || '';
+  const canvas = {
+    w: emuToIn(sldSzTag.match(/\bcx="(\d+)"/)?.[1]) || 13.333333,
+    h: emuToIn(sldSzTag.match(/\bcy="(\d+)"/)?.[1]) || 7.5,
+  };
   const presExtMatch = presXml.match(/<p:extLst>[\s\S]*?<\/p:extLst>/);
 
   const masterEntry = zip.getEntry('ppt/slideMasters/slideMaster1.xml');
@@ -962,3 +968,8 @@ export async function distillPptxDesign(
 }
 
 export { generateNativePptx as generatePptxWithDesign };
+export {
+  inheritPptxTemplate,
+  type InheritPptxTemplateResult,
+  type InheritTemplateSlideInput,
+} from './native-pptx-engine/template-inherit.js';
