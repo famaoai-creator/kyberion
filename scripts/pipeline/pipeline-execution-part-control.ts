@@ -931,6 +931,11 @@ const INLINE_OP_HANDLERS: Record<string, InlineOpHandler> = {
 
     return (await domainOps()).runInlineDependencyVulnerabilityScan(step, params, ctx);
   },
+  'core:run_usage_weekly_report': async (dctx) => {
+    const { step, params, ctx } = dctx;
+
+    return (await domainOps()).runInlineUsageWeeklyReport(step, params, ctx);
+  },
   'core:run_health_degradation_watch': async (dctx) => {
     const { step, params, ctx } = dctx;
 

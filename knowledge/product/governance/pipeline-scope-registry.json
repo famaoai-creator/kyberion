@@ -500,6 +500,12 @@
       "placement": "canonical"
     },
     {
+      "pipeline": "pipelines/usage-weekly-report.json",
+      "audience": "system",
+      "placement": "canonical",
+      "reason": "Operator usage report derived from the system audit chain (counts and categories only)."
+    },
+    {
       "pipeline": "pipelines/vcs-development-preflight.json",
       "audience": "system",
       "placement": "canonical",

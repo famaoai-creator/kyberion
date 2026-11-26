@@ -164,6 +164,7 @@
     "deck": "node --import ./scripts/ts-loader.mjs scripts/deck.ts",
     "tui": "node --import ./scripts/ts-loader.mjs scripts/tui.ts",
     "typecheck": "node --import ./scripts/ts-loader.mjs scripts/check/check_stale_dist.ts && node --max-old-space-size=6144 node_modules/typescript/bin/tsc --noEmit --incremental false && node node_modules/typescript/bin/tsc -p tsconfig.bootstrap.json",
+    "usage:weekly": "node --import ./scripts/ts-loader.mjs scripts/report/report_usage_weekly.ts",
     "validate": "pnpm run build && pnpm run typecheck && pnpm run check -- --scope full",
     "validation-bundle:export": "node scripts/run_built.mjs dist/scripts/export_validation_bundle.js",
     "verify": "pnpm run typecheck && pnpm run lint && pnpm run test:unit",

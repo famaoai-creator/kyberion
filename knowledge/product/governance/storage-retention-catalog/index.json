@@ -44,6 +44,7 @@
     "active/shared/runtime/distill-candidates",
     "active/shared/runtime/feedback-loop/tenants",
     "active/shared/runtime/heartbeats",
+    "active/shared/runtime/session-length",
     "active/shared/runtime/a2a",
     "active/shared/runtime/agent-supervisor",
     "active/shared/runtime/artifacts",

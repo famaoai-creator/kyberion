@@ -2430,6 +2430,26 @@ describe('mission controller router — runtime input boundaries', () => {
     expect(array.recordTask).not.toHaveBeenCalled();
   });
 
+  it('routes publish-artifact with its options and requires a mission id', async () => {
+    const context = makeContext(
+      'publish-artifact',
+      ['MSN-BOUNDARY'],
+      ['--path', 'evidence/final.html', '--class', 'export', '--name', 'out.html', '--json']
+    ) as ReturnType<typeof makeContext> & { publishMissionArtifact: ReturnType<typeof vi.fn> };
+    context.publishMissionArtifact = vi.fn(async () => undefined);
+    await missionControllerRouter.runMissionControllerAction(context);
+    expect(context.publishMissionArtifact).toHaveBeenCalledWith('MSN-BOUNDARY', {
+      path: 'evidence/final.html',
+      artifactClass: 'export',
+      name: 'out.html',
+      kind: undefined,
+      json: true,
+    });
+    expect(() =>
+      missionControllerRouter.assertMissionIdArgument('publish-artifact', undefined)
+    ).toThrow('publish-artifact requires a mission ID');
+  });
+
   it('rejects invalid review and evidence metadata before dispatch', async () => {
     const findings = makeContext(
       'review-task',

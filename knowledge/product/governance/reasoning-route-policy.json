@@ -376,7 +376,8 @@
     "claude-cli-default": {
       "mode": "claude-cli",
       "model_ref": "anthropic:claude-opus-5-5",
-      "capabilities": ["text", "structured_output", "tools"]
+      "capabilities": ["text", "structured_output", "tools"],
+      "timeout_ms": 1800000
     },
     "gemini-cli-default": {
       "mode": "gemini-cli",

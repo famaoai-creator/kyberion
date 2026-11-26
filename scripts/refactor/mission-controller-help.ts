@@ -96,6 +96,11 @@ Visibility Commands:
   status   <ID> [--refresh-providers | --json] [--tenant-slug <slug>]
                                  Show a specific mission. JSON includes only the mission status view.
   outbox   [ID] [--ack]          Show mission results delivered to the terminal surface (--ack to clear)
+  publish-artifact <ID> --path <evidence/FILE> [--class report|export] [--name <FILE>] [--kind <KIND>] [--json]
+                                 Publish a mission evidence file as a deliverable (scoped artifact + record).
+                                 \`finish\` then copies it to the linked project, or to the owner storage
+                                 floor when the mission has no project link. Use this for the delivery task
+                                 instead of writing into a project directory from a provider CLI.
   sync-project-ledger <ID>       Upsert this mission into the related project mission-ledger
   reassign-project <ID> --project-id <PROJECT_ID> [--project-path <PATH>] [--track-id <TRACK_ID>] [--dry-run] [--force]
                                  Safely move a paused/planned mission to another project and reconcile both sides

@@ -35,6 +35,12 @@ export interface DaemonWatchdogRunState {
    * run before). A first sighting is in `unhealthy` but not here.
    */
   confirmed?: string[];
+  /**
+   * Daemons whose current unhealthy episode has alerted (confirmed on some run
+   * and unhealthy ever since). Closes the episode with a recovery record; a
+   * first sighting that cleared on its own never alerted and closes silently.
+   */
+  alerted?: string[];
 }
 
 /**

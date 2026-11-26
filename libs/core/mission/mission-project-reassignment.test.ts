@@ -164,6 +164,41 @@ describe('mission Project reassignment', () => {
     ).toContain(MISSION_ID);
   });
 
+  it('binds the target project organization to a mission that has none', async () => {
+    await saveState(MISSION_ID, fixtureMission());
+    saveProjectRecord({
+      ...loadProjectRecord(TARGET_PROJECT_ID)!,
+      organization_id: 'ORG-PM-TEST',
+    });
+
+    await reassignMissionToProject({ mission_id: MISSION_ID, project_id: TARGET_PROJECT_ID });
+
+    const state = loadState(MISSION_ID);
+    expect(state?.organization_id).toBe('ORG-PM-TEST');
+    expect(state?.history.at(-1)?.note).toContain('organization ORG-PM-TEST bound');
+  });
+
+  it('refuses a mission that belongs to a different organization than the target project', async () => {
+    await saveState(MISSION_ID, { ...fixtureMission(), organization_id: 'ORG-OTHER' });
+    saveProjectRecord({
+      ...loadProjectRecord(TARGET_PROJECT_ID)!,
+      organization_id: 'ORG-PM-TEST',
+    });
+
+    await expect(
+      reassignMissionToProject({ mission_id: MISSION_ID, project_id: TARGET_PROJECT_ID })
+    ).rejects.toThrow('cross-organization reassignment is not supported');
+    expect(loadState(MISSION_ID)?.relationships?.project?.project_id).toBe(SOURCE_PROJECT_ID);
+  });
+
+  it('leaves a mission without an organization when the project has none', async () => {
+    await saveState(MISSION_ID, fixtureMission());
+
+    await reassignMissionToProject({ mission_id: MISSION_ID, project_id: TARGET_PROJECT_ID });
+
+    expect(loadState(MISSION_ID)?.organization_id).toBeUndefined();
+  });
+
   it('rejects reassignment across tenant scope even when the mission is paused', async () => {
     process.env.KYBERION_TENANT = 'other-tenant';
     await saveState(MISSION_ID, { ...fixtureMission(), tenant_slug: 'other-tenant' });

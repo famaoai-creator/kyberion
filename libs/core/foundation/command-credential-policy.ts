@@ -46,6 +46,17 @@ const MISSION_ACTION_REQUIREMENTS: Readonly<Record<string, CredentialRequirement
   'prepare-source-workspace': 'none',
   // Registers an already performed review; it does not run model inference.
   'review-task': 'none',
+  // Publishes an existing evidence file as a scoped artifact; no model call.
+  'publish-artifact': 'none',
+  // Project link / ledger reconciliation: deterministic state writes. Left
+  // unlisted they fell through to 'required' and could not run under a tenant
+  // scope without a task binding (the link step of a project-bound delivery).
+  'reassign-project': 'none',
+  'sync-project-ledger': 'none',
+  // Reassignment needs the mission paused first, so its pause/resume bracket
+  // must run under the same tenant scope: state moves only, no model call.
+  pause: 'none',
+  resume: 'none',
   // Journal/state-only verbs: they never delegate to a reasoning backend.
   triage: 'none',
   'scope-approve': 'none',
@@ -55,6 +66,11 @@ const MISSION_ACTION_REQUIREMENTS: Readonly<Record<string, CredentialRequirement
   verify: 'none',
   distill: 'none',
   finish: 'none',
+  // Terminal lifecycle moves (status → failed, tree → active/archive/): governed
+  // state/file operations with no model call. Left unlisted they fell through to
+  // 'required' and could not be run under a tenant scope without a task binding.
+  cancel: 'none',
+  archive: 'none',
   // Thin alias of verify for operator review flows — same code path.
   'review-worker-output': 'none',
   // Read-only views over mission/organization/outbox/memory state.

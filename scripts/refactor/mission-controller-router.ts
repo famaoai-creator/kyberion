@@ -201,6 +201,7 @@ export function assertMissionIdArgument(
     'supersede-task',
     'review-reenter',
     'review-worker-output',
+    'publish-artifact',
   ]);
   const requiredMissionIdCommands = new Set([
     'create',
@@ -214,6 +215,7 @@ export function assertMissionIdArgument(
     'distill',
     'sync-project-ledger',
     'reassign-project',
+    'publish-artifact',
     'team',
     'staff',
     'classify',
@@ -651,6 +653,15 @@ export async function runMissionControllerAction(
           reason: getValue('--reason', context.argv),
           successCondition: getValue('--success-condition', context.argv),
           requestedBy: getValue('--requested-by', context.argv),
+        });
+      },
+      'publish-artifact': async () => {
+        await context.publishMissionArtifact(arg1!, {
+          path: getValue('--path', context.argv),
+          artifactClass: getValue('--class', context.argv),
+          name: getValue('--name', context.argv),
+          kind: getValue('--kind', context.argv),
+          json,
         });
       },
       delegate: async () => {

@@ -4882,6 +4882,16 @@
       "long_running": true
     },
     {
+      "id": "script.usage.weekly",
+      "script": "usage:weekly",
+      "command": "usage weekly",
+      "noun": "usage",
+      "verb": "weekly",
+      "audience": "operator",
+      "description": "cli_cmd_script_usage_weekly",
+      "group": "inspect"
+    },
+    {
       "id": "script.validate",
       "script": "validate",
       "command": "validate default",

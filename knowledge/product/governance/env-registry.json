@@ -895,6 +895,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_CLAUDE_CLI_INACTIVITY_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Batch claude-cli calls fail as a timeout (and fail over) when no assistant message or tool event arrives for this long, so a frozen turn does not hold the route until the hard ceiling. Default 300000.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_CLAUDE_CLI_MODEL",
       "category": "provider",
       "type": "string",
@@ -903,11 +911,19 @@
       "documented": true
     },
     {
+      "name": "KYBERION_CLAUDE_CLI_STARTUP_TIMEOUT_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Batch claude-cli calls fail as a timeout (and fail over) when the CLI prints no stream-json record within this window after launch — a CLI hung on auth, keychain or MCP boot. Default 90000.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_CLAUDE_CLI_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "Optional numeric tuning value for claude cli timeout ms; leave unset to use the governed default.",
+      "description": "Per-request hard ceiling (ms) for the claude-cli backend when it is built outside reasoning-route resolution. Routed backends (including Dot wakes) take the route profile's timeout_ms instead: claude-cli-default sets 1800000 in reasoning-route-policy.json, overriding the 60000 route fallback. Frozen calls fail earlier through KYBERION_CLAUDE_CLI_STARTUP_TIMEOUT_MS and KYBERION_CLAUDE_CLI_INACTIVITY_MS.",
       "documented": true
     },
     {

@@ -33,6 +33,8 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   // ambiguous/hidden owners must throw rather than select a fallback location.
   'libs/core/mission/mission-admission.ts': 'lifecycle',
   'libs/core/mission/mission-artifact-closure.ts': 'lifecycle',
+  // Publish copies mission deliverables into a project; ambiguous/hidden owners must throw.
+  'libs/core/mission/mission-artifact-publish.ts': 'lifecycle',
   'libs/core/mission/mission-creation.ts': 'lifecycle',
   'libs/core/mission/mission-distill.ts': 'lifecycle',
   'libs/core/mission/mission-governance.ts': 'lifecycle',

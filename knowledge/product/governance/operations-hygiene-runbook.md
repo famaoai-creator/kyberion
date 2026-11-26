@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-18
+last_updated: 2026-11-24
 ---
 
 # Operations Hygiene Runbook
@@ -861,11 +861,16 @@ delivery path it just failed.
 owned OS unit or an enabled `owner_surface`); an optional daemon only ever warns. A stale or
 missing heartbeat pages `critical` only when the previous watchdog run was unhealthy for the
 same daemon AND ran less than `DAEMON_WATCHDOG_CONFIRM_WINDOW_MS` (2 × the unit interval)
-ago; a first sighting or a run after a sleep gap is a grace run and warns. The last run lives
+ago (an optional daemon warns at that point). A first sighting — a grace run after a sleep
+gap included — raises no alert and no recovery request: it is listed as `pending` in the
+report and the run state, and the next run confirms or clears it. Recovery requests
+(`daemon_restart`, which may reach the operator's approvals) are raised only for confirmed
+outages, so a wake no longer queues a restart approval. The last run lives
 in `active/shared/runtime/heartbeats/watchdog-runs/last-run.json`
 (`scripts/daemon/daemon_watchdog_state.ts`). Alerts are keyed
-`daemon-watchdog:<daemon>:<severity>` with a 60-minute re-page interval, and a recovered
-daemon gets one `info` record. `run_baseline_check`'s `scheduler:chronos-daemon-dead` page
+`daemon-watchdog:<daemon>:<severity>` with a 60-minute re-page interval, and a daemon whose
+episode alerted gets one `info` record when it recovers (`alerted` in the run state keeps the
+episode open across a sleep gap); a first sighting that cleared on its own closes silently. `run_baseline_check`'s `scheduler:chronos-daemon-dead` page
 uses the same state: it pages only when the watchdog's recent run also saw chronos unhealthy
 (or no watchdog state exists), so a wake does not spend the day's alert. Never page on a single
 heartbeat observation.
@@ -874,6 +879,21 @@ heartbeat observation.
 `failingSince` and a bounded `lastError` (first failed step, ≤500 chars) per schedule and
 resets them on success; the failed-schedule sweep alert carries them. Tracking never
 auto-disables — that stays with the failure policy.
+
+**RSS growth needs a rising heap floor.** `evaluateRuntimeHealthTrends` compares the upper
+quartile of RSS in the first and last thirds of the window (≥ 50 MB and the configured
+ratio), and reports it only when the post-GC heap floor (lower quartile of `heap_used_mb`)
+rose by the same margin. A heavy in-process job spikes RSS (chronos reached 1 GB for one
+sample) and a GC saw-tooth swings heap 90–365 MB without a leak; a leak raises the floor. The
+RSS floor is not used — paged-out samples after macOS sleep fake a rising one — so off-heap
+growth is out of this check's reach.
+
+**Operational learning needs an explicit personal owner.** Machine signals
+(`enqueueOperationalLearningSignal`) land in the personal organization only with the owner NHI
+the process claims (`KYBERION_NHI_ID`); none is inferred. A daemon without one skips them and
+raises a single daily `Operational learning paused` warning instead of one
+dropped-candidate alert per signal. Setting the owner NHI in the daemon's service environment
+is the installation owner's decision.
 
 **Latency regressions need an absolute floor.** `evaluateDegradation` drops relative
 regressions unless the last run is ≥ `LATENCY_REGRESSION_MIN_LAST_MS` (1000 ms) or slower by
@@ -3673,3 +3693,58 @@ refused rather than adopted.
   Mission verification reads `NEXT_TASKS.json` strictly: a missing or invalid board
   cannot become an empty completed board, including under an open-task override.
   Gate: `libs/core/mission/mission-lifecycle.test.ts`.
+
+## Provider CLI deliveries: publish through the mission, never write the project tree
+
+A provider CLI session (Cursor, Claude Code, Codex, …) is not a Kyberion principal. It has
+no `KYBERION_BASE_ROLE`, no `MISSION_ROLE` and no `SYSTEM_ROLE`, so every script or hook it
+spawns resolves its role from the process name (`resolveRole()` in `libs/core/authority.ts`)
+and its persona to `unknown`. A write into a confidential project directory then fails with
+`[POLICY_VIOLATION] Persona 'unknown' … NOT authorized`, and `withExecutionContext('base_worker')`
+fails with `[ROLE_ASSUMPTION_DENIED] … a base Authority Role, not an assumable role`. Both
+refusals are by design. Do not look for a role, persona or env var that makes the write pass,
+do not write the file with a throwaway script, and do not copy it into the project tree by
+hand — that is the same bypass under a different name.
+
+Procedure for the `delivery` task of a document / media mission:
+
+1. Keep the final file under the mission's own `evidence/` tree. `record-evidence` and
+   `review-task` close the earlier tasks as usual.
+2. Publish it: `pnpm mission publish-artifact <MISSION_ID> --path evidence/<final-file>
+[--class report|export] [--name <file>] [--kind <artifact kind>] --tenant-slug <slug>`
+   (under `KYBERION_TENANT=<slug>` for a tenant mission). The command runs as the mission
+   controller, writes the file as a mission-scoped artifact with an ArtifactRecord and prints
+   the `artifact_id`, the stored path and where `finish` will carry it. It is idempotent: the
+   same bytes republish the same record. It accepts no destination.
+3. Link the mission to its project **before** finishing if the deliverable belongs there:
+   `pnpm mission pause <ID>`, then `pnpm mission reassign-project <ID> --project-id <PROJECT_ID>
+--project-path <project dir> --tier <tier>`, then `pnpm mission start <ID> --tenant-slug <slug>`
+   (`resume` replays the journal but leaves the status `paused`; only `start` reactivates).
+   The project's `organization_id` must name an organization profile that exists for the tenant:
+   `reassign-project` binds that organization onto the mission and refuses up front when the
+   profile is missing, because `start` would otherwise reject the mission and leave it paused
+   with no verb that can finish it. Check with `--dry-run` first. `finish` then copies the published `report` / `export`
+   artifacts to `<project>/artifacts/<class>/missions/<MISSION_ID>/<name>`
+   (`libs/core/mission/mission-artifact-promotion.ts`). Without a link the copy lands on the
+   owner storage floor, `active/shared/artifacts/<tier>/<tenant>/`.
+4. Record the `artifact_id` and the destination in the `delivery-publish` task's evidence.
+   A deliverable that exists only under `evidence/` has not been delivered, even when the
+   task board shows the task completed (a task whose deliverable file exists auto-completes).
+
+Which verbs run without a reasoning binding: `publish-artifact`, `reassign-project`,
+`sync-project-ledger`, `pause` and `resume` never call a model, so they are `none` in
+`MISSION_ACTION_REQUIREMENTS` (`libs/core/foundation/command-credential-policy.ts`). A verb
+left out of that map fails closed to `required` and cannot run under a tenant scope
+(`[CREDENTIAL_BINDING_REQUIRED]`). When you add a mission verb, classify it in the same diff.
+
+`pnpm mission` runs the bundled `dist/scripts/mission_controller.bundle.js`, and
+`@agent/core/<subpath>` resolves to the built `libs/core/dist`. After changing either,
+run `pnpm build:packages` (libs) and `pnpm build:repo` (scripts and bundle) before expecting
+the command to exist; a new `@agent/core` subpath also needs its `libs/core/package.json`
+`exports` entry.
+
+Gates: `libs/core/mission/mission-artifact-publish.test.ts` (publish, idempotence, evidence
+confinement, hand-off to project promotion), `scripts/mission_controller.test.ts` (routing and
+mission-id requirement), `libs/core/foundation/command-credential-policy.test.ts`
+(classification of the five verbs), `libs/core/mission/mission-project-reassignment.test.ts`
+(organization binding and cross-organization refusal).

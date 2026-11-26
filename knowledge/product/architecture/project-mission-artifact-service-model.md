@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, project, mission, artifact, service-binding, vault, outcome]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-08-12
+last_updated: 2026-11-24
 ---
 
 # Project Mission Artifact Service Model
@@ -119,6 +119,13 @@ Examples:
 
 Every artifact should carry explicit ownership metadata.
 Canonical artifacts are expected to live in the shared artifact registry and be reusable across missions; mission-local coordination artifacts should only point at them, not duplicate them.
+
+A mission hands its deliverable to the project in two governed steps. `pnpm mission publish-artifact`
+(`libs/core/mission/mission-artifact-publish.ts`) publishes one file from the mission's `evidence/`
+tree as a mission-scoped `report` / `export` artifact with an ArtifactRecord; the mission's `finish`
+then copies it into the linked project (`mission-artifact-promotion.ts`) or, without a link, to the
+owner's storage floor. A caller never names the destination, and a provider CLI never writes the
+project directory itself.
 
 ### 3.5 Service Binding
 
