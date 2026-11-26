@@ -6,7 +6,11 @@
  * (pipeline-run-manifest-model.md §3.5). The gate is observed, not assumed:
  * `runExternalOperation` is replaced by a recorder that stops the handler.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
+import { cleanupCreatedLivePaths } from '../../../../tests/helpers/live-path-cleanup.js';
+
+// Writes confined to literal browser partitions cannot be sandboxed; remove what this file created.
+afterAll(cleanupCreatedLivePaths(['active/shared/runtime/browser/approvals/default.json']));
 
 const gated: string[] = [];
 vi.mock('@agent/core/governance/external-operation', async (importOriginal) => ({

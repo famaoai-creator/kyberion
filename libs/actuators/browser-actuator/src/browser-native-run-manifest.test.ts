@@ -5,7 +5,8 @@
  * engine, its real if / while control handlers and on_error fallbacks.
  */
 import * as path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
+import { cleanupCreatedLivePaths } from '../../../../tests/helpers/live-path-cleanup.js';
 import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
 import type { AdfStep } from '@agent/core/pipeline/adf-engine';
 import { computeApprovalPayloadHash } from '@agent/core/governance/approval-presentation';
@@ -40,6 +41,9 @@ import {
 } from '@agent/core/secure-io';
 import { resolveRole, withExecutionContextAsync } from '@agent/core/authority';
 import { browserRuntimeHelpers, externalBrowserAttachAllowed } from './browser-runtime-helpers.js';
+
+// Writes confined to literal browser partitions cannot be sandboxed; remove what this file created.
+afterAll(cleanupCreatedLivePaths(['active/shared/runtime/browser/profiles/confidential/acme']));
 
 const INPUT = 'knowledge/confidential/acme/browser-workflows/scenarios/native-parity.json';
 const SCOPE: RunScope = {
