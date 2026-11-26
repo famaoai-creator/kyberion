@@ -110,7 +110,14 @@ function resolveLayoutIndex(
         `template slide ${slide.layout_from_slide} id=${design.slides[slide.layout_from_slide - 1].id}`
       );
     }
-    index = sourceLayout;
+    index = layouts.findIndex((layout, i) => (layout.partNumber ?? i + 1) === sourceLayout) + 1;
+    if (index === 0) {
+      fail(
+        `${where} references layout part ${sourceLayout}, which the template does not have`,
+        `use a layout index in ${range}`,
+        `template slide ${slide.layout_from_slide}`
+      );
+    }
   } else if (slide.layoutIndex !== undefined) {
     index = slide.layoutIndex;
   } else {
@@ -126,7 +133,7 @@ function resolveLayoutIndex(
       `resolved layoutIndex=${index}`
     );
   }
-  return index;
+  return layouts[index - 1]!.partNumber ?? index;
 }
 
 /**

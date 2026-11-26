@@ -148,13 +148,14 @@ export interface PptxSlide {
   notes?: string;
   elements: PptxElement[];
   extensions?: string;
-  layoutIndex?: number; // 1-based index into layouts; defaults to 1 for first slide, 2 for others
+  layoutIndex?: number; // Layout part number; defaults to the first layout, then the second when present
   rawSlideXml?: string; // Full raw slide XML for fallback reconstruction
   rawSlideRelsXml?: string; // Full raw slide rels XML
 }
 
 export interface PptxLayoutRaw {
   name: string; // e.g. "Title Slide", "Two Content"
+  partNumber?: number; // Original slideLayoutN.xml suffix; older protocols use array order
   type?: string; // OOXML layout type attribute, e.g. "title", "obj", "twoObj"
   xml: string; // Full raw slideLayout XML content
   relsXml?: string; // Raw .rels XML for this layout

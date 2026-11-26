@@ -196,8 +196,27 @@ describe('scan_dependency_vulns', () => {
       /^\[vuln-scan\] dependency audit scanned 0 packages — .+ \| next: .+ \| evidence: pnpm audit exit=1 .*ERR_PNPM_AUDIT_ENDPOINT_NOT_EXISTS/
     );
     expect(formatDependencyVulnerabilityScanSummary(result)).toContain(result.diagnostic);
+    expect(result.unresolved_summary).toBeUndefined();
+    expect(formatDependencyVulnerabilityScanSummary(result)).not.toContain('0 open');
     const ledger = safeReadFile(ledgerPath, { encoding: 'utf8' }) as string;
     expect(ledger).toContain('"scan_status":"zero_packages"');
+  });
+
+  it('records an unavailable scan when the audit command emits malformed JSON', () => {
+    const dir = pathResolver.sharedTmp(`vuln-ledger-tests/malformed-${Date.now()}`);
+    safeMkdir(dir, { recursive: true });
+    const ledgerPath = path.join(dir, 'ledger.jsonl');
+    const result = scanDependencyVulnerabilitiesFromInputs({
+      auditJson: 'registry response was truncated {',
+      outdatedJson: 'registry unavailable',
+      ledgerPath,
+      auditOutcome: { status: 1 },
+    });
+
+    expect(result.scan_status).toBe('zero_packages');
+    expect(result.diagnostic).toContain('invalid audit JSON');
+    expect(result.unresolved_summary).toBeUndefined();
+    expect(safeReadFile(ledgerPath, { encoding: 'utf8' })).toContain('invalid audit JSON');
   });
 });
 

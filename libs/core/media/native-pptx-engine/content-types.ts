@@ -1,6 +1,6 @@
 export function generateContentTypes(
   slideCount: number,
-  layoutCount: number,
+  layoutNumbers: readonly number[],
   masterCount: number,
   diagramCount: number,
   chartCount: number = 0,
@@ -31,7 +31,7 @@ export function generateContentTypes(
   for (let i = 1; i <= masterCount; i++) {
     xml += `\n  <Override PartName="/ppt/slideMasters/slideMaster${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>`;
   }
-  for (let i = 1; i <= layoutCount; i++) {
+  for (const i of layoutNumbers) {
     xml += `\n  <Override PartName="/ppt/slideLayouts/slideLayout${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>`;
   }
   for (let i = 1; i <= slideCount; i++) {

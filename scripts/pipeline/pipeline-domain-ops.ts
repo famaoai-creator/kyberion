@@ -347,8 +347,9 @@ export async function runInlineDependencyVulnerabilityScan(
   ctx: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   const report = await runDependencyVulnerabilityScanOnce();
-  // A zero-package scan is not a clean scan; it hid a parser bug for months.
-  if (report.scan_status === 'zero_packages' && report.diagnostic) logger.warn(report.diagnostic);
+  if (report.scan_status === 'zero_packages') {
+    throw new Error(report.diagnostic ?? '[vuln-scan] dependency audit examined no packages');
+  }
   return exportValue(params, step, report, ctx);
 }
 

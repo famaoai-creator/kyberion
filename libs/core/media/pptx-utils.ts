@@ -820,6 +820,7 @@ export async function distillPptxDesign(
 
     rawLayouts.push({
       name: nameMatch?.[1] || layoutBaseName,
+      partNumber: Number(layoutBaseName.match(/^slideLayout([1-9]\d*)\.xml$/u)?.[1]) || undefined,
       type: typeMatch?.[1],
       xml: layoutXml,
       relsXml: layoutRelsEntry?.getData().toString('utf8'),

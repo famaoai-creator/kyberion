@@ -83,6 +83,7 @@ export interface AuditCommandOutcome {
   status: number | null;
   stderr?: string;
   error?: string;
+  invalidJson?: boolean;
 }
 
 export interface DependencyVulnerabilityScanResult {
@@ -92,7 +93,7 @@ export interface DependencyVulnerabilityScanResult {
   scanned_packages: number;
   findings: DependencyVulnerabilityFinding[];
   reevaluations: DeferReevaluation[];
-  unresolved_summary: UnresolvedSummary;
+  unresolved_summary?: UnresolvedSummary;
 }
 
 /** AO-02 Task 4 — a previously deferred finding whose conditions changed. */
@@ -112,7 +113,11 @@ export interface UnresolvedSummary {
 
 const DEFAULT_LEDGER_PATH = pathResolver.active('shared/runtime/vuln-ledger.jsonl');
 
-function readJsonObject(text: string, label: string): Record<string, unknown> {
+function readJsonObject(
+  text: string,
+  label: string,
+  reportInvalid = false
+): Record<string, unknown> {
   const trimmed = String(text || '').trim();
   if (!trimmed) return {};
   const candidates = [trimmed];
@@ -133,7 +138,10 @@ function readJsonObject(text: string, label: string): Record<string, unknown> {
     }
   }
 
-  if (lastError instanceof Error && lastError.message.includes('dangerous JSON key')) {
+  if (
+    reportInvalid ||
+    (lastError instanceof Error && lastError.message.includes('dangerous JSON key'))
+  ) {
     throw lastError;
   }
   return {};
@@ -260,10 +268,6 @@ function inferRollbackDifficulty(severity: string): number {
   return severity === 'critical' ? 3 : severity === 'high' ? 2 : severity === 'moderate' ? 1 : 0;
 }
 
-function parseAuditJson(raw: string): AuditJson {
-  return readJsonObject(raw, 'pnpm audit json') as AuditJson;
-}
-
 function severityRank(severity: string): number {
   return severityToScore(normalizeSeverity(severity));
 }
@@ -320,12 +324,12 @@ export function countAuditedDependencies(audit: AuditJson, vulnerablePackages: n
 }
 
 function describeZeroPackageScan(outcome?: AuditCommandOutcome): string {
+  const commandCode = outcome?.stderr?.match(/\b(?:ERR_PNPM_[A-Z0-9_]+|E[A-Z]+[A-Z0-9]*)\b/u)?.[0];
   const evidence = outcome
     ? `pnpm audit exit=${outcome.status ?? 'null'}` +
-      (outcome.error ? ` error=${outcome.error}` : '') +
-      (outcome.stderr
-        ? ` stderr=${outcome.stderr.trim().split('\n').slice(0, 3).join(' / ').slice(0, 300)}`
-        : '')
+      (outcome.invalidJson ? ' invalid audit JSON' : '') +
+      (outcome.error ? ' command error' : '') +
+      (commandCode ? ` code=${commandCode}` : '')
     : 'audit JSON supplied by caller';
   return (
     '[vuln-scan] dependency audit scanned 0 packages — the audit produced no dependency count, ' +
@@ -471,12 +475,22 @@ export function scanDependencyVulnerabilitiesFromInputs(input: {
   ledgerPath?: string;
   auditOutcome?: AuditCommandOutcome;
 }): DependencyVulnerabilityScanResult {
-  const audit = parseAuditJson(input.auditJson);
+  let audit: AuditJson;
+  let auditOutcome = input.auditOutcome;
+  try {
+    audit = readJsonObject(input.auditJson, 'pnpm audit json', Boolean(auditOutcome)) as AuditJson;
+  } catch (error) {
+    if (!auditOutcome) throw error;
+    auditOutcome = { ...auditOutcome, invalidJson: true };
+    audit = {};
+  }
   const vulnerabilities = collectAuditVulnerabilities(audit);
-  const outdated = parseOutdatedJson(input.outdatedJson);
-  const workspaceDeps = collectWorkspaceDependencyNames(
-    input.workspaceRoot || pathResolver.rootDir()
-  );
+  const scannedPackages = countAuditedDependencies(audit, Object.keys(vulnerabilities).length);
+  const outdated = scannedPackages > 0 ? parseOutdatedJson(input.outdatedJson) : {};
+  const workspaceDeps =
+    scannedPackages > 0
+      ? collectWorkspaceDependencyNames(input.workspaceRoot || pathResolver.rootDir())
+      : new Set<string>();
   const findings: DependencyVulnerabilityFinding[] = [];
 
   for (const [packageName, vuln] of Object.entries(vulnerabilities)) {
@@ -519,15 +533,15 @@ export function scanDependencyVulnerabilitiesFromInputs(input: {
   const previousState = readPreviousLedgerState(ledgerPath);
   const reevaluations = computeDeferReevaluations(previousState, findings);
 
-  const scannedPackages = countAuditedDependencies(audit, Object.keys(vulnerabilities).length);
   const result: DependencyVulnerabilityScanResult = {
     timestamp: nowIso(),
     scan_status: scannedPackages > 0 ? 'ok' : 'zero_packages',
-    ...(scannedPackages > 0 ? {} : { diagnostic: describeZeroPackageScan(input.auditOutcome) }),
+    ...(scannedPackages > 0
+      ? { unresolved_summary: summarizeUnresolved(findings, previousState) }
+      : { diagnostic: describeZeroPackageScan(auditOutcome) }),
     scanned_packages: scannedPackages,
     findings,
     reevaluations,
-    unresolved_summary: summarizeUnresolved(findings, previousState),
   };
 
   withExecutionContext('ecosystem_architect', () => {
@@ -557,13 +571,17 @@ export async function runDependencyVulnerabilityScanOnce(): Promise<DependencyVu
 export function formatDependencyVulnerabilityScanSummary(
   result: DependencyVulnerabilityScanResult
 ): string {
+  if (result.scan_status === 'zero_packages' && result.diagnostic) return result.diagnostic;
   const lines = [
-    ...(result.scan_status === 'zero_packages' && result.diagnostic ? [result.diagnostic] : []),
     `[vuln-scan] scanned ${result.scanned_packages} package(s), findings=${result.findings.length}`,
-    `[vuln-scan] unresolved: ${result.unresolved_summary.open} open, ` +
-      `${result.unresolved_summary.deferred} deferred, ` +
-      `${result.unresolved_summary.patched} patched to date`,
   ];
+  const summary = result.unresolved_summary;
+  if (summary) {
+    lines.push(
+      `[vuln-scan] unresolved: ${summary.open} open, ${summary.deferred} deferred, ` +
+        `${summary.patched} patched to date`
+    );
+  }
   if (result.findings.length > 0) lines.push('[vuln-scan] findings appended to vuln ledger');
   for (const reevaluation of result.reevaluations) {
     lines.push(

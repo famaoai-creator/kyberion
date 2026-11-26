@@ -307,6 +307,27 @@ describe('compareRenderedTextRuns (post-render)', () => {
     expect(result.unmatchedElements).toBe(0);
   });
 
+  it('does not pass when authored text cannot be matched to the PDF', () => {
+    const { boxes } = predictPptxTextBoxes(slide([label]));
+    const result = compareRenderedTextRuns(boxes, [run('別の資料', 1.5, 1.25)]);
+    expect(result).toMatchObject({
+      status: 'inconclusive',
+      checkedElements: 0,
+      unmatchedElements: 1,
+    });
+  });
+
+  it('reports incomplete coverage when only some authored text matches the PDF', () => {
+    const other = { ...label, text: '確認', pos: { x: 3, y: 1, w: 1, h: 0.4 } };
+    const { boxes } = predictPptxTextBoxes(slide([label, other]));
+    const result = compareRenderedTextRuns(boxes, [run('検証環境の準備', 1.5, 1.25)]);
+    expect(result).toMatchObject({
+      status: 'inconclusive',
+      checkedElements: 1,
+      unmatchedElements: 1,
+    });
+  });
+
   it('does not count blank authored lines as missing rendered lines', () => {
     const el = { ...label, text: '見出し\n\n本文', pos: { x: 1, y: 1, w: 2, h: 0.8 } };
     const { boxes } = predictPptxTextBoxes(slide([el]));

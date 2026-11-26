@@ -10,18 +10,18 @@ const NS =
 const REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
 /**
- * The shared fixture deck plus a second layout ("Title Only") used by slide 2.
+ * The shared fixture deck plus a second layout ("Title Only") at sparse part 7, used by slide 2.
  * The master's layout ids (2147483649, 2147483650) are the values a naive
  * master-id allocation would reuse.
  */
 function twoLayoutDeck(): Buffer {
   return buildTestDeck((parts) => {
     parts.set(
-      'ppt/slideLayouts/slideLayout2.xml',
+      'ppt/slideLayouts/slideLayout7.xml',
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<p:sldLayout ${NS} type="titleOnly"><p:cSld name="Title Only"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld></p:sldLayout>`
     );
     parts.set(
-      'ppt/slideLayouts/_rels/slideLayout2.xml.rels',
+      'ppt/slideLayouts/_rels/slideLayout7.xml.rels',
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${REL}/slideMaster" Target="../slideMasters/slideMaster1.xml"/></Relationships>`
     );
     parts.set(
@@ -35,21 +35,21 @@ function twoLayoutDeck(): Buffer {
       'ppt/slideMasters/_rels/slideMaster1.xml.rels',
       String(parts.get('ppt/slideMasters/_rels/slideMaster1.xml.rels')).replace(
         '</Relationships>',
-        `<Relationship Id="rId3" Type="${REL}/slideLayout" Target="../slideLayouts/slideLayout2.xml"/></Relationships>`
+        `<Relationship Id="rId3" Type="${REL}/slideLayout" Target="../slideLayouts/slideLayout7.xml"/></Relationships>`
       )
     );
     parts.set(
       '[Content_Types].xml',
       String(parts.get('[Content_Types].xml')).replace(
         '</Types>',
-        '<Override PartName="/ppt/slideLayouts/slideLayout2.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/></Types>'
+        '<Override PartName="/ppt/slideLayouts/slideLayout7.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/></Types>'
       )
     );
     parts.set(
       'ppt/slides/_rels/slide2.xml.rels',
       String(parts.get('ppt/slides/_rels/slide2.xml.rels')).replace(
         'slideLayout1.xml',
-        'slideLayout2.xml'
+        'slideLayout7.xml'
       )
     );
   });
@@ -114,12 +114,17 @@ describe('media:pptx_inherit_template', () => {
     const presentation = files.get('ppt/presentation.xml')!;
     expect(ids(presentation, 'sldId')).toHaveLength(2);
     expect(files.get('ppt/slides/_rels/slide1.xml.rels')).toContain(
-      'slideLayouts/slideLayout2.xml'
+      'slideLayouts/slideLayout7.xml'
     );
     expect(files.get('ppt/slides/_rels/slide2.xml.rels')).toContain(
       'slideLayouts/slideLayout1.xml'
     );
-    expect(files.get('ppt/slideLayouts/slideLayout2.xml')).toContain('name="Title Only"');
+    expect(files.get('ppt/slideLayouts/slideLayout7.xml')).toContain('name="Title Only"');
+    expect(files.get('ppt/slideMasters/_rels/slideMaster1.xml.rels')).toContain(
+      'slideLayouts/slideLayout7.xml'
+    );
+    expect(files.get('[Content_Types].xml')).toContain('/ppt/slideLayouts/slideLayout7.xml');
+    expect(files.has('ppt/slideLayouts/slideLayout2.xml')).toBe(false);
     expect(files.get('ppt/slides/slide1.xml')).toContain('Inherited body A');
     expect(files.get('ppt/slides/slide1.xml')).not.toContain('Section heading');
     expect(files.get('ppt/notesSlides/notesSlide1.xml')).toContain(
