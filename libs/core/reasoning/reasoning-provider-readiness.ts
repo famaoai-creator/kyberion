@@ -85,6 +85,17 @@ const ADAPTER_PROBES: Readonly<Record<ReasoningProviderAdapterId, AdapterProbe>>
     getRegisteredEnvText('CLAUDE_API_KEY', { env })?.trim()
       ? { available: true }
       : deps.claudeProbe(),
+  // The SDK runs in-process: readiness is a resolvable Cursor API key, never a binary.
+  'cursor-sdk': async (descriptor, env) =>
+    descriptor.secret_refs?.[0]?.env_keys.some((name) =>
+      Boolean(getRegisteredEnvText(name, { env })?.trim())
+    )
+      ? { available: true }
+      : {
+          available: false,
+          reason:
+            'Cursor API key is not configured (run `pnpm kyberion secret introduce cursor API_KEY`).',
+        },
   'provider-cli': async (descriptor, env, deps) => cliBinaryProbe(descriptor, env, deps),
   'anthropic-api': async (_descriptor, env, deps) => deps.anthropicProbe(env),
   'openai-responses': async (descriptor, env) => {

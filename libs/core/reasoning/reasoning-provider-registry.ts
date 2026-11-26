@@ -76,6 +76,7 @@ export type ReasoningProviderCostTier = 'free' | 'metered';
 export const REASONING_PROVIDER_ADAPTERS = [
   'claude-cli',
   'claude-agent-sdk',
+  'cursor-sdk',
   'provider-cli',
   'anthropic-api',
   'openai-responses',

@@ -25,6 +25,7 @@
     "grok-api",
     "copilot",
     "cursor-cli",
+    "cursor-sdk",
     "opencode-cli",
     "devin-cli",
     "local",
