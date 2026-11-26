@@ -14,7 +14,6 @@ const BACKEND_PROVIDER: Record<string, string> = {
   'gemini-cli': 'gemini',
   'cursor-cli': 'cursor',
   'cursor-sdk': 'cursor',
-  'cursor-sdk': 'cursor',
   'copilot-acp': 'copilot',
   'grok-cli': 'grok',
   'opencode-cli': 'opencode',

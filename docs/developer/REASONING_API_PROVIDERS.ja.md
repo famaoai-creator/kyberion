@@ -74,7 +74,7 @@ KYBERION_REASONING_BACKEND=cursor-sdk pnpm kyberion ...
 - 自動選択はされません。`CURSOR_API_KEY` だけがある場合は従来どおり `cursor-cli` が選ばれます。
 - ツールなし・空の scratch workspace で動くテキスト推論専用です。ファイル操作や実行を伴う作業は `cursor-cli` を使います。
 - モデルは `KYBERION_CURSOR_SDK_MODEL`（既定 `composer-2.5`）。無効なモデルを指定すると、利用可能なモデル一覧付きのエラーになります。アカウントで使えるモデルは `Cursor.models.list` で確認できます。
-- system prompt は既定でユーザーメッセージへ織り込みます。アカウントが Cursor のネイティブ `systemPrompt` を許可していない場合、拒否されるまでに約20秒かかるためです。許可済みのアカウントは `KYBERION_CURSOR_SDK_NATIVE_SYSTEM_PROMPT=1` で切り替えられます。
+- system prompt は既定でユーザーメッセージへ織り込みます。アカウントが Cursor のネイティブ `systemPrompt` を許可していない場合、拒否されるまでに約20秒かかるためです。許可済みのアカウントは `KYBERION_CURSOR_SDK_NATIVE_SYSTEM_PROMPT=1` で切り替えられます。この opt-in はステートレス呼び出し専用で、`context_mode` の継続会話では常に織り込み方式になります（会話の最初のメッセージに1回だけ載せます）。
 - 呼び出しは既定でステートレス（毎回新しい Agent と scratch）です。`context_mode`（`'fresh'` / `'continue'`）を指定した呼び出しだけが、backend instance が持つ 1 つの会話に参加します。`'fresh'` は会話を捨てて新しく始め、`'continue'` は続けます。未指定の呼び出しは会話に触れません。
 - 継続中の会話は FIFO で直列化され、最後のターンから `KYBERION_CURSOR_SDK_SESSION_IDLE_TTL_MS`（既定 900000 = 15 分、`0` で無効）が過ぎると Agent と scratch を解放します。失敗・タイムアウト・中断・モデル変更・`'fresh'`・`resetSession()`（failover 時に呼ばれます）のいずれでも会話を破棄します。継続のターンは約 1.8 秒で、新規呼び出し（約 4 秒）より速くなります。
 - 構造化出力は prompt で JSON を強制し Zod で検証します。不正な場合は検証エラーを添えて1回だけ再依頼します。

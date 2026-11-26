@@ -44,6 +44,7 @@ import {
 } from './cursor-sdk-reasoning-backend.js';
 import {
   resetCursorSdkCapabilityCache,
+  runCursorSdkText,
   type CursorSdkCreateAgentOptions,
   type CursorSdkRunResult,
   type CursorSdkRuntime,
@@ -277,6 +278,23 @@ describe('cursor-sdk-reasoning-backend', () => {
     expect(fake.sent).toEqual(['hi']);
   });
 
+  it.each([
+    'Cannot use this model: nope. Available models: auto, composer-2.5',
+    'invalid_model: nope',
+    'The model "nope" is not available for this account',
+    'model not found: nope',
+    'unknown model nope',
+  ])('points a model error (%s) at the model override', async (message) => {
+    const fake = fakeRuntime([{ status: 'error', error: { message, code: 'invalid_argument' } }]);
+    const backend = new CursorSdkReasoningBackend({
+      runtime: fake.runtime,
+      apiKey: 'k',
+      model: 'nope',
+    });
+
+    await expect(backend.prompt('x')).rejects.toThrow(/next: set KYBERION_CURSOR_SDK_MODEL/u);
+  });
+
   it('points an invalid model at the model override and keeps the available list', async () => {
     const fake = fakeRuntime([
       {
@@ -296,6 +314,14 @@ describe('cursor-sdk-reasoning-backend', () => {
     await expect(backend.prompt('x')).rejects.toThrow(
       /Available models: auto, composer-2\.5.*next: set KYBERION_CURSOR_SDK_MODEL/su
     );
+  });
+
+  it('does not append the model hint to unrelated errors', async () => {
+    const fake = fakeRuntime([
+      { status: 'error', error: { message: 'quota exceeded', code: 'quota' } },
+    ]);
+    const backend = new CursorSdkReasoningBackend({ runtime: fake.runtime, apiKey: 'k' });
+    await expect(backend.prompt('x')).rejects.toThrow(/run failed: quota exceeded$/u);
   });
 
   it('reads the native system prompt opt-in from the governed env accessor', () => {
@@ -349,7 +375,7 @@ describe('cursor-sdk-reasoning-backend', () => {
       apiKey: 'k',
       timeoutMs: 20,
     });
-    await expect(backend.prompt('x')).rejects.toThrow(/timed out after 20ms/u);
+    await expect(backend.prompt('x')).rejects.toThrow(/timed out after \d+ms/u);
   });
 
   it('cancels the run when the caller aborts', async () => {
@@ -382,6 +408,114 @@ describe('cursor-sdk-reasoning-backend', () => {
     setTimeout(() => controller.abort(), 10);
     await expect(pending).rejects.toThrow(/cancelled/u);
     expect(cancelled).toBe(1);
+  });
+
+  it('cancels the run when the signal aborted between send and wait', async () => {
+    const controller = new AbortController();
+    let cancelled = 0;
+    const runtime: CursorSdkRuntime = {
+      async createAgent() {
+        return {
+          async send() {
+            // Abort lands after send() resolves but before waitForRun can
+            // attach its listener — the run must still be cancelled.
+            const run = {
+              wait: () =>
+                new Promise<CursorSdkRunResult>((resolve) =>
+                  setTimeout(() => resolve({ status: 'cancelled' }), 5)
+                ),
+              async cancel() {
+                cancelled += 1;
+              },
+            };
+            controller.abort();
+            return run;
+          },
+          close() {
+            return undefined;
+          },
+        };
+      },
+    };
+    const backend = new CursorSdkReasoningBackend({ runtime, apiKey: 'k' });
+    await expect(backend.prompt('x', { signal: controller.signal })).rejects.toThrow(/cancelled/u);
+    expect(cancelled).toBe(1);
+  });
+
+  it('times out a stalled createAgent and closes the late-resolving agent', async () => {
+    vi.useFakeTimers();
+    try {
+      let closed = 0;
+      const runtime: CursorSdkRuntime = {
+        createAgent() {
+          return new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  async send() {
+                    return {
+                      wait: () => Promise.resolve(finished('late')),
+                      async cancel() {},
+                    };
+                  },
+                  close() {
+                    closed += 1;
+                  },
+                }),
+              100
+            )
+          );
+        },
+      };
+      const backend = new CursorSdkReasoningBackend({
+        runtime,
+        apiKey: 'k',
+        timeoutMs: 20,
+      });
+      const pending = backend.prompt('x');
+      const assertion = expect(pending).rejects.toThrow(/timed out after /u);
+      await vi.advanceTimersByTimeAsync(30);
+      await assertion;
+      // The create resolves later than the deadline — the agent is closed, not leaked.
+      await vi.advanceTimersByTimeAsync(100);
+      expect(closed).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rejects a contextMode without a session before touching the SDK', async () => {
+    const fake = fakeRuntime([finished('never')]);
+    await expect(
+      runCursorSdkText(
+        { systemPrompt: 's', userPrompt: 'u', contextMode: 'continue' },
+        { runtime: fake.runtime, apiKey: 'k' }
+      )
+    ).rejects.toThrow(/contextMode and session must be passed together/u);
+    expect(fake.created).toHaveLength(0);
+  });
+
+  it('bounds a stalled createAgent inside a continued session too', async () => {
+    vi.useFakeTimers();
+    try {
+      const runtime: CursorSdkRuntime = {
+        createAgent() {
+          return new Promise<never>(() => undefined);
+        },
+      };
+      const backend = new CursorSdkReasoningBackend({
+        runtime,
+        apiKey: 'k',
+        timeoutMs: 20,
+      });
+      const pending = backend.prompt('x', { context_mode: 'continue' });
+      const assertion = expect(pending).rejects.toThrow(/timed out after /u);
+      await vi.advanceTimersByTimeAsync(30);
+      await assertion;
+      await backend.resetSession();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('fails before any SDK call when no API key resolves', async () => {

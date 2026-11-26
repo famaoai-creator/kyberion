@@ -1283,7 +1283,7 @@
       "category": "provider",
       "type": "boolean",
       "required": false,
-      "description": "Send the system prompt through the Cursor SDK native systemPrompt option (cursor-sdk). Off by default: accounts without the feature reject the run only after ~20s of SDK retries; the default folds the system prompt into the user message.",
+      "description": "Send the system prompt through the Cursor SDK native systemPrompt option (cursor-sdk) for stateless calls; continued conversations (context_mode) always fold it into the first message instead. Off by default: accounts without the feature reject the run only after ~20s of SDK retries; the default folds the system prompt into the user message.",
       "documented": true,
       "subsystem": "reasoning"
     },
