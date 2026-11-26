@@ -305,7 +305,7 @@ export function wrapParagraphForRenderer(
 
   const lines: string[] = [];
   let current = '';
-  const width = (s: string) => measureRendererWidthEm(s.replace(/\s+$/u, ''), bold, fontFamily);
+  const width = (s: string) => measureRendererWidthEm(s.trimEnd(), bold, fontFamily);
   const limit = maxWidthEm - FIT_EPSILON_EM;
   for (const unit of units) {
     const candidate = current + unit;
@@ -321,11 +321,11 @@ export function wrapParagraphForRenderer(
     const last = prevChars[prevChars.length - 1] ?? '';
     const firstOfUnit = Array.from(unit)[0] ?? '';
     if (!kinsokuAllowsBreak(last, firstOfUnit) && prevChars.length > 1) {
-      lines.push(prevChars.slice(0, -1).join('').replace(/\s+$/u, ''));
+      lines.push(prevChars.slice(0, -1).join('').trimEnd());
       current = last + unit;
     } else {
-      lines.push(current.replace(/\s+$/u, ''));
-      current = unit.replace(/^\s+/u, '');
+      lines.push(current.trimEnd());
+      current = unit.trimStart();
     }
     // A single word wider than the line breaks mid-word.
     while (width(current) > limit && Array.from(current).length > 1) {
@@ -336,7 +336,7 @@ export function wrapParagraphForRenderer(
       current = cs.slice(cut).join('');
     }
   }
-  lines.push(current.replace(/\s+$/u, ''));
+  lines.push(current.trimEnd());
   return lines;
 }
 
@@ -652,7 +652,7 @@ export function predictPptxTextBoxes(
 }
 
 function excerptOf(text: string, max = 40): string {
-  const flat = text.replace(/\s*\n\s*/g, ' / ').trim();
+  const flat = text.replace(/\s+/gu, (space) => (space.includes('\n') ? ' / ' : space)).trim();
   return Array.from(flat).length > max ? `${Array.from(flat).slice(0, max).join('')}…` : flat;
 }
 

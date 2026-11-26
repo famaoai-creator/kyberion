@@ -4,6 +4,7 @@
  * builder actually emits, and a brief that names neither is untouched.
  */
 import { describe, expect, it } from 'vitest';
+import { resolveFontFamilyPair } from '@agent/core/design-fonts';
 import { handleAction } from './index.js';
 import {
   resolveBodyZoneKey,
@@ -94,7 +95,10 @@ describe('KDS v2 in the media actuator', () => {
       if (key === 'fontFamily') fonts.add(String(value));
       return value;
     });
-    expect([...fonts].join(';')).toMatch(/Serif|Mincho/); // editorial heading face
+    expect([...fonts].map(resolveFontFamilyPair)).toContainEqual({
+      latin: 'Georgia',
+      eastAsian: 'Noto Serif JP',
+    });
   });
 
   it('design_system_id kds-<style> selects the style and its preferred compositions', async () => {

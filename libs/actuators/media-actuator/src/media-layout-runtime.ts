@@ -197,7 +197,8 @@ function buildPptxSlideFromPattern(
 
   const isHero = semanticType === 'hero';
   const themeFonts = theme?.fonts || theme?.theme?.fonts || {};
-  const headingFont = resolveLatinFontFamily(themeFonts.heading);
+  // The PPTX writer resolves Latin and East Asian typefaces from this stack.
+  const headingFont = themeFonts.heading || resolveLatinFontFamily();
   const bodyFont = resolveLatinFontFamily(themeFonts.body);
   const bzl = resolveLayoutTemplate(rootDir, data.design_system_id, data, theme);
   const chr = bzl.chrome;
