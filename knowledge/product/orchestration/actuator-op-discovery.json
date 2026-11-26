@@ -41104,12 +41104,41 @@
           "kind": "control",
           "input_schema": {
             "type": "object",
-            "title": "system:assert",
-            "description": "Open legacy parameter contract for system:assert (control); replace with typed fields during operation migration.",
-            "additionalProperties": true,
-            "x-kyberion-contract": "inferred-legacy"
+            "required": ["conditions"],
+            "properties": {
+              "conditions": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "object"
+                    }
+                  ]
+                }
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
           },
-          "examples": [{}]
+          "examples": [
+            {
+              "conditions": [
+                {
+                  "from": "input.tenant",
+                  "operator": "not_empty"
+                }
+              ],
+              "message": "tenant is required"
+            }
+          ]
         },
         {
           "op": "if",
