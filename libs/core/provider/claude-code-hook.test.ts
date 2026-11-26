@@ -60,6 +60,7 @@ import {
   evaluatePreToolUse,
   evaluatePreToolUseShellDeny,
   recordPostToolUse,
+  recordPreToolUseDenial,
   resolveHookHostProvider,
 } from './claude-code-hook.js';
 import { ALL_TEST_RUN_MARKER_ENV_KEYS } from '../foundation/env.js';
@@ -132,6 +133,67 @@ describe('claude-code-hook — PreToolUse tier-guard', () => {
     expect(out.hookSpecificOutput.permissionDecision).toBe('deny');
     expect(out.hookSpecificOutput.permissionDecisionReason).toContain('personal tier');
     expect(out.hookSpecificOutput.permissionDecisionReason).toContain('not authorized');
+  });
+});
+
+describe('claude-code-hook — PreToolUse denial audit', () => {
+  const denials = () =>
+    recordSpy.mock.calls.map((c) => c[0]).filter((e) => e.action === 'claude_code_tool_denied');
+  beforeEach(() => recordSpy.mockClear());
+
+  it('records a shell-policy deny with rule id and no command text', () => {
+    const cmd = 'pdftotext -layout knowledge/confidential/acme/secret.pdf -';
+    evaluatePreToolUseShellDeny({ tool_name: 'Bash', tool_input: { command: cmd } });
+    expect(denials()).toHaveLength(1);
+    const row = denials()[0];
+    expect(row).toMatchObject({
+      agentId: 'claude-code',
+      action: 'claude_code_tool_denied',
+      operation: 'Bash',
+      result: 'denied',
+      metadata: {
+        tool: 'Bash',
+        reason_category: 'shell_policy',
+        rule_id: 'document-hand-extraction',
+      },
+    });
+    expect(JSON.stringify(row)).not.toContain('pdftotext');
+    expect(JSON.stringify(row)).not.toContain('confidential');
+  });
+
+  it('records a strict-gate shell deny but nothing for allowed commands', () => {
+    evaluatePreToolUse({ tool_name: 'Bash', tool_input: { command: 'ls' } });
+    expect(denials()).toHaveLength(0);
+    evaluatePreToolUse({ tool_name: 'Bash', tool_input: { command: 'pnpm install' } });
+    expect(denials()).toHaveLength(1);
+    expect(denials()[0].metadata.reason_category).toBe('shell_policy');
+    expect(JSON.stringify(denials()[0])).not.toContain('pnpm install');
+  });
+
+  it('records a tier-guard deny with the tier only, never the protected path', () => {
+    evaluatePreToolUse({
+      tool_name: 'Write',
+      tool_input: { file_path: 'knowledge/personal/secret.md', content: 'TOP-SECRET' },
+    });
+    expect(denials()).toHaveLength(1);
+    expect(denials()[0].metadata).toEqual({
+      tool: 'Write',
+      reason_category: 'tier_guard',
+      tier: 'personal',
+    });
+    expect(JSON.stringify(denials()[0])).not.toMatch(/secret\.md|TOP-SECRET/);
+  });
+
+  it('keeps the deny when the audit append throws', () => {
+    recordSpy.mockImplementationOnce(() => {
+      throw new Error('audit down');
+    });
+    const out = evaluatePreToolUse({
+      tool_name: 'Edit',
+      tool_input: { file_path: 'knowledge/personal/secret.md' },
+    });
+    expect(out.hookSpecificOutput.permissionDecision).toBe('deny');
+    expect(recordPreToolUseDenial({ tool_name: 'Bash' }, { category: 'hook_error' })).toBe(true);
   });
 });
 

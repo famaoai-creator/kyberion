@@ -52,10 +52,43 @@ describe('dot-task-session-tools', () => {
   beforeEach(() => {
     safeRmSync(tmpRoot, { recursive: true, force: true });
     safeMkdir(path.join(tmpRoot, 'knowledge/public/dir-entry'), { recursive: true });
-    safeMkdir(path.join(tmpRoot, 'knowledge/confidential/acme'), { recursive: true });
+    safeMkdir(
+      path.join(tmpRoot, 'knowledge/confidential/acme/organizations/org-1/projects/proj-1'),
+      {
+        recursive: true,
+      }
+    );
+    safeMkdir(
+      path.join(tmpRoot, 'knowledge/confidential/acme/organizations/org-1/projects/proj-2'),
+      {
+        recursive: true,
+      }
+    );
+    safeMkdir(path.join(tmpRoot, 'knowledge/confidential/acme/organizations/org-2'), {
+      recursive: true,
+    });
     safeMkdir(path.join(tmpRoot, 'knowledge/confidential/globex'), { recursive: true });
     safeWriteFile(path.join(tmpRoot, 'knowledge/public/guide.md'), '# Public Guide\n');
-    safeWriteFile(path.join(tmpRoot, 'knowledge/confidential/acme/runbook.md'), '# Acme Runbook\n');
+    safeWriteFile(
+      path.join(tmpRoot, 'knowledge/confidential/acme/tenant-wide.md'),
+      '# Acme Tenant Wide\n'
+    );
+    safeWriteFile(
+      path.join(tmpRoot, 'knowledge/confidential/acme/organizations/org-1/runbook.md'),
+      '# Acme Org-1 Runbook\n'
+    );
+    safeWriteFile(
+      path.join(tmpRoot, 'knowledge/confidential/acme/organizations/org-1/projects/proj-1/spec.md'),
+      '# Proj-1 Spec\n'
+    );
+    safeWriteFile(
+      path.join(tmpRoot, 'knowledge/confidential/acme/organizations/org-1/projects/proj-2/spec.md'),
+      '# Proj-2 Secret\n'
+    );
+    safeWriteFile(
+      path.join(tmpRoot, 'knowledge/confidential/acme/organizations/org-2/other.md'),
+      '# Acme Org-2 Other\n'
+    );
     safeWriteFile(
       path.join(tmpRoot, 'knowledge/confidential/globex/secret-plan.md'),
       '# Globex Only\n'
@@ -112,9 +145,9 @@ describe('dot-task-session-tools', () => {
 
     const readRes = await runtime.executeTool({
       name: 'dot_read_scoped_file',
-      input: { path: 'knowledge/confidential/acme/runbook.md' },
+      input: { path: 'knowledge/confidential/acme/organizations/org-1/runbook.md' },
     });
-    expect(JSON.parse(readRes.resultText).content).toContain('Acme Runbook');
+    expect(JSON.parse(readRes.resultText).content).toContain('Acme Org-1 Runbook');
 
     const searchRes = await runtime.executeTool({
       name: 'dot_search_knowledge',
@@ -144,7 +177,9 @@ describe('dot-task-session-tools', () => {
 
     const summary = runtime.getSummary();
     expect(summary.toolCalls).toBe(4);
-    expect(summary.readPaths).toEqual(['knowledge/confidential/acme/runbook.md']);
+    expect(summary.readPaths).toEqual([
+      'knowledge/confidential/acme/organizations/org-1/runbook.md',
+    ]);
     expect(summary.deliveredKnowledgePaths).toEqual([
       'knowledge/product/evolution/wisdom/generated/ops.md',
     ]);
@@ -244,5 +279,108 @@ describe('dot-task-session-tools', () => {
         },
       })
     ).rejects.toThrow(/DOT_TASK_TOOL_SCOPE_DENIED/);
+  });
+
+  it('enforces organization, project, personal owner_nhi, and item context coherence', async () => {
+    const orgRuntime = createDotTaskSessionToolRuntime({
+      charter: makeCharter(),
+      item: makeItem(),
+      rootDir: tmpRoot,
+      assertCurrent: () => undefined,
+      audit: vi.fn(),
+    });
+    await expect(
+      orgRuntime.executeTool({
+        name: 'dot_read_scoped_file',
+        input: { path: 'knowledge/confidential/acme/organizations/org-2/other.md' },
+      })
+    ).rejects.toThrow(/DOT_TASK_TOOL_SCOPE_DENIED/);
+    await expect(
+      orgRuntime.executeTool({
+        name: 'dot_read_scoped_file',
+        input: { path: 'knowledge/confidential/acme/tenant-wide.md' },
+      })
+    ).rejects.toThrow(/DOT_TASK_TOOL_SCOPE_DENIED/);
+
+    const projRuntime = createDotTaskSessionToolRuntime({
+      charter: makeCharter({
+        scope: {
+          tier: 'confidential',
+          tenant_slug: 'acme',
+          organization_id: 'org-1',
+          project_id: 'proj-1',
+        },
+      }),
+      item: makeItem({
+        context: {
+          tenant_slug: 'acme',
+          organization_id: 'org-1',
+          project_id: 'proj-1',
+        },
+      }),
+      rootDir: tmpRoot,
+      assertCurrent: () => undefined,
+      audit: vi.fn(),
+    });
+    const okProj = await projRuntime.executeTool({
+      name: 'dot_read_scoped_file',
+      input: {
+        path: 'knowledge/confidential/acme/organizations/org-1/projects/proj-1/spec.md',
+      },
+    });
+    expect(JSON.parse(okProj.resultText).content).toContain('Proj-1 Spec');
+    await expect(
+      projRuntime.executeTool({
+        name: 'dot_read_scoped_file',
+        input: {
+          path: 'knowledge/confidential/acme/organizations/org-1/projects/proj-2/spec.md',
+        },
+      })
+    ).rejects.toThrow(/DOT_TASK_TOOL_SCOPE_DENIED/);
+
+    expect(() =>
+      createDotTaskSessionToolRuntime({
+        charter: makeCharter({ scope: { tier: 'personal' } }),
+        item: makeItem({ context: {} }),
+        rootDir: tmpRoot,
+        assertCurrent: () => undefined,
+        audit: vi.fn(),
+      })
+    ).toThrow(/DOT_TASK_TOOL_SCOPE_DENIED/);
+
+    expect(() =>
+      createDotTaskSessionToolRuntime({
+        charter: makeCharter(),
+        item: makeItem({
+          context: {
+            tenant_slug: 'acme',
+            organization_id: 'org-2',
+          },
+        }),
+        rootDir: tmpRoot,
+        assertCurrent: () => undefined,
+        audit: vi.fn(),
+      })
+    ).toThrow(/DOT_TASK_TOOL_SCOPE_DENIED/);
+
+    const writeArtifact = vi.fn((input) => ({
+      absolute_path: path.join(tmpRoot, input.name),
+      repo_relative_path: `active/shared/artifacts/personal/shared/report/${input.name}`,
+      index_path: path.join(tmpRoot, 'artifacts-index.jsonl'),
+      scope_kind: 'tenant' as const,
+    }));
+    const personalRuntime = createDotTaskSessionToolRuntime({
+      charter: makeCharter({ scope: { tier: 'personal', owner_nhi: 'user:alice' } }),
+      item: makeItem({ context: {}, assignee_user_id: 'user:alice' }),
+      rootDir: tmpRoot,
+      assertCurrent: () => undefined,
+      writeArtifact: writeArtifact as never,
+      audit: vi.fn(),
+    });
+    const personalRes = await personalRuntime.executeTool({
+      name: 'dot_write_scoped_deliverable',
+      input: { name: 'note.md', content: '# Personal Note\n' },
+    });
+    expect(JSON.parse(personalRes.resultText).path).toMatch(/owners\/[0-9a-f]{12}\/dot-ops-dot/);
   });
 });

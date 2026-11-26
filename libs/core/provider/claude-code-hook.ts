@@ -18,6 +18,10 @@ import {
   coSessionHookLeaseGate,
   formatPendingHandoffs,
 } from './co-session-hook.js';
+import {
+  recordSessionPromptForNudge,
+  recordSessionToolEventForNudge,
+} from './session-length-nudge.js';
 
 /**
  * Claude Code hook bridge (Direction A: Claude Code as front-end → Kyberion).
@@ -199,6 +203,80 @@ function pre(decision: PermissionDecision, reason: string): PreToolUseHookOutput
   return out;
 }
 
+/** Audit action for a PreToolUse deny (not stamped: see session-hook-provenance.ts). */
+export const PRE_TOOL_USE_DENIED_ACTION = 'claude_code_tool_denied';
+
+/** Short reason category recorded with a PreToolUse deny — never the reason text. */
+export type PreToolUseDenialCategory =
+  'shell_policy' | 'tier_guard' | 'co_session_lease' | 'hook_error' | 'other';
+
+export interface PreToolUseDenialDetail {
+  category: PreToolUseDenialCategory;
+  /** Policy rule id when the deciding policy exposes one (e.g. shell-command-policy). */
+  ruleId?: string;
+  /** Tier of the gated path (tier-guard / lease denials). */
+  tier?: string;
+  /**
+   * Gated path. Recorded only when it is public-tier and repo-relative (or
+   * under the payload cwd); protected-tier paths record the tier alone.
+   */
+  filePath?: string;
+}
+
+function repoRelativePublicPath(filePath: string, cwd: unknown): string | undefined {
+  if (detectTier(filePath) !== 'public') return undefined;
+  let rel = filePath;
+  if (rel.startsWith('/') || /^[A-Za-z]:[\\/]/.test(rel)) {
+    // Trim trailing separators without a trailing-quantifier regex
+    // (CodeQL js/polynomial-redos flags `[\\/]+$` on hook payload input).
+    let base = typeof cwd === 'string' ? cwd : '';
+    while (base.endsWith('/') || base.endsWith('\\')) base = base.slice(0, -1);
+    if (!base || !rel.startsWith(`${base}/`)) return undefined;
+    rel = rel.slice(base.length + 1);
+  }
+  if (!rel || rel.split(/[\\/]/).includes('..')) return undefined;
+  return rel;
+}
+
+/**
+ * Append one `claude_code_tool_denied` audit row for a PreToolUse deny.
+ * Best-effort: an audit failure never changes the deny or throws. Records the
+ * tool, a reason category and rule id — never the command text, file content,
+ * or a protected-tier path.
+ */
+export function recordPreToolUseDenial(
+  input: PreToolUseInput,
+  detail: PreToolUseDenialDetail
+): boolean {
+  try {
+    const tool = canonicalHookToolName(input?.tool_name) || 'unknown';
+    const relPath =
+      detail.filePath !== undefined
+        ? repoRelativePublicPath(detail.filePath, input?.cwd)
+        : undefined;
+    auditChain.record({
+      agentId: hookHostAgentId(),
+      action: PRE_TOOL_USE_DENIED_ACTION,
+      operation: tool,
+      result: 'denied',
+      metadata: {
+        tool,
+        reason_category: detail.category,
+        ...(detail.ruleId ? { rule_id: detail.ruleId } : {}),
+        ...(detail.tier ? { tier: detail.tier } : {}),
+        ...(relPath ? { file_path: relPath } : {}),
+        ...(typeof input?.session_id === 'string' && input.session_id
+          ? { session_id: input.session_id }
+          : {}),
+      },
+    });
+    return true;
+  } catch {
+    // best-effort; a deny stays a deny even when the audit append fails
+    return false;
+  }
+}
+
 /** Deny response for fail-closed paths in the script boundary. */
 export function denyHookResponse(reason: string): PreToolUseHookOutput {
   return pre('deny', reason);
@@ -231,6 +309,7 @@ export function evaluatePreToolUseShellDeny(input: PreToolUseInput): PreToolUseH
   if (!command) return null;
   const decision = evaluateShellCommandPolicy(command);
   if (decision.verdict !== 'deny') return null;
+  recordPreToolUseDenial(input, { category: 'shell_policy', ruleId: decision.matchedRuleId });
   return pre('deny', decision.reason || 'Denied by Kyberion shell-command policy.');
 }
 
@@ -240,6 +319,7 @@ export function evaluatePreToolUse(input: PreToolUseInput): PreToolUseHookOutput
     const command = String(input.tool_input?.command ?? input.tool_input?.cmd ?? '').trim();
     const decision = evaluateShellCommandPolicy(command);
     if (decision.verdict !== 'allow') {
+      recordPreToolUseDenial(input, { category: 'shell_policy', ruleId: decision.matchedRuleId });
       return pre(
         'deny',
         `${decision.reason} ${command ? `Command: ${command}` : 'Bash command was not provided.'}`
@@ -255,6 +335,7 @@ export function evaluatePreToolUse(input: PreToolUseInput): PreToolUseHookOutput
     if (tier === 'public') continue; // source / public knowledge — not tier-gated
     const verdict = validateWritePermission(p);
     if (!verdict.allowed) {
+      recordPreToolUseDenial(input, { category: 'tier_guard', tier });
       return pre(
         'deny',
         `Kyberion tier-guard blocked a write into the ${tier} tier: ${verdict.reason ?? 'not authorized'}. ` +
@@ -269,6 +350,11 @@ export function evaluatePreToolUse(input: PreToolUseInput): PreToolUseHookOutput
       file_path: p,
     });
     if (gate.decision === 'deny') {
+      recordPreToolUseDenial(input, {
+        category: 'co_session_lease',
+        tier: detectTier(p),
+        filePath: p,
+      });
       return pre('deny', `Kyberion co-session lease gate: ${gate.reason}`);
     }
   }
@@ -311,11 +397,15 @@ function recordSessionSignal(
 export function buildUserPromptSubmitContext(input: Record<string, unknown> = {}): string {
   const prompt = normalizePrompt(input.prompt);
   const summary = prompt ? truncate(prompt, 180) : 'No prompt text was provided.';
-  const hints = prompt ? classifyPromptIntent(prompt) : [];
+  const intentHints = prompt ? classifyPromptIntent(prompt) : [];
+  // Cheap per-session counter (session-length-nudge.ts); fail-open, null when not due.
+  const lengthHint = recordSessionPromptForNudge(resolveHookHostProvider(), input.session_id);
+  const hints = lengthHint ? [...intentHints, lengthHint] : intentHints;
   recordSessionSignal(SESSION_HOOK_AUDIT_ACTION.userPrompt, 'UserPromptSubmit', input.session_id, {
     cwd: input.cwd,
     prompt_summary: summary,
-    hints,
+    hints: intentHints,
+    ...(lengthHint ? { session_length_nudge: true } : {}),
   });
 
   const handoffBlock = formatPendingHandoffs(
@@ -392,23 +482,33 @@ export function buildPostCompactionContext(input: Record<string, unknown> = {}):
 
 export interface CliUsageSummary {
   model: string;
+  /** Uncached input + cache-creation input tokens (unchanged legacy semantics). */
   inputTokens: number;
   outputTokens: number;
+  /** Unique assistant messages (deduped by `message.id`). */
   turns: number;
+  /** `cache_read_input_tokens` total (not included in inputTokens). */
+  cacheReadTokens?: number;
+  /** `cache_creation_input_tokens` total (already included in inputTokens). */
+  cacheCreationTokens?: number;
 }
+
+const usageCount = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
 
 /**
  * Parse a Claude Code transcript (JSONL) and sum token usage across assistant
- * turns. Pure (no I/O) so it is unit-testable; the transcript file read happens in
- * the hook script boundary (it is an external Claude Code artifact, not repo/tier
- * content, so it cannot go through secure-io's project-root read guard).
+ * messages. Claude Code writes one line per content block, each repeating the
+ * same `message.id` and `message.usage`, so lines are deduped by `message.id`
+ * (last record wins); lines without an id count individually. Pure (no I/O) so
+ * it is unit-testable; the transcript file read happens in the hook script
+ * boundary (it is an external Claude Code artifact, not repo/tier content, so it
+ * cannot go through secure-io's project-root read guard).
  */
 export function summarizeTranscriptUsage(transcriptText: string): CliUsageSummary | null {
   if (!transcriptText) return null;
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let turns = 0;
-  let model = '';
+  const byMessage = new Map<string, { usage: any; model: string }>();
+  const anonymous: { usage: any; model: string }[] = [];
   for (const line of transcriptText.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
@@ -424,14 +524,38 @@ export function summarizeTranscriptUsage(transcriptText: string): CliUsageSummar
       usage &&
       (typeof usage.input_tokens === 'number' || typeof usage.output_tokens === 'number')
     ) {
-      inputTokens += (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0);
-      outputTokens += usage.output_tokens ?? 0;
-      turns += 1;
-      if (typeof msg.model === 'string' && msg.model) model = msg.model;
+      const record = { usage, model: typeof msg.model === 'string' ? msg.model : '' };
+      if (typeof msg.id === 'string' && msg.id) {
+        byMessage.delete(msg.id); // re-insert so iteration order tracks the last record
+        byMessage.set(msg.id, record);
+      } else {
+        anonymous.push(record);
+      }
     }
   }
-  if (turns === 0) return null;
-  return { model: model || 'unknown', inputTokens, outputTokens, turns };
+  const records = [...anonymous, ...byMessage.values()];
+  if (records.length === 0) return null;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let cacheReadTokens = 0;
+  let cacheCreationTokens = 0;
+  let model = '';
+  for (const { usage, model: m } of records) {
+    const cacheCreation = usageCount(usage.cache_creation_input_tokens);
+    inputTokens += usageCount(usage.input_tokens) + cacheCreation;
+    outputTokens += usageCount(usage.output_tokens);
+    cacheReadTokens += usageCount(usage.cache_read_input_tokens);
+    cacheCreationTokens += cacheCreation;
+    if (m) model = m;
+  }
+  return {
+    model: model || 'unknown',
+    inputTokens,
+    outputTokens,
+    turns: records.length,
+    cacheReadTokens,
+    cacheCreationTokens,
+  };
 }
 
 /**
@@ -449,6 +573,10 @@ export function recordCliUsage(summary: CliUsageSummary | null, sessionId?: unkn
       agent: SESSION_HOOK_METRICS_COMPONENT,
       turns: summary.turns,
       usage: { prompt_tokens: summary.inputTokens, completion_tokens: summary.outputTokens },
+      // Top-level, not inside `usage`: prompt_tokens already includes cache
+      // creation, and metrics prices usage.cache_* separately (double count).
+      cache_read_tokens: summary.cacheReadTokens ?? 0,
+      cache_creation_tokens: summary.cacheCreationTokens ?? 0,
       ...(stamp ? { [SESSION_HOOK_PROVENANCE_KEY]: stamp } : {}),
     });
     return true;
@@ -504,6 +632,7 @@ export function recordPostToolUse(input: PostToolUseInput): {
       cwd: input.cwd,
     }),
   });
+  recordSessionToolEventForNudge(resolveHookHostProvider(), input.session_id);
   return { recorded: true, entryId: entry.id };
 }
 

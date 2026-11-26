@@ -30,6 +30,7 @@ import { killSwitch } from '@agent/core/governance/kill-switch';
 import { buildHandoffPacket } from '@agent/core/mesh/handoff-packet';
 import type { ArtifactReviewFinding } from '@agent/core/workforce/artifact-review';
 import type * as MissionTriageCommands from './refactor/mission-triage-commands.js';
+import type * as MissionPublishCommands from './refactor/mission-publish-commands.js';
 import type * as MissionMemoryCommands from './refactor/mission-memory-commands.js';
 import type * as MissionOrganizationCommands from './refactor/mission-organization-commands.js';
 import type * as MissionProcessPlanning from '@agent/core/mission/mission-process-planning';
@@ -1312,6 +1313,10 @@ function triageCommands(): Promise<typeof MissionTriageCommands> {
   return import('./refactor/mission-triage-commands.js');
 }
 
+function publishCommands(): Promise<typeof MissionPublishCommands> {
+  return import('./refactor/mission-publish-commands.js');
+}
+
 function memoryCommands(): Promise<typeof MissionMemoryCommands> {
   return import('./refactor/mission-memory-commands.js');
 }
@@ -1414,6 +1419,10 @@ async function mainImpl(
       id: string,
       options?: Parameters<typeof MissionTriageCommands.runMissionTriage>[1]
     ) => (await triageCommands()).runMissionTriage(id, options, printOutput),
+    publishMissionArtifact: async (
+      id: string,
+      options: Parameters<typeof MissionPublishCommands.runPublishArtifact>[1]
+    ) => (await publishCommands()).runPublishArtifact(id, options, printOutput),
     createCheckpoint,
     delegateMission,
     importMission,

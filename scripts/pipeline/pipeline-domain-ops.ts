@@ -15,6 +15,7 @@ import { runAiAudit } from '../run_ai_audit.js';
 import { main as runFirstWinLifecycle } from '../onboarding/first_win_lifecycle_smoke.js';
 import { runDependencyVulnerabilityScanOnce } from '../scan/scan_dependency_vulns.js';
 import { runHealthDegradationWatch } from '../health_degradation_watch.js';
+import { runUsageWeeklyReportOnce } from '../report/report_usage_weekly.js';
 import {
   runMeetingReadinessCheck,
   type MeetingReadinessStage,
@@ -346,7 +347,39 @@ export async function runInlineDependencyVulnerabilityScan(
   ctx: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   const report = await runDependencyVulnerabilityScanOnce();
+  // A zero-package scan is not a clean scan; it hid a parser bug for months.
+  if (report.scan_status === 'zero_packages' && report.diagnostic) logger.warn(report.diagnostic);
   return exportValue(params, step, report, ctx);
+}
+
+/**
+ * Weekly usage report over the audit chain (scripts/report/report_usage_weekly.ts).
+ * `week` (Monday, JST) is optional — default is the previous full week.
+ */
+export function runInlineUsageWeeklyReport(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Record<string, unknown> {
+  const week = String(resolveVars(params.week ?? '', ctx) ?? '').trim() || undefined;
+  const result = runUsageWeeklyReportOnce({ week });
+  return exportValue(
+    params,
+    step,
+    {
+      week: result.report.window.week,
+      markdown_path: result.markdown_path,
+      json_path: result.json_path,
+      total_events: result.report.current.total_events,
+      prompts: result.report.current.prompts,
+      sessions: result.report.current.sessions.count,
+      long_sessions: result.report.current.sessions.long_sessions,
+      trigger_failed: result.report.current.trigger.failed,
+      host_suspended: result.report.current.trigger.host_suspended,
+      improvement_candidates: result.report.improvement_candidates.length,
+    },
+    ctx
+  );
 }
 
 export function runInlineHealthDegradationWatch(

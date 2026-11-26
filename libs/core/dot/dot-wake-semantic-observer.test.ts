@@ -256,6 +256,10 @@ beforeAll(async () => {
     path.join(sourceRoot, 'knowledge/product/governance/agent-policies.yaml'),
     path.join(root, 'knowledge/product/governance/agent-policies.yaml')
   );
+  copy(
+    path.join(sourceRoot, 'knowledge/product/governance/reasoning-route-policy.json'),
+    path.join(root, 'knowledge/product/governance/reasoning-route-policy.json')
+  );
   io.safeWriteFile(path.join(root, 'package.json'), '{}');
   vi.stubEnv('KYBERION_ROOT', root);
   vi.stubEnv('MISSION_ROLE', 'mission_controller');

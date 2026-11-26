@@ -15,6 +15,21 @@ import {
 } from '../organization/organization-operating-model.js';
 import { resolveScopeResolution } from '../scope-context.js';
 import { sendOpsAlert } from '../daemon/ops-alert.js';
+import { NHI_IDENTITY_ENV } from '../organization/nhi-session-admission.js';
+
+/**
+ * One configuration alert per day while personal-tier signals have no owner:
+ * the gap is a property of the process (no claimed NHI), not of each signal,
+ * so a per-learning-id alert only repeated the same finding several times a day.
+ */
+const PERSONAL_OWNER_MISSING_ALERT_INTERVAL_MS = 24 * 60 * 60 * 1000;
+/** Process-local guard so a long-lived daemon does not even append suppressed rows. */
+let personalOwnerMissingAlertedAt: number | undefined;
+
+/** Test seam: forget the process-local alert guard. */
+export function resetOperationalLearningAlertStateForTests(): void {
+  personalOwnerMissingAlertedAt = undefined;
+}
 
 export interface OperationalLearningSignal {
   signalId: string;
@@ -54,8 +69,46 @@ interface LearningScope {
   tier: OrganizationTier;
   tenantSlug?: string;
   organizationId: string;
-  /** The producer's resolved NHI — the owner for personal-tier candidates. */
+  /** Personal tier only: the owner the candidate is captured for (never inferred). */
   ownerNhi?: string;
+}
+
+/**
+ * A personal-tier learning needs an explicit owner (D8). The owner is the NHI
+ * the producer resolved for the signal (`KYBERION_NHI_ID`, or the claimed NHI
+ * via scope resolution) and is never invented. Without one the signal is
+ * skipped and the gap surfaces as a single daily configuration alert instead
+ * of a dropped-candidate alert per signal.
+ */
+function resolvePersonalOwner(signalId: string, producerNhi: string | undefined): string | null {
+  const owner = producerNhi?.trim() || undefined;
+  if (owner) return owner;
+  logger.debug(
+    `[operational-learning] skipped ${signalId}: personal tier has no owner (${NHI_IDENTITY_ENV} unset)`
+  );
+  const now = Date.now();
+  if (
+    personalOwnerMissingAlertedAt !== undefined &&
+    now - personalOwnerMissingAlertedAt < PERSONAL_OWNER_MISSING_ALERT_INTERVAL_MS
+  )
+    return null;
+  personalOwnerMissingAlertedAt = now;
+  try {
+    sendOpsAlert(
+      {
+        severity: 'warning',
+        title: 'Operational learning paused: personal tier has no owner',
+        context: { tier: 'personal', missing: NHI_IDENTITY_ENV },
+        recommendation: `Operational learning signals for the personal organization are skipped because this process claims no owner NHI. Set ${NHI_IDENTITY_ENV} to the installation owner's NHI in the daemon's service environment (an identity decision for the owner), then restart the daemon; until then no personal candidates are queued.`,
+        dedupe_key: 'operational-learning:personal-owner-missing',
+        category: 'learning',
+      },
+      { minIntervalMs: PERSONAL_OWNER_MISSING_ALERT_INTERVAL_MS }
+    );
+  } catch {
+    // observability only
+  }
+  return null;
 }
 
 /**
@@ -107,20 +160,24 @@ function resolveLearningScope(
     );
     return null;
   }
-  // Personal-tier candidates are partitioned by owner_nhi; the producer's
-  // resolved nhi_id is the honest owner — never invent or default one. A
-  // producer that runs with no nhi_id of its own (a standalone harvest) may
-  // name the owner it verified against the installed runtime.
-  const ownerNhi =
-    tier === 'personal'
-      ? resolvedScope.nhi_id?.trim() || options.ownerNhi?.trim() || undefined
-      : undefined;
-  return {
-    tier,
-    ...(tenantSlug ? { tenantSlug } : {}),
-    ...(ownerNhi ? { ownerNhi } : {}),
-    organizationId: activeOrganizationId,
-  };
+  if (tier === 'personal') {
+    // Personal-tier candidates are partitioned by owner_nhi; the producer's
+    // resolved nhi_id is the honest owner — never invent or default one. A
+    // producer that runs with no nhi_id of its own (a standalone harvest) may
+    // name the owner it verified against the installed runtime.
+    const ownerNhi = resolvePersonalOwner(
+      signal.signalId,
+      resolvedScope.nhi_id?.trim() || options.ownerNhi?.trim() || undefined
+    );
+    if (!ownerNhi) return null;
+    return {
+      tier,
+      ...(tenantSlug ? { tenantSlug } : {}),
+      organizationId: activeOrganizationId,
+      ownerNhi,
+    };
+  }
+  return { tier, ...(tenantSlug ? { tenantSlug } : {}), organizationId: activeOrganizationId };
 }
 
 function candidateInput(

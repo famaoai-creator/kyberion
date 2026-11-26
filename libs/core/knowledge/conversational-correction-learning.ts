@@ -9,7 +9,9 @@
  */
 
 import { segmentKeywordTerms } from '../foundation/locale-normalize.js';
+import { scrubContent } from '../governance/pii-scrubber.js';
 import { matchesIntentPhrase } from '../intent/intent-phrase-lexicon.js';
+import { redactSensitiveString } from '../network.js';
 import {
   materializeExecutionFeedbackCandidate,
   recordExecutionFeedback,
@@ -43,10 +45,12 @@ export interface CaptureConversationalCorrectionInput {
 
 export interface CaptureConversationalCorrectionResult {
   captured: boolean;
-  reason: 'captured' | 'not_correction' | 'scope_required';
+  reason: 'captured' | 'not_correction' | 'scope_required' | 'sensitive_content_blocked';
   detection: ConversationalCorrectionDetection;
   feedback?: ExecutionFeedbackRecord;
   candidate?: ExecutionFeedbackCandidate | null;
+  blockedReasons?: string[];
+  redactedRules?: string[];
 }
 
 const MIN_CORRECTION_CHARS = 6;
@@ -136,6 +140,33 @@ export function captureConversationalCorrectionLearning(
     return { captured: false, reason: 'scope_required', detection };
   }
   const canonicalScope = assertMemoryScope(input.scope);
+  const secretRedacted = redactSensitiveString(detection.normalizedRule);
+  if (secretRedacted.includes('[REDACTED_SECRET]')) {
+    return {
+      captured: false,
+      reason: 'sensitive_content_blocked',
+      detection: { ...detection, normalizedRule: undefined },
+      blockedReasons: ['secret'],
+    };
+  }
+  const scrubbed = scrubContent(secretRedacted);
+  if (scrubbed.blocked) {
+    return {
+      captured: false,
+      reason: 'sensitive_content_blocked',
+      detection: { ...detection, normalizedRule: undefined },
+      blockedReasons: scrubbed.block_reasons,
+    };
+  }
+  const safeRule = scrubbed.scrubbed_text.trim();
+  if (safeRule.length < MIN_CORRECTION_CHARS) {
+    return {
+      captured: false,
+      reason: 'sensitive_content_blocked',
+      detection: { ...detection, normalizedRule: undefined },
+      blockedReasons: ['empty_after_redaction'],
+    };
+  }
   const category = detection.category ?? 'general';
   const scenarioId = input.scenarioId ?? `use-case-conversational-${category}`;
   const intentId = input.intentId ?? `conversational-correction:${category}`;
@@ -149,7 +180,7 @@ export function captureConversationalCorrectionLearning(
     ...(input.correlationId ? { correlation_id: input.correlationId } : {}),
     ...(input.surface ? { surface: input.surface } : {}),
     outcome: 'partially_satisfied',
-    correction: detection.normalizedRule,
+    correction: safeRule,
     source: 'user',
     scope: canonicalScope,
   });
@@ -163,8 +194,11 @@ export function captureConversationalCorrectionLearning(
   return {
     captured: true,
     reason: 'captured',
-    detection,
+    detection: { ...detection, normalizedRule: safeRule },
     feedback,
     candidate,
+    ...(scrubbed.applied.length > 0
+      ? { redactedRules: scrubbed.applied.map((entry) => entry.rule_id) }
+      : {}),
   };
 }

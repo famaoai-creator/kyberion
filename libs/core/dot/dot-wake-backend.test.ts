@@ -13,6 +13,7 @@ import { ShellClaudeCliBackend } from '../shell/shell-claude-cli-backend.js';
 import type { DotCharter } from './dot-charter.js';
 import {
   dotBackendIsUnconfiguredStub,
+  dotReasoningRole,
   isDotToolBackendUnavailableError,
   resolveDotWakeBackend,
   runDelegatedWake,
@@ -131,14 +132,37 @@ describe('isDotToolBackendUnavailableError', () => {
 });
 
 describe('runDelegatedWake', () => {
-  it("routes the delegated turn on the charter's authority role", async () => {
+  it('routes on default when the authority role is not a reasoning role', async () => {
     const delegateTask = vi.fn(async () => 'done');
     // Unnamed port: an explicit test seam, so no provider permission profile applies.
     await expect(runDelegatedWake(CHARTER, { delegateTask }, 'wake', 1_000)).resolves.toBe('done');
     expect(delegateTask).toHaveBeenCalledWith(
       'wake',
       undefined,
-      expect.objectContaining({ role: 'infrastructure_sentinel', advisory: true })
+      expect.objectContaining({ role: 'default', advisory: true })
     );
+  });
+
+  it('routes an organization operator dot on default instead of an unknown reasoning role', async () => {
+    const delegateTask = vi.fn(async () => 'done');
+    const charter = {
+      ...CHARTER,
+      authority: { ...CHARTER.authority, authority_role: 'organization_operator' },
+    } as DotCharter;
+    expect(dotReasoningRole(charter)).toBe('default');
+    await runDelegatedWake(charter, { delegateTask }, 'wake', 1_000);
+    expect(delegateTask).toHaveBeenCalledWith(
+      'wake',
+      undefined,
+      expect.objectContaining({ role: 'default' })
+    );
+  });
+
+  it('keeps an authority role that the route policy defines as a reasoning role', () => {
+    const charter = {
+      ...CHARTER,
+      authority: { ...CHARTER.authority, authority_role: 'researcher' },
+    } as DotCharter;
+    expect(dotReasoningRole(charter)).toBe('researcher');
   });
 });

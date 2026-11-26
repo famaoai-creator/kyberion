@@ -40,18 +40,23 @@ function sample(overrides: Partial<RuntimeHealthSample>): RuntimeHealthSample {
   };
 }
 
+/** A leaking sample: the post-GC heap grows with RSS. */
+function leak(rss_mb: number): RuntimeHealthSample {
+  return sample({ rss_mb, heap_used_mb: rss_mb * 0.6 });
+}
+
 describe('runtime health trends (OP-04)', () => {
+  it('needs the heap floor to rise too: RSS growth with a flat heap is not reported', () => {
+    expect(
+      evaluateRuntimeHealthTrends([sample({ rss_mb: 100 }), sample({ rss_mb: 300 })], THRESHOLDS)
+    ).toEqual([]);
+  });
+
   it('flags RSS growth beyond the warning and red ratios', () => {
-    const warning = evaluateRuntimeHealthTrends(
-      [sample({ rss_mb: 100 }), sample({ rss_mb: 160 })],
-      THRESHOLDS
-    );
+    const warning = evaluateRuntimeHealthTrends([leak(200), leak(320)], THRESHOLDS);
     expect(warning).toEqual([expect.objectContaining({ kind: 'rss_growth', severity: 'warning' })]);
 
-    const critical = evaluateRuntimeHealthTrends(
-      [sample({ rss_mb: 100 }), sample({ rss_mb: 300 })],
-      THRESHOLDS
-    );
+    const critical = evaluateRuntimeHealthTrends([leak(100), leak(300)], THRESHOLDS);
     expect(critical[0].severity).toBe('critical');
   });
 
@@ -69,11 +74,62 @@ describe('runtime health trends (OP-04)', () => {
   });
 
   it('still flags sustained growth across the window', () => {
-    const samples = [100, 110, 105, 120, 180, 220, 260, 300, 320].map((rss_mb) =>
-      sample({ rss_mb })
-    );
+    const samples = [100, 110, 105, 120, 180, 220, 260, 300, 320].map(leak);
     expect(evaluateRuntimeHealthTrends(samples, THRESHOLDS)).toEqual([
       expect.objectContaining({ kind: 'rss_growth', severity: 'critical' }),
+    ]);
+  });
+
+  it('ignores spikes and a GC saw-tooth whose floor stays flat (chronos 2026-11-20)', () => {
+    // [rss_mb, heap_used_mb] hourly: heavy in-process jobs spike RSS up to 1GB,
+    // heap returns to ~100MB after each GC — no leak.
+    const rows: Array<[number, number]> = [
+      [277.8, 142],
+      [197.5, 89.2],
+      [258, 296.1],
+      [250.8, 280.7],
+      [383.6, 298.9],
+      [258.9, 325.7],
+      [370.8, 157.3],
+      [255.2, 148.2],
+      [1004.3, 146.2],
+      [316.7, 95],
+      [270.8, 277.7],
+      [319.8, 192.4],
+      [482.5, 364.8],
+      [308.9, 111.3],
+      [300.2, 287.3],
+      [132, 108.5],
+      [505.3, 142.2],
+    ];
+    const samples = rows.map(([rss_mb, heap_used_mb]) => sample({ rss_mb, heap_used_mb }));
+    expect(evaluateRuntimeHealthTrends(samples, THRESHOLDS)).toEqual([]);
+  });
+
+  it('flags a JS heap leak whose post-GC floor keeps rising', () => {
+    const rows: Array<[number, number]> = [
+      [150, 60],
+      [190, 90],
+      [160, 65],
+      [200, 95],
+      [170, 70],
+      [210, 100],
+      [260, 140],
+      [300, 180],
+      [270, 150],
+      [320, 200],
+      [290, 170],
+      [340, 220],
+      [360, 230],
+      [420, 280],
+      [380, 250],
+      [440, 300],
+      [400, 260],
+      [460, 320],
+    ];
+    const samples = rows.map(([rss_mb, heap_used_mb]) => sample({ rss_mb, heap_used_mb }));
+    expect(evaluateRuntimeHealthTrends(samples, THRESHOLDS)).toEqual([
+      expect.objectContaining({ kind: 'rss_growth', severity: 'warning' }),
     ]);
   });
 
@@ -101,7 +157,7 @@ describe('runtime health trends (OP-04)', () => {
     const report = evaluateDegradation({
       regressions: [],
       demotedProviders: [],
-      runtimeSamples: [sample({ rss_mb: 100 }), sample({ rss_mb: 180 })],
+      runtimeSamples: [leak(200), leak(360)],
     });
     expect(report.verdict).toBe('yellow');
     expect(report.findings[0].kind).toBe('rss_growth');

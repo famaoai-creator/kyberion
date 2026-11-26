@@ -57,6 +57,8 @@ const TENANT_BOUND_MISSION_VERBS = new Set([
   'status',
   'record-evidence',
   'review-task',
+  'publish-artifact',
+  'reassign-project',
   'verify',
   'distill',
   'finish',

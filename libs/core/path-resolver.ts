@@ -316,6 +316,10 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/service-receipts/',
   // R5 delegation idempotency reservations (delegation-idempotency.ts).
   'shared/runtime/delegation-idempotency/',
+  // Active delegation-child registry (mission/delegation-child-registry.ts):
+  // register/unregister during a spawned-CLI test must not touch the
+  // operator's live registry.
+  'shared/runtime/delegation-children.json',
   'shared/logs/traces/',
   'shared/coordination/orchestration/',
   'shared/coordination/agent-runtime/',
@@ -359,6 +363,8 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/oauth/',
   'shared/runtime/voice-loopback-receipts/',
   'shared/runtime/background-review/nudge/',
+  // Per-session prompt/tool counters for the long-session hook nudge (provider/session-length-nudge.ts).
+  'shared/runtime/session-length/',
   'shared/runtime/mesh-hub/',
   'shared/observability/mesh-hub/',
   // Durable hearing session/receipt state is always isolated during tests.

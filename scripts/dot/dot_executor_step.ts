@@ -41,6 +41,7 @@ import {
   DotExecutorPreEffectError,
   DotExecutorStaleAttemptError,
   isDotExecutorPreEffectError,
+  isDotExecutorStaleAttemptError,
   DOT_EXECUTOR_TASK_SESSION_GUIDANCE,
   runDotExecutorSweep,
   type DotExecutorDeps,
@@ -396,6 +397,16 @@ export function buildDotExecutorPorts(
             assertCurrent: () => {
               context.assertCurrent();
               if (!deps.claim) assertWorkClaimsAllowed(context.item.item_id);
+              const latestCharter = findDotCharter(charter.dot_id, deps.rootDir)?.charter;
+              if (
+                latestCharter &&
+                (latestCharter.status !== 'active' ||
+                  !latestCharter.authority.allowed_execution_shapes?.includes('task_session'))
+              ) {
+                throw new DotExecutorStaleAttemptError(
+                  `dot charter ${charter.dot_id} is no longer active for task_session`
+                );
+              }
             },
             ...(deps.taskToolDeps ?? {}),
           })
@@ -418,7 +429,7 @@ export function buildDotExecutorPorts(
       try {
         result = await drive(driverOptions);
       } catch (error) {
-        if (observed.called()) throw error;
+        if (observed.called() || isDotExecutorStaleAttemptError(error)) throw error;
         throw new DotExecutorPreEffectError(
           `goal driver failed before its first model call: ${error instanceof Error ? error.message : String(error)}`
         );

@@ -26,9 +26,27 @@ type AuditVulnEntry = {
   fixAvailable?: boolean | { name?: string; version?: string };
 };
 
+/**
+ * `pnpm audit --json` emits the npm v6 report shape: advisories keyed by
+ * advisory id, each naming its `module_name`. (npm 7+ emits the
+ * `vulnerabilities` map keyed by package name instead.) Both are accepted.
+ */
+type AuditAdvisory = {
+  module_name?: string;
+  severity?: string;
+  vulnerable_versions?: string;
+  patched_versions?: string;
+  findings?: Array<{ version?: string; paths?: string[] }>;
+};
+
 type AuditJson = {
   vulnerabilities?: Record<string, AuditVulnEntry>;
-  metadata?: { vulnerabilities?: Record<string, number> };
+  advisories?: Record<string, AuditAdvisory>;
+  metadata?: {
+    vulnerabilities?: Record<string, number>;
+    totalDependencies?: number;
+    dependencies?: number | { total?: number };
+  };
 };
 
 type OutdatedJson = Record<
@@ -53,8 +71,24 @@ export interface DependencyVulnerabilityFinding {
   reevaluate_when: string;
 }
 
+/**
+ * `ok` — the audit reported a non-zero dependency count, so an empty
+ * findings list means "clean". `zero_packages` — nothing was scanned (audit
+ * failed, produced no JSON, or ran outside the workspace); an empty findings
+ * list then means nothing, and `diagnostic` says why.
+ */
+export type DependencyVulnerabilityScanStatus = 'ok' | 'zero_packages';
+
+export interface AuditCommandOutcome {
+  status: number | null;
+  stderr?: string;
+  error?: string;
+}
+
 export interface DependencyVulnerabilityScanResult {
   timestamp: string;
+  scan_status: DependencyVulnerabilityScanStatus;
+  diagnostic?: string;
   scanned_packages: number;
   findings: DependencyVulnerabilityFinding[];
   reevaluations: DeferReevaluation[];
@@ -230,6 +264,77 @@ function parseAuditJson(raw: string): AuditJson {
   return readJsonObject(raw, 'pnpm audit json') as AuditJson;
 }
 
+function severityRank(severity: string): number {
+  return severityToScore(normalizeSeverity(severity));
+}
+
+/**
+ * Normalize either audit shape into one entry per vulnerable package. pnpm's
+ * advisory shape is folded by `module_name` (highest severity wins; finding
+ * paths become `nodes` so reachability inference sees them).
+ */
+export function collectAuditVulnerabilities(audit: AuditJson): Record<string, AuditVulnEntry> {
+  const merged: Record<string, AuditVulnEntry> = {};
+  if (isRecord(audit.vulnerabilities)) {
+    for (const [name, entry] of Object.entries(audit.vulnerabilities)) {
+      if (isRecord(entry)) merged[name] = entry;
+    }
+  }
+  if (isRecord(audit.advisories)) {
+    for (const advisory of Object.values(audit.advisories)) {
+      if (!isRecord(advisory) || !nonEmptyString(advisory.module_name)) continue;
+      const name = advisory.module_name;
+      const paths = Array.isArray(advisory.findings)
+        ? advisory.findings.flatMap((f) =>
+            isRecord(f) && Array.isArray(f.paths) ? f.paths.filter(nonEmptyString) : []
+          )
+        : [];
+      const existing = merged[name];
+      const severity =
+        existing &&
+        severityRank(String(existing.severity)) >= severityRank(String(advisory.severity))
+          ? existing.severity
+          : advisory.severity;
+      merged[name] = {
+        name,
+        severity,
+        range: advisory.vulnerable_versions ?? existing?.range,
+        nodes: [...new Set([...(existing?.nodes || []), ...paths])],
+      };
+    }
+  }
+  return merged;
+}
+
+/** Dependency count the audit actually examined (pnpm/npm6 and npm7+ shapes). */
+export function countAuditedDependencies(audit: AuditJson, vulnerablePackages: number): number {
+  const meta = isRecord(audit.metadata) ? audit.metadata : {};
+  if (typeof meta.totalDependencies === 'number' && meta.totalDependencies >= 0) {
+    return Math.floor(meta.totalDependencies);
+  }
+  const deps = meta.dependencies;
+  if (isRecord(deps) && typeof deps.total === 'number' && deps.total >= 0) {
+    return Math.floor(deps.total);
+  }
+  return vulnerablePackages;
+}
+
+function describeZeroPackageScan(outcome?: AuditCommandOutcome): string {
+  const evidence = outcome
+    ? `pnpm audit exit=${outcome.status ?? 'null'}` +
+      (outcome.error ? ` error=${outcome.error}` : '') +
+      (outcome.stderr
+        ? ` stderr=${outcome.stderr.trim().split('\n').slice(0, 3).join(' / ').slice(0, 300)}`
+        : '')
+    : 'audit JSON supplied by caller';
+  return (
+    '[vuln-scan] dependency audit scanned 0 packages — the audit produced no dependency count, ' +
+    'so an empty findings list does NOT mean the workspace is clean | ' +
+    'next: run `pnpm audit --json` from the repo root and check the registry/network reachability ' +
+    `and the audit JSON shape | evidence: ${evidence}`
+  );
+}
+
 interface PreviousLedgerState {
   /** Latest scan finding per package (most recent scan snapshot wins). */
   findings: Map<string, DependencyVulnerabilityFinding>;
@@ -364,15 +469,17 @@ export function scanDependencyVulnerabilitiesFromInputs(input: {
   outdatedJson: string;
   workspaceRoot?: string;
   ledgerPath?: string;
+  auditOutcome?: AuditCommandOutcome;
 }): DependencyVulnerabilityScanResult {
   const audit = parseAuditJson(input.auditJson);
+  const vulnerabilities = collectAuditVulnerabilities(audit);
   const outdated = parseOutdatedJson(input.outdatedJson);
   const workspaceDeps = collectWorkspaceDependencyNames(
     input.workspaceRoot || pathResolver.rootDir()
   );
   const findings: DependencyVulnerabilityFinding[] = [];
 
-  for (const [packageName, vuln] of Object.entries(audit.vulnerabilities || {})) {
+  for (const [packageName, vuln] of Object.entries(vulnerabilities)) {
     const severity = normalizeSeverity(vuln.severity);
     const reachability = inferReachability(packageName, workspaceDeps, vuln);
     const latestVersion = outdated[packageName]?.latest;
@@ -412,9 +519,12 @@ export function scanDependencyVulnerabilitiesFromInputs(input: {
   const previousState = readPreviousLedgerState(ledgerPath);
   const reevaluations = computeDeferReevaluations(previousState, findings);
 
+  const scannedPackages = countAuditedDependencies(audit, Object.keys(vulnerabilities).length);
   const result: DependencyVulnerabilityScanResult = {
     timestamp: nowIso(),
-    scanned_packages: Object.keys(audit.vulnerabilities || {}).length,
+    scan_status: scannedPackages > 0 ? 'ok' : 'zero_packages',
+    ...(scannedPackages > 0 ? {} : { diagnostic: describeZeroPackageScan(input.auditOutcome) }),
+    scanned_packages: scannedPackages,
     findings,
     reevaluations,
     unresolved_summary: summarizeUnresolved(findings, previousState),
@@ -427,12 +537,20 @@ export function scanDependencyVulnerabilitiesFromInputs(input: {
 }
 
 export async function runDependencyVulnerabilityScanOnce(): Promise<DependencyVulnerabilityScanResult> {
-  const audit = safeExecResult('pnpm', ['audit', '--json'], { maxOutputMB: 20 });
-  const outdated = safeExecResult('pnpm', ['outdated', '--json'], { maxOutputMB: 20 });
+  // Pin cwd to the workspace root: the daemon's cwd is not guaranteed to be
+  // the repo, and `pnpm audit` outside it audits nothing.
+  const execOptions = { cwd: pathResolver.rootDir(), maxOutputMB: 20, timeoutMs: 120_000 };
+  const audit = safeExecResult('pnpm', ['audit', '--json'], execOptions);
+  const outdated = safeExecResult('pnpm', ['outdated', '--json'], execOptions);
 
   return scanDependencyVulnerabilitiesFromInputs({
     auditJson: audit.stdout || '{}',
     outdatedJson: outdated.stdout || '{}',
+    auditOutcome: {
+      status: audit.status,
+      stderr: audit.stderr,
+      ...(audit.error ? { error: audit.error.message } : {}),
+    },
   });
 }
 
@@ -440,6 +558,7 @@ export function formatDependencyVulnerabilityScanSummary(
   result: DependencyVulnerabilityScanResult
 ): string {
   const lines = [
+    ...(result.scan_status === 'zero_packages' && result.diagnostic ? [result.diagnostic] : []),
     `[vuln-scan] scanned ${result.scanned_packages} package(s), findings=${result.findings.length}`,
     `[vuln-scan] unresolved: ${result.unresolved_summary.open} open, ` +
       `${result.unresolved_summary.deferred} deferred, ` +

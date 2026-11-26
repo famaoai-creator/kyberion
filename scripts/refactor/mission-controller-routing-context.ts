@@ -107,6 +107,16 @@ export interface MissionControllerRoutingContext {
       requestedBy?: string;
     }
   ) => Awaitable<unknown>;
+  publishMissionArtifact: (
+    id: string,
+    options: {
+      path?: string;
+      artifactClass?: string;
+      name?: string;
+      kind?: string;
+      json?: boolean;
+    }
+  ) => Awaitable<unknown>;
   delegateMission: (id: string, agentId: string, a2aMessageId: string) => Awaitable<void>;
   importMission: (id: string, remoteUrl: string) => Awaitable<void>;
   verifyMission: (

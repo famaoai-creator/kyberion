@@ -4,6 +4,7 @@ import { pathResolver, safeMkdir, safeReadFile } from '@agent/core';
 import { safeWriteFile } from '@agent/core';
 import {
   computeDeferReevaluations,
+  formatDependencyVulnerabilityScanSummary,
   readPreviousLedgerState,
   scanDependencyVulnerabilitiesFromInputs,
   type DependencyVulnerabilityFinding,
@@ -115,6 +116,88 @@ describe('scan_dependency_vulns', () => {
 
     expect(result.scanned_packages).toBe(0);
     expect(result.findings).toEqual([]);
+    expect(result.scan_status).toBe('zero_packages');
+  });
+
+  // Shape captured from `pnpm audit --json` (pnpm 11, lockfile v9): npm v6
+  // advisories keyed by id, not the npm 7+ `vulnerabilities` map.
+  it('reads findings and the dependency count from the pnpm advisories shape', () => {
+    const dir = pathResolver.sharedTmp(`vuln-ledger-tests/pnpm-shape-${Date.now()}`);
+    safeMkdir(dir, { recursive: true });
+    const result = scanDependencyVulnerabilitiesFromInputs({
+      auditJson: JSON.stringify({
+        advisories: {
+          '1100001': {
+            module_name: 'lodash',
+            severity: 'moderate',
+            vulnerable_versions: '<4.17.21',
+            patched_versions: '>=4.17.21',
+            findings: [{ version: '4.17.20', paths: ['. > some-lib > lodash'] }],
+          },
+          '1100002': {
+            module_name: 'lodash',
+            severity: 'high',
+            vulnerable_versions: '<4.17.21',
+            findings: [{ version: '4.17.20', paths: ['. > other > lodash'] }],
+          },
+        },
+        metadata: {
+          vulnerabilities: { info: 0, low: 0, moderate: 1, high: 1, critical: 0 },
+          dependencies: 709,
+          devDependencies: 366,
+          optionalDependencies: 175,
+          totalDependencies: 1169,
+        },
+      }),
+      outdatedJson: '{}',
+      workspaceRoot: path.join(dir, 'workspace'),
+      ledgerPath: path.join(dir, 'ledger.jsonl'),
+    });
+
+    expect(result.scan_status).toBe('ok');
+    expect(result.diagnostic).toBeUndefined();
+    expect(result.scanned_packages).toBe(1169);
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toMatchObject({ package_name: 'lodash', severity: 'high' });
+    expect(result.findings[0]?.reachability).toBe(1);
+  });
+
+  it('treats a clean pnpm audit as scanned, not as a zero-package scan', () => {
+    const dir = pathResolver.sharedTmp(`vuln-ledger-tests/pnpm-clean-${Date.now()}`);
+    safeMkdir(dir, { recursive: true });
+    const result = scanDependencyVulnerabilitiesFromInputs({
+      auditJson: JSON.stringify({
+        advisories: {},
+        metadata: { vulnerabilities: { high: 0 }, totalDependencies: 1169 },
+      }),
+      outdatedJson: '{}',
+      workspaceRoot: path.join(dir, 'workspace'),
+      ledgerPath: path.join(dir, 'ledger.jsonl'),
+    });
+    expect(result.scan_status).toBe('ok');
+    expect(result.scanned_packages).toBe(1169);
+    expect(result.findings).toEqual([]);
+  });
+
+  it('marks a scan that examined nothing and explains why in diagnostic format', () => {
+    const dir = pathResolver.sharedTmp(`vuln-ledger-tests/zero-${Date.now()}`);
+    safeMkdir(dir, { recursive: true });
+    const ledgerPath = path.join(dir, 'ledger.jsonl');
+    const result = scanDependencyVulnerabilitiesFromInputs({
+      auditJson: '{}',
+      outdatedJson: '{}',
+      workspaceRoot: path.join(dir, 'workspace'),
+      ledgerPath,
+      auditOutcome: { status: 1, stderr: 'ERR_PNPM_AUDIT_ENDPOINT_NOT_EXISTS\nmore' },
+    });
+
+    expect(result.scan_status).toBe('zero_packages');
+    expect(result.diagnostic).toMatch(
+      /^\[vuln-scan\] dependency audit scanned 0 packages — .+ \| next: .+ \| evidence: pnpm audit exit=1 .*ERR_PNPM_AUDIT_ENDPOINT_NOT_EXISTS/
+    );
+    expect(formatDependencyVulnerabilityScanSummary(result)).toContain(result.diagnostic);
+    const ledger = safeReadFile(ledgerPath, { encoding: 'utf8' }) as string;
+    expect(ledger).toContain('"scan_status":"zero_packages"');
   });
 });
 

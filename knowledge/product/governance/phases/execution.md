@@ -267,6 +267,16 @@ Other traps seen on this path:
   `$MC verify …`) is not word-split and silently does nothing — use an array or the full
   command.
 
+- **Delivery tasks (document / media missions) publish, they do not copy.** A provider CLI session
+  has no principal identity, so it cannot write a confidential project directory (`Persona
+'unknown' … NOT authorized`) and must not look for a way to. Keep the final file under
+  `evidence/`, run `pnpm mission publish-artifact <ID> --path evidence/<file>`, link the mission
+  to its project with `reassign-project` while it is paused (then `start`), and let `finish`
+  promote the published `report` / `export` artifact into the project. A task whose deliverable
+  file merely exists auto-completes — the published `artifact_id` is the evidence of delivery.
+  Procedure and failure modes:
+  [operations-hygiene-runbook](../operations-hygiene-runbook.md#provider-cli-deliveries-publish-through-the-mission-never-write-the-project-tree).
+
 ### When `finish` blocks: `mission triage` + approval-mediated close
 
 A mission that cannot reach `finish` is diagnosed — not poked at by hand — with:

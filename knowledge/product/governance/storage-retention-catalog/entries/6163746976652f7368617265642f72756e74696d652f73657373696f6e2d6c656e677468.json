@@ -1,0 +1,8 @@
+{
+  "path": "active/shared/runtime/session-length",
+  "artifact_class": "cache",
+  "ttl_days": 14,
+  "action": "delete",
+  "backup": "exclude",
+  "note": "Per-session prompt/tool-event counters for the long-session hook nudge (libs/core/provider/session-length-nudge.ts). One small JSON per host session; a lost file only delays the next handoff hint."
+}

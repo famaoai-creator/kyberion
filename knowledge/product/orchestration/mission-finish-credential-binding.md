@@ -69,6 +69,14 @@ binding は決して生成されない — フラグでも env でも代替で�
   `email status` (binding 不要の readiness) で状態を確認してから、
   実作業は claim 済み WorkItem 経由で委任する。
 
+## 更新 (2026-11-24)
+
+- `mission cancel` / `mission archive` も binding 不要の動詞として
+  `libs/core/foundation/command-credential-policy.ts` の `MISSION_ACTION_REQUIREMENTS` に
+  `'none'` で登録した(状態遷移とファイル移動のみでモデルを呼ばない)。登録漏れの間は
+  既定の `'required'` に落ち、テナント mission を終了・退避できなかった。新しい決定的な
+  lifecycle 動詞を足すときは、同じ表に分類を書くこと。
+
 ## 関連コード
 
 - `libs/core/foundation/credential-binding.ts` — `getSecret` の拒否条件と `withTaskCredentialBinding`

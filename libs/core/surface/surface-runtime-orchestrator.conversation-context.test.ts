@@ -284,5 +284,14 @@ describe('surface conversation context opt-in wiring', () => {
       workAuthority: 'ask_only',
     });
     expect(askOnlyResult.conversationalCorrectionCandidateId).toBeUndefined();
+
+    vi.clearAllMocks();
+    const secretResult = await runSurfaceMessageConversation({
+      ...baseInput,
+      locale: 'ja',
+      text: '今後は sk-1234567890abcdefghijklmnop を使わず簡潔に書いてください',
+    });
+    expect(secretResult.conversationalCorrectionCandidateId).toBeUndefined();
+    expect(mocks.recordExecutionFeedback).not.toHaveBeenCalled();
   });
 });
