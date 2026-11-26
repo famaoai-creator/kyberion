@@ -19,6 +19,7 @@
  * the targeted values, an ADF that no longer validates).
  */
 import * as path from 'node:path';
+import { KNOWLEDGE_TIERS } from '../foundation/knowledge-tier.js';
 import { isRecord } from '../foundation/primitives.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import * as pathResolver from '../path-resolver.js';
@@ -232,7 +233,7 @@ function movableProfileRoots(): [string, string] {
   const relative = (sub: string) => `${pathResolver.toRepoRelative(pathResolver.shared(sub))}/`;
   return [relative('tmp'), relative('runtime/browser')];
 }
-const TIER_SEGMENTS = new Set(['personal', 'confidential', 'public']);
+const TIER_SEGMENTS: ReadonlySet<string> = new Set(KNOWLEDGE_TIERS);
 /** Unpartitioned folders other runs use (the default export dir, floors); never moved wholesale. */
 const SHARED_LEGACY_SEGMENTS = new Set(['profiles', 'browser', 'system', 'shared']);
 
