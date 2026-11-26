@@ -151,4 +151,36 @@ describe('daemon-heartbeat', () => {
       'malformed'
     );
   });
+
+  it('applies per-daemon staleness overrides in listDaemonHeartbeatStatuses', () => {
+    safeRmSync(HEARTBEAT_TEST_ROOT, { recursive: true, force: true });
+    recordDaemonHeartbeat(
+      'chronos-daemon',
+      { pid: 101, status: 'running' },
+      { rootDir: HEARTBEAT_TEST_ROOT, now: new Date('2026-07-04T00:00:00.000Z') }
+    );
+    recordDaemonHeartbeat(
+      'dot-repo-guardian',
+      { pid: 102, status: 'running' },
+      { rootDir: HEARTBEAT_TEST_ROOT, now: new Date('2026-07-04T00:00:00.000Z') }
+    );
+
+    const overrides = new Map([['dot-repo-guardian', 4_500_000]]);
+    const atFifteenMin = listDaemonHeartbeatStatuses({
+      rootDir: HEARTBEAT_TEST_ROOT,
+      now: new Date('2026-07-04T00:15:00.000Z'),
+      staleAfterMs: 180_000,
+      staleAfterMsByDaemonId: overrides,
+    });
+    expect(atFifteenMin.find((s) => s.daemon_id === 'dot-repo-guardian')?.status).toBe('healthy');
+    expect(atFifteenMin.find((s) => s.daemon_id === 'chronos-daemon')?.status).toBe('stale');
+
+    const atNinetyMin = listDaemonHeartbeatStatuses({
+      rootDir: HEARTBEAT_TEST_ROOT,
+      now: new Date('2026-07-04T01:30:00.000Z'),
+      staleAfterMs: 180_000,
+      staleAfterMsByDaemonId: overrides,
+    });
+    expect(atNinetyMin.find((s) => s.daemon_id === 'dot-repo-guardian')?.status).toBe('stale');
+  });
 });

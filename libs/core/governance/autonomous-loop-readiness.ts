@@ -8,18 +8,27 @@
  */
 
 import { pathResolver } from '../path-resolver.js';
+import { withStoreGrant } from '../authority.js';
+import { isValidTenantSlug } from '../entity-scope.js';
 import {
   listDaemonHeartbeatStatuses,
+  repoHeartbeatDir,
   type DaemonHeartbeatStatus,
 } from '../daemon/daemon-heartbeat.js';
 import { listDotCharters } from '../dot/dot-charter.js';
-import { listActiveDotHeartbeatIds } from '../dot/dot-runtime.js';
+import {
+  listActiveDotHeartbeatIds,
+  listActiveDotHeartbeatSpecs,
+  type DotHeartbeatSpec,
+} from '../dot/dot-runtime.js';
 import { readDotWakeLedger, type DotWakeLedgerEntry } from '../dot/dot-wake-ledger.js';
 import {
   computeMemoryLoopHealth,
   formatMemoryLoopHealthDetail,
   type MemoryLoopHealth,
 } from '../knowledge/memory-loop-health.js';
+import { tenantProfileDir } from '../organization/tenant-registry.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '../secure-io.js';
 import {
   evaluateFactoryReadiness,
   type FactoryReadinessInput,
@@ -37,6 +46,8 @@ export interface AutonomousLoopReadinessInput extends FactoryReadinessInput {
   listHeartbeatStatuses?: () => DaemonHeartbeatStatus[];
   listDotChartersFn?: typeof listDotCharters;
   listActiveDotHeartbeatsFn?: typeof listActiveDotHeartbeatIds;
+  listActiveDotHeartbeatSpecsFn?: typeof listActiveDotHeartbeatSpecs;
+  listTenantsFn?: (options?: { rootDir?: string }) => string[];
   readWakeLedgerFn?: () => DotWakeLedgerEntry[];
   computeMemoryLoopFn?: typeof computeMemoryLoopHealth;
   evaluateFactoryFn?: typeof evaluateFactoryReadiness;
@@ -70,6 +81,22 @@ export interface AutonomousLoopReadinessReport {
 const DEFAULT_WAKE_WINDOW_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+function listRegisteredTenantSlugs(options: { rootDir?: string } = {}): string[] {
+  return withStoreGrant('workspace_tenant_registry_index_reader', () => {
+    const dir = tenantProfileDir(options);
+    const safeDir = assertSafeRepositoryPath(dir, {
+      allowMissingLeaf: true,
+      rootDir: options.rootDir,
+    });
+    if (!safeExistsSync(safeDir)) return [];
+    return safeReaddir(safeDir)
+      .filter((entry) => entry.endsWith('.json'))
+      .map((entry) => entry.slice(0, -'.json'.length))
+      .filter(isValidTenantSlug)
+      .sort();
+  });
+}
+
 /**
  * Evaluate the end-to-end health of Kyberion's unattended autonomous loop.
  */
@@ -81,22 +108,32 @@ export function evaluateAutonomousLoopReadiness(
   const windowDays = input.windowDays ?? DEFAULT_WAKE_WINDOW_DAYS;
   const cutoffMs = now.getTime() - windowDays * DAY_MS;
 
-  const expectedDotHeartbeats = (input.listActiveDotHeartbeatsFn ?? listActiveDotHeartbeatIds)(
-    rootDir
-  );
+  const dotSpecs: DotHeartbeatSpec[] = input.listActiveDotHeartbeatSpecsFn
+    ? input.listActiveDotHeartbeatSpecsFn(rootDir)
+    : input.listActiveDotHeartbeatsFn
+      ? input.listActiveDotHeartbeatsFn(rootDir).map((heartbeat_id) => ({ heartbeat_id }))
+      : listActiveDotHeartbeatSpecs(rootDir);
+  const dotStaleAfter = new Map<string, number>();
+  for (const spec of dotSpecs) {
+    if (spec.stale_after_ms !== undefined) {
+      dotStaleAfter.set(spec.heartbeat_id, spec.stale_after_ms);
+    }
+  }
   const statuses = (
     input.listHeartbeatStatuses ??
     (() =>
       listDaemonHeartbeatStatuses({
+        ...(input.rootDir ? { rootDir: repoHeartbeatDir(input.rootDir) } : {}),
         now,
         staleAfterMs: input.heartbeatStaleAfterMs,
+        staleAfterMsByDaemonId: dotStaleAfter,
       }))
   )();
   const statusById = new Map(statuses.map((entry) => [entry.daemon_id, entry]));
-  for (const id of expectedDotHeartbeats) {
-    if (!statusById.has(id)) {
-      statusById.set(id, {
-        daemon_id: id,
+  for (const spec of dotSpecs) {
+    if (!statusById.has(spec.heartbeat_id)) {
+      statusById.set(spec.heartbeat_id, {
+        daemon_id: spec.heartbeat_id,
         status: 'missing',
         reason: 'active dot heartbeat missing',
       });
@@ -129,11 +166,23 @@ export function evaluateAutonomousLoopReadiness(
     else if (row.outcome === 'rejected') recentRejected += 1;
   }
 
+  let memoryLoopTenants: string[];
+  if (input.tenant_slug) {
+    memoryLoopTenants = [input.tenant_slug];
+  } else {
+    try {
+      memoryLoopTenants = (input.listTenantsFn ?? listRegisteredTenantSlugs)(
+        input.rootDir ? { rootDir: input.rootDir } : {}
+      );
+    } catch {
+      memoryLoopTenants = [];
+    }
+  }
   const memoryLoop = (input.computeMemoryLoopFn ?? computeMemoryLoopHealth)({
     now,
     rootDir,
     windowDays,
-    tenants: input.tenant_slug ? [input.tenant_slug] : undefined,
+    tenants: memoryLoopTenants.length > 0 ? memoryLoopTenants : undefined,
   });
 
   const factory = input.tenant_slug
