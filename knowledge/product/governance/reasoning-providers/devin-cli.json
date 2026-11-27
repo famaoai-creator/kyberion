@@ -40,6 +40,7 @@
       "egress_provider_id": "devin",
       "model_env_keys": ["KYBERION_DEVIN_CLI_MODEL"],
       "cli": {
+        "account_probe": true,
         "binary": "devin",
         "version_args": ["--version"],
         "help_args": ["--help"],

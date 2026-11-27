@@ -217,6 +217,10 @@
                 "type": "array",
                 "items": { "type": "string", "pattern": "^/.*/$", "minLength": 3 }
               },
+              "account_probe": {
+                "description": "Selects this CLI mode for its provider's local account inspection.",
+                "type": "boolean"
+              },
               "session_principal": {
                 "description": "Name recorded as agent:<name> for a detected session; defaults to the mode.",
                 "type": "string",

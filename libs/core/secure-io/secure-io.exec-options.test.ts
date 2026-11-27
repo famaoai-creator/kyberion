@@ -1,3 +1,5 @@
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 import { describe, it, expect, vi } from 'vitest';
 
 // `node:child_process` is a native ESM namespace whose exports are
@@ -227,6 +229,40 @@ describe('safeExecResultAsync — stdin input', () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toBe('');
   });
+});
+
+describe('safeExecResultAsync forceKillOnAbort', () => {
+  it.each(['deadline', 'output cap'])(
+    'settles at the %s without waiting for pipe closure',
+    async (trigger) => {
+      vi.useFakeTimers();
+      const child = Object.assign(new EventEmitter(), {
+        kill: vi.fn(),
+        stdin: null,
+        stdout: new PassThrough(),
+        stderr: new PassThrough(),
+      });
+      childProcessSpies.spawn.mockReturnValueOnce(child);
+      try {
+        const pending = safeExecResultAsync('echo', [], {
+          timeoutMs: 100,
+          maxOutputMB: 0.000001,
+          forceKillOnAbort: true,
+        });
+        if (trigger === 'deadline') await vi.advanceTimersByTimeAsync(100);
+        else child.stdout.write(Buffer.from('too much output'));
+        const result = await pending;
+        expect(result.status).toBe(1);
+        expect(result.error?.message).toMatch(
+          trigger === 'deadline' ? /timed out/ : /output exceeded/
+        );
+        expect(child.kill).toHaveBeenCalledExactlyOnceWith('SIGKILL');
+        expect(child.stdout.destroyed && child.stderr.destroyed).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
 });
 
 describe('safeSpawn process groups', () => {

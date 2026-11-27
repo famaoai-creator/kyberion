@@ -22,6 +22,7 @@
  *
  * The exported helpers are shared with the interactive onboarding wizard.
  */
+import { createHash } from 'node:crypto';
 import { captureCliAttestationInvoker } from '../lib/cli/cli-attestation-invoker.js';
 import { resolveIdentityContext, withExecutionContext } from '@agent/core/authority';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
@@ -40,10 +41,12 @@ import {
   providerAttestationApplyArgs,
   requestTenantProviderAttestationApproval,
   shellQuoteArg,
+  showTenant,
   type AttestationInvoker,
   type ProviderAttestationApprovalRequest,
   type TenantProviderAttestationResult,
 } from '@agent/core/organization/tenant-governance';
+import { assertTenantOperational } from '@agent/core/organization/tenant-registry';
 import {
   attestCustodyProvider,
   custodyCliArgs,
@@ -62,6 +65,7 @@ import { loadReasoningRoutePolicy } from '@agent/core/reasoning/reasoning-route-
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { hasCliFlag } from '@agent/core/cli-guard';
 import { guardCliArgsNormalized, type CliGuardSpec } from '../lib/cli/cli-guard.js';
+import type { AccountProvider, AccountReading } from './onboarding_provider_account.js';
 import { ScriptExitError } from '../lib/harness.js';
 import {
   defaultEnvLocalPath,
@@ -80,14 +84,26 @@ export interface OnboardingLlmOptions {
   tenantRegistryRootDir?: string;
 }
 
-const VERBS = ['show', 'select', 'attest', 'probe-local', 'account'] as const;
+const VERBS = ['show', 'select', 'attest', 'attest-installed', 'probe-local', 'account'] as const;
 type Verb = (typeof VERBS)[number];
 
 const SPECS: Record<Verb, CliGuardSpec> = {
   account: {
     command: 'pnpm onboarding llm account',
     manifestId: 'script.onboarding',
-    options: [{ flag: '--json' }],
+    options: [{ flag: '--provider', value: '<provider>' }, { flag: '--json' }],
+  },
+  'attest-installed': {
+    command: 'pnpm onboarding llm attest-installed',
+    manifestId: 'script.onboarding',
+    options: [
+      { flag: '--tenant', value: '<tenant-slug>' },
+      { flag: '--provider', value: '<provider>' },
+      { flag: '--apply' },
+      { flag: '--review-token', value: '<token>' },
+      { flag: '--accept' },
+      { flag: '--json' },
+    ],
   },
   'probe-local': {
     command: 'pnpm onboarding llm probe-local',
@@ -138,8 +154,9 @@ const SPECS: Record<Verb, CliGuardSpec> = {
 
 export function onboardingLlmUsage(): string {
   return [
-    'Usage: pnpm onboarding llm <show|select|attest|probe-local|account> [options]',
-    '  account [--json]  Check the active local Codex account type and reported plan.',
+    'Usage: pnpm onboarding llm <show|select|attest|attest-installed|probe-local|account> [options]',
+    '  account [--provider <provider|all>] [--json]',
+    '         Read the active CLI account plan or usage limits (default: codex).',
     '  show   [--tenant <slug>] [--json]',
     '         Current backend/model selection and, per data tier, which providers may receive',
     '         material for LLM work and why the others are denied (--tenant, else the active',
@@ -151,6 +168,10 @@ export function onboardingLlmUsage(): string {
     '  select --backend <mode> [--model <model-id>] [--apply] [--json]',
     '         Record the reasoning backend (reasoning-backend-policy allowed_modes) and model',
     '         (model registry) in the operator LLM selection. Dry-run without --apply.',
+    '  attest-installed --tenant <slug> [--provider <provider>] [--json]',
+    '  attest-installed --tenant <slug> --apply --accept --review-token <token> [--json]',
+    '         Detect installed account CLIs and register newly observed plans as training-use unknown.',
+    '         Dry-run by default. Existing attestations are preserved.',
     '  attest --tenant <slug> --provider <id> --training-use <none|used|unknown>',
     '         [--plan <text> --basis <url|ref> --attested-by <who>] [--valid-for-days <n>]',
     '         [--request-approval | --apply --accept [--approval-request-id <id>]] [--json]',
@@ -384,6 +405,7 @@ export interface ProviderAttestationInput {
   attested_by?: string;
   valid_for_days?: number;
   approvalRequestId?: string;
+  ifAbsent?: boolean;
   invoker: AttestationInvoker;
   tenantRegistryRootDir?: string;
 }
@@ -391,6 +413,7 @@ export interface ProviderAttestationInput {
 function toCoreAttestation(input: ProviderAttestationInput) {
   return {
     invoker: input.invoker,
+    ifAbsent: input.ifAbsent,
     slug: input.tenant,
     provider: input.provider,
     training_use: input.training_use,
@@ -977,24 +1000,262 @@ export function main(
   if (verb === 'show') return show(rest, print, options);
   if (verb === 'select') return select(rest, print, options);
   if (verb === 'probe-local') return probeLocal(rest, print);
-  if (verb === 'account') return showCodexAccount(rest, print);
+  if (verb === 'attest-installed') return attestInstalled(rest, print, options);
+  if (verb === 'account') return showProviderAccounts(rest, print);
   return attest(rest, print, options);
 }
 
-async function showCodexAccount(argv: readonly string[], print: Print): Promise<void> {
-  const { inspectCodexAccount } = await import('./onboarding_codex_account.js');
-  const account = await inspectCodexAccount();
+type InstalledAttestationResult = {
+  provider: AccountProvider;
+  status:
+    | 'not_reviewed'
+    | 'cli_unavailable'
+    | 'plan_unavailable'
+    | 'already_registered'
+    | 'blocked'
+    | 'would_register'
+    | 'registered';
+  plan?: string;
+  observed_plan?: string;
+  cli_failure?: AccountReading['cli_failure'];
+  account_failure?: AccountReading['account_failure'];
+  reason?: string;
+};
+
+const CLI_CHECK_FAILURE_HINTS: Record<NonNullable<AccountReading['cli_failure']>, string> = {
+  version_failed: 'The CLI version check failed. Run the CLI version command in this environment.',
+  version_timeout:
+    'The CLI version check timed out. Check whether the CLI starts promptly, then try again.',
+  probe_start_failed:
+    'The CLI check could not start. Check binary configuration and process permissions.',
+};
+
+const ACCOUNT_FAILURE_HINTS: Record<NonNullable<AccountReading['account_failure']>, string> = {
+  timeout: 'The account check timed out. Retry in the same environment where the CLI is signed in.',
+  output_limit:
+    'The account check exceeded its output limit. Check the CLI installation and configuration.',
+};
+
+function attestInstalledAccount(
+  provider: AccountProvider,
+  account: AccountReading | null,
+  scope: Pick<ProviderAttestationInput, 'tenant' | 'invoker' | 'tenantRegistryRootDir'>,
+  apply: boolean,
+  planUnavailableHint: string
+): InstalledAttestationResult {
+  if (!account) {
+    return {
+      provider,
+      status: 'cli_unavailable',
+      reason: 'Check the CLI installation and binary configuration.',
+    };
+  }
+  if (account.cli_failure) {
+    return {
+      provider,
+      status: 'cli_unavailable',
+      cli_failure: account.cli_failure,
+      reason: CLI_CHECK_FAILURE_HINTS[account.cli_failure],
+    };
+  }
+  if (account.status !== 'available' || !account.plan) {
+    const { account_failure } = account;
+    return {
+      provider,
+      status: 'plan_unavailable',
+      ...(account_failure ? { account_failure } : {}),
+      reason: account_failure ? ACCOUNT_FAILURE_HINTS[account_failure] : planUnavailableHint,
+    };
+  }
+
+  const { plan } = account;
+  const input: ProviderAttestationInput = {
+    ...scope,
+    provider,
+    plan,
+    training_use: 'unknown',
+    basis: 'local-cli-account-probe',
+    ifAbsent: true,
+  };
+  const refused = (reason: string): InstalledAttestationResult =>
+    reason.startsWith('[PROVIDER_ATTESTATION_EXISTS]')
+      ? { provider, observed_plan: plan, status: 'already_registered' }
+      : { provider, plan, status: 'blocked', reason };
+
+  if (!apply) {
+    const decision = previewProviderAttestation(input);
+    return decision.status === 'direct'
+      ? { provider, plan, status: 'would_register' }
+      : refused(
+          'reason' in decision ? decision.reason : 'Attestation requires further authorization.'
+        );
+  }
+
+  try {
+    applyProviderAttestation(input);
+    return { provider, plan, status: 'registered' };
+  } catch (error) {
+    return refused(error instanceof Error ? error.message : String(error));
+  }
+}
+
+async function attestInstalled(
+  argv: readonly string[],
+  print: Print,
+  options: OnboardingLlmOptions
+): Promise<void> {
+  const tenant = effectiveTenant(requireTenant(argv, true))!;
+  const { apply, accept, json } = attestModeFlags(argv);
+  if (apply && !accept) throw new Error('attest-installed --apply requires --accept');
+  const expectedToken = optionValue(argv, '--review-token');
+  if (apply && !expectedToken) {
+    throw new Error('attest-installed --apply requires --review-token from a dry-run');
+  }
+  if (!apply && expectedToken) throw new Error('--review-token requires --apply');
+  const { ACCOUNT_PROVIDERS, accountPlanUnavailableHint, inspectInstalledAccount } =
+    await import('./onboarding_provider_account.js');
+  const requested = optionValue(argv, '--provider');
+  const provider = ACCOUNT_PROVIDERS.find((id) => id === requested);
+  if (requested && !provider) {
+    throw new Error(
+      `Unknown account provider '${requested}'. Choose ${ACCOUNT_PROVIDERS.join(', ')}.`
+    );
+  }
+  if (apply && provider)
+    throw new Error('--apply takes the provider selection from --review-token');
+  const tokenMatch =
+    expectedToken && /^[a-f0-9]{64}\.([a-z0-9_-]+(?:,[a-z0-9_-]+)*)$/.exec(expectedToken);
+  const reviewedIds = tokenMatch ? tokenMatch[1].split(',') : [];
+  const reviewed = new Set(reviewedIds);
+  const selected = apply
+    ? ACCOUNT_PROVIDERS.filter((id) => reviewed.has(id))
+    : provider
+      ? [provider]
+      : ACCOUNT_PROVIDERS;
+  if (apply && (!tokenMatch || selected.length !== reviewedIds.length)) {
+    throw new Error('Invalid --review-token. Use the token printed by attest-installed dry-run.');
+  }
+  const invoker = captureCliAttestationInvoker();
+  withExecutionContext(
+    'sovereign_concierge',
+    () =>
+      assertTenantOperational(
+        showTenant(tenant, { rootDir: options.tenantRegistryRootDir }),
+        'provider attestation'
+      ),
+    undefined,
+    tenant
+  );
+  const accounts = new Map(
+    await Promise.all(
+      selected.map(async (provider) => [provider, await inspectInstalledAccount(provider)] as const)
+    )
+  );
+  const makeReviewToken = (providers: readonly AccountProvider[]) => {
+    const ids = [...providers].sort();
+    const observations = ids.map((provider) => {
+      const account = accounts.get(provider);
+      return [provider, account?.status ?? null, account?.plan ?? null];
+    });
+    const digest = createHash('sha256')
+      .update(JSON.stringify(['attest-installed-v2', tenant, observations]))
+      .digest('hex');
+    return `${digest}.${ids.join(',')}`;
+  };
+  if (apply && makeReviewToken(selected) !== expectedToken) {
+    const providerArg = selected.length === 1 ? ` --provider ${shellQuoteArg(selected[0])}` : '';
+    const preview_command = `pnpm onboarding llm attest-installed --tenant ${shellQuoteArg(tenant)}${providerArg}`;
+    const message = 'Reviewed CLI plans changed since the preview.';
+    print(
+      json
+        ? JSON.stringify({ tenant, status: 'review_changed', message, preview_command }, null, 2)
+        : `${message} Review again with: ${preview_command}`
+    );
+    throw new ScriptExitError(1);
+  }
+
+  const scope = { tenant, invoker, tenantRegistryRootDir: options.tenantRegistryRootDir };
+  const displayed = provider ? [provider] : ACCOUNT_PROVIDERS;
+  const results = displayed.map<InstalledAttestationResult>((provider) =>
+    accounts.has(provider)
+      ? attestInstalledAccount(
+          provider,
+          accounts.get(provider) ?? null,
+          scope,
+          apply,
+          accountPlanUnavailableHint(provider)
+        )
+      : { provider, status: 'not_reviewed' }
+  );
+  const candidates = results
+    .filter((result) => result.status === 'would_register')
+    .map((result) => result.provider);
+  const reviewToken = candidates.length ? makeReviewToken(candidates) : undefined;
+  const applyCommand = reviewToken
+    ? `pnpm onboarding llm attest-installed --tenant ${shellQuoteArg(tenant)} --apply --accept --review-token ${reviewToken}`
+    : undefined;
+  const nextStep = applyCommand
+    ? `Apply reviewed plans with: ${applyCommand}`
+    : 'No new plans to register.';
   print(
-    hasCliFlag(argv, '--json')
-      ? JSON.stringify(account, null, 2)
+    json
+      ? JSON.stringify(
+          {
+            tenant,
+            dry_run: !apply,
+            training_use: 'unknown',
+            ...(reviewToken ? { review_token: reviewToken } : {}),
+            ...(applyCommand ? { apply_command: applyCommand } : {}),
+            results,
+          },
+          null,
+          2
+        )
       : [
-          account.status === 'available'
-            ? `Codex account: ${account.account_type ?? 'unavailable'}, plan: ${account.plan ?? 'unavailable'}`
-            : 'Codex account check unavailable. Check CLI installation, login, and process permissions.',
-          'Training use remains unknown. Confirm the applicable data controls separately.',
+          `${tenant} CLI attestation ${apply ? 'registration' : 'preview'} (training-use: unknown)`,
+          ...results.map(
+            (result) =>
+              `${result.provider}: ${result.status}${result.plan ? ` (${result.plan})` : ''}${result.observed_plan ? ` (observed: ${result.observed_plan})` : ''}${result.reason ? ` — ${result.reason}` : ''}`
+          ),
+          ...(!apply ? [nextStep] : []),
         ].join('\n')
   );
-  if (account.status === 'unavailable') throw new ScriptExitError(1);
+  if (results.some((result) => result.status === 'blocked')) throw new ScriptExitError(1);
+}
+
+async function showProviderAccounts(argv: readonly string[], print: Print): Promise<void> {
+  const { ACCOUNT_PROVIDERS, inspectProviderAccount } =
+    await import('./onboarding_provider_account.js');
+  const selected = optionValue(argv, '--provider') ?? 'codex';
+  const provider = ACCOUNT_PROVIDERS.find((item) => item === selected);
+  if (!provider && selected !== 'all') {
+    throw new Error(
+      `Unknown account provider '${selected}'. Choose ${ACCOUNT_PROVIDERS.join(', ')}, or all.`
+    );
+  }
+  const accounts = await Promise.all(
+    (provider ? [provider] : ACCOUNT_PROVIDERS).map((item) => inspectProviderAccount(item))
+  );
+  if (hasCliFlag(argv, '--json')) {
+    print(JSON.stringify(provider ? accounts[0] : accounts, null, 2));
+  } else {
+    print(
+      [
+        ...accounts.map((account) => {
+          if (account.status === 'unavailable') {
+            const hint = account.account_failure
+              ? ACCOUNT_FAILURE_HINTS[account.account_failure]
+              : 'Check CLI installation, login, and process permissions.';
+            return `${account.provider} account check unavailable. ${hint}`;
+          }
+          const usage = account.usage ? `, usage: ${JSON.stringify(account.usage)}` : '';
+          return `${account.provider} account: ${account.account_type ?? 'unavailable'}, plan: ${account.plan ?? 'unavailable'}${usage}`;
+        }),
+        'Training use remains unknown. Confirm the applicable data controls separately.',
+      ].join('\n')
+    );
+  }
+  if (accounts.every((account) => account.status === 'unavailable')) throw new ScriptExitError(1);
 }
 
 async function probeLocal(argv: readonly string[], print: Print): Promise<void> {

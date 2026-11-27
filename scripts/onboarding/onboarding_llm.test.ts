@@ -12,7 +12,17 @@ import {
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/authority';
 
-const fixture = vi.hoisted(() => ({ profileRoot: '' }));
+const fixture = vi.hoisted(() => ({
+  profileRoot: '',
+  inspectProviderAccount: vi.fn(),
+  inspectInstalledAccount: vi.fn(),
+}));
+
+vi.mock('./onboarding_provider_account.js', async (original) => ({
+  ...(await original<typeof import('./onboarding_provider_account.js')>()),
+  inspectProviderAccount: fixture.inspectProviderAccount,
+  inspectInstalledAccount: fixture.inspectInstalledAccount,
+}));
 
 vi.mock('@agent/core/profile-root', () => ({
   resolveActiveProfileRoot: () => fixture.profileRoot,
@@ -463,6 +473,194 @@ describe('pnpm onboarding llm', () => {
       expect(applied.approval).toBeUndefined();
     });
 
+    it('previews and registers discovered plans without replacing an existing attestation', async () => {
+      const cli = ['attest-installed', '--tenant', 'acme', '--json'];
+      const existing = [
+        'attest',
+        '--tenant',
+        'acme',
+        '--provider',
+        'claude',
+        '--training-use',
+        'used',
+        '--plan',
+        'existing',
+        '--apply',
+        '--accept',
+      ];
+      run(existing);
+      fixture.inspectInstalledAccount.mockImplementation(async (provider: string) => {
+        if (provider === 'agy') return { status: 'available', provider, plan: 'Google AI Pro' };
+        if (provider === 'claude') return { status: 'available', provider, plan: 'max' };
+        if (provider === 'grok') return { status: 'available', provider, plan: null };
+        return null;
+      });
+      const execute = async (...flags: string[]) => {
+        const print = vi.fn();
+        await main([...cli, ...flags], print, { tenantRegistryRootDir: path.join(ROOT, 'repo') });
+        return JSON.parse(String(print.mock.calls[0][0]));
+      };
+      await expect(execute('--apply')).rejects.toThrow(/requires --accept/);
+      await expect(execute('--apply', '--accept')).rejects.toThrow(/requires --review-token/);
+      const preview = await execute();
+      const reviewed = ['--apply', '--accept', '--review-token', preview.review_token];
+      expect(preview).toMatchObject({ dry_run: true, training_use: 'unknown' });
+      expect(preview.apply_command).toContain(preview.review_token);
+      expect(preview.review_token).toMatch(/^[a-f0-9]{64}\.agy$/);
+      expect(preview.results).toEqual(
+        expect.arrayContaining([
+          { provider: 'agy', plan: 'Google AI Pro', status: 'would_register' },
+          { provider: 'claude', observed_plan: 'max', status: 'already_registered' },
+          expect.objectContaining({ provider: 'grok', status: 'plan_unavailable' }),
+          expect.objectContaining({ provider: 'cursor', status: 'cli_unavailable' }),
+        ])
+      );
+      fixture.inspectInstalledAccount.mockResolvedValueOnce({
+        status: 'available',
+        plan: 'newly signed in',
+      });
+      await expect(execute(...reviewed)).rejects.toThrow();
+      fixture.inspectInstalledAccount.mockClear();
+      expect((await execute(...reviewed)).results).toEqual(
+        expect.arrayContaining([
+          { provider: 'agy', plan: 'Google AI Pro', status: 'registered' },
+          { provider: 'grok', status: 'not_reviewed' },
+        ])
+      );
+      expect(fixture.inspectInstalledAccount.mock.calls).toEqual([['agy']]);
+      expect((await execute(...reviewed)).results).toContainEqual({
+        provider: 'agy',
+        observed_plan: 'Google AI Pro',
+        status: 'already_registered',
+      });
+      const profile = withExecutionContext('sovereign_concierge', () =>
+        JSON.parse(
+          String(
+            safeReadFile(path.join(ROOT, 'repo', 'knowledge', 'personal', 'tenants', 'acme.json'), {
+              encoding: 'utf8',
+            })
+          )
+        )
+      );
+      expect(profile.provider_attestations).toEqual({
+        claude: expect.objectContaining({ plan: 'existing', training_use: 'used' }),
+        agy: expect.objectContaining({
+          plan: 'Google AI Pro',
+          training_use: 'unknown',
+          basis: 'local-cli-account-probe',
+        }),
+      });
+    });
+
+    it('previews only the requested provider and repeats that scope on review drift', async () => {
+      const argv = ['attest-installed', '--tenant', 'acme', '--json'];
+      const print = vi.fn();
+      const options = { tenantRegistryRootDir: path.join(ROOT, 'repo') };
+      fixture.inspectInstalledAccount.mockClear();
+      fixture.inspectInstalledAccount.mockResolvedValueOnce({ status: 'available', plan: 'Pro' });
+      await main([...argv, '--provider', 'cursor'], print, options);
+      const preview = JSON.parse(print.mock.lastCall![0]);
+      expect(preview.results).toEqual([
+        { provider: 'cursor', status: 'would_register', plan: 'Pro' },
+      ]);
+      expect(fixture.inspectInstalledAccount.mock.calls).toEqual([['cursor']]);
+      fixture.inspectInstalledAccount.mockResolvedValueOnce({ status: 'available', plan: 'Team' });
+      await expect(
+        main(
+          [...argv, '--apply', '--accept', '--review-token', preview.review_token],
+          print,
+          options
+        )
+      ).rejects.toThrow();
+      expect(JSON.parse(print.mock.lastCall![0])).toMatchObject({
+        status: 'review_changed',
+        preview_command: expect.stringContaining('--provider cursor'),
+      });
+      expect(fixture.inspectInstalledAccount.mock.calls).toEqual([['cursor'], ['cursor']]);
+    });
+
+    it('preserves successful registrations when another provider fails and permits a retry', async () => {
+      const argv = ['attest-installed', '--tenant', 'acme', '--json'];
+      fixture.inspectInstalledAccount.mockImplementation(async (provider: string) =>
+        provider === 'claude' || provider === 'codex'
+          ? { status: 'available', provider, plan: 'Pro' }
+          : null
+      );
+      const print = vi.fn();
+      const options = { tenantRegistryRootDir: path.join(ROOT, 'repo') };
+      await main(argv, print, options);
+      const { review_token } = JSON.parse(print.mock.lastCall![0]);
+      const apply = [...argv, '--apply', '--accept', '--review-token', review_token];
+      const realAttest = tenantGovernance.attestTenantProvider;
+      const spy = vi.spyOn(tenantGovernance, 'attestTenantProvider').mockImplementation((input) => {
+        if (input.provider === 'claude') throw new Error('simulated write refusal');
+        return realAttest(input);
+      });
+      try {
+        await expect(main(apply, print, options)).rejects.toThrow();
+        expect(JSON.parse(print.mock.lastCall![0]).results).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ provider: 'codex', status: 'registered' }),
+            expect.objectContaining({ provider: 'claude', status: 'blocked' }),
+          ])
+        );
+      } finally {
+        spy.mockRestore();
+      }
+      await main(apply, print, options);
+      expect(JSON.parse(print.mock.lastCall![0]).results).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ provider: 'codex', status: 'already_registered' }),
+          expect.objectContaining({ provider: 'claude', status: 'registered' }),
+        ])
+      );
+    });
+
+    it.each(['unknown', 'agy,agy', '1'])(
+      'rejects a review token with invalid provider IDs before probing (%s)',
+      async (providerIds) => {
+        fixture.inspectInstalledAccount.mockClear();
+        await expect(
+          main(
+            [
+              'attest-installed',
+              '--tenant',
+              'acme',
+              '--apply',
+              '--accept',
+              '--review-token',
+              `${'0'.repeat(64)}.${providerIds}`,
+            ],
+            vi.fn(),
+            { tenantRegistryRootDir: path.join(ROOT, 'repo') }
+          )
+        ).rejects.toThrow(/Invalid --review-token/);
+        expect(fixture.inspectInstalledAccount).not.toHaveBeenCalled();
+      }
+    );
+
+    it('rejects an unknown tenant before starting any installed CLI checks', async () => {
+      fixture.inspectInstalledAccount.mockClear();
+      await expect(
+        main(
+          [
+            'attest-installed',
+            '--tenant',
+            'missing-tenant',
+            '--apply',
+            '--accept',
+            '--review-token',
+            `${'0'.repeat(64)}.codex`,
+          ],
+          vi.fn(),
+          {
+            tenantRegistryRootDir: path.join(ROOT, 'repo'),
+          }
+        )
+      ).rejects.toThrow(/does not exist/);
+      expect(fixture.inspectInstalledAccount).not.toHaveBeenCalled();
+    });
+
     it('refuses to attest for another tenant from a tenant-bound process', () => {
       const used = ['attest', '--tenant', 'acme', '--provider', 'codex', '--training-use', 'used'];
       expect(() =>
@@ -727,4 +925,19 @@ describe('pnpm onboarding llm', () => {
       )
     ).toThrow(/conflicts with the active tenant scope 'acme'/);
   });
+});
+
+it('prints both the Grok plan and usage in text mode', async () => {
+  fixture.inspectProviderAccount.mockResolvedValueOnce({
+    status: 'available',
+    provider: 'grok',
+    account_type: null,
+    plan: 'X Premium',
+    usage: { weekly: { used_percent: 0 } },
+    training_use: 'unknown',
+  });
+  const print = vi.fn();
+  await main(['account', '--provider', 'grok'], print);
+  expect(fixture.inspectProviderAccount).toHaveBeenCalledWith('grok');
+  expect(print.mock.calls[0][0]).toContain('plan: X Premium, usage: {"weekly":{"used_percent":0}}');
 });

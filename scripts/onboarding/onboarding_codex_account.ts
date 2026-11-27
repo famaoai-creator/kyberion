@@ -9,6 +9,7 @@ type CodexAccountInfo = {
   account_type: string | null;
   plan: string | null;
   training_use: 'unknown';
+  account_failure?: 'timeout' | 'output_limit';
 };
 
 function accountField(value: unknown): string | null {
@@ -16,7 +17,7 @@ function accountField(value: unknown): string | null {
 }
 
 /** Query the installed local CLI. Never return the email or raw response. */
-export async function inspectCodexAccount(): Promise<CodexAccountInfo> {
+export async function inspectCodexAccount(binary?: string): Promise<CodexAccountInfo> {
   const unavailable = {
     status: 'unavailable',
     provider: 'codex',
@@ -26,10 +27,17 @@ export async function inspectCodexAccount(): Promise<CodexAccountInfo> {
   } as const;
   try {
     return await new Promise<CodexAccountInfo>((resolve) => {
-      const child = safeSpawn(resolveCodexBinary(), ['app-server', '--listen', 'stdio://'], {
-        env: safeChildEnv({ ...process.env, CODEX_HOME: resolveCodexHome(undefined, process.env) }),
-        stdio: ['pipe', 'pipe', 'ignore'],
-      });
+      const child = safeSpawn(
+        binary ?? resolveCodexBinary(),
+        ['app-server', '--listen', 'stdio://'],
+        {
+          env: safeChildEnv({
+            ...process.env,
+            CODEX_HOME: resolveCodexHome(undefined, process.env),
+          }),
+          stdio: ['pipe', 'pipe', 'ignore'],
+        }
+      );
       let buffer = '';
       let initialized = false;
       let done = false;
@@ -38,18 +46,24 @@ export async function inspectCodexAccount(): Promise<CodexAccountInfo> {
         done = true;
         clearTimeout(deadline);
         if (!child.killed) child.kill('SIGKILL');
+        child.stdin?.destroy();
+        child.stdout?.destroy();
         resolve(result);
       };
-      const deadline = setTimeout(() => finish(), 5000);
+      const deadline = setTimeout(
+        () => finish({ ...unavailable, account_failure: 'timeout' }),
+        5000
+      );
       const send = (payload: Record<string, unknown>) =>
         child.stdin?.write(JSON.stringify(payload) + '\n');
       child.on('error', () => finish());
-      child.on('exit', () => finish());
+      child.on('close', () => finish());
       child.stdin?.on('error', () => finish());
       child.stdout?.setEncoding('utf8').on('data', (chunk: string) => {
+        if (done) return;
         buffer += chunk;
         if (Buffer.byteLength(buffer) > 64 * 1024) {
-          finish();
+          finish({ ...unavailable, account_failure: 'output_limit' });
           return;
         }
         const lines = buffer.split('\n');

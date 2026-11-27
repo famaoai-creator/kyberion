@@ -470,6 +470,8 @@ export interface AttestTenantProviderInput extends RecordProviderAttestationInpu
   invoker?: AttestationInvoker;
   /** Approved human request (required for training_use 'none'). */
   approvalRequestId?: string;
+  /** First registration only. Checked again inside the apply lock. */
+  ifAbsent?: boolean;
 }
 
 /** Storage channel of the human approval a `training_use: none` attestation needs. */
@@ -977,6 +979,11 @@ function resolveProviderAttestationAuthority(input: AttestTenantProviderInput) {
   if (!profile)
     throw new Error(`[tenant-registry] tenant '${slug}' has no profile to attest against.`);
   assertTenantOperational(profile, 'provider attestation');
+  if (input.ifAbsent && Object.hasOwn(profile.provider_attestations ?? {}, provider)) {
+    throw new Error(
+      `[PROVIDER_ATTESTATION_EXISTS] Tenant '${slug}' already has a ${provider} attestation.`
+    );
+  }
   if (input.training_use !== 'none') return { normalized, status: 'direct' } as const;
   if (input.approvalRequestId?.trim()) {
     return {

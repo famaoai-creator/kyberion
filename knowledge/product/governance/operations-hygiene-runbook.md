@@ -777,6 +777,9 @@ supervisor and PTC IPC tests when changing a listener.
   arm a kill timer. Always attach an `'error'` listener: an `ENOENT` without one crashes the process.
 - Probes of external CLIs (`--version`, keychain, osascript) are bounded at about 10 s. Report a
   timeout as "unavailable (timed out)", never as a hang.
+  For a disposable diagnostic child, `safeExecResultAsync` with `forceKillOnAbort` stops at the
+  timeout or output cap and closes its pipes even if a descendant keeps them open. Regression gate:
+  `libs/core/secure-io/secure-io.exec-options.test.ts`.
 - **Streaming completion includes output drain.** A child's `exit` does not mean stdout has
   reached EOF. STT/TTS adapters finish on `close`, drain queued output on successful completion,
   and propagate nonzero exits, spawn failures and input-pump errors to the async consumer,

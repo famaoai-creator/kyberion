@@ -35,6 +35,7 @@
       "endpoint": "https://api.anthropic.com",
       "egress_provider_id": "claude",
       "cli": {
+        "account_probe": true,
         "binary": "claude",
         "version_args": ["--version"],
         "help_args": ["--help"],

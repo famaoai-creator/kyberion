@@ -56,6 +56,21 @@ it('returns unavailable and cleans up when the process does not respond', async 
   const { child } = setup();
   const reading = inspectCodexAccount();
   await vi.advanceTimersByTimeAsync(5000);
-  expect(await reading).toMatchObject({ status: 'unavailable', plan: null });
+  expect(await reading).toMatchObject({
+    status: 'unavailable',
+    plan: null,
+    account_failure: 'timeout',
+  });
   expect(child.kill).toHaveBeenCalledOnce();
+  expect(child.stdin.destroyed && child.stdout.destroyed).toBe(true);
+});
+
+it('drains the app-server reply even after the process exits', async () => {
+  const { child } = setup();
+  const reading = inspectCodexAccount();
+  child.stdout.write('{"id":1,"result":{}}\n');
+  child.emit('exit', 0);
+  child.stdout.write('{"id":2,"result":{"account":{"planType":"pro","type":"chatgpt"}}}\n');
+  child.emit('close', 0);
+  expect(await reading).toMatchObject({ status: 'available', plan: 'pro' });
 });
