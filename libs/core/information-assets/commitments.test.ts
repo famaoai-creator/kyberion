@@ -99,6 +99,13 @@ describe('matter derivation', () => {
     expect(normalizeMatterTitle('RE: Fwd:  Q4   Pricing')).toBe('q4 pricing');
     expect(normalizeMatterTitle('返信： 見積もり')).toBe('見積もり');
   });
+  it('strips stacked prefixes with counters and handles a long whitespace run after a token', () => {
+    expect(normalizeMatterTitle('Fwd[2]: RE : fw: Budget')).toBe('budget');
+    expect(normalizeMatterTitle('Reply needed')).toBe('reply needed');
+    expect(normalizeMatterTitle('Re[]: x')).toBe('re[]: x');
+    const hostile = 're' + '\t'.repeat(50000) + '!';
+    expect(normalizeMatterTitle(hostile)).toBe('re !');
+  });
   it('classifies owners against the caller identities only', () => {
     expect(commitmentOwnerSide('me@acme.test', ['ME@acme.test'])).toBe('self');
     expect(commitmentOwnerSide('Sam <me@acme.test>', ['me@acme.test'])).toBe('self');

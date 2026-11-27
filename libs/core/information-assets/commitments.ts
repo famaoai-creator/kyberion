@@ -27,10 +27,35 @@ export interface InformationArtifactSource {
   end?: string;
 }
 
-const REPLY_PREFIX = /^\s*((re|fw|fwd|aw|wg|tr|返信|転送)\s*(\[\d+\])?\s*[:：]\s*)+/i;
+const REPLY_TOKENS = ['fwd', 're', 'fw', 'aw', 'wg', 'tr', '返信', '転送'];
+const isSpace = (ch: string | undefined) => ch !== undefined && /\s/.test(ch);
+
+/** Length of one leading "Re:" / "Fwd[2]:" / "返信：" prefix at `at`, or 0. Linear scan, no backtracking. */
+function replyPrefixLength(title: string, at: number): number {
+  const lower = title.toLowerCase();
+  const token = REPLY_TOKENS.find((t) => lower.startsWith(t, at));
+  if (!token) return 0;
+  let i = at + token.length;
+  while (isSpace(title[i])) i++;
+  if (title[i] === '[') {
+    let j = i + 1;
+    while (j < title.length && title[j]! >= '0' && title[j]! <= '9') j++;
+    if (j === i + 1 || title[j] !== ']') return 0;
+    i = j + 1;
+    while (isSpace(title[i])) i++;
+  }
+  if (title[i] !== ':' && title[i] !== '：') return 0;
+  i++;
+  while (isSpace(title[i])) i++;
+  return i - at;
+}
 
 export function normalizeMatterTitle(title: string): string {
-  return title.replace(REPLY_PREFIX, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  let at = 0;
+  while (isSpace(title[at])) at++;
+  for (let step = replyPrefixLength(title, at); step > 0; step = replyPrefixLength(title, at))
+    at += step;
+  return title.slice(at).replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
 function header(data: Record<string, unknown>, name: string): string | undefined {
