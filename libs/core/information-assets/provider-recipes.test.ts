@@ -91,7 +91,7 @@ const charter = {
     mission_mandate_refs: ['information-fixture'],
   },
 } as unknown as DotCharter;
-describe('real provider facts reach all twelve builtin intake recipes', () => {
+describe('real provider facts reach all twelve builtin non-calendar intake recipes', () => {
   it('derives Gmail follow-up only when the latest thread message is old and sent', async () => {
     const loc = location('google-workspace', 'gmail.followups', 'customer.request', {
       reply_overdue_after_seconds: 86400,
@@ -136,7 +136,7 @@ describe('real provider facts reach all twelve builtin intake recipes', () => {
     );
     expect(answered.subjects).toEqual([]);
   });
-  it('normalizes wire facts into all twelve matching recipes without fixture-only synthetic flags', async () => {
+  it('normalizes wire facts into all twelve non-calendar matching recipes without fixture-only synthetic flags', async () => {
     const results: InformationAssetObservation[] = [];
     const mail = location('google-workspace', 'gmail.history', 'customer.request', {});
     const mailPage = await gmailHistoryCollector.collect(

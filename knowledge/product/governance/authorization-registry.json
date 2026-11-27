@@ -74,6 +74,14 @@
       },
       "protectedPaths": [["params"]]
     },
+    "service:google-workspace:preset:calendar_events_list": {
+      "effectClass": "external_read",
+      "authority": {
+        "kind": "admission",
+        "boundary": "external"
+      },
+      "protectedPaths": [["params"]]
+    },
     "service:jira:preset:search_issues_enhanced": {
       "effectClass": "external_read",
       "authority": {

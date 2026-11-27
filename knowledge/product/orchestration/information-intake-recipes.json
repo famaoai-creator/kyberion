@@ -42,6 +42,26 @@
       "requires_approval": true
     },
     {
+      "recipe_id": "calendar.meeting_prep",
+      "version": 1,
+      "title": "Prepare meeting brief",
+      "asset_type": "calendar.meeting",
+      "event_types": ["meeting.upcoming"],
+      "action": "prepare_brief",
+      "completion": "artifact_hash",
+      "requires_approval": false
+    },
+    {
+      "recipe_id": "calendar.meeting_followup",
+      "version": 1,
+      "title": "Extract meeting follow-up actions",
+      "asset_type": "calendar.meeting",
+      "event_types": ["meeting.ended"],
+      "action": "extract_actions",
+      "completion": "artifact_hash",
+      "requires_approval": false
+    },
+    {
       "recipe_id": "github.review_request",
       "version": 1,
       "title": "Handle requested code review",

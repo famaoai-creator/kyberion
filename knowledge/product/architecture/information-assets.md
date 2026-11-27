@@ -1,7 +1,7 @@
 ---
 title: 情報資産の所在・観測・作業化の接続
 tags: [information-assets, intake, organization, collectors, governance]
-last_updated: 2026-11-02
+last_updated: 2026-11-27
 ---
 
 # 情報資産の所在・観測・作業化の接続
@@ -58,12 +58,29 @@ resolver の `available` は所在が enabled で、参照する binding の存�
 
 ## 拡張点と現状の範囲
 
-初期の論理型は `customer.request`、`code.review_request`、`workflow.approval_request`。collector は `gmail.history`、`gmail.followups`、`github.review_requests`、`jira.issues`、`jira.approvals` を typed provider として登録する。collector を追加するときは provider 契約・read preset・ページング・イベント同一性・coverage を実装し、台帳データだけで任意コードをロードしない。
+論理型は `customer.request`、`code.review_request`、`workflow.approval_request`、`calendar.meeting`。collector は `gmail.history`、`gmail.followups`、`google_calendar.events`、`github.review_requests`、`jira.issues`、`jira.approvals` を typed provider として登録する。collector を追加するときは provider 契約・read preset・ページング・イベント同一性・coverage を実装し、台帳データだけで任意コードをロードしない。
 
 recipe は `information-intake-recipes.json` に version 付きで宣言する。観測の subject / change と recipe version に由来する work key により再観測と再実行を関連付ける。取得自体は completion を意味しない。成果物は実体を読み戻して hash を確認し、外部変更は readback によって確認する。承認待ち、相手待ち、結果不明、再確認待ちを完了へ丸めない。
 
 現行管理 facade は confidential の組織所有接続を対象とする。personal の所在は person owner の認可モデルを追加するまで登録を拒否する。新しい所在 version は collector checkpoint の同一性を変えるため、古い checkpoint を黙って再利用しない。実環境での接続設定、provider の API 権限、既存承認・実行 claim は別途必要で、台帳登録から権限を推定しない。
 
 取得 transport は登録済み binding の auth_mode・target・secret_refs を使い、個人/global connection の暗黙 fallback を利用しない。認証付き取得には tenant に束縛された既存 credential broker の実行 binding が必要になる。対応外の secret reference や未束縛の session は取得を保留する。台帳の `available` はこの broker の準備完了まで証明するものではない。
+
+## Commitment Loop（約束の射影）
+
+メール・カレンダーの取り込みを「誰が・何を・いつまでに」へ落とす読み取り側の射影。新しい作業ストアは作らない。正本は完了済み WorkItem の `information_asset_outcome` と、その hash 付き成果物である。
+
+```
+google_calendar.events / gmail.history  →  Observation
+  → recipe（calendar.meeting_prep / calendar.meeting_followup / email.action_extraction …）
+  → 成果物 JSON（matter・source は provider 事実から決定的に付与、本文の要約と actions は model）
+  → projectCommitments（読み戻し + hash 照合）→ 朝のダイジェスト
+```
+
+- **カレンダー collector**: `calendar_events_list` の読み取りだけを使い、現在時刻を中心とした窓（既定 前後 24 時間、selector `prep_lead_seconds` / `followup_window_seconds` は 300 秒〜7 日）を毎回スナップショットする。開始前の会議は `meeting.upcoming`、終了後は `meeting.ended` として観測する。change_id は phase と「会議の中身」（日時・タイトル・説明・場所・本人以外の参加者の集合）の hash で、provider の etag は使わない。日時や議題の変更は再観測されるが、出欠の返答だけの変更では準備をやり直さない。ページ途中で止まった取得は、開始時の時間窓を cursor に保存して同じ窓で再開する（窓のない page token は捨てて最初から取り直す）。キャンセル・本人辞退・終日・`focusTime` / `outOfOffice` / `workingLocation`、本人以外の参加者がいない予定は会議として扱わない。
+- **matter（案件）**: Gmail は threadId、会議は calendar と繰り返し系列（`recurring_event_id`、なければ event id）でまとめる。成果物の `matter` / `source` は観測データから計算し、model の出力から決めない。別ソース間の結合は、返信・転送の接頭辞を除いて正規化したタイトルが完全一致する場合だけ行う（推論による結合はしない）。
+- **約束の状態**: action の owner が `--self` で渡した本人の識別子に一致すれば自分の約束（期限超過なら `overdue`、それ以外は `open`）、他者なら `waiting`、不明なら `unassigned`。同じ matter で同じ正規化タイトルの action は、最新の観測を採用して 1 件にまとめる。会議前の準備項目は会議に付けて表示し、約束には数えない。
+- **境界**: ダイジェストは返信下書きを「未送信」として示すだけで、送信・予定登録・依頼は既存の承認付き service actuator 経路（`email.overdue_reply` などの external_readback recipe）を通す。読み戻せない・hash が一致しない・形式が不正な成果物は捨てずに「Not shown」として表示する。
+- **既知の制限**: personal tier の所在（本人所有の受信箱・カレンダー）は所有者認可モデルが未実装のため、引き続き登録を拒否する。owner の本人判定は呼び出し側が渡す識別子との一致だけで、組織の member 台帳とはまだ結合しない。準備済みの会議がその後キャンセル・辞退されても取り消しの観測は出ないため、開始時刻を過ぎるまでダイジェストに残る。正規化タイトルの完全一致による結合は「定例」のような汎用タイトルを過剰に結合しうる。繰り返し会議の各回は同じ matter に入り、同名の action は最新の回に集約される。ダイジェストの日時は UTC の ISO 表記。約束の完了状態はまだ持たず、新しい観測で上書きされるまで残る。
 
 運用手順は [情報資産運用 runbook](../governance/information-assets-runbook.md) を参照する。
