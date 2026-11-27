@@ -20,7 +20,10 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { findRelevantPromotedKnowledge } from '../knowledge/promoted-knowledge-retrieval.js';
-import { knowledgeDeliveryLogDir } from '../knowledge/knowledge-feedback-loop.js';
+import {
+  knowledgeDeliveryLogDir,
+  loadKnowledgeUsageAggregate,
+} from '../knowledge/knowledge-feedback-loop.js';
 import {
   clearWorkCoordinationStore,
   createWorkItem,
@@ -955,6 +958,80 @@ describe('validateAndRepairAdf', () => {
           title: 'ADF repair delivery test doc',
         })
       );
+    });
+
+    it('records used on validated repair success and not_used on failed repair', async () => {
+      const usagePath = pathResolver.sharedTmp(`kp02-adf-usage-${process.pid}/usage.json`);
+      const feedbackDir = pathResolver.sharedTmp(`kp02-adf-feedback-${process.pid}`);
+      const prevUsage = process.env.KYBERION_KNOWLEDGE_USAGE_PATH;
+      const prevFeedback = process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR;
+      process.env.KYBERION_KNOWLEDGE_USAGE_PATH = usagePath;
+      process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR = feedbackDir;
+      safeRmSync(path.dirname(usagePath), { recursive: true, force: true });
+      safeRmSync(feedbackDir, { recursive: true, force: true });
+
+      try {
+        const docPath = 'knowledge/product/evolution/patterns/generated/mem-ADF-REPAIR-USED.md';
+        vi.mocked(findRelevantPromotedKnowledge).mockResolvedValueOnce([
+          {
+            path: docPath,
+            title: 'ADF repair pattern',
+            tags: [],
+            excerpt: 'Set action field.',
+            score: 0.6,
+          },
+        ]);
+        registerFakeRepairBackend(async () =>
+          JSON.stringify({ capability: 'demo', action: 'run' })
+        );
+        const okFile = writeFixture(
+          'schema-invalid-used.json',
+          JSON.stringify({ capability: 'demo' })
+        );
+        const okRes = await validateAndRepairAdf(okFile, 'capability-input');
+        expect(okRes.repaired).toBe(true);
+        expect(loadKnowledgeUsageAggregate()).toEqual([
+          expect.objectContaining({
+            document_path: docPath,
+            delivered_count: 1,
+            used_count: 1,
+            not_used_count: 0,
+          }),
+        ]);
+
+        vi.mocked(findRelevantPromotedKnowledge).mockResolvedValueOnce([
+          {
+            path: docPath,
+            title: 'ADF repair pattern',
+            tags: [],
+            excerpt: 'Set action field.',
+            score: 0.6,
+          },
+        ]);
+        resetReasoningBackend();
+        registerFakeRepairBackend(async () => JSON.stringify({ still: 'invalid' }));
+        const failFile = writeFixture(
+          'schema-invalid-unused.json',
+          JSON.stringify({ capability: 'demo' })
+        );
+        const failRes = await validateAndRepairAdf(failFile, 'capability-input');
+        expect(failRes.repaired).toBe(false);
+        expect(loadKnowledgeUsageAggregate()).toEqual([
+          expect.objectContaining({
+            document_path: docPath,
+            delivered_count: 2,
+            used_count: 1,
+            not_used_count: 1,
+          }),
+        ]);
+      } finally {
+        if (prevUsage === undefined) delete process.env.KYBERION_KNOWLEDGE_USAGE_PATH;
+        else process.env.KYBERION_KNOWLEDGE_USAGE_PATH = prevUsage;
+        if (prevFeedback === undefined) delete process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR;
+        else process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR = prevFeedback;
+        safeRmSync(path.dirname(usagePath), { recursive: true, force: true });
+        safeRmSync(feedbackDir, { recursive: true, force: true });
+      }
     });
   });
 });

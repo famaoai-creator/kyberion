@@ -51,7 +51,10 @@ import { parseStructuredJson } from '../reasoning/structured-reasoning.js';
 import { logger } from '../core.js';
 import { t } from '../localization/t.js';
 import { findRelevantPromotedKnowledge } from '../knowledge/promoted-knowledge-retrieval.js';
-import { recordKnowledgeDelivery } from '../knowledge/knowledge-feedback-loop.js';
+import {
+  recordKnowledgeDelivery,
+  recordKnowledgeUsageFeedback,
+} from '../knowledge/knowledge-feedback-loop.js';
 import {
   enqueueSurfaceNotification,
   enqueueSurfaceOutboxMessage,
@@ -98,6 +101,7 @@ const BackgroundReviewProposalSchema = z
       .enum(['sop', 'template', 'heuristic', 'risk_rule', 'clarification_prompt'])
       .optional(),
     sensitivity_tier: z.enum(KNOWLEDGE_TIERS).optional(),
+    used_knowledge_paths: z.array(z.string().trim().min(1)).max(10).optional(),
     patch: z
       .object({
         operation: z.enum(['append_step', 'append_section', 'apply_consolidation']),
@@ -292,21 +296,35 @@ const BACKGROUND_REVIEW_KNOWLEDGE_EXCERPT_MAX = 200;
  * existing fail-open shape below — delegation proceeds either way, just
  * without the (denied) knowledge attached.
  */
+interface BackgroundReviewKnowledgeContext {
+  context: string;
+  deliveredPaths: string[];
+  missionId: string;
+  taskId: string;
+}
+
 async function buildBackgroundReviewKnowledgeContext(
   input: BackgroundReviewForkInput,
   backendName: string
-): Promise<string> {
+): Promise<BackgroundReviewKnowledgeContext> {
   const baseContext = 'background-review:' + input.sessionId;
+  const missionId = input.missionId || `session:${input.sessionId}`;
+  const empty: BackgroundReviewKnowledgeContext = {
+    context: baseContext,
+    deliveredPaths: [],
+    missionId,
+    taskId: input.sessionId,
+  };
   try {
     const topic = boundedSnapshot(input.snapshot);
-    if (!topic) return baseContext;
+    if (!topic) return empty;
     // Public, tenantless reader: a tenant hint is not a grant (see buildForkPrompt).
     const entries = await findRelevantPromotedKnowledge({
       topic,
       limit: BACKGROUND_REVIEW_KNOWLEDGE_HINT_LIMIT,
       minScore: 0.08,
     });
-    if (entries.length === 0) return baseContext;
+    if (entries.length === 0) return empty;
 
     if (!isLocalReasoningBackend(backendName)) {
       const providerId = providerIdForReasoningIdentifier(backendName);
@@ -325,7 +343,7 @@ async function buildBackgroundReviewKnowledgeContext(
           logger.warn(
             `[KP-02][XP-03] Background review knowledge egress denied for provider=${providerId} tier=${dataTier}: ${egressCheck.reason}`
           );
-          return baseContext;
+          return empty;
         }
       }
     }
@@ -338,19 +356,54 @@ async function buildBackgroundReviewKnowledgeContext(
       ),
     ];
     recordKnowledgeDelivery({
-      missionId: input.missionId || `session:${input.sessionId}`,
+      missionId,
       taskId: input.sessionId,
       recipientKind: 'background_review_fork',
       refs: entries.map((entry) => ({ path: entry.path, score: entry.score, title: entry.title })),
     });
-    return `${baseContext}\n\n${lines.join('\n')}`;
+    return {
+      context: `${baseContext}\n\n${lines.join('\n')}`,
+      deliveredPaths: entries.map((entry) => entry.path),
+      missionId,
+      taskId: input.sessionId,
+    };
   } catch (error) {
     logger.warn(
       `[KP-02] Background review knowledge lookup failed, delegating without knowledge context: ${
         error instanceof Error ? error.message : String(error)
       }`
     );
-    return baseContext;
+    return empty;
+  }
+}
+
+function recordBackgroundReviewKnowledgeOutcome(
+  knowledge: BackgroundReviewKnowledgeContext,
+  proposal: BackgroundReviewProposal,
+  sessionId: string
+): void {
+  if (knowledge.deliveredPaths.length === 0) return;
+  const cited = new Set(proposal.used_knowledge_paths ?? []);
+  const haystacks = [proposal.target_ref ?? '', proposal.summary ?? ''].filter(Boolean);
+  const used: string[] = [];
+  const notUsed: string[] = [];
+  for (const docPath of knowledge.deliveredPaths) {
+    if (cited.has(docPath) || haystacks.some((text) => text.includes(docPath))) {
+      used.push(docPath);
+    } else {
+      notUsed.push(docPath);
+    }
+  }
+  try {
+    recordKnowledgeUsageFeedback({
+      missionId: knowledge.missionId,
+      taskId: knowledge.taskId,
+      resultId: `${sessionId}:${proposal.action}`,
+      outcome: 'worker_report_complete',
+      feedback: { used, not_used: notUsed, missing_topics: [] },
+    });
+  } catch {
+    /* fail-open: telemetry never blocks background review */
   }
 }
 
@@ -387,7 +440,8 @@ Output JSON contract:
   "target_ref": "existing skill or pipeline reference when relevant",
   "patch": { "operation": "append_step", "step": { "op": "...", "params": {} } }
   "proposed_memory_kind": "sop | template | heuristic | risk_rule | clarification_prompt",
-  "sensitivity_tier": "personal | confidential"
+  "sensitivity_tier": "personal | confidential",
+  "used_knowledge_paths": ["optional path(s) from Relevant knowledge actually applied"]
 }
 For skill_patch, use { "operation": "append_section", "section": "## Heading\\n\\nGuidance" } instead.
 For memory_consolidation, use { "operation": "apply_consolidation", "actions": [{ "kind": "update|delete", "index": 1, "text": "..." }] } and target only an existing MEMORY.md.
@@ -518,6 +572,12 @@ export async function runBackgroundReviewFork(
     }),
     role: input.callOptions?.role || 'background_review',
   };
+  let reviewKnowledge: BackgroundReviewKnowledgeContext = {
+    context: `background-review:${input.sessionId}`,
+    deliveredPaths: [],
+    missionId: input.missionId || `session:${input.sessionId}`,
+    taskId: input.sessionId,
+  };
   try {
     // A mission snapshot is tenant working material and may reach a provider
     // the tenant attested as no-training. A task-session snapshot is the
@@ -540,10 +600,11 @@ export async function runBackgroundReviewFork(
           },
       async () => {
         const prompt = buildForkPrompt(input);
-        const context = await buildBackgroundReviewKnowledgeContext(
+        reviewKnowledge = await buildBackgroundReviewKnowledgeContext(
           input,
           backend.getRuntimeProviderName?.(callOptions) || backend.name || ''
         );
+        const context = reviewKnowledge.context;
         if (!input.workItemId) return backend.delegateTask(prompt, context, callOptions);
         // The native getter has no routing arguments. Reuse its default adopter
         // only when this role inherits that exact route, and never borrow an
@@ -617,6 +678,7 @@ export async function runBackgroundReviewFork(
     );
     const proposal = parseProposal(raw);
     assertProposalPolicy(proposal);
+    recordBackgroundReviewKnowledgeOutcome(reviewKnowledge, proposal, input.sessionId);
 
     if (proposal.action === 'no_action') {
       completeBackgroundReview(input.sessionId);
