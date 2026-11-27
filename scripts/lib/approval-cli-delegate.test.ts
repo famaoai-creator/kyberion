@@ -83,18 +83,24 @@ describe('delegateApprovalToCharter', () => {
 
   it('composes a person-scope plan with a ~90 day default expiry', () => {
     const { print } = lines();
-    const before = Date.now();
-    const result = delegateApprovalToCharter(
-      request({ delegation_target: { ...TARGET } }),
-      undefined,
-      print
-    );
+    const now = Date.parse('2026-11-01T00:00:00Z');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    const result = (() => {
+      try {
+        return delegateApprovalToCharter(
+          request({ delegation_target: { ...TARGET } }),
+          undefined,
+          print
+        );
+      } finally {
+        clock.mockRestore();
+      }
+    })();
     expect(result.ok).toBe(true);
     const input = previewOnboardingAuthority.mock.calls.at(-1)?.[1] as Record<string, unknown>;
     expect(input).toMatchObject({ scope_kind: 'person', mode: 'grant', grants: [TARGET] });
     const expires = Date.parse(String(input.expires_at));
-    expect(expires - before).toBeGreaterThan(89 * 86_400_000);
-    expect(expires - before).toBeLessThanOrEqual(90 * 86_400_000);
+    expect(expires - now).toBe(90 * 86_400_000);
     expect(requestOnboardingAuthority).toHaveBeenCalledWith(expect.anything(), input, {
       digest: 'digest-1',
       base_hash: 'base-1',

@@ -372,7 +372,7 @@ pnpm onboarding llm attest-installed --tenant <slug> --apply --accept --review-t
 対象はプラン照会を備える Codex・Claude・Agy・Grok・Devin・Cursor。dry-run の `--provider` で1件に絞れる。CLI の起動・バージョン確認の失敗、プランの取得不可、照会のタイムアウトや出力上限超過を区別し、それぞれの対処を出力する。バージョン確認に成功し、実際にプランを取得できた CLI を、既存のテナント attestation 経路で登録する。データ利用区分は `unknown` と記録し、すでに登録済みの申告は保持する。dry-run の `apply_command` または `review_token` を使って適用する。登録候補だけを再照会し、その結果が変わった場合は、書き込む前に停止し、再度 dry-run を求める。適用はプロバイダー単位で行われ、途中で失敗した場合も成功済みの登録は保持される。確認した候補の結果が同じなら、同じトークンで再実行できる。Grok の対話確認で `TMPDIR` を使う場合は、dry-run と適用を実行するシェルで同じ値を `export` する。
 データ利用区分を `none` と申告する場合は通常の `attest` と既存の承認フローを使う。
 
-新しい CLI のアカウント照会を追加するときは、reasoning provider registry にある CLI モードを `scripts/onboarding/onboarding_provider_account.ts` の照会定義に紐付ける。実行可否の確認には registry のバージョン引数を使い、照会関数はプランなど観測できたフィールドだけを返す。オンボーディングの対象一覧と登録フローに個別の分岐を追加する必要はない。
+新しい CLI のアカウント照会を追加するときは、reasoning provider registry で対象の CLI モードに `cli.account_probe: true` を指定し、プロバイダー ID の照会定義を `scripts/onboarding/onboarding_provider_account.ts` に追加する。実行可否の確認には registry のバージョン引数を使い、照会関数はプランなど観測できたフィールドだけを返す。オンボーディングの対象一覧と登録フローに個別の分岐を追加する必要はない。
 
 Codex CLI、Claude Code、その他の外部モデルは、実際に使う認証経路・アカウント・契約のデータ利用条件を確認する。テナントの `llm attest` は既定で書き込まず、同じ対象に対する実行時の権限判定を表示する。`direct` は既存の承認または送信を開かない宣言、`delegated` は一致する有効な Charter、`interactive` は新たな決裁、`blocked` は証拠や前提条件の不足を示す。
 

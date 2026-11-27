@@ -34,6 +34,7 @@
       "egress_provider_id": "cursor",
       "model_env_keys": ["KYBERION_CURSOR_CLI_MODEL"],
       "cli": {
+        "account_probe": true,
         "binary": "cursor-agent",
         "version_args": ["--version"],
         "help_args": ["--help"],

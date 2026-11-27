@@ -36,6 +36,7 @@
       "egress_provider_id": "grok",
       "model_env_keys": ["KYBERION_GROK_CLI_MODEL"],
       "cli": {
+        "account_probe": true,
         "binary": "grok",
         "version_args": ["--version"],
         "help_args": ["--help"],

@@ -33,6 +33,7 @@
       "endpoint": "https://generativelanguage.googleapis.com",
       "egress_provider_id": "agy",
       "cli": {
+        "account_probe": true,
         "binary": "agy",
         "version_args": ["--version"],
         "help_args": ["--help"],

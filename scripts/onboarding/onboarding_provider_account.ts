@@ -8,9 +8,8 @@ import {
   resolveProviderCliCommand,
 } from '@agent/core/provider/provider-managed-env';
 import {
-  getReasoningProviderDescriptor,
+  listCliReasoningProviderDescriptors,
   type ReasoningProviderCli,
-  type ReasoningProviderDescriptor,
 } from '@agent/core/reasoning/reasoning-provider-registry';
 import { assertGovernedExec, buildSafeExecEnv, safeExecResultAsync } from '@agent/core/secure-io';
 import { stripTerminalControl } from '../lib/tty/cli-tty-challenge-driver.js';
@@ -193,7 +192,6 @@ type AccountProbeOptions = { requirePlan?: boolean };
 type AccountProbeResult = Partial<AccountFields & Pick<AccountReading, 'status'>>;
 
 type AccountProbe = {
-  mode: ReasoningProviderDescriptor['mode'];
   resolveBinary?: () => string;
   planUnavailableHint?: string;
   inspect(binary: string, options: AccountProbeOptions): Promise<AccountProbeResult | null>;
@@ -201,7 +199,6 @@ type AccountProbe = {
 
 const accountProbes = {
   codex: {
-    mode: 'codex-cli',
     resolveBinary: resolveCodexBinary,
     async inspect(binary) {
       const { status, account_type, plan, account_failure } = await inspectCodexAccount(binary);
@@ -209,7 +206,6 @@ const accountProbes = {
     },
   },
   claude: {
-    mode: 'claude-cli',
     async inspect(binary) {
       const data = record(JSON.parse(await readCli(binary, ['auth', 'status', '--json'])));
       return data.loggedIn === true
@@ -218,14 +214,12 @@ const accountProbes = {
     },
   },
   agy: {
-    mode: 'agy-cli',
     async inspect(binary) {
       const plan = await readAgyTier(binary);
       return plan ? { plan } : null;
     },
   },
   grok: {
-    mode: 'grok-cli',
     planUnavailableHint:
       'Check Grok login and use an already trusted temporary directory for /usage.',
     async inspect(binary, { requirePlan }) {
@@ -249,7 +243,6 @@ const accountProbes = {
     },
   },
   devin: {
-    mode: 'devin-cli',
     async inspect(binary) {
       const output = await readCli(binary, ['auth', 'status', '--process-model', 'in-process']);
       if (!/^Logged in\b/m.test(output)) return null;
@@ -260,7 +253,6 @@ const accountProbes = {
     },
   },
   cursor: {
-    mode: 'cursor-cli',
     async inspect(binary) {
       const data = record(JSON.parse(await readCli(binary, ['about', '--format', 'json'])));
       const plan = label(data.subscriptionTier);
@@ -276,12 +268,14 @@ export function accountPlanUnavailableHint(provider: AccountProvider): string {
   return probe.planUnavailableHint ?? 'Check login and access to the CLI credential store.';
 }
 
-function accountCli(provider: AccountProvider, probe: AccountProbe): ReasoningProviderCli {
-  const descriptor = getReasoningProviderDescriptor(probe.mode);
-  if (descriptor?.provider !== provider || !descriptor.cli) {
-    throw new Error(`No CLI descriptor for account probe '${provider}' (${probe.mode}).`);
+function accountCli(provider: AccountProvider): ReasoningProviderCli {
+  const descriptors = listCliReasoningProviderDescriptors().filter(
+    (descriptor) => descriptor.provider === provider && descriptor.cli.account_probe
+  );
+  if (descriptors.length !== 1) {
+    throw new Error(`Expected one CLI descriptor for account probe '${provider}'.`);
   }
-  return descriptor.cli;
+  return descriptors[0].cli;
 }
 
 function accountBinary(
@@ -315,7 +309,7 @@ async function readAccount(
 ): Promise<AccountReading> {
   const unavailable = unavailableAccount(provider);
   try {
-    const command = binary ?? accountBinary(provider, probe, accountCli(provider, probe));
+    const command = binary ?? accountBinary(provider, probe, accountCli(provider));
     const result = await probe.inspect(command, options);
     return result
       ? { ...unavailable, ...result, status: result.status ?? 'available' }
@@ -338,7 +332,7 @@ export async function inspectInstalledAccount(
 ): Promise<AccountReading | null> {
   const probe: AccountProbe = accountProbes[provider];
   try {
-    const cli = accountCli(provider, probe);
+    const cli = accountCli(provider);
     const binary = accountBinary(provider, probe, cli);
     const version = await runAccountCli(binary, [...cli.version_args]);
     if (version.status === 0) return readAccount(provider, probe, { requirePlan: true }, binary);
