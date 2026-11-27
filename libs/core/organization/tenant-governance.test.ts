@@ -24,6 +24,7 @@ import {
   assertPrintableCommandValue,
   attestTenantProvider,
   findProviderAttestationGrantAuthority,
+  previewTenantProviderAttestation,
   mutateTenant,
   PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
   deleteTenant,
@@ -510,6 +511,15 @@ describe('training_use none attestations go through the human approval gate', ()
   it('writes and audits with the approver once a human approves the exact claim — once', () => {
     const id = requestApproval();
     decide(id, 'approved');
+    const preview = () =>
+      withExecutionContext('sovereign_concierge', () =>
+        previewTenantProviderAttestation({ ...claim, rootDir, approvalRequestId: id })
+      );
+    expect(preview()).toEqual({ status: 'direct', authorization: 'approved_request' });
+    expect(
+      loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id)?.applyClaim
+    ).toBeUndefined();
+    expect(egress('beta')).toBe(false);
     const result = apply(id);
     expect(result.approval).toEqual({ request_id: id, approved_by: 'human-owner' });
     expect(record).toHaveBeenCalledWith(
@@ -529,6 +539,10 @@ describe('training_use none attestations go through the human approval gate', ()
     expect(egress('gamma')).toBe(false);
     // At most once: the approval cannot be replayed to refresh the claim.
     expect(() => apply(id)).toThrow(/already used/);
+    expect(preview()).toMatchObject({
+      status: 'blocked',
+      reason: expect.stringContaining('already used'),
+    });
   });
 
   it.each(['owner', 'approver'])(
@@ -957,7 +971,16 @@ describe('training_use none attestations may be delegated by an exact charter gr
 
   it('applies the exact granted claim under an organization charter without an approval', () => {
     writeCharter('organization', [grant], 'chr-attest-beta');
+    const preview = withExecutionContext('sovereign_concierge', () =>
+      previewTenantProviderAttestation({ ...claim, rootDir })
+    );
+    expect(preview).toMatchObject({
+      status: 'delegated',
+      delegation: { charter_id: 'chr-attest-beta', scope_kind: 'organization' },
+    });
+    expect(record).not.toHaveBeenCalled();
     const result = apply();
+    expect(preview).toEqual({ status: 'delegated', delegation: result.delegation });
     expect(result.delegation).toMatchObject({
       charter_id: 'chr-attest-beta',
       scope_kind: 'organization',
@@ -985,6 +1008,37 @@ describe('training_use none attestations may be delegated by an exact charter gr
     writeCharter('organization', [grant], 'chr-attest-beta');
     expect(() => apply({ plan: 'a different plan' })).toThrow(/needs a human approval/);
     expect(() => apply({ provider: 'claude' })).toThrow(/needs a human approval|unknown provider/);
+  });
+
+  it('distinguishes direct non-enabling records, unsupported claims, and ungranted declarations', () => {
+    const preview = (
+      overrides: Partial<Parameters<typeof previewTenantProviderAttestation>[0]> = {}
+    ) =>
+      withExecutionContext('sovereign_concierge', () =>
+        previewTenantProviderAttestation({ ...claim, rootDir, ...overrides })
+      );
+    expect(
+      preview({
+        training_use: 'unknown',
+        plan: undefined,
+        basis: undefined,
+        attested_by: undefined,
+      })
+    ).toEqual({
+      status: 'direct',
+      authorization: 'non_enabling',
+    });
+    expect(preview()).toMatchObject({ status: 'interactive' });
+    expect(preview({ basis: undefined })).toMatchObject({
+      status: 'blocked',
+      reason: expect.stringContaining('basis'),
+    });
+    expect(preview({ slug: 'missing' })).toMatchObject({ status: 'blocked' });
+    expect(preview({ invoker: { actor: 'agent-delegate', tenantSlug: 'gamma' } })).toMatchObject({
+      status: 'blocked',
+      reason: expect.stringContaining('cross-tenant'),
+    });
+    expect(record).not.toHaveBeenCalled();
   });
 
   it('ignores grants held under a different tenant scope', () => {

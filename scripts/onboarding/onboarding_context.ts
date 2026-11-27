@@ -5,12 +5,17 @@ import {
   applyOnboardingFirstWork,
   loadOnboardingContextBinding,
   loadOnboardingFirstWorkRecord,
+  OnboardingStanceMissingError,
   resolveOnboardingContext,
   resolveOnboardingFirstWork,
 } from '@agent/core/organization/onboarding-context';
 import * as customerResolver from '@agent/core/stance-resolver';
-import type { OrganizationTier } from '@agent/core/organization/organization-operating-model';
-import { withExecutionContext } from '@agent/core/authority';
+import {
+  loadOrganizationOperationalState,
+  type OrganizationTier,
+} from '@agent/core/organization/organization-operating-model';
+import { assertTenantOperational, resolveTenant } from '@agent/core/organization/tenant-registry';
+import { resolveIdentityContext, withExecutionContext } from '@agent/core/authority';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 type Print = (value: unknown) => void;
@@ -57,15 +62,21 @@ function parseArgs(argv: string[]): ParsedArgs {
   )[0];
   if (!command || command === 'help')
     return { command: 'help', apply: false, accept: false, bootstrapProject: false, json: false };
-  const subcommand = argv.includes('first-work')
-    ? 'first-work'
-    : argv.includes('bind')
-      ? 'bind'
-      : 'show';
+  const subcommand =
+    command === 'organization'
+      ? 'organization'
+      : argv.includes('first-work')
+        ? 'first-work'
+        : argv.includes('bind')
+          ? 'bind'
+          : 'show';
   return {
     command: subcommand,
     rootDir: value(argv, '--root-dir') ? path.resolve(value(argv, '--root-dir')!) : undefined,
-    customerSlug: value(argv, '--customer-slug') || customerResolver.activeStance() || undefined,
+    customerSlug:
+      subcommand === 'organization'
+        ? undefined
+        : value(argv, '--customer-slug') || customerResolver.activeStance() || undefined,
     tenantSlug: value(argv, '--tenant-slug'),
     organizationId: value(argv, '--organization-id'),
     tier: parseTier(value(argv, '--tier')),
@@ -105,6 +116,7 @@ function usage(): string {
     'Onboarding context binding',
     '',
     '  pnpm onboarding:context show --customer-slug <slug> [--root-dir <path>] [--json]',
+    '  pnpm onboarding:context organization --tenant-slug <slug> --organization-id <id> [--organization-name <name>] [--intent "<request>"] [--json]',
     '  pnpm onboarding:context bind --customer-slug <slug> --tenant-slug <slug> [--organization-id <id>] [--root-dir <path>] [--apply] [--json]',
     '  pnpm onboarding:context first-work --customer-slug <slug> --intent "<request>" [--service-id <id>] [--root-dir <path>] [--apply --accept] [--bootstrap-project --project-id <id> --project-name <name> --project-summary <text>] [--json]',
     '',
@@ -112,10 +124,91 @@ function usage(): string {
   ].join('\n');
 }
 
+function planInternalOrganization(args: ParsedArgs) {
+  if (args.apply)
+    throw new Error('The organization plan is read-only. Apply writes through pnpm organization.');
+  const { tenantSlug, organizationId } = args;
+  if (!tenantSlug || !organizationId)
+    throw new Error('--tenant-slug and --organization-id are required.');
+  const boundTenant = resolveIdentityContext().tenantSlug;
+  if (boundTenant && boundTenant !== tenantSlug)
+    throw new Error('The requested tenant does not match the current tenant scope.');
+  return withExecutionContext(
+    'sovereign_concierge',
+    () => {
+      const { profile } = resolveTenant(tenantSlug, { rootDir: args.rootDir });
+      assertTenantOperational(profile, 'internal organization onboarding');
+      const tier = args.tier ?? 'confidential';
+      const state = loadOrganizationOperationalState(organizationId, {
+        tier,
+        tenantSlug,
+        rootDir: args.rootDir,
+      });
+      if (state && (state.tenant_slug !== tenantSlug || state.tier !== tier))
+        throw new Error('The organization state does not match the requested tenant and tier.');
+      const scopeArgs = [
+        '--tenant-slug',
+        tenantSlug,
+        '--organization-id',
+        organizationId,
+        '--tier',
+        tier,
+      ];
+      const init = [
+        'pnpm',
+        'organization',
+        'init',
+        ...scopeArgs,
+        '--name',
+        args.organizationName?.trim() || profile.display_name,
+        '--dry-run',
+        '--json',
+      ];
+      const status = ['pnpm', 'organization', 'status', ...scopeArgs, '--json'];
+      const firstWork =
+        state?.status === 'active' && args.intent?.trim()
+          ? [
+              'pnpm',
+              'organization',
+              'work',
+              'resolve',
+              ...scopeArgs,
+              '--intent',
+              args.intent.trim(),
+              '--dry-run',
+              '--json',
+            ]
+          : undefined;
+      return {
+        kind: 'internal_organization_onboarding',
+        tenant_slug: tenantSlug,
+        organization_id: organizationId,
+        tier,
+        organization_status: state?.status ?? 'missing',
+        next_action: {
+          kind: firstWork
+            ? 'preview_organization_work'
+            : state
+              ? 'review_organization_status'
+              : 'preview_organization_init',
+          ...(!args.rootDir ? { argv: firstWork ?? (state ? status : init) } : {}),
+        },
+      };
+    },
+    undefined,
+    tenantSlug,
+    organizationId
+  );
+}
+
 export function run(args: string[] = [], print: Print = () => undefined): void {
   const parsed = parseArgs(args);
   if (parsed.command === 'help') {
     print(usage());
+    return;
+  }
+  if (parsed.command === 'organization') {
+    emit(planInternalOrganization(parsed), print);
     return;
   }
   const customerSlug = customerRequired(parsed);
@@ -143,8 +236,38 @@ export function run(args: string[] = [], print: Print = () => undefined): void {
       purpose: parsed.purpose,
       rootDir: parsed.rootDir,
     };
+    const result = parsed.apply
+      ? applyOnboardingContextBinding(input)
+      : resolveOnboardingContext(input);
+    const { binding } = result;
     emit(
-      parsed.apply ? applyOnboardingContextBinding(input) : resolveOnboardingContext(input),
+      {
+        ...result,
+        next_action:
+          result.mode === 'apply' || result.would_write.length === 0
+            ? binding.tier !== 'confidential'
+              ? { kind: 'review_binding_scope', tier: binding.tier }
+              : {
+                  kind: 'review_activation',
+                  argv: [
+                    'pnpm',
+                    'tenant:activation',
+                    'plan',
+                    '--customer-slug',
+                    binding.customer_slug,
+                    '--tenant-slug',
+                    binding.tenant_slug,
+                    '--organization-id',
+                    binding.organization_id,
+                    ...(parsed.rootDir ? ['--root-dir', parsed.rootDir] : []),
+                  ],
+                }
+            : {
+                kind: 'review_binding',
+                detail:
+                  'Review the tenant, organization and planned writes before rerunning with --apply.',
+              },
+      },
       print
     );
     return;
@@ -192,13 +315,26 @@ export const runOnboardingContext = defineScript({
       // Binding and first-work read the tenant registry (personal tier) and
       // write tenant-scoped organization state: the governed onboarding
       // authority `pnpm tenant` assumes, so no exported persona is needed.
-      withExecutionContext('sovereign_concierge', () => run(argv, print));
+      if (argv[0] === 'organization') run(argv, print);
+      else withExecutionContext('sovereign_concierge', () => run(argv, print));
     } catch (error) {
       print(
         JSON.stringify(
           {
             error_code: 'ONBOARDING_CONTEXT_FAILED',
             message: error instanceof Error ? error.message : String(error),
+            ...(error instanceof OnboardingStanceMissingError
+              ? {
+                  next_action: {
+                    kind: 'prepare_customer_stance',
+                    customer_slug: error.customerSlug,
+                    detail: 'Have an authorized operator prepare this stance before retrying bind.',
+                    ...(!value(argv, '--root-dir')
+                      ? { argv: ['pnpm', 'stance:create', error.customerSlug] }
+                      : {}),
+                  },
+                }
+              : {}),
           },
           null,
           2

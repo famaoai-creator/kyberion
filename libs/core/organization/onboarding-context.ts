@@ -642,6 +642,13 @@ export function loadOnboardingContextBinding(
   }
 }
 
+export class OnboardingStanceMissingError extends Error {
+  constructor(readonly customerSlug: string) {
+    super(`Customer overlay '${customerSlug}' does not exist.`);
+    this.name = 'OnboardingStanceMissingError';
+  }
+}
+
 export function resolveOnboardingContext(
   input: ResolveOnboardingContextInput
 ): OnboardingContextResolution {
@@ -649,7 +656,7 @@ export function resolveOnboardingContext(
   const rootDir = input.rootDir || pathResolver.rootDir();
   const customerPath = stanceDirForSlug(customerSlug, rootDir);
   const customerExists = safeExistsSync(customerPath);
-  if (!customerExists) throw new Error(`Customer overlay '${customerSlug}' does not exist.`);
+  if (!customerExists) throw new OnboardingStanceMissingError(customerSlug);
   const tenantSlug = input.tenantSlug.trim();
   const tenant = resolveTenantForCustomer(customerSlug, tenantSlug, rootDir);
   const profile = loadOrganizationProfile(
@@ -689,10 +696,10 @@ export function resolveOnboardingContext(
     tenant,
     organization_profile: profile,
     organization_state: organizationState,
-    would_write: existingBinding
-      ? organizationState
-        ? []
-        : [
+    would_write: [
+      ...(!existingBinding ? [contextPath(customerSlug, rootDir)] : []),
+      ...(!organizationState
+        ? [
             path.join(
               pathResolver.organizationStateDir(
                 binding.organization_id,
@@ -703,18 +710,8 @@ export function resolveOnboardingContext(
               'organization-state.json'
             ),
           ]
-      : [
-          contextPath(customerSlug, rootDir),
-          path.join(
-            pathResolver.organizationStateDir(
-              binding.organization_id,
-              binding.tier,
-              binding.tenant_slug,
-              rootDir
-            ),
-            'organization-state.json'
-          ),
-        ],
+        : []),
+    ],
   };
 }
 

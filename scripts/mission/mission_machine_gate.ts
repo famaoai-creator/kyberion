@@ -1,8 +1,35 @@
 /** Stored-gate-only advancement for automated mission owners. */
 import type { StoredGateEvaluationResult } from '@agent/core/mission/mission-process-planning';
+import type { WorkflowPhaseSpec } from '@agent/core/mission/mission-workflow-catalog';
 import { createLogger } from '@agent/core/logger';
 
 const logger = createLogger('mission-machine-gate');
+
+export function requiresManualGateConfirmation(check: { kind: string }): boolean {
+  return check.kind === 'human_override' || check.kind === 'reviewer_approved';
+}
+
+/** Static preview of confirmation checks refused by gate-pass --machine-only. */
+export function previewMachineGateCompatibility(phases: readonly WorkflowPhaseSpec[] | undefined) {
+  const blockers = (phases ?? []).flatMap((phase) =>
+    [phase.entry_gate, phase.exit_gate].flatMap(
+      (gate) =>
+        gate?.checks.filter(requiresManualGateConfirmation).map((check) => ({
+          phase: phase.id,
+          gate_id: gate.id,
+          check: check.kind,
+        })) ?? []
+    )
+  );
+  return {
+    status: !phases?.length
+      ? 'unknown'
+      : blockers.length
+        ? 'confirmation_required'
+        : 'no_confirmation_checks',
+    blockers,
+  };
+}
 
 export interface MachineMissionGatePorts {
   evaluateStored: (input: {
@@ -56,11 +83,7 @@ export async function runMachineOnlyMissionGate(
     );
     throw new Error(`Machine-only gate definition missing: ${missionId}/${gateId}`);
   }
-  if (
-    stored.evaluation.checks.some(
-      (check) => check.kind === 'human_override' || check.kind === 'reviewer_approved'
-    )
-  ) {
+  if (stored.evaluation.checks.some(requiresManualGateConfirmation)) {
     logger.warn(
       `machine gate requires attributed review — raw human confirmation is not machine evidence | next: use a governed approval-bound check or an explicit human review | evidence: ${missionId}/${gateId}`
     );

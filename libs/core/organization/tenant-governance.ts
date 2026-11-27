@@ -21,6 +21,7 @@ import {
 } from '../governance/approval-store.js';
 import { nowIso } from '../foundation/time.js';
 import {
+  assertTenantOperational,
   DEFAULT_TENANT_ISOLATION_POLICY,
   defaultTenantKnowledgeRoot,
   listTenantProfileSlugs,
@@ -557,7 +558,7 @@ export function providerAttestationApplyArgs(
     RecordProviderAttestationInput,
     'provider' | 'training_use' | 'plan' | 'basis' | 'attested_by' | 'valid_for_days'
   >,
-  approvalRequestId: string
+  approvalRequestId?: string
 ): string[] {
   return [
     '--provider',
@@ -572,8 +573,7 @@ export function providerAttestationApplyArgs(
       : []),
     '--apply',
     '--accept',
-    '--approval-request-id',
-    approvalRequestId,
+    ...(approvalRequestId ? ['--approval-request-id', approvalRequestId] : []),
   ];
 }
 
@@ -957,6 +957,71 @@ export function findProviderAttestationGrantAuthority(
   return undefined;
 }
 
+export type TenantProviderAttestationPreview =
+  | { status: 'direct'; authorization: 'non_enabling' | 'approved_request' }
+  | {
+      status: 'delegated';
+      delegation: NonNullable<ReturnType<typeof findProviderAttestationGrantAuthority>>;
+    }
+  | { status: 'interactive'; reason: string }
+  | { status: 'blocked'; reason: string };
+
+const ATTESTATION_AUTHORITY_REQUIRED =
+  "[tenant-governance] training_use 'none' opens confidential egress and needs a human approval or an exact charter grant: request one with --request-approval, have a human run 'pnpm kyberion approvals --approve <id>', then re-run with --approval-request-id <id>. To delegate this exact claim instead, grant it via 'pnpm onboarding authority' (operation tenant:attest_provider).";
+
+function resolveProviderAttestationAuthority(input: AttestTenantProviderInput) {
+  const { slug, provider } = validateAttestationInput(input);
+  const normalized = { ...input, slug, provider };
+  const options = input.rootDir ? { rootDir: input.rootDir } : {};
+  const profile = readTenantProfile(slug, options);
+  if (!profile)
+    throw new Error(`[tenant-registry] tenant '${slug}' has no profile to attest against.`);
+  assertTenantOperational(profile, 'provider attestation');
+  if (input.training_use !== 'none') return { normalized, status: 'direct' } as const;
+  if (input.approvalRequestId?.trim()) {
+    return {
+      normalized,
+      status: 'approved',
+      checked: assertProviderAttestationApproval(input.approvalRequestId.trim(), normalized),
+    } as const;
+  }
+  const delegation = findProviderAttestationGrantAuthority(normalized, options);
+  return delegation
+    ? ({ normalized, status: 'delegated', delegation } as const)
+    : ({ normalized, status: 'interactive' } as const);
+}
+
+/** Inspect the current claim without reserving an approval or writing a tenant. */
+export function previewTenantProviderAttestation(
+  input: AttestTenantProviderInput
+): TenantProviderAttestationPreview {
+  try {
+    const authority = resolveProviderAttestationAuthority(input);
+    switch (authority.status) {
+      case 'direct':
+        return { status: 'direct', authorization: 'non_enabling' };
+      case 'approved': {
+        const approval = authority.checked.approval;
+        const refusal = evaluateApprovalUsability(approval);
+        if (approval.consumption || refusal) {
+          return {
+            status: 'blocked',
+            reason:
+              'The supplied approval is no longer usable. Review the decision before applying.',
+          };
+        }
+        return { status: 'direct', authorization: 'approved_request' };
+      }
+      case 'delegated':
+        return { status: 'delegated', delegation: authority.delegation };
+      case 'interactive':
+        return { status: 'interactive', reason: ATTESTATION_AUTHORITY_REQUIRED };
+    }
+  } catch (error) {
+    return { status: 'blocked', reason: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 /**
  * Governed entry point for recording a tenant provider attestation — shared by
  * `pnpm tenant attest-provider` and `pnpm onboarding llm attest`.
@@ -979,40 +1044,25 @@ export function attestTenantProvider(
 function attestTenantProviderUnderLock(
   input: AttestTenantProviderInput
 ): TenantProviderAttestationResult {
-  const { slug, provider } = validateAttestationInput(input);
+  const authority = resolveProviderAttestationAuthority(input);
+  if (authority.status === 'interactive') throw new Error(ATTESTATION_AUTHORITY_REQUIRED);
+  const { slug, provider } = authority.normalized;
   const actor = input.actor || input.invoker?.actor || baseRoleEnvText() || 'operator';
   let approved:
     { approval: ApprovalRequestRecord; humanDecider: string; claimId: string } | undefined;
-  let delegated:
-    { charter_id: string; scope_kind: CharterScopeKind; grant_hash: string } | undefined;
-  if (input.training_use === 'none') {
-    if (input.approvalRequestId?.trim()) {
-      const checked = assertProviderAttestationApproval(input.approvalRequestId.trim(), {
-        ...input,
-        slug,
-        provider,
-      });
-      // At most once: an approval cannot be replayed to keep extending the claim.
-      const claimId = claimApprovalApply('mission_controller', {
-        channel: checked.approval.channel,
-        storageChannel: PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
-        requestId: checked.approval.id,
-        appliedBy: actor,
-        expectedRecordHash: computeApprovalPayloadHash({ record: checked.approval }),
-        rerequestCommand: providerAttestationRequestCommand({ ...input, slug, provider }),
-      }).applyClaim.claimId;
-      approved = { ...checked, claimId };
-    } else {
-      delegated = findProviderAttestationGrantAuthority(
-        { slug, provider, ...input },
-        input.rootDir ? { rootDir: input.rootDir } : {}
-      );
-      if (!delegated) {
-        throw new Error(
-          "[tenant-governance] training_use 'none' opens confidential egress and needs a human approval or an exact charter grant: request one with --request-approval, have a human run 'pnpm kyberion approvals --approve <id>', then re-run with --approval-request-id <id>. To delegate this exact claim instead, grant it via 'pnpm onboarding authority' (operation tenant:attest_provider)."
-        );
-      }
-    }
+  const delegated = authority.status === 'delegated' ? authority.delegation : undefined;
+  if (authority.status === 'approved') {
+    const checked = authority.checked;
+    // At most once: an approval cannot be replayed to keep extending the claim.
+    const claimId = claimApprovalApply('mission_controller', {
+      channel: checked.approval.channel,
+      storageChannel: PROVIDER_ATTESTATION_APPROVAL_CHANNEL,
+      requestId: checked.approval.id,
+      appliedBy: actor,
+      expectedRecordHash: computeApprovalPayloadHash({ record: checked.approval }),
+      rerequestCommand: providerAttestationRequestCommand({ ...input, slug, provider }),
+    }).applyClaim.claimId;
+    approved = { ...checked, claimId };
   }
   const {
     actor: _actor,

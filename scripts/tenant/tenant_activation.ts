@@ -2,6 +2,7 @@
 import * as path from 'node:path';
 import {
   applyTenantActivation,
+  TENANT_ACTIVATION_CHECKS,
   loadTenantActivation,
   reconcileTenantActivation,
   rollbackTenantActivation,
@@ -90,7 +91,7 @@ function usage(): string {
     '',
     '  Explicit successful probes and audit refs are required: --check-viewer-scope --check-nhi --check-services --check-isolation',
     '  Probe refs: --probe-ref viewer_scope=<audit-ref> --probe-ref nhi_provisioned=<audit-ref> ...',
-    '  `probe` runs all four checks, writes evidence beside the receipt, and prints the activate command.',
+    '  `probe` writes evidence and offers activation only when the canonical activation checks pass.',
     '  A ref is either <scheme>://... (external attestation) or an existing repository path.',
     '  `plan` also prints llm_availability: per data tier, the providers usable for LLM work',
     '  (attest one with `pnpm onboarding llm attest` to enable confidential/personal tiers).',
@@ -148,6 +149,40 @@ function dispatch(command: string, argv: string[], print: Print): void {
     return;
   }
   const activationInput = input(argv);
+  if (command === 'plan') {
+    const result = resolveTenantActivation(activationInput);
+    const nextCheck = TENANT_ACTIVATION_CHECKS.find((check) => !result.record.checks[check]);
+    // Show the consequence of the tenant's provider attestations before work
+    // starts: which providers each data tier can use for LLM work.
+    print(
+      JSON.stringify(
+        {
+          ...result,
+          next_action: nextCheck
+            ? {
+                kind: 'resolve_check',
+                check: nextCheck,
+                detail: activationCheckGuidance[nextCheck],
+              }
+            : result.record.status === 'active'
+              ? { kind: 'plan_first_work', detail: 'Use pnpm onboarding:context first-work.' }
+              : {
+                  kind: 'review_activation',
+                  detail: 'Review successful probes before activation.',
+                },
+          llm_availability: describeProviderTierAvailability({
+            tenant_slug: activationInput.tenantSlug,
+            ...(activationInput.rootDir
+              ? { tenant_registry_root_dir: activationInput.rootDir }
+              : {}),
+          }),
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
   const result =
     command === 'activate' && argv.includes('--apply')
       ? applyTenantActivation({ ...activationInput, accept: argv.includes('--accept') })
@@ -168,28 +203,23 @@ function dispatch(command: string, argv: string[], print: Print): void {
                   accept: argv.includes('--accept'),
                 })
               : resolveTenantActivation(activationInput);
-  if (command === 'plan') {
-    // Show the consequence of the tenant's provider attestations before work
-    // starts: which providers each data tier can use for LLM work.
-    print(
-      JSON.stringify(
-        {
-          ...result,
-          llm_availability: describeProviderTierAvailability({
-            tenant_slug: activationInput.tenantSlug,
-            ...(activationInput.rootDir
-              ? { tenant_registry_root_dir: activationInput.rootDir }
-              : {}),
-          }),
-        },
-        null,
-        2
-      )
-    );
-    return;
-  }
   print(JSON.stringify(result, null, 2));
 }
+
+const activationCheckGuidance: Record<TenantActivationCheck, string> = {
+  registry: 'Check the tenant status with pnpm tenant show.',
+  context_binding:
+    'Review the customer, tenant and organization binding with pnpm onboarding:context bind (dry-run by default).',
+  organization_state:
+    'Verify the organization state and scoped authority with pnpm organization status.',
+  accountable_human: 'Confirm the accountable human recorded on the organization binding.',
+  memory_policy: 'Review the tenant isolation policy before using tenant knowledge.',
+  viewer_scope: 'Run pnpm tenant:activation probe to obtain viewer-scope evidence.',
+  nhi_provisioned:
+    'Identify the provisioned worker NHIs and pass them to pnpm tenant:activation probe.',
+  service_readiness: 'Run pnpm tenant:activation probe with the services needed for first work.',
+  isolation_probe: 'Run pnpm tenant:activation probe to obtain scoped isolation evidence.',
+};
 
 async function probe(argv: string[], print: Print): Promise<void> {
   const { runTenantActivationProbes } = await import('./tenant_activation_probe.js');
@@ -198,6 +228,7 @@ async function probe(argv: string[], print: Print): Promise<void> {
     customerSlug: activationInput.customerSlug,
     tenantSlug: activationInput.tenantSlug,
     organizationId: activationInput.organizationId,
+    ownerId: activationInput.ownerId,
     nhiIds: activationInput.nhiIds,
     serviceIds: argv.flatMap((arg, index) =>
       arg === '--service' && argv[index + 1] ? [argv[index + 1]!] : []

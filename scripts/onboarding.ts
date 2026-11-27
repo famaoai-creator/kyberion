@@ -26,7 +26,7 @@ export async function main(
   }
   if (args[0] === 'llm') {
     const { main: llmMain } = await import('./onboarding/onboarding_llm.js');
-    llmMain(args.slice(1), print);
+    await llmMain(args.slice(1), print);
     return;
   }
   if (args[0] === 'authority') {

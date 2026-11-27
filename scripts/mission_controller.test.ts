@@ -653,12 +653,29 @@ describe('mission_controller argument parsing', () => {
                 checks: [{ kind: 'evidence_exists', params: { path: 'evidence/alignment.json' } }],
               },
             },
+            {
+              id: 'execution',
+              exit_gate: {
+                id: 'EXECUTION_DONE',
+                checks: [{ kind: 'human_override', params: { require_signature: true } }],
+              },
+            },
           ],
         },
       };
       safeMkdir(missionDir, { recursive: true });
       safeWriteFile(statePath, JSON.stringify(state));
       try {
+        const preview: unknown[] = [];
+        await main(['workflow-select', id], (value) => preview.push(value));
+        expect(JSON.parse(String(preview[0]))).toMatchObject({
+          machine_gate_preview: {
+            source: 'planned_template',
+            workflow_id: 'test-alignment',
+            status: 'confirmation_required',
+            blockers: [{ phase: 'execution', gate_id: 'EXECUTION_DONE', check: 'human_override' }],
+          },
+        });
         const args = ['gate-pass', id, 'EXECUTION_DONE'];
         const output: unknown[] = [];
         await main([...args, '--dry-run', '--json'], (value) => output.push(value));

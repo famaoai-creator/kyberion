@@ -67,6 +67,19 @@ export interface AutonomousLoopDotSummary {
   recent_rejected: number;
 }
 
+export interface AutonomousLoopFinding {
+  code:
+    | 'unhealthy_heartbeats'
+    | 'invalid_dot_charters'
+    | 'recent_wake_failures'
+    | 'memory_delivery_open'
+    | 'memory_usage_open'
+    | 'factory_not_ready';
+  severity: 'blocker' | 'warning';
+  area: 'operations' | 'learning';
+  action: string;
+}
+
 export interface AutonomousLoopReadinessReport {
   status: AutonomousLoopStatus;
   ready_for_unattended_loop: boolean;
@@ -76,6 +89,8 @@ export interface AutonomousLoopReadinessReport {
   memory_loop: MemoryLoopHealth;
   factory?: FactoryReadinessReport;
   findings: string[];
+  diagnostics: AutonomousLoopFinding[];
+  next_check?: AutonomousLoopFinding;
 }
 
 const DEFAULT_WAKE_WINDOW_DAYS = 7;
@@ -190,29 +205,67 @@ export function evaluateAutonomousLoopReadiness(
     : undefined;
 
   const findings: string[] = [];
+  const diagnostics: AutonomousLoopFinding[] = [];
   if (unhealthyIds.length > 0) {
     findings.push(`unhealthy daemon heartbeats: ${unhealthyIds.join(', ')}`);
+    diagnostics.push({
+      code: 'unhealthy_heartbeats',
+      severity: 'blocker',
+      area: 'operations',
+      action: 'Run pnpm kyberion scheduler reconcile to preview resident service changes.',
+    });
   }
   if (charterErrors.length > 0) {
     findings.push(`${charterErrors.length} dot charter(s) failed validation`);
+    diagnostics.push({
+      code: 'invalid_dot_charters',
+      severity: 'blocker',
+      area: 'operations',
+      action: 'Check active Dot charters against the Dot charter schema.',
+    });
   }
   if (recentFailed > 0) {
     findings.push(`${recentFailed} dot wake failure(s) in the last ${windowDays}d`);
+    diagnostics.push({
+      code: 'recent_wake_failures',
+      severity: 'warning',
+      area: 'operations',
+      action: 'Check the failed Dot wake receipts and their execution evidence.',
+    });
   }
   if (memoryLoop.loop_status === 'delivery_open' && memoryLoop.warning) {
     findings.push(`memory loop delivery open: ${memoryLoop.warning}`);
+    diagnostics.push({
+      code: 'memory_delivery_open',
+      severity: 'warning',
+      area: 'learning',
+      action: 'Check whether eligible promoted knowledge reached the worker context pack.',
+    });
   } else if (memoryLoop.loop_status === 'usage_open' && memoryLoop.usage_warning) {
     findings.push(`memory loop usage open: ${memoryLoop.usage_warning}`);
+    diagnostics.push({
+      code: 'memory_usage_open',
+      severity: 'warning',
+      area: 'learning',
+      action: 'Check whether work evidence records which retrieved knowledge was used.',
+    });
   }
   if (factory && !factory.ready) {
     findings.push(...factory.blockers);
   }
+  if (factory && (factory.halted || !factory.ready)) {
+    diagnostics.push({
+      code: 'factory_not_ready',
+      severity: 'blocker',
+      area: 'operations',
+      action: 'Check the factory halt state, action readiness, and active mandates.',
+    });
+  }
 
-  const blocked =
-    (factory ? factory.halted || !factory.ready : false) ||
-    charterErrors.length > 0 ||
-    unhealthyIds.length > 0;
-  const degraded = !blocked && findings.length > 0;
+  const blocker = diagnostics.find((diagnostic) => diagnostic.severity === 'blocker');
+  const nextCheck = blocker ?? diagnostics[0];
+  const blocked = blocker !== undefined;
+  const degraded = !blocked && diagnostics.length > 0;
   const status: AutonomousLoopStatus = blocked ? 'blocked' : degraded ? 'degraded' : 'ready';
 
   return {
@@ -234,6 +287,8 @@ export function evaluateAutonomousLoopReadiness(
     memory_loop: memoryLoop,
     ...(factory ? { factory } : {}),
     findings,
+    diagnostics,
+    ...(nextCheck ? { next_check: nextCheck } : {}),
   };
 }
 
@@ -250,6 +305,7 @@ export function formatAutonomousLoopReadiness(report: AutonomousLoopReadinessRep
       `  factory (${report.factory.tenant_slug ?? 'global'}): ${report.factory.ready ? 'READY' : 'NOT READY'} (${report.factory.active_mandate_count} mandate(s), ${report.factory.graduated_actions.length} graduated)`
     );
   }
+  if (report.next_check) lines.push(`  next check: ${report.next_check.action}`);
   for (const finding of report.findings) {
     lines.push(`  finding: ${finding}`);
   }

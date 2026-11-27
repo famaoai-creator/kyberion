@@ -10286,9 +10286,9 @@
         "qps-ploc": "⟦Řůñ ŧħė ėɱȧïŀ ẇőřķƒŀőẇ ŀőřėɱ ï⟧"
       },
       "cli_cmd_script_mission": {
-        "en": "Manage the Mission lifecycle. Preview startup with --dry-run --json.",
-        "ja": "ミッションのライフサイクルを管理します。起動前の確認には --dry-run --json を使います。",
-        "qps-ploc": "⟦Ɱȧñȧɠė ŧħė Ɱïşşïőñ ŀïƒėƈẏƈŀė. Ṗřėṽïėẇ şŧȧřŧůṗ ẇïŧħ --ḓřẏ-řůñ --ĵşőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+        "en": "Manage the Mission lifecycle. Inspect machine-only gate compatibility with workflow-select.",
+        "ja": "ミッションを管理します。機械実行で通せるゲートの確認には workflow-select を使います。",
+        "qps-ploc": "⟦Ɱȧñȧɠė ŧħė Ɱïşşïőñ ŀïƒėƈẏƈŀė. Ïñşṗėƈŧ ɱȧƈħïñė-őñŀẏ ɠȧŧė ƈőɱṗȧŧïƀïŀïŧẏ ẇïŧħ ẇőřķƒŀőẇ-şėŀėƈŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
       },
       "cli_cmd_script_project": {
         "en": "Project controller (same target as kyberion project)",
@@ -10411,9 +10411,9 @@
         "qps-ploc": "⟦Řůñ ŧħė ɱïşşïőñ őřƈħėşŧřȧŧïőñ ėṽėñŧ ẇőřķėř ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "cli_cmd_script_onboard": {
-        "en": "Run the onboarding wizard (identity, services, tenant)",
-        "ja": "オンボーディングウィザードを実行 (アイデンティティ・サービス・テナント)",
-        "qps-ploc": "⟦Řůñ ŧħė őñƀőȧřḓïñɠ ẇïẑȧřḓ (ïḓėñŧïŧẏ, şėřṽïƈėş, ŧėñȧñŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+        "en": "Run the onboarding wizard. Check the active Codex plan with llm account.",
+        "ja": "オンボーディングウィザードを実行します。Codex のプランは llm account で確認できます。",
+        "qps-ploc": "⟦Řůñ ŧħė őñƀőȧřḓïñɠ ẇïẑȧřḓ. Ƈħėƈķ ŧħė ȧƈŧïṽė Ƈőḓėẋ ṗŀȧñ ẇïŧħ ŀŀɱ ȧƈƈőůñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
       "cli_cmd_script_mission_journal": {
         "en": "Show the mission journal",

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
+import * as reasoningEgress from '../reasoning/reasoning-egress-scope.js';
 import { safeReadFile } from '../secure-io.js';
 import {
   buildGeminiApiBackendFromEnv,
@@ -11,6 +12,7 @@ import {
 describe('GeminiApiBackend', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('normalizes only supported response shapes', () => {
@@ -226,7 +228,39 @@ describe('GeminiApiBackend', () => {
     expect(body.contents[0].parts[0].inlineData?.data.length).toBeGreaterThan(100);
   });
 
-  it('streams SSE text deltas from streamGenerateContent', async () => {
+  it('disables redirects for capped native text and tool requests', async () => {
+    const egress = vi.spyOn(reasoningEgress, 'assertReasoningEgressAllowedAtEndpoint');
+    egress.mockImplementation(() => undefined);
+    const request = vi.fn().mockResolvedValue({
+      candidates: [{ content: { parts: [{ text: 'done' }] } }],
+    });
+    const backend = new GeminiApiBackend({
+      apiKey: 'test-gemini-key',
+      model: 'gemini-flash-latest',
+      request,
+    });
+    await reasoningEgress.withReasoningTrainingUseCap('no_training', async () => {
+      await expect(backend.prompt('probe')).resolves.toBe('done');
+      await expect(
+        backend.generateWithTools('probe', [
+          { name: 'fixture', description: 'Test tool', inputSchema: { type: 'object' } },
+        ])
+      ).resolves.toEqual({ text: 'done' });
+    });
+    expect(egress).toHaveBeenCalledWith(
+      'gemini-api',
+      'https://generativelanguage.googleapis.com/v1beta'
+    );
+    expect(request).toHaveBeenCalledTimes(2);
+    for (const [options] of request.mock.calls) expect(options).toMatchObject({ maxRedirects: 0 });
+  });
+
+  it.each([false, true])('streams SSE text deltas with a data-use cap %s', async (capped) => {
+    if (capped) {
+      vi.spyOn(reasoningEgress, 'assertReasoningEgressAllowedAtEndpoint').mockImplementation(
+        () => undefined
+      );
+    }
     const encoder = new TextEncoder();
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -250,14 +284,21 @@ describe('GeminiApiBackend', () => {
       model: 'gemini-flash-latest',
     });
 
-    const deltas: string[] = [];
-    for await (const delta of backend.streamPrompt('Tell me a short answer')) deltas.push(delta);
+    const collect = async () => {
+      const deltas: string[] = [];
+      for await (const delta of backend.streamPrompt('Tell me a short answer')) deltas.push(delta);
+      return deltas;
+    };
+    const deltas = await (capped
+      ? reasoningEgress.withReasoningTrainingUseCap('no_training', collect)
+      : collect());
 
     expect(deltas).toEqual(['最初の', '応答です。']);
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(String(fetchMock.mock.calls[0][0])).toContain(
       '/models/gemini-flash-latest:streamGenerateContent?alt=sse'
     );
+    expect(fetchMock.mock.calls[0][1]?.redirect).toBe(capped ? 'error' : undefined);
   });
 
   it('routes Gemini runtime environment reads through the governed accessor', () => {

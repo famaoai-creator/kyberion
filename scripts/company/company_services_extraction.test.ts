@@ -36,6 +36,9 @@ describe('canonical company onboarding services', () => {
     const result = {
       passed: false,
       evidence_ref: 'fixture',
+      activation_status: 'validating' as const,
+      activation_blockers: ['fixture'],
+      activate_args: null,
       activate_command: null,
       results: {
         isolation_probe: check,
