@@ -8,6 +8,11 @@ vi.mock('@agent/core/secure-io', async (original) => ({
   ...(await original<typeof import('@agent/core/secure-io')>()),
   safeSpawn: mocks.spawn,
 }));
+// Hermetic: do not depend on a locally installed `codex` binary.
+vi.mock('@agent/core/provider/codex-cli-query', async (original) => ({
+  ...(await original<typeof import('@agent/core/provider/codex-cli-query')>()),
+  resolveCodexBinary: () => 'codex',
+}));
 
 function setup() {
   const child = Object.assign(new EventEmitter(), {
