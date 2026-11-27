@@ -114,6 +114,7 @@ export function assertReadOnlyServiceCapture(
       gmail_message_get: ['gmail', 'users', 'messages', 'get', '--params', '{{params}}'],
       gmail_history_list: ['gmail', 'users', 'history', 'list', '--params', '{{params}}'],
       gmail_thread_get: ['gmail', 'users', 'threads', 'get', '--params', '{{params}}'],
+      calendar_events_list: ['calendar', 'events', 'list', '--params', '{{params}}'],
     };
     if (
       service !== 'google-workspace' ||

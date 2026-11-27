@@ -19,5 +19,12 @@
     "description": "Workflow tickets awaiting an authorized approval decision.",
     "aliases": ["approval", "jira_approval"],
     "default_freshness_seconds": 900
+  },
+  {
+    "asset_type": "calendar.meeting",
+    "title": "Calendar meetings",
+    "description": "Meetings with people: prepared before they start and followed up after they end.",
+    "aliases": ["calendar", "meeting", "google_calendar"],
+    "default_freshness_seconds": 1800
   }
 ]

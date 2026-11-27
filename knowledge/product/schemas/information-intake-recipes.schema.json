@@ -37,7 +37,12 @@
             "minLength": 1
           },
           "asset_type": {
-            "enum": ["customer.request", "code.review_request", "workflow.approval_request"]
+            "enum": [
+              "customer.request",
+              "code.review_request",
+              "workflow.approval_request",
+              "calendar.meeting"
+            ]
           },
           "event_types": {
             "type": "array",
@@ -52,6 +57,7 @@
             "enum": [
               "classify",
               "prepare_reply",
+              "prepare_brief",
               "extract_actions",
               "follow_up",
               "review",

@@ -5,6 +5,14 @@ import { findDotCharter } from '@agent/core/dot/dot-charter';
 import { evaluateDotFeedTriggers } from '@agent/core/dot/dot-feed-source';
 import { runAsDotCharter } from '@agent/core/dot/dot-key-results';
 import { executeServicePreset } from '@agent/core/service/service-engine';
+import { safeReadFile } from '@agent/core/secure-io';
+import {
+  projectCommitments,
+  renderCommitmentDigest,
+  type CommitmentProjectionEntry,
+} from '@agent/core/information-assets/work';
+import { informationArtifactHash } from '@agent/core/information-assets/completion';
+import { parseInformationAssetWorkBinding } from '@agent/core/information-assets/work-types';
 /** Owner-authorized CLI for information availability; mutation uses the organization facade. */
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { resolveScopeContext } from '@agent/core/scope-context';
@@ -35,7 +43,7 @@ export async function runOrganizationInformationAssets(
     .scriptName('pnpm organization information-assets')
     .command('$0 [action]', 'Manage scoped information asset locations', (y) =>
       y.positional('action', {
-        choices: ['list', 'resolve', 'save', 'remove', 'collect', 'work'],
+        choices: ['list', 'resolve', 'save', 'remove', 'collect', 'work', 'commitments'],
         default: 'list',
       })
     )
@@ -48,6 +56,12 @@ export async function runOrganizationInformationAssets(
     .option('location-id', { type: 'string' })
     .option('expected-version', { type: 'number' })
     .option('apply', { type: 'boolean', default: false })
+    .option('self', {
+      type: 'string',
+      array: true,
+      description: 'Your own email addresses or names, so commitments split into owed vs waiting',
+    })
+    .option('format', { choices: ['markdown', 'json'] as const, default: 'markdown' as const })
     .strict()
     .parse();
   if (!args.tenant || !args.organizationId)
@@ -77,7 +91,7 @@ export async function runOrganizationInformationAssets(
     );
     return;
   }
-  if (args.action === 'collect' || args.action === 'work') {
+  if (args.action === 'collect' || args.action === 'work' || args.action === 'commitments') {
     // The registered owner and canonical parent scopes are checked before runtime authority.
     const authorized = await authorizeInformationAssetManagement(auth, scope);
     if (authorized.allowedProjectIds !== 'all' && !scope.project_id)
@@ -86,6 +100,12 @@ export async function runOrganizationInformationAssets(
     const result = await withExecutionContextAsync(
       'organization_operator',
       async () => {
+        if (args.action === 'commitments') {
+          const projection = projectCommitments(collectCommitmentEntries(scope), {
+            selfIdentities: args.self ?? [],
+          });
+          return args.format === 'json' ? projection : renderCommitmentDigest(projection);
+        }
         if (args.action === 'work')
           return listWorkItems({
             tenantSlugs: [scope.tenant_slug],
@@ -174,4 +194,72 @@ export async function runOrganizationInformationAssets(
       expectedVersion,
     })
   );
+}
+
+/**
+ * Completed intake work whose artifact still matches its recorded hash. A
+ * mismatch is surfaced as a skipped entry by the projection, never trusted.
+ */
+function collectCommitmentEntries(scope: {
+  tenant_slug: string;
+  organization_id: string;
+  project_id?: string;
+}): CommitmentProjectionEntry[] {
+  const entries: CommitmentProjectionEntry[] = [];
+  for (const item of listWorkItems({
+    tenantSlugs: [scope.tenant_slug],
+    organizationIds: [scope.organization_id],
+    ...(scope.project_id ? { projectIds: [scope.project_id] } : {}),
+  })) {
+    const outcome = item.metadata?.information_asset_outcome as
+      | { status?: string; work_key?: string; artifact_ref?: string; evidence_sha256?: string }
+      | undefined;
+    if (
+      !item.metadata?.information_asset_work ||
+      outcome?.status !== 'completed' ||
+      typeof outcome.artifact_ref !== 'string' ||
+      typeof outcome.work_key !== 'string'
+    )
+      continue;
+    let binding: ReturnType<typeof parseInformationAssetWorkBinding>;
+    try {
+      binding = parseInformationAssetWorkBinding(item.metadata.information_asset_work);
+    } catch {
+      continue;
+    }
+    const base = {
+      work_item_id: item.item_id,
+      work_key: outcome.work_key,
+      artifact_ref: outcome.artifact_ref,
+    };
+    let content: string;
+    try {
+      content = safeReadFile(outcome.artifact_ref, { encoding: 'utf8' }) as string;
+    } catch {
+      entries.push({ ...base, artifact: null, error: 'artifact_unreadable' });
+      continue;
+    }
+    if (informationArtifactHash(content) !== outcome.evidence_sha256) {
+      entries.push({ ...base, artifact: null, error: 'artifact_hash_mismatch' });
+      continue;
+    }
+    let artifact: { recipe_id?: unknown; subject_id?: unknown } | null;
+    try {
+      artifact = JSON.parse(content) as { recipe_id?: unknown; subject_id?: unknown } | null;
+    } catch {
+      entries.push({ ...base, artifact: null, error: 'artifact_not_json' });
+      continue;
+    }
+    // The artifact must describe the same admitted work it is recorded against.
+    if (
+      outcome.work_key !== binding.work_key ||
+      artifact?.recipe_id !== binding.recipe_id ||
+      artifact?.subject_id !== binding.observation.subject_id
+    ) {
+      entries.push({ ...base, artifact: null, error: 'artifact_binding_mismatch' });
+      continue;
+    }
+    entries.push({ ...base, artifact });
+  }
+  return entries;
 }

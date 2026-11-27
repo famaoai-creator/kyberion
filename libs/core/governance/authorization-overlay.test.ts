@@ -19,6 +19,7 @@ const SHIPPED_CAPTURE_READS = [
   'service:google-workspace:preset:gmail_message_get',
   'service:google-workspace:preset:gmail_history_list',
   'service:google-workspace:preset:gmail_thread_get',
+  'service:google-workspace:preset:calendar_events_list',
   'service:jira:preset:search_issues_enhanced',
   'service:jira:preset:get_request_approvals',
   'service:jira:preset:get_request_approval',

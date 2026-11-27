@@ -263,6 +263,9 @@ The operations console does not directly own mission state. It delegates to:
 
 ### 5. Service binding and channel delivery
 
+- `libs/core/information-assets/collector.ts` (typed read-only collectors: `provider-gmail.ts`, `provider-calendar.ts` for Google Calendar meeting prep / follow-up windows, `provider-code-work.ts`; capture admission in `libs/core/service/service-capture-admission.ts`)
+- `libs/core/information-assets/work-preparation.ts` + `work-types.ts` (recipe preparation; provider-derived matter and source facts on every intake artifact)
+- `libs/core/information-assets/commitments.ts` (Commitment Loop: read-only projection of completed intake artifacts into owed / waiting commitments and the morning digest, `pnpm organization information-assets commitments`)
 - `libs/core/service/service-binding.ts`
 - `libs/core/service/service-binding-reader.ts` (governed connection reads; no execution authorization)
 - `libs/core/service/service-binding-registry.ts` (writes and tenant/project/action authorization)
