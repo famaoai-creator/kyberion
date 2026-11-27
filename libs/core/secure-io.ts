@@ -1373,6 +1373,7 @@ export function safeExecResult(
  * Execute a command asynchronously through the same governed boundary as
  * safeExecResult. This is used by independent validation gates so the runner
  * can overlap work without allowing feature code to bypass secure-io.
+ * Set forceKillOnAbort for probes that must settle at their timeout or output cap.
  */
 export function safeExecResultAsync(
   command: string,
@@ -1390,6 +1391,7 @@ export function safeExecResultAsync(
     env = {},
     maxOutputMB = 10,
     input,
+    forceKillOnAbort = false,
   } = options;
   assertNotShellScriptInvocation(command, args);
   assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
@@ -1425,14 +1427,33 @@ export function safeExecResultAsync(
       settled = true;
       resolve(result);
     };
+    const abort = (error: Error) => {
+      child.kill(forceKillOnAbort ? 'SIGKILL' : 'SIGTERM');
+      if (!forceKillOnAbort) return;
+      clearTimeout(timeout);
+      // Descendants can inherit these pipes and delay the close event.
+      child.stdin?.destroy();
+      child.stdout.destroy();
+      child.stderr.destroy();
+      finish({
+        stdout: Buffer.concat(stdout).toString(),
+        stderr: Buffer.concat(stderr).toString(),
+        status: 1,
+        error,
+      });
+    };
     const timeout = setTimeout(() => {
       timedOut = true;
-      child.kill('SIGTERM');
+      abort(
+        Object.assign(new Error(`command timed out after ${timeoutMs}ms`), { code: 'ETIMEDOUT' })
+      );
     }, timeoutMs);
     const append = (target: Buffer[], chunk: Buffer): void => {
       outputBytes += chunk.byteLength;
       if (outputBytes > maxBytes) {
-        child.kill('SIGTERM');
+        abort(
+          Object.assign(new Error(`command output exceeded ${maxOutputMB}MB`), { code: 'ENOBUFS' })
+        );
         return;
       }
       target.push(chunk);

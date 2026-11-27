@@ -360,6 +360,20 @@ pnpm onboarding apply --identity <reviewed-identity-json>
 
 `pnpm onboarding llm account --json` はローカルの Codex CLI に実際のプラン識別子と認証種別を問い合わせる。メールアドレスは出力せず、認証の更新や推論リクエストも行わない。プラン名とアカウントのデータ利用設定はそれぞれ確認する。
 
+`--provider claude|agy|grok|devin|cursor` で別の CLI を指定できる。`--provider all --json` は各 CLI の結果を配列で返し、一部の CLI が未認証または取得不可でも他の結果を表示する。Claude、Agy、Devin、Cursor は契約プランを読み取る。Agy は一時ステータスラインへの対応と `jq` が必要。Grok は `grok usage --json` で利用枠を照会する。応答がない場合は一時ディレクトリで CLI の `/usage` を開き、表示されたプラン名と週次利用率を読み取る。CLI がディレクトリの信頼やログインの確認を求める場合は `unavailable` を返す。 Grok の対話確認には、空の専用ディレクトリを Grok で一度信頼済みにし、
+`TMPDIR=/path/to/trusted-empty-dir pnpm onboarding llm account --provider grok --json` で指定できる。認証ストアやバックグラウンドサービスにアクセスできない環境では `unavailable` になる場合がある。CLI から取得できたプランをテナントにまとめて登録するには、まず dry-run で対象を確認する。dry-run は CLI を照会し、テナントの申告や承認リクエストへの書き込みを行わない。
+
+```bash
+pnpm onboarding llm attest-installed --tenant <slug> --json
+pnpm onboarding llm attest-installed --tenant <slug> --provider grok --json
+pnpm onboarding llm attest-installed --tenant <slug> --apply --accept --review-token <review_token> --json
+```
+
+対象はプラン照会を備える Codex・Claude・Agy・Grok・Devin・Cursor。dry-run の `--provider` で1件に絞れる。CLI の起動・バージョン確認の失敗、プランの取得不可、照会のタイムアウトや出力上限超過を区別し、それぞれの対処を出力する。バージョン確認に成功し、実際にプランを取得できた CLI を、既存のテナント attestation 経路で登録する。データ利用区分は `unknown` と記録し、すでに登録済みの申告は保持する。dry-run の `apply_command` または `review_token` を使って適用する。登録候補だけを再照会し、その結果が変わった場合は、書き込む前に停止し、再度 dry-run を求める。適用はプロバイダー単位で行われ、途中で失敗した場合も成功済みの登録は保持される。確認した候補の結果が同じなら、同じトークンで再実行できる。Grok の対話確認で `TMPDIR` を使う場合は、dry-run と適用を実行するシェルで同じ値を `export` する。
+データ利用区分を `none` と申告する場合は通常の `attest` と既存の承認フローを使う。
+
+新しい CLI のアカウント照会を追加するときは、reasoning provider registry にある CLI モードを `scripts/onboarding/onboarding_provider_account.ts` の照会定義に紐付ける。実行可否の確認には registry のバージョン引数を使い、照会関数はプランなど観測できたフィールドだけを返す。オンボーディングの対象一覧と登録フローに個別の分岐を追加する必要はない。
+
 Codex CLI、Claude Code、その他の外部モデルは、実際に使う認証経路・アカウント・契約のデータ利用条件を確認する。テナントの `llm attest` は既定で書き込まず、同じ対象に対する実行時の権限判定を表示する。`direct` は既存の承認または送信を開かない宣言、`delegated` は一致する有効な Charter、`interactive` は新たな決裁、`blocked` は証拠や前提条件の不足を示す。
 
 `interactive` の対象は Concierge の Settings → Authority で、テナント・操作・送信先・根拠を限定して委任できる。複数の provider をまとめて確認する場合は、各 dry-run が返す `delegation_grant` を一つの Charter 計画の `grants` に入れる。有効な委任がある同一の claim は、申請を再作成せず `--apply --accept` で記録する。個人・システム custody の attest は別の署名フローを使う。

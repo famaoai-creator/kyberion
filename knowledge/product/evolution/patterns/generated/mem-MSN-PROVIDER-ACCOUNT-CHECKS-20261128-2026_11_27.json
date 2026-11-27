@@ -1,0 +1,22 @@
+{
+  "record_id": "mem-MSN-PROVIDER-ACCOUNT-CHECKS-20261128-2026_11_27",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "CLI account diagnostics and reviewed attestations",
+  "summary": "Resolve a provider executable once, keep account observations separate from data-use policy, and recheck reviewed plans before tenant registration.",
+  "candidate_id": "mem-MSN-PROVIDER-ACCOUNT-CHECKS-20261128-2026_11_27",
+  "evidence_refs": [
+    "active/missions/public/MSN-PROVIDER-ACCOUNT-CHECKS-20261128/evidence/account-adapter-registry.md",
+    "active/missions/public/MSN-PROVIDER-ACCOUNT-CHECKS-20261128/evidence/attest-installed-improvement-cycle.md",
+    "active/missions/public/MSN-PROVIDER-ACCOUNT-CHECKS-20261128/evidence/account-extension-review-cycle.md"
+  ],
+  "created_at": "2026-11-27T19:40:10.699Z",
+  "applicability": ["mission", "mission:MSN-PROVIDER-ACCOUNT-CHECKS-20261128"],
+  "reusable_steps": [
+    "Resolve a provider executable once, keep account observations separate from data-use policy, and recheck reviewed plans before tenant registration"
+  ],
+  "expected_outcome": "Use the reasoning CLI descriptor to resolve the executable and version arguments. Resolve relative overrides before changing the working directory and use the same executable for capability checks and account inspection. Bound disposable subprocesses by time and output, and close inherited pipes on failure. Report credential-store access failures as unavailable without inferring logout. Register observed plans only as unknown data use, bind apply to reviewed provider IDs and plans, and preserve existing attestations under the lifecycle lock.",
+  "source_branch": "feat/onboarding-provider-account-checks",
+  "source_commit": "8c7b01573db8c583cebce405f137b11b9d68cee2"
+}
