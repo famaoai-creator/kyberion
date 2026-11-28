@@ -195,14 +195,23 @@ export default function FirstJobPage() {
         !Number.isNaN(new Date(artifact.verifiedAt).getTime())
           ? field('checked_at', date(artifact.verifiedAt))
           : null}
-        {revision ? (
+        {revision || status === 'work_completed' ? (
           <div className="first-job-toolbar">
-            <Button
-              label={text('revise_' + nextFormat)}
-              variant="secondary"
-              disabled={!canAct}
-              onClick={() => act(() => guide.revise(artifact))}
-            />
+            {revision ? (
+              <Button
+                label={text('revise_' + nextFormat)}
+                variant="secondary"
+                disabled={!canAct}
+                onClick={() => act(() => guide.revise(artifact))}
+              />
+            ) : null}
+            {status === 'work_completed' ? (
+              <Button
+                label={frontDeskText('ia_nav_settings', locale)}
+                variant="secondary"
+                href="/settings"
+              />
+            ) : null}
           </div>
         ) : null}
       </article>

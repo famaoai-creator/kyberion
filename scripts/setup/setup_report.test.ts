@@ -6,8 +6,125 @@ import {
   buildRecommendedSurfaces,
   collectSetupSurfaceHealth,
   formatSetupReport,
+  runSetupReportCli,
   type SetupReadinessInput,
 } from './setup_report.js';
+import * as surfaces from '../surface/surface_runtime.js';
+import {
+  buildSetupLifecycleGuide,
+  formatSetupLifecycleGuide,
+  onboardingSetupHandoff,
+  onboardingSetupPreview,
+} from './setup-lifecycle-guide.js';
+import { parseOffboardArgs } from '../cli/cli-offboard-args.js';
+
+it('exposes the lifecycle reference before applying an identity', () => {
+  const preview = onboardingSetupPreview(true);
+  expect(preview.available_now).toEqual({
+    lifecycle_reference_command: 'pnpm kyberion setup report --lifecycle --summary',
+  });
+  expect(preview.after_apply).toEqual(onboardingSetupHandoff(true));
+});
+
+it('includes the baseline in both onboarding handoffs and keeps tenant activation scoped', () => {
+  const personal = onboardingSetupHandoff(false);
+  expect(personal.baseline_command).toContain('pipelines/baseline-check.json');
+  expect(personal).not.toHaveProperty('tenant_activation_guide');
+  expect(onboardingSetupHandoff(true)).toMatchObject({
+    ...personal,
+    tenant_activation_guide: expect.stringContaining('--domain tenant'),
+  });
+});
+
+it('shows a filtered lifecycle guide without running live setup checks', async () => {
+  const check = vi.spyOn(surfaces, 'setupSurfaces');
+  try {
+    const result = await runSetupReportCli([
+      '--lifecycle',
+      '--domain',
+      'offboard',
+      '--json',
+      '--quiet',
+    ]);
+    expect(result).toMatchObject({
+      mode: 'reference',
+      verification: 'not_run',
+      routes: [
+        {
+          id: 'offboard',
+          inspection_commands: [
+            'pnpm kyberion offboard tenant <tenant-slug> --json',
+            expect.stringContaining('--tenant-slug <tenant-slug>'),
+          ],
+          actions: [
+            { effect: 'terminal', path: expect.stringContaining('--preview-id <preview-id>') },
+          ],
+        },
+      ],
+    });
+    expect(check).not.toHaveBeenCalled();
+  } finally {
+    check.mockRestore();
+  }
+});
+
+it('renders the lifecycle area index without embedding apply instructions', async () => {
+  const index = await runSetupReportCli(['--lifecycle', '--summary', '--json', '--quiet']);
+  expect(index).toEqual({
+    mode: 'reference',
+    verification: 'not_run',
+    summary: true,
+    routes: buildSetupLifecycleGuide().routes.map(({ id, title, use_when, guide_command }) => ({
+      id,
+      title,
+      use_when,
+      guide_command,
+    })),
+  });
+  const guide = buildSetupLifecycleGuide(undefined, true);
+  expect(guide.routes.map(({ id }) => id)).toEqual(
+    expect.arrayContaining([
+      'actuator',
+      'ingress',
+      'workitem',
+      'workspace',
+      'mission',
+      'pipeline',
+      'model',
+      'objectives',
+      'portfolio',
+      'operations',
+      'track',
+      'artifact',
+    ])
+  );
+  expect(new Set(guide.routes.map(({ id }) => id)).size).toBe(guide.routes.length);
+  const text = formatSetupLifecycleGuide(guide);
+  for (const route of guide.routes) {
+    expect(route.use_when.trim()).not.toBe('');
+    expect(text).toContain(route.use_when);
+    expect(route.guide_command).toBe(`pnpm kyberion setup report --lifecycle --domain ${route.id}`);
+    expect(route.inspection_commands.length || route.inspection_note?.length).toBeTruthy();
+  }
+  expect(text).toContain('offboard');
+  expect(text).not.toContain('--execute');
+  for (const route of guide.routes) {
+    for (const related of route.related_guides) {
+      expect(related.id).not.toBe(route.id);
+      expect(guide.routes.find(({ id }) => id === related.id)?.guide_command).toBe(
+        related.guide_command
+      );
+    }
+  }
+  const examples = guide.routes.find(({ id }) => id === 'offboard')!.inspection_commands;
+  for (const example of examples) {
+    const args = example
+      .replaceAll(/<[^>]+>/gu, 'fixture')
+      .split(' ')
+      .slice(3);
+    expect(parseOffboardArgs(args).mode).toBe('dry_run');
+  }
+});
 
 describe('setup report onboarding action', () => {
   it('places an onboarding command when identity or profile artifacts are missing', () => {

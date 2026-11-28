@@ -423,7 +423,11 @@ async function runMain(args: string[] = []): Promise<void> {
       const itemId = optionalArg(argv['item-id']);
       if (!itemId) throw new Error('session-summary requires --item-id');
       const tenantSlug = resolveIdentityContext().tenantSlug;
-      if (!tenantSlug) throw new Error('session-summary requires a tenant-bound execution context');
+      if (!tenantSlug) {
+        throw new Error(
+          'session-summary requires a tenant-bound execution context. Check the customer binding with pnpm onboarding:context show --customer-slug <customer-slug> --json, then retry from the authorized tenant context.'
+        );
+      }
       const item = getWorkItem(itemId);
       if (!item || item.context?.tenant_slug !== tenantSlug ||
           (argv['tenant-slug'] && argv['tenant-slug'] !== tenantSlug)) {

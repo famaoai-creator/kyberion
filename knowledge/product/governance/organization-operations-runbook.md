@@ -77,6 +77,21 @@ A learning candidate is a row on the one memory candidate queue (`kind: organiza
 
 ## Objectives and key results
 
+Choose the starting point by the decision you need to make.
+
+| I want to                                     | Start with                                                                                           | Continue to                                                                          |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Decide what to improve and how to measure it  | `organization status` and the `objectives` guide                                                     | Objective, KR, and contributing projects                                             |
+| Review several change projects together       | `organization status` and `organization lineage` in the `portfolio` guide                            | The organization's `solution_projects`, their objectives, and the project to inspect |
+| Plan or unblock a release                     | `project show` and `control chronos tracks` in the `track` guide                                     | The track's next gate, required artifact, and mission to produce it                  |
+| Keep a service running                        | `organization service list --health` and `organization operation run list` in the `operations` guide | Run evidence, incident, and cadence decision as applicable                           |
+| Find what was produced and confirm the result | Concierge Deliverables or the `artifact` guide                                                       | Artifact, review verdict, and delivery receipt                                       |
+
+Use `pnpm kyberion setup report --lifecycle --domain <id>` for the related
+guides and exact inspection commands. Organizations own the projects shown in
+the Solution Portfolio view. Each Track belongs to a project. WorkItem
+dependencies record prerequisites between work items.
+
 Attach key results to an objective with `objective add` and `objective kr add`. A KR measures itself (`--metric-json` source `org_metric`, `file`, `probe` or `signal_ratio`) or takes values recorded by people (`manual`); `pnpm organization help` lists the shapes. KRs are measured automatically only while an active dot charter references the objective, so an organization run by hand measures on demand. Each KR is measured at most once per interval (`kr add --every <seconds>`, default 900); add `--force` to re-measure now, for example right after opening an incident. Objective lines show how old the oldest measurement is:
 
 ```bash
@@ -86,6 +101,11 @@ pnpm organization objective kr record --organization-id ORG --tier confidential 
 ```
 
 `status` shows each objective's progress and the projects that point at it through `--objective-ids`. The walkthrough from objective to project is Step 11 of the [onboarding flow](./onboarding-flow.md).
+
+For day-to-day review, open `pnpm kyberion setup report --lifecycle --domain objectives`
+to find the relevant inspection commands and follow the project, mission, or
+WorkItem guide. After delivery, measure the KR again and review the objective
+in `organization status` using the same organization and tenant scope.
 
 ## Members and roles
 
@@ -132,6 +152,8 @@ pnpm organization agent retire --tenant acme --organization-id org-a --nhi-id ky
 ```
 
 New mutation commands show a dry-run unless `--apply` is supplied. For an existing assignment, always pass the exact version returned by `participant list`, including when reactivating a removed assignment. Agent lifecycle/accountability edits require the exact `agent list` / `show` version. Activation also checks the current accountable human and home organization. Suspension and retirement remain available for offboarding. Retirement is terminal; use a new identity slug for a replacement.
+
+Member mutation output identifies the change scope and whether the caller supplied an expected version. Agent change previews show the current identity version and lifecycle state. The agent write result reports the identity update. Runtime status requires a separate check.
 
 When ownership, scope, context or version changes, refresh and review again. The member HTTP list returns a context hash bound to the full authenticated viewer and a version per member; the management UI binds drafts to both. A member PATCH returns only success/version, then the UI refreshes the scoped list. It never returns another tenant's membership data as a mutation receipt. A saved assignment is evidence of organizational responsibility; runtime startup and external action approval continue through their existing facades.
 

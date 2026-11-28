@@ -1,11 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
+import * as approvals from '../governance/approval-store.js';
+import * as catalogs from '../foundation/governed-catalog.js';
+import * as locks from '../foundation/lock-utils.js';
+import * as intents from '../intent/intent-resolution.js';
+import * as secureIo from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   acceptedBindingGovernanceAllowsBypass,
   acceptedBindingMatchesPipelineHash,
   acceptedPipelineBindingCatalogPath,
+  acceptPromotedPipelineBinding,
+  hashAcceptedPipeline,
+  inspectPipelineBindingAcceptance,
+  resetAcceptedPipelineBindingCatalog,
   loadAcceptedPipelineBindingCatalog,
   resolveAcceptedPipelineBindingFromCatalog,
   validateAcceptedBindingCatalogScope,
@@ -57,6 +66,72 @@ function approval(overrides: Partial<ApprovalRequestRecord> = {}): ApprovalReque
 }
 
 describe('accepted pipeline bindings', () => {
+  it('completes a missing receipt without republishing the binding and is idempotent', () => {
+    resetAcceptedPipelineBindingCatalog();
+    const input = {
+      pipeline_ref: binding.pipeline_ref,
+      intent_id: binding.intent_ids[0],
+      scope: binding.scope,
+      successful_run_id: 'fixture-run',
+      approval_request_id: binding.approval_request_id,
+    };
+    const readFile = secureIo.safeReadFile;
+    vi.spyOn(secureIo, 'safeReadFile').mockImplementation((file, options) =>
+      file === pathResolver.rootResolve(input.pipeline_ref)
+        ? Buffer.from('{"promotion":{}}')
+        : readFile(file, options)
+    );
+    vi.spyOn(intents, 'loadResolvedStandardIntentCatalog').mockReturnValue([
+      {
+        id: input.intent_id,
+        execution_shape: 'pipeline',
+        resolution: { shape: 'pipeline' },
+      } as never,
+    ]);
+    vi.spyOn(locks, 'withLockSync').mockImplementation((_resource, run) => run());
+    try {
+      const pipelineHash = hashAcceptedPipeline(input.pipeline_ref);
+      const { approval_request_id: _approvalId, ...effect } = input;
+      const digest = approvals.computeApprovalPayloadHash({
+        ...effect,
+        pipeline_sha256: pipelineHash,
+      });
+      const published = {
+        ...binding,
+        binding_id: `accepted-${digest.slice(0, 16)}`,
+        successful_run_evidence: {
+          ...binding.successful_run_evidence,
+          pipeline_sha256: pipelineHash,
+        },
+      };
+      const record = approval({
+        correlationId: `pipeline-binding:${digest}`,
+        accountability: { ...approval().accountability!, payloadHash: digest },
+      });
+      const load = vi.spyOn(approvals, 'loadApprovalRequest').mockReturnValue(record);
+      const receipt = vi.spyOn(approvals, 'recordApprovalApplyResult').mockReturnValue(record);
+      const publish = vi.fn();
+      vi.spyOn(catalogs, 'defineCatalog').mockReturnValue({
+        load: () => ({ version: 1, bindings: [published] }),
+        generation: () => 'fixture-generation',
+        reset: () => undefined,
+        publish,
+      } as never);
+      expect(inspectPipelineBindingAcceptance(input)).toMatchObject({ status: 'receipt_pending' });
+      expect(receipt).not.toHaveBeenCalled();
+      expect(acceptPromotedPipelineBinding(input)).toEqual(published);
+      expect(publish).not.toHaveBeenCalled();
+      expect(receipt).toHaveBeenCalledOnce();
+      load.mockReturnValue({ ...record, applyResult: receipt.mock.calls[0][1].applyResult });
+      expect(inspectPipelineBindingAcceptance(input)).toMatchObject({ status: 'accepted' });
+      expect(acceptPromotedPipelineBinding(input)).toEqual(published);
+      expect(receipt).toHaveBeenCalledOnce();
+    } finally {
+      resetAcceptedPipelineBindingCatalog();
+      vi.restoreAllMocks();
+    }
+  });
+
   it('ships an empty public catalog rather than fabricated acceptance', () => {
     expect(loadAcceptedPipelineBindingCatalog()).toEqual({ version: 1, bindings: [] });
   });

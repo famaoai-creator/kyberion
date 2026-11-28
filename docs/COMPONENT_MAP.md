@@ -134,6 +134,7 @@ This path establishes identity files under `knowledge/personal/` and prepares th
 - `libs/core/organization/continuous-operations.ts` owns observation-to-admission episodes. The resident cadence and organization CLI share the same checkpoint interpretation in `scripts/continuous/continuous_operations_cadence.ts`.
 - `libs/core/mission/mission-orchestration-events.ts`
 - `libs/core/mission/mission-orchestration-worker.ts`
+- `libs/core/pipeline/accepted-pipeline-bindings.ts` (scope-bound pipeline acceptance, receipt inspection and recovery)
 - `libs/core/mission/gate-ai-assessment.ts` (AI gate evaluation contract + convening policy; enforced via `scripts/check/check_gate_ai_assessment.ts` on `gate-review-session` — human decision stays authoritative)
 - `libs/core/agent/agent-runtime-supervisor.ts`
 - `libs/core/mesh/a2a-bridge.ts`
@@ -271,7 +272,8 @@ The operations console does not directly own mission state. It delegates to:
 - `libs/core/service/service-binding.ts`
 - `libs/core/service/service-binding-reader.ts` (governed connection reads; no execution authorization)
 - `libs/core/service/service-binding-registry.ts` (writes and tenant/project/action authorization)
-- `libs/core/secret/account-introduction.ts` (owner-approved registration of exact account generations)
+- `libs/core/secret/account-introduction.ts` (owner-approved account registration and generation status)
+- `libs/core/organization/nhi-session-admission.ts` (tenant-scoped session admission and binding release verification)
 - `libs/core/secret/account-broker.ts` (explicit organization account provisioning and receipt validation)
 - `libs/core/secret/personal-task-credential-claim.ts` (read-only installed personal owner/NHI, runtime envelope and current WorkItem run/lease proof)
 - `libs/core/governance/personal-credential-grant.ts` (authenticated owner consent in the canonical standing-grant store)

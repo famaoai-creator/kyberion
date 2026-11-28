@@ -1,11 +1,31 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import * as identity from '@agent/core/workforce/workspace-process-identity';
 import {
   formatSurfaceStatus,
   normalizeSurfaceRuntimeArgs,
   parseSurfaceRegisterArgs,
+  stopRecordedProcess,
 } from './surface_runtime.js';
 
 describe('surface runtime entrypoint', () => {
+  it('signals only an identified process and waits for evidence of exit before reporting stopped', () => {
+    const alive = vi.spyOn(identity, 'isPidAlive').mockReturnValue(true);
+    const marker = vi.spyOn(identity, 'processStartMarker').mockReturnValue('matching-marker');
+    const kill = vi.spyOn(process, 'kill').mockReturnValue(true);
+    try {
+      expect(stopRecordedProcess({ pid: 42 })).toBe('identity_unknown');
+      expect(kill).not.toHaveBeenCalled();
+      const record = { pid: 42, pidStartMarker: 'matching-marker' };
+      expect(stopRecordedProcess(record)).toBe('stop_requested');
+      expect(kill).toHaveBeenCalledWith(42, 'SIGTERM');
+      alive.mockReturnValueOnce(true).mockReturnValueOnce(false);
+      expect(stopRecordedProcess(record)).toBe('stopped');
+    } finally {
+      kill.mockRestore();
+      alive.mockRestore();
+      marker.mockRestore();
+    }
+  });
   it('maps the unified positional action to the legacy action option', () => {
     expect(normalizeSurfaceRuntimeArgs(['reconcile', '--', '--json'])).toEqual([
       '--action',

@@ -226,7 +226,10 @@ pnpm plugin:install --reload <plugin-id>      # re-verify, classify, apply
 pnpm plugin:install --deactivate <plugin-id>  # dispose everything it owns
 ```
 
-Both act on the current process only. A change is applied on the least
+Both act on the current process only. The CLI reports that scope and leaves other
+hosts unchecked. For deactivation, the JSON result distinguishes `deactivated`
+from `already_inactive`. Confirm activation in each long-running host before
+treating the plugin as stopped. A change is applied on the least
 disruptive rung:
 
 | Mode               | When                                                                       |

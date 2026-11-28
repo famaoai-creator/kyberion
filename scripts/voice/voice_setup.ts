@@ -12,6 +12,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { isWindows } from '@agent/core/platform';
+import { redactActiveSecretsForHostLog } from '@agent/core/secret/secret-guard';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import {
   discoverLocalSttBackends,
@@ -152,6 +153,8 @@ function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
         `uv pip install failed for ${toolId}: ${installResult.stderr || installResult.error?.message || 'unknown error'}`
       );
     }
+    if (!isManagedVoiceRuntimeHealthy(toolId, pythonBin))
+      throw new Error(`Post-install Python or package check failed for ${toolId}`);
 
     markToolRuntimeInstalled(toolId, {
       action: 'voice_setup',
@@ -181,6 +184,9 @@ function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
       `${backend.command} ${backend.args?.join(' ') || ''} failed for ${toolId}: ${result.stderr || result.error?.message || 'unknown error'}`
     );
   }
+  const pythonBin = resolveManagedPythonBin(toolId);
+  if (!isManagedVoiceRuntimeHealthy(toolId, pythonBin))
+    throw new Error(`Post-install Python or package check failed for ${toolId}`);
   markToolRuntimeInstalled(toolId, {
     action: 'voice_setup',
     command: backend.command,
@@ -192,7 +198,7 @@ function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
     managedEnvPath: resolution.managed_env_path,
     installed: true,
     installAction: 'applied',
-    pythonBin: resolveManagedPythonBin(toolId),
+    pythonBin,
     status: 'ready',
     detail: `Installed via ${backend.command}`,
   };
@@ -241,6 +247,13 @@ function inspectVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
   };
 }
 
+function voiceSetupInstallCommand(rows: readonly VoiceSetupRow[]): string | undefined {
+  const tools = rows.filter(({ status }) => status === 'needs_install').map(({ toolId }) => toolId);
+  return tools.length
+    ? `pnpm kyberion voice setup --apply ${tools.map((toolId) => `--tool ${toolId}`).join(' ')}`
+    : undefined;
+}
+
 export function formatVoiceSetupReport(rows: VoiceSetupRow[], apply: boolean): string[] {
   const lines = ['Voice runtime setup', ''];
   for (const row of rows) {
@@ -265,9 +278,11 @@ export function formatVoiceSetupReport(rows: VoiceSetupRow[], apply: boolean): s
     lines.push('Local STT detected: none');
   }
   lines.push('');
-  if (!apply && rows.some((row) => row.status === 'needs_install')) {
-    lines.push('Next step: `pnpm kyberion voice setup --apply`');
-  }
+  const installCommand = voiceSetupInstallCommand(rows);
+  if (installCommand)
+    lines.push(
+      `${apply ? 'Retry after reviewing the failed rows' : 'Next step'}: \`${installCommand}\``
+    );
   lines.push('Verify: `pnpm pipeline voice-health-check`');
   lines.push(
     'Meeting/browser adjuncts: `pnpm env:bootstrap --manifest meeting-participation-runtime --apply`'
@@ -285,6 +300,15 @@ export async function runVoiceSetup(options: {
     if (options.apply && current.status === 'needs_install') {
       try {
         rows.push(installManagedVoiceRuntime(toolId));
+      } catch (error) {
+        rows.push({
+          ...current,
+          installAction: 'failed',
+          detail: redactActiveSecretsForHostLog(
+            error instanceof Error ? error.message : String(error),
+            '[REDACTED_SECRET]'
+          ).slice(0, 1500),
+        });
       } finally {
         // The runtime just installed may be a local STT backend (mlx_whisper,
         // faster_whisper): drop the cached probe so this and later processes see it.
@@ -322,10 +346,14 @@ export const runVoiceSetupScript = defineScript({
   flags: ['json', 'quiet'],
   run: async (context) => {
     const { rows, apply, localStt } = await main(context.argv);
+    const status = summarizeVoiceSetupStatus(rows);
+    const installCommand = voiceSetupInstallCommand(rows);
     if (context.json) {
       context.print({
-        status: rows.some((row) => row.status === 'needs_install') ? 'needs_install' : 'ready',
+        status,
         apply,
+        ...(installCommand ? { install_command: installCommand } : {}),
+        verify_command: 'pnpm pipeline voice-health-check',
         rows,
         local_stt: localStt,
       });
@@ -338,6 +366,11 @@ export const runVoiceSetupScript = defineScript({
     return rows;
   },
 });
+
+export function summarizeVoiceSetupStatus(rows: readonly Pick<VoiceSetupRow, 'status'>[]) {
+  if (rows.some((row) => row.status === 'needs_install')) return 'needs_install';
+  return rows.some((row) => row.status === 'ready') ? 'ready' : 'unsupported';
+}
 
 if (
   isDirectScript(import.meta.url, 'voice_setup.ts') ||

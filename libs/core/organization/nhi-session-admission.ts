@@ -418,15 +418,26 @@ export function revokeNhiSessionAdmission(
   const matches = (agent.runtime_instances ?? []).filter(
     (entry) =>
       entry.instance_id.startsWith(ADMISSION_INSTANCE_PREFIX) &&
+      entry.tenant_slug === input.tenant_slug &&
       (input.instance_id ? entry.instance_id === input.instance_id : true) &&
       (input.session_id ? entry.session_id === input.session_id : true)
   );
   if (matches.length === 0) deny('no live admission binding matches');
-  if (matches.length > 1 && !input.instance_id && !input.session_id)
-    deny('multiple live bindings — select with --instance or --session');
-  return withExecutionContext('mission_controller', () =>
-    releaseRuntimeInstance(input.nhi_id, matches[0].instance_id, 'operator_revoked')
+  if (matches.length > 1) deny('multiple live bindings — select with --instance or --session');
+  const target = matches[0];
+  const record = withExecutionContext('mission_controller', () =>
+    releaseRuntimeInstance(input.nhi_id, target.instance_id, 'operator_revoked')
   );
+  if (
+    !record ||
+    record.runtime_instances?.some((entry) => entry.instance_id === target.instance_id)
+  )
+    deny('admission release could not be confirmed');
+  return {
+    ...record,
+    released_instance_id: target.instance_id,
+    released_session_id: target.session_id,
+  };
 }
 
 /** Read-only projection: live + expired session bindings for a tenant/org. */

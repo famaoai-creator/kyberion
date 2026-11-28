@@ -770,6 +770,39 @@ export function baselineNextAction(
   }
 }
 
+export function baselineOperatorStep(
+  action: ReturnType<typeof baselineNextAction>,
+  failedLayer?: string | null,
+  schedulerFindings: readonly OpsHealthFinding[] = []
+): string {
+  switch (action) {
+    case 'proceed':
+      return 'Run pnpm kyberion setup report --persona first-time-user for the next onboarding step.';
+    case 'onboard':
+      return 'Run pnpm kyberion onboarding --json to get the reviewed identity input instructions.';
+    case 'wait':
+      return 'Wait for the current operation to finish, then rerun Baseline.';
+    case 'request_operator':
+      return 'Ask the operator to inspect the detailed Baseline report before retrying.';
+    case 'recover':
+      if (failedLayer === 'L1') return 'Run pnpm install, then rerun Baseline.';
+      if (failedLayer === 'L2') return 'Run pnpm build, then rerun Baseline.';
+      return 'Inspect the failed layer and follow the recovery runbook before retrying.';
+    case 'inspect_attention':
+      if (failedLayer === 'L10') {
+        const shown = schedulerFindings.slice(0, 5);
+        const remaining = schedulerFindings.length - shown.length;
+        return [
+          'Inspect schedule status with pnpm kyberion schedule list and daemon health with pnpm kyberion scheduler status.',
+          ...shown.map((finding) => `- ${formatOpsHealthFinding(finding)}`),
+          ...(remaining ? [`+${remaining} more scheduler finding(s) in the detailed report.`] : []),
+          'Review each pipeline before rerunning a scheduled job.',
+        ].join('\n');
+      }
+      return 'Inspect the detailed Baseline report for the failed layer and its remediation.';
+  }
+}
+
 export function deriveBaselineStatus(
   result: { success: boolean; failedLayer?: string | null; deferred?: boolean },
   janitorMaintenance: BaselineMaintenanceState,
@@ -1354,9 +1387,11 @@ export async function runBaselineCheck() {
       : deriveBaselineStatus(result, janitorMaintenance, reasoningDegraded !== null);
 
   // Format Output
+  const nextAction = baselineNextAction(status, result);
   const report = {
     status,
-    next_action: baselineNextAction(status, result),
+    next_action: nextAction,
+    next_step: baselineOperatorStep(nextAction, result.failedLayer, opsHealthSplit.scheduler),
     circuit_broken: result.circuitBroken,
     failed_layer: result.failedLayer || null,
     details: state.layers,
@@ -1465,7 +1500,7 @@ export async function runBaselineCheck() {
 // typed actuator operation without spawning a script from an ADF step.
 export const runBaselineCheckCli = defineScript({
   name: 'baseline-check',
-  flags: [],
+  flags: ['json'],
   async run(context) {
     if (context.argv.includes(JANITOR_MAINTENANCE_JOB_FLAG)) {
       const job = await runJanitorMaintenanceJob();
@@ -1486,6 +1521,7 @@ export const runBaselineCheckCli = defineScript({
       const fatalReport = {
         status: 'fatal_error' as const,
         next_action: baselineNextAction('fatal_error', {}),
+        next_step: baselineOperatorStep('request_operator'),
         circuit_broken: true,
         failed_layer: null,
         details: {},

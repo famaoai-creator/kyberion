@@ -226,6 +226,8 @@ describe('Kyberion CLI helpers', () => {
     // Real connection verbs keep the bootstrap and its binding requirement.
     expect(shouldBootstrapRuntime(['calendar', 'list-calendars'])).toBe(true);
     expect(shouldBootstrapRuntime(['email', 'deliver'])).toBe(true);
+    expect(shouldBootstrapRuntime(['email', 'deliver', '--dry-run'])).toBe(false);
+    expect(shouldBootstrapRuntime(['email', 'deliver', '--dry-run', 'false'])).toBe(true);
     // Document reading must stay fast and keep stdout clean.
     expect(shouldBootstrapRuntime(['read', 'deck.pptx'])).toBe(false);
     // Authoring resolves design catalogs from disk; no reasoning backend either.

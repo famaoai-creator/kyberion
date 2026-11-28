@@ -95,6 +95,28 @@ describe('workspace_ledger CLI', () => {
     expect(safeExistsSync(stray)).toBe(true);
   });
 
+  it('limits apply to the explicitly selected workspace and rechecks eligibility', () => {
+    const { orphanPath, livePath } = seed();
+    const list = runWorkspaceLedgerCli(
+      { positional: ['list'], json: true, dryRun: false },
+      print,
+      options
+    ) as WorkspaceListResult;
+    const liveId = list.workspaces.find((record) => record.path === livePath)!.id;
+    const orphanId = list.workspaces.find((record) => record.path === orphanPath)!.id;
+    const apply = (id: string) =>
+      runWorkspaceLedgerCli(
+        { positional: ['gc', '--apply', '--only', id], json: true, dryRun: false },
+        print,
+        options
+      ) as WorkspaceGcResult;
+    expect(apply(liveId)).toMatchObject({ selectionStatus: 'not_eligible', deleted: [] });
+    expect(safeExistsSync(orphanPath)).toBe(true);
+    expect(apply(orphanId)).toMatchObject({ selectionStatus: 'deleted', deleted: [orphanId] });
+    expect(apply(orphanId)).toMatchObject({ selectionStatus: 'not_found', deleted: [] });
+    expect(safeExistsSync(livePath)).toBe(true);
+  });
+
   it('rejects unknown verbs, unknown arguments and --apply with --dry-run', () => {
     expect(() =>
       runWorkspaceLedgerCli({ positional: ['prune'], json: false, dryRun: false }, print, options)

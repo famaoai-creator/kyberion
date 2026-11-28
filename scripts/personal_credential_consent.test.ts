@@ -400,6 +400,11 @@ describe('personal credential consent CLI', () => {
     ).toEqual({
       grant_id: 'grant-1',
       status: 'revoked',
+      verification: {
+        usage_grant: 'revoked',
+        credential_registration: 'not_checked',
+        provider_revocation: 'not_checked',
+      },
     });
     expect(m.revoke).toHaveBeenCalledWith(
       { ...owner, requesterId: 'user:owner' },

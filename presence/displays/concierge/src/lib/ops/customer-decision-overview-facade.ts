@@ -14,10 +14,8 @@ import { governedWorkerEnv } from '../server-child-env';
  * tenant the viewer resolved to. The facade assumes its own narrow
  * tenant-bound roles and refuses a `--tenant` other than the bound one, so a
  * child for tenant A can never print tenant B. The child is bounded by its own
- * narrow system role (SYSTEM_ROLE=customer_decision_reader, which may assume
- * decision_ledger), never by the server's role — the concierge policy does
- * not grant decision_ledger, so a concierge-bounded child cannot read the
- * ledger at all.
+ * narrow system role (SYSTEM_ROLE=customer_decision_reader). The facade reads
+ * the tenant ledger through the declared decision_ledger_store grant.
  *
  * Responses are bounded: a timeout and an output cap on the child, a short
  * per-view cache (`kind:tenant:arg`) plus in-flight sharing so polling cards
@@ -80,10 +78,8 @@ export const OVERVIEW_CHILD_CLEARED_ENV = [
  */
 export function overviewChildEnv(tenant: string): Record<string, string | undefined> {
   const root = getRegisteredEnvText('KYBERION_ROOT');
-  // H1: the child is never unbounded. It runs under its own narrow system
-  // role, which may assume decision_ledger (the tenant ledger read) — the
-  // server itself (SYSTEM_ROLE=concierge) must not, and a child bounded by
-  // the concierge policy is refused that role.
+  // H1: the child runs under its own narrow system role and uses the
+  // tenant-bound store grant for ledger reads.
   return governedWorkerEnv(CUSTOMER_DECISION_READER_ROLE, {
     ...Object.fromEntries(OVERVIEW_CHILD_CLEARED_ENV.map((key) => [key, ''])),
     KYBERION_TENANT: tenant,

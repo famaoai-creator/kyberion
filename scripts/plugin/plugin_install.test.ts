@@ -289,14 +289,19 @@ describe('plugin_install lifecycle commands (EP-04)', () => {
     expect(deactivateExit).toBe(0);
     expect(text.join('\n')).toContain(`Plugin '${pluginId}' deactivate: ok`);
     expect(text.join('\n')).toContain('mode:   plugin_reload');
+    expect(text.join('\n')).toContain('scope: current process (other hosts were not checked)');
 
     const again: string[] = [];
     expect(
-      await runPluginLifecycleCommand(['--deactivate', pluginId], (value) =>
+      await runPluginLifecycleCommand(['--deactivate', pluginId, '--json'], (value) =>
         again.push(String(value))
       )
     ).toBe(0);
-    expect(again.join('\n')).toContain('nothing to dispose');
+    expect(JSON.parse(again.join(''))).toMatchObject({
+      scope: 'current_process',
+      process_effect: 'already_inactive',
+      other_hosts: 'not_checked',
+    });
   });
 
   it('fails (exit 1) when --reload targets a plugin that is not installed', async () => {

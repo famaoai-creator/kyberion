@@ -21,6 +21,7 @@ process.env.KYBERION_PROVIDER_CAPABILITY_PROBE = '0';
 const {
   parseConnectionReadinessConfig,
   baselineNextAction,
+  baselineOperatorStep,
   deriveBaselineStatus,
   reasoningFailoverWarning,
   summarizeProviderCapabilities,
@@ -57,6 +58,34 @@ function fakeCapability(overrides: Partial<ProviderCapability> = {}): ProviderCa
 }
 
 describe('run_baseline_check', () => {
+  it('shows the scheduler findings and the read-only entry points for L10', () => {
+    const findings = Array.from({ length: 6 }, (_, index) => ({
+      id: `schedule-failing:fixture-${index}`,
+      severity: 'error' as const,
+      reason: 'Last run failed',
+      next: 'Review the run evidence',
+    }));
+    const next = baselineOperatorStep('inspect_attention', 'L10', findings);
+    expect(next).toContain('pnpm kyberion schedule list');
+    expect(next).toContain('schedule-failing:fixture-0');
+    expect(next).toContain('Last run failed | next: Review the run evidence');
+    expect(next).not.toContain('schedule-failing:fixture-5');
+    expect(next).toContain('+1 more scheduler finding(s)');
+    expect(baselineOperatorStep('inspect_attention', 'L12', findings)).not.toContain(
+      'schedule-failing:fixture-0'
+    );
+  });
+  it('keeps the operator step aligned with the recovery circuit and build lock', () => {
+    expect(baselineOperatorStep(baselineNextAction('needs_recovery', {}), 'L2')).toContain(
+      'pnpm build'
+    );
+    expect(
+      baselineOperatorStep(baselineNextAction('needs_recovery', { circuitBroken: true }), 'L2')
+    ).not.toContain('pnpm build');
+    expect(
+      baselineOperatorStep(baselineNextAction('needs_attention', { deferred: true }), 'L2')
+    ).toContain('Wait for the current operation');
+  });
   it.each([
     ['all_clear', {}, 'proceed'],
     ['needs_onboarding', {}, 'onboard'],

@@ -25,7 +25,7 @@ const USAGE =
   'Usage: kyberion workspace <list|gc> [--json]\n' +
   '  list                 show registered workspaces and unregistered directories\n' +
   '  gc [--dry-run]       report orphaned workspaces (default)\n' +
-  '  gc --apply           delete orphaned registered workspaces\n' +
+  '  gc --apply [--only <workspace-id>]  delete eligible registered orphans\n' +
   '  gc --apply --include-unresolvable-owners\n' +
   '                       also reclaim workspaces whose mission owner no longer resolves (3x TTL; not from a tenant-bound process)';
 
@@ -36,6 +36,8 @@ export interface WorkspaceListResult {
 
 export interface WorkspaceGcResult {
   dryRun: boolean;
+  selectedWorkspaceId?: string;
+  selectionStatus?: 'not_found' | 'not_eligible' | 'eligible' | 'deleted' | 'error';
   registered: number;
   orphaned: string[];
   deleted: string[];
@@ -70,12 +72,16 @@ function summarizeGc(dryRun: boolean, result: SweepWorkspacesResult): WorkspaceG
 function renderGc(result: WorkspaceGcResult): string {
   const lines = [
     `${result.dryRun ? '[dry-run] ' : ''}registered=${result.registered} orphaned=${result.orphaned.length} deleted=${result.deleted.length}`,
+    ...(result.selectedWorkspaceId
+      ? [`workspace: ${result.selectedWorkspaceId} (${result.selectionStatus})`]
+      : []),
     ...result.orphaned.map((id) => `orphan  ${id}`),
     ...result.unregisteredDirs.map((dir) => `unregistered  ${dir}`),
     ...result.unresolvedOwners.map((id) => `owner-unresolvable  ${id}`),
     ...result.errors.map((error) => `error  ${error}`),
   ];
-  if (result.dryRun && result.orphaned.length > 0) lines.push('re-run with --apply to delete');
+  if (result.dryRun && result.orphaned.length > 0)
+    lines.push('Use --apply --only <workspace-id> to remove one reviewed orphan.');
   return lines.join('\n');
 }
 
@@ -101,6 +107,11 @@ export function runWorkspaceLedgerCli(
     return result;
   }
   if (verb === 'gc') {
+    const optionIndex = rest.indexOf('--only');
+    const workspaceId = optionIndex >= 0 ? rest[optionIndex + 1] : undefined;
+    if (optionIndex >= 0 && (!workspaceId || workspaceId.startsWith('--')))
+      throw new ScriptExitError(2, '--only requires a workspace ID');
+    if (workspaceId) rest.splice(optionIndex, 2);
     const apply = rest.includes('--apply');
     const includeUnresolvable = rest.includes('--include-unresolvable-owners');
     const unknown = rest.filter(
@@ -115,9 +126,22 @@ export function runWorkspaceLedgerCli(
       sweepWorkspaces({
         ...options,
         dryRun,
+        ...(workspaceId ? { workspaceId } : {}),
         sweepUnresolvableOwners: options.sweepUnresolvableOwners ?? includeUnresolvable,
       })
     );
+    if (workspaceId) {
+      result.selectedWorkspaceId = workspaceId;
+      result.selectionStatus = result.errors.length
+        ? 'error'
+        : result.deleted.includes(workspaceId)
+          ? 'deleted'
+          : result.orphaned.includes(workspaceId)
+            ? 'eligible'
+            : result.registered
+              ? 'not_eligible'
+              : 'not_found';
+    }
     print(args.json ? result : renderGc(result));
     if (result.errors.length > 0) throw new ScriptExitError(1, '', true, result);
     return result;

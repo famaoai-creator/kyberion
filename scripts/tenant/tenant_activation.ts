@@ -149,15 +149,39 @@ function dispatch(command: string, argv: string[], print: Print): void {
     return;
   }
   const activationInput = input(argv);
-  if (command === 'plan') {
-    const result = resolveTenantActivation(activationInput);
+  const result =
+    command === 'activate' && argv.includes('--apply')
+      ? applyTenantActivation({ ...activationInput, accept: argv.includes('--accept') })
+      : command === 'resume' && argv.includes('--apply')
+        ? resumeTenantActivation({ ...activationInput, accept: argv.includes('--accept') })
+        : command === 'reconcile'
+          ? reconcileTenantActivation(activationInput)
+          : command === 'rollback' && argv.includes('--apply')
+            ? rollbackTenantActivation({
+                ...activationInput,
+                reason: value(argv, '--reason') || 'operator requested rollback',
+                accept: argv.includes('--accept'),
+              })
+            : command === 'suspend' && argv.includes('--apply')
+              ? suspendTenantActivation({
+                  ...activationInput,
+                  reason: value(argv, '--reason') || 'operator requested suspension',
+                  accept: argv.includes('--accept'),
+                })
+              : resolveTenantActivation(activationInput);
+  const verification =
+    'mode' in result
+      ? { source: 'readiness_projection', persisted: false }
+      : { source: 'activation_receipt_written', persisted: true };
+  const response = { ...result, verification };
+  if (command === 'plan' && 'mode' in result) {
     const nextCheck = TENANT_ACTIVATION_CHECKS.find((check) => !result.record.checks[check]);
     // Show the consequence of the tenant's provider attestations before work
     // starts: which providers each data tier can use for LLM work.
     print(
       JSON.stringify(
         {
-          ...result,
+          ...response,
           next_action: nextCheck
             ? {
                 kind: 'resolve_check',
@@ -183,27 +207,7 @@ function dispatch(command: string, argv: string[], print: Print): void {
     );
     return;
   }
-  const result =
-    command === 'activate' && argv.includes('--apply')
-      ? applyTenantActivation({ ...activationInput, accept: argv.includes('--accept') })
-      : command === 'resume' && argv.includes('--apply')
-        ? resumeTenantActivation({ ...activationInput, accept: argv.includes('--accept') })
-        : command === 'reconcile'
-          ? reconcileTenantActivation(activationInput)
-          : command === 'rollback' && argv.includes('--apply')
-            ? rollbackTenantActivation({
-                ...activationInput,
-                reason: value(argv, '--reason') || 'operator requested rollback',
-                accept: argv.includes('--accept'),
-              })
-            : command === 'suspend' && argv.includes('--apply')
-              ? suspendTenantActivation({
-                  ...activationInput,
-                  reason: value(argv, '--reason') || 'operator requested suspension',
-                  accept: argv.includes('--accept'),
-                })
-              : resolveTenantActivation(activationInput);
-  print(JSON.stringify(result, null, 2));
+  print(JSON.stringify(response, null, 2));
 }
 
 const activationCheckGuidance: Record<TenantActivationCheck, string> = {

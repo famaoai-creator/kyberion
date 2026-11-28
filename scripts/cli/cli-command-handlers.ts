@@ -530,13 +530,16 @@ export function createCliCommandHandlers(deps: CliCommandDeps): Record<string, C
         } else {
           printText(`\n=== Scheduled Pipelines (${schedules.length}) ===`);
           for (const s of schedules) {
-            const status = s.enabled ? '\u2705' : '\u23F8\uFE0F';
+            const configuration = s.enabled ? 'enabled' : 'disabled';
             const trigger =
               s.trigger.type === 'cron'
                 ? `cron: ${s.trigger.cron}`
                 : `interval: ${s.trigger.intervalMs}ms`;
-            const last = s.lastRun ? ` | last: ${s.lastRun} (${s.lastStatus})` : '';
-            printText(`${status} ${s.id} \u2014 ${s.name} [${s.actuator}] ${trigger}${last}`);
+            const lastRun = s.lastRun ?? 'never';
+            const lastResult = s.lastStatus ?? 'unrecorded';
+            printText(
+              `${s.id} \u2014 ${s.name} [${s.actuator}] ${trigger} | configuration: ${configuration} | last run: ${lastRun} | last result: ${lastResult}`
+            );
             printText(`   pipeline: ${s.pipelinePath}`);
           }
         }

@@ -441,6 +441,11 @@ export function accountIntroductionStatus(
     presented_digest: computeApprovalPresentedDigest(record),
     min_assurance: record.accountability?.min_assurance ?? 'A2',
     can_apply,
+    verification: {
+      registration_generation: state.generation,
+      usage_grant: 'not_checked',
+      provider_revocation: 'not_checked',
+    },
     ...(isGws(plan) ? { material_kind: plan.material_kind, runtimeAvailable: false as const } : {}),
     recovery_required: Boolean(
       state.pendingApprovalId || (record.applyClaim && record.applyResult?.result !== 'success')

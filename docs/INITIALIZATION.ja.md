@@ -139,6 +139,17 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 - **目的**: surface / service / reasoning / doctor の readiness を一度に確認し、初期セットアップの抜けをまとめて見つけます。まずこれを実行し、報告に出た項目だけを下の個別コマンドで詳しく見てください。
 - **物理的変化**: 実体の変更は行いません。
 
+停止・再開・再登録の手順は `pnpm kyberion setup report --lifecycle` から確認できます。
+オンボーディング開始時と dry-run の JSON には、適用前にも使える索引が
+`available_now.lifecycle_reference_command` として表示されます。
+メール、バックアップ、ワークスペース、音声・OS 権限も索引から選べます。必要になったときに確認する運用項目です。
+`--domain <id>` で対象を絞れます。実際の状態は、ガイドに表示された確認コマンドで調べます。
+オンボーディング完了時の案内から Setup Report と運用手順に進めます。
+テナントを扱う場合は、実作業の前に `--lifecycle --domain tenant` の有効化手順を確認します。
+Baseline では終了コードに加えて `status` と `Next step` を確認します。
+L10 では定期実行の指摘と確認コマンドも表示します。再実行の前に対象パイプラインの動作を確認してください。
+ビルドが進行中なら完了を待ち、再試行の上限に達した場合は詳細を運用者が確認します。
+
 #### 4a. Runtime Surface Setup
 
 - **実行コマンド**: `pnpm surfaces setup`

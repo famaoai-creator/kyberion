@@ -147,6 +147,16 @@ async function runScriptCommand(
 ): Promise<void> {
   const scriptCommand = resolveScriptCommand(command, manifest);
   if (!scriptCommand) {
+    const helpArgs = args.slice(command.split(' ').length);
+    if (helpArgs.length === 1 && hasHelpFlag(helpArgs)) {
+      const subcommands = (manifest.script_commands ?? []).filter((entry) =>
+        entry.command.startsWith(`${command} `)
+      );
+      if (subcommands.length > 0) {
+        print(formatCliManifestHelp({ ...manifest, commands: [], script_commands: subcommands }));
+        return;
+      }
+    }
     // Show what the operator typed (up to noun + verb), not just the first token.
     const typed = args
       .slice(0, 2)

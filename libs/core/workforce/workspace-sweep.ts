@@ -38,6 +38,7 @@ import {
 
 export interface SweepWorkspacesOptions extends Omit<WorkspaceLedgerOptions, 'now'> {
   dryRun: boolean;
+  workspaceId?: string;
   now?: () => number;
   /** Orphan TTL override; defaults to the workspace budget policy. */
   orphanTtlHours?: number;
@@ -158,6 +159,8 @@ export function sweepRegisteredWorkspaces(opts: SweepWorkspacesOptions): SweepWo
     allowedRoots: opts.allowedRoots,
   };
   const errors: string[] = [];
+  const selectRecords = (records: WorkspaceRecord[]) =>
+    opts.workspaceId ? records.filter((record) => record.id === opts.workspaceId) : records;
   const empty = (): SweepWorkspacesResult => ({
     registered: 0,
     orphaned: [],
@@ -169,7 +172,7 @@ export function sweepRegisteredWorkspaces(opts: SweepWorkspacesOptions): SweepWo
 
   let records: WorkspaceRecord[];
   try {
-    records = listWorkspaces(ledger);
+    records = selectRecords(listWorkspaces(ledger));
   } catch (err: unknown) {
     errors.push(`read: ${errorMessage(err)}`);
     return empty();
@@ -223,7 +226,7 @@ export function sweepRegisteredWorkspaces(opts: SweepWorkspacesOptions): SweepWo
     // (retried or abandoned) on the ledger; refresh so the orphan check and
     // the delete-time snapshot below reflect that, not the stale copy above.
     try {
-      records = listWorkspaces(ledger);
+      records = selectRecords(listWorkspaces(ledger));
     } catch (err: unknown) {
       errors.push(`read: ${errorMessage(err)}`);
       return { ...empty(), registered: records.length };
