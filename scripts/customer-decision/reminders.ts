@@ -37,7 +37,8 @@
  * agenda. `--dry-run` writes nothing (no records, no inbox, no audit).
  *
  * Authority: the sweep is facade code — the case and actor reads/writes as
- * the tenant-bound `decision_ledger` role, invites through the invite store
+ * the tenant-bound `decision_ledger_store` declared grant, invites through
+ * the invite store
  * role, the inbox as its shared core writer. It runs only in the facade
  * process: the operator's `customer-decision remind`, or the facade child the
  * scheduled op starts (`reminder-op.ts`, no SYSTEM_ROLE, bound to the run's

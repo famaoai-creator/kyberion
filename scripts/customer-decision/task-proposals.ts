@@ -13,8 +13,9 @@
  *                        `previous_links`.
  *   status               lists pending proposals and held tasks (taskProposalStatus).
  *
- * Mission workers only write their own lock (narrow consumer store role); the
- * agenda is written here, as the facade's decision_ledger role, which also
+ * Mission workers only write their own lock (narrow consumer store grant);
+ * the agenda is written here, inside the facade's decision_ledger_store
+ * declared grant, which also
  * links each collected proposal back to its agenda entry on the lock, so a
  * proposal is collected once. A re-ask writes the agenda first, then each
  * lock as the content-checked consumer store role (owner-bound capability),

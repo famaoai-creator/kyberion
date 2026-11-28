@@ -6,7 +6,8 @@
  * Part of scripts/customer/customer_decision.ts (the entry point); see its header.
  *
  *   1. read every case of the tenant (agendas, receipts, switches) as the
- *      tenant-bound `decision_ledger` role — no case lock, nothing else read;
+ *      tenant-bound `decision_ledger_store` declared grant — no case lock,
+ *      nothing else read;
  *   2. metrics and suggestions (`libs/core/customer-decision/learning.ts`,
  *      pure, minimum sample sizes);
  *   3. unless `--dry-run`: the report

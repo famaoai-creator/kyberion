@@ -426,7 +426,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "grants": ["workspace_graph_reader"],
+      "grants": ["credential_probe_store", "env_setup_receipt_store", "workspace_graph_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -495,7 +495,7 @@
       },
       "tiers": ["personal"],
       "status": "active",
-      "grants": ["chronos_token_registry_reader"],
+      "grants": ["chronos_token_registry_reader", "personal_connections_store"],
       "sources": ["role-policy"]
     },
     {
@@ -634,6 +634,18 @@
       "status": "active",
       "grants": ["tool_runtime_policy_reader"],
       "sources": ["role-policy"]
+    },
+    {
+      "id": "public-knowledge.ingest",
+      "path": "knowledge/public/ingest",
+      "custody": {
+        "kind": "system"
+      },
+      "tiers": ["public"],
+      "status": "active",
+      "grants": ["ingest_knowledge_store"],
+      "sources": ["role-policy"],
+      "note": "Public-tier landing partition for ingested knowledge; written only inside the ingest_knowledge_store declared grant."
     },
     {
       "id": "projects",
@@ -937,7 +949,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "grants": ["ops_alert_store"],
+      "grants": ["ops_alert_store", "workspace_graph_reader"],
       "sources": ["role-policy"]
     },
     {
@@ -947,7 +959,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "grants": ["dot_charter_store", "dot_lifecycle_runtime_store"],
+      "grants": ["dot_charter_store", "dot_lifecycle_runtime_store", "workspace_graph_reader"],
       "sources": ["role-policy"],
       "note": "Dot charter validation reads use dot_charter_store; lifecycle runtime writes use dot_lifecycle_runtime_store narrowed to audit, heartbeat and event-continuation artifacts. The rejected asset_derivation_store role remains absent."
     },
@@ -958,7 +970,7 @@
         "kind": "unscoped-legacy"
       },
       "status": "active",
-      "grants": ["reasoning_settings_writer"],
+      "grants": ["browser_cookie_store", "env_setup_receipt_store", "reasoning_settings_writer"],
       "sources": ["role-policy"]
     },
     {
@@ -1070,7 +1082,15 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "grants": ["dot_lifecycle_runtime_store", "peer_responder_reader"],
+      "grants": [
+        "credential_allocation_reader",
+        "credential_allocation_store",
+        "credential_probe_store",
+        "decision_ledger_store",
+        "dot_lifecycle_runtime_store",
+        "ingest_knowledge_store",
+        "peer_responder_reader"
+      ],
       "sources": ["role-policy"],
       "note": "The raw policy inventory includes the lifecycle runtime store projection grant. Its physical knowledge access remains denied by raw-purpose operation ceilings; this entry does not confer authority."
     },
@@ -1105,6 +1125,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
+      "grants": ["decision_ledger_store"],
       "sources": ["role-policy"]
     },
     {
@@ -1116,11 +1137,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
-      "grants": [
-        "peer_catalog_reader",
-        "customer_channel_binding_store",
-        "credential_custody_store"
-      ],
+      "grants": ["peer_catalog_reader", "customer_channel_binding_store"],
       "note": "Tenant connection documents. Reasoning credentials of tenant custody (<service>[.<label>].json + .record.json) are written only inside the credential custody store grant (issuance right credential_custody_store, secret/credential-lending-broker.ts; listed in no role-assumption-policy entry, so only an operator CLI process without SYSTEM_ROLE — pnpm kyberion reasoning credentials register — can issue it, never a surface or daemon) and read for another tenant only through the brokered lent capability with a credential.lent_read audit.",
       "sources": ["role-policy"]
     },
@@ -1133,6 +1150,7 @@
       },
       "tiers": ["confidential"],
       "status": "active",
+      "grants": ["decision_ledger_store"],
       "sources": ["role-policy"]
     },
     {
@@ -1250,6 +1268,18 @@
       },
       "status": "active",
       "sources": ["scope-model"]
+    },
+    {
+      "id": "vault-secrets",
+      "path": "vault/secrets",
+      "custody": {
+        "kind": "person",
+        "ref": "installation-owner"
+      },
+      "status": "active",
+      "grants": ["secret_vault_store"],
+      "sources": ["role-policy"],
+      "note": "Installation secret material; written only inside the secret_vault_store declared grant (the retired secret_introduce role's vault surface)."
     }
   ]
 }

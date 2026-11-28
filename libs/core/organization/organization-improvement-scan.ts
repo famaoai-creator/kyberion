@@ -4,7 +4,7 @@
  * stagnation, operations friction, dot outcome verdicts and usage-ledger cost
  * into a ranked candidate report. The scan only discovers: every candidate is
  * a proposal routed through existing governed facades (dot dispatch gate,
- * mission_controller, `pnpm organization`, `dot_lifecycle_writer`), never a
+ * mission_controller, `pnpm organization`, the dot lifecycle facade), never a
  * new write path. All ports are injectable for hermetic tests.
  */
 import { createHash } from 'node:crypto';
