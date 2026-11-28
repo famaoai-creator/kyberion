@@ -116,6 +116,7 @@ export async function assistWithJudgment<T>(
         questions: input.questions,
         tier: input.tier,
         ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
+        requireCalibrated: input.requireCalibrated,
         signal: controller.signal,
       }),
       new Promise<never>((_, reject) => {

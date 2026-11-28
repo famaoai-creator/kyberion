@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resolveExecutionFeedbackPath } from '@agent/core/execution-feedback';
 import type { ScopeContext } from '@agent/core/scope-context';
 import * as path from 'node:path';
 import { safeExistsSync, safeRmSync } from '@agent/core/secure-io';
@@ -8,6 +9,8 @@ import { readDotInboundEvents } from '@agent/core/dot/dot-event-intake';
 const mocks = vi.hoisted(() => ({
   scope: { tier: 'public' } as ScopeContext,
   conversation: vi.fn(),
+  conversationSignal: vi.fn(),
+  operator: undefined as string | undefined,
   materialize: vi.fn(),
   a2aRoute: vi.fn(),
   charters: [] as unknown[],
@@ -53,6 +56,14 @@ vi.mock('@agent/core/execution-feedback', async (original) => ({
   ...(await original<object>()),
   materializeExecutionFeedbackCandidate: mocks.materialize,
 }));
+vi.mock('@agent/core/intent/conversation-signals', () => ({
+  recordConversationSignal: mocks.conversationSignal,
+}));
+vi.mock('@agent/core/governance/cli-operator-principal', async (original) => ({
+  ...(await original<object>()),
+  detectCliAgentPrincipal: () => null,
+  resolveCliOperatorIdentity: () => ({ principalId: mocks.operator }),
+}));
 import { main } from './kyberion_home.js';
 
 const organizationScope: ScopeContext = {
@@ -67,6 +78,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv('MISSION_ROLE', 'mission_controller');
   mocks.scope = { tier: 'public' };
+  mocks.operator = undefined;
   mocks.charters = [];
   mocks.materialize.mockReturnValue({ candidate: null });
   mocks.conversation.mockResolvedValue({ text: 'Recorded.', executionFeedbackRecord: undefined });
@@ -168,6 +180,7 @@ describe('CLI ask scope and source correlation', () => {
     const output: unknown[] = [];
     await main(['ask', 'Kyberion 通しで会話したい', '--json'], (value) => output.push(value));
     const data = JSON.parse(output.join('\n'));
+    expect(data.correlation_id).toMatch(/^guidance:[0-9a-f-]+$/);
     expect(data.clarification.question).toBe('誰と会話したいですか？');
     expect(data.clarification.choices.map(({ domain }: { domain: string }) => domain)).toEqual([
       'conversation',
@@ -175,6 +188,151 @@ describe('CLI ask scope and source correlation', () => {
       'coordination',
     ]);
     expect(mocks.conversation).not.toHaveBeenCalled();
+  });
+
+  it('joins public guidance and the follow-up reply using the issued correlation ID', async () => {
+    const output: unknown[] = [];
+    await main(['ask', 'Kyberion 通しで会話したい', '--json'], (value) => output.push(value));
+    const { correlation_id: correlationId } = JSON.parse(output.join('\n'));
+    await main(['ask', 'Hello', '--correlation-id', correlationId]);
+    expect(mocks.conversationSignal.mock.calls).toEqual([
+      [
+        {
+          kind: 'guidance_offered',
+          correlationId,
+          surface: 'cli',
+          detail: { topic: 'conversation' },
+        },
+      ],
+      [
+        {
+          kind: 'guidance_followup',
+          correlationId,
+          surface: 'cli',
+          detail: { outcome: 'response_returned' },
+        },
+      ],
+    ]);
+  });
+
+  it.each([
+    ['provide_input', 'input_pending'],
+    ['request_approval', 'approval_pending'],
+  ])('records %s as pending even when the conversation returns text', async (kind, outcome) => {
+    const args = [
+      'ask',
+      'Hello',
+      '--correlation-id',
+      'guidance:00000000-0000-4000-8000-000000000001',
+    ];
+    mocks.conversation.mockResolvedValue({
+      text: 'Follow-up needed.',
+      intentResolution: { next_action: { kind } },
+    });
+    await main([...args, '--json'], () => undefined);
+    expect(mocks.conversationSignal).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'guidance_followup', detail: { outcome } })
+    );
+  });
+
+  it('learns and corrects a route preference through the displayed CLI actions', async () => {
+    const owner = `user:ask-guidance-journey-${process.pid}`;
+    const otherOwner = `${owner}-other`;
+    mocks.operator = owner;
+    const ask = async (args: string[]) => {
+      const output: unknown[] = [];
+      await main([...args, '--json'], (value) => output.push(value));
+      return JSON.parse(output.join('\n'));
+    };
+    const question = ['ask', 'Kyberion 通しで会話したい', '--explain'];
+    try {
+      const first = await ask(question);
+      expect(first.recommended).toBeUndefined();
+      const next = first.follow_up;
+      expect(next.domain).toBe('conversation');
+      next.argv[next.message_arg_index] = 'Hello';
+      const reply = await ask(next.argv.slice(2));
+      expect(reply.text).toBe('Recorded.');
+      await expect(
+        ask(first.feedback_actions.conversation.helpful.slice(2))
+      ).resolves.toMatchObject({
+        ok: true,
+        correlation_id: first.correlation_id,
+        learning: { evaluated_attempts: 1, suggested_route: null, source: null },
+      });
+
+      const second = await ask(question);
+      expect(second.recommended).toBeUndefined();
+      expect(second.correlation_id).not.toBe(first.correlation_id);
+      await expect(
+        ask(second.feedback_actions.conversation.helpful.slice(2))
+      ).resolves.toMatchObject({
+        learning: {
+          evaluated_attempts: 2,
+          suggested_route: 'conversation',
+          source: 'feedback_preference',
+        },
+      });
+      const learned = await ask(question);
+      expect(learned.recommended.domain).toBe('conversation');
+      expect(learned.explanation.decision).toBe('feedback_preference');
+      expect(learned.clarification.choices).toHaveLength(3);
+      await ask(learned.feedback_actions.conversation.missed.slice(2));
+      const status = await ask(['ask', 'guide status conversation']);
+      expect(status.recommendations_by_source.feedback_preference).toEqual({
+        evaluated: 1,
+        switched: 0,
+        helpful: 0,
+      });
+
+      mocks.operator = otherOwner;
+      expect((await ask(question)).recommended).toBeUndefined();
+      mocks.operator = owner;
+      mocks.scope = { tier: 'personal' };
+      const scoped = await ask(question);
+      expect(scoped.recommended).toBeUndefined();
+      expect(scoped.follow_up).toBeUndefined();
+      mocks.scope = { tier: 'public' };
+      await ask(second.feedback_actions.conversation.missed.slice(2));
+      expect((await ask(question)).recommended).toBeUndefined();
+    } finally {
+      for (const owner_nhi of [owner, otherOwner]) {
+        safeRmSync(resolveExecutionFeedbackPath({ tier: 'personal', owner_nhi }), { force: true });
+      }
+    }
+  });
+
+  it('offers a feedback entry point in ordinary guidance without explain mode', async () => {
+    const owner = `user:ask-guidance-plain-${process.pid}`;
+    mocks.operator = owner;
+    const correlationId = 'guidance:plain-fixture';
+    try {
+      const output: unknown[] = [];
+      await main(['ask', 'Kyberion 通しで会話したい', '--correlation-id', correlationId], (value) =>
+        output.push(value)
+      );
+      expect(output.join('\n')).toContain(
+        `pnpm kyberion ask 'guide feedback conversation: ROUTE helpful' --correlation-id ${correlationId}`
+      );
+      const feedback: unknown[] = [];
+      await main(
+        [
+          'ask',
+          'guide feedback conversation: conversation helpful',
+          '--correlation-id',
+          correlationId,
+        ],
+        (value) => feedback.push(value)
+      );
+      expect(JSON.parse(feedback.join('\n'))).toMatchObject({
+        ok: true,
+        counts_toward_recommendation: true,
+      });
+    } finally {
+      safeRmSync(resolveExecutionFeedbackPath({ tier: 'personal', owner_nhi: owner }), {
+        force: true,
+      });
+    }
   });
 
   it.each(['What is a Track?', 'Trackとは何ですか？'])(

@@ -82,6 +82,37 @@ flowchart LR
 | Execution (Actuators)            | `error.category`, `browser.failure_kind`, `browser.page_readiness`, `semantic_decide.option` | Lightweight (`assistWithJudgment` / `semantic-decide.ts`)          | Fills `unknown` only, forces `not ready` only, or picks strictly from caller-supplied `options` (defaults to `confidential` tier)     |
 | Accounting / Learning            | `scripts/eval/run_judgment_calibration.ts`                                                   | Offline Calibration Fitter                                         | Runs `evaluateCallSite()` + `proposeCalibrationEntry()` and writes `judgment-calibration.json` only when deterministic & ECE-verified |
 
+### Operator lifecycle guidance
+
+CLI `ask` resolves its reference guide locally. For an ambiguous conversation
+destination, recovery target, or onboarding target with a recognized hint and an available
+calibration fit, it may ask `setup.ask.conversation_destination` or
+`setup.ask.recovery_destination` or `setup.ask.onboarding_destination` through the lightweight assist. The state
+contains only fixed destination hint labels. The same question and option
+descriptions are used across display languages. A provider suggestion is
+eligible only if a hint for that choice is present in the current request.
+Hints pointing to different routes preserve the full choice list and skip
+the provider call. Common English and Japanese negation markers also
+preserve the choice list because the fixed labels omit negation.
+The choice can highlight one of
+the existing guides and leaves all options available for the operator.
+Calibration-required calls select and retry only providers fitted for every
+question. If none qualifies, the assist returns the original choices.
+For ambiguous requests, explicit operator preferences and recent evaluations
+can highlight a choice before provider selection. These records use the existing
+execution-feedback store with an exact operator and execution scope. Updates
+to each store file are serialized across CLI processes. Guidance receipts and
+evaluations check the latest settings inside that same lock so a concurrent
+opt-out or reset takes effect before a subsequent write. The
+evaluations affect guidance only. Calibration and execution authority follow
+their existing contracts.
+Evaluate labeled samples for these exact question IDs with the calibration
+runner’s `--cases` input before enabling recommendations with a real provider.
+The runner also accepts `ask-conversation-smoke`, `ask-recovery-smoke`,
+and `ask-installation-smoke`. These suites use the live question contract and
+synthetic single or conflicting hint cases. They reject `--apply`; a fit
+requires a separate representative labeled corpus.
+
 ### T14 (80-case) Decision Model Benchmark
 
 Measured on `tests/fixtures/judgment-eval.v1.draft.json` (60 positive cases across `apply_precedent` / `reframe` / `escalate`, 20 negative cases):

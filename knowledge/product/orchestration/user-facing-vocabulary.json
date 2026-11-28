@@ -9031,9 +9031,9 @@
         "qps-ploc": "⟦Ħőɱė: şŧȧŧůş ḓïɠėşŧ ȧñḓ ñėẋŧ ȧƈŧïőñ ŀőřėɱ ïṗşůɱ⟧"
       },
       "cli_cmd_operator_home_ask": {
-        "en": "Ask Kyberion in natural language",
-        "ja": "自然文で Kyberion に依頼する",
-        "qps-ploc": "⟦Ȧşķ Ķẏƀėřïőñ ïñ ñȧŧůřȧŀ ŀȧñɠůȧɠė ŀőřėɱ ïṗşů⟧"
+        "en": "Ask Kyberion in natural language, find lifecycle guidance, or manage your guidance feedback",
+        "ja": "自然文で Kyberion に依頼し、運用ガイドを探したり案内への評価を管理したりする",
+        "qps-ploc": "⟦Ȧşķ Ķẏƀėřïőñ ïñ ñȧŧůřȧŀ ŀȧñɠůȧɠė, ƒïñḓ ŀïƒėƈẏƈŀė ɠůïḓȧñƈė, őř ɱȧñȧɠė ẏőůř ɠůïḓȧñƈė ƒėėḓƀȧƈķ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
       },
       "cli_cmd_operator_home_procedure": {
         "en": "List, inspect, repair, promote, or run registered procedures",
@@ -11121,9 +11121,9 @@
         "qps-ploc": "⟦Ƈőɱṗȧřė ŧħė ɠȧŧė'ş şħȧḓőẇ ṽėřḓïƈŧş őñ ṗůŀŀ řėɋůėşŧş ẇïŧħ ẇħȧŧ ŧħė őṗėřȧŧőř ȧƈŧůȧŀŀẏ ḓïḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
       },
       "cli_cmd_script_conversation_report": {
-        "en": "Report how the conversation is going: turn outcomes per intent, unanswered clarifications and repeated misses worth adding to the eval corpus.",
-        "ja": "会話の状況を報告する: 意図ごとの結果、答えのない確認質問、評価コーパスに加える価値のある繰り返しの失敗。",
-        "qps-ploc": "⟦Řėṗőřŧ ħőẇ ŧħė ƈőñṽėřşȧŧïőñ ïş ɠőïñɠ: ŧůřñ őůŧƈőɱėş ṗėř ïñŧėñŧ, ůñȧñşẇėřėḓ ƈŀȧřïƒïƈȧŧïőñş ȧñḓ řėṗėȧŧėḓ ɱïşşėş ẇőřŧħ ȧḓḓïñɠ ŧő ŧħė ėṽȧŀ ƈőřṗůş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
+        "en": "Report conversation outcomes, unanswered questions, repeated misses, and follow-ups to lifecycle guidance.",
+        "ja": "会話の結果、未回答の確認質問、繰り返し発生した失敗、運用ガイドに沿った後続操作を集計する。",
+        "qps-ploc": "⟦Řėṗőřŧ ƈőñṽėřşȧŧïőñ őůŧƈőɱėş, ůñȧñşẇėřėḓ ɋůėşŧïőñş, řėṗėȧŧėḓ ɱïşşėş, ȧñḓ ƒőŀŀőẇ-ůṗş ŧő ŀïƒėƈẏƈŀė ɠůïḓȧñƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
       },
       "cli_cmd_script_tenant_export": {
         "en": "Export one tenant's governed data as a portable bundle.",

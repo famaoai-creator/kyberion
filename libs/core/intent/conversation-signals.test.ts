@@ -31,6 +31,35 @@ describe('conversation signal ledger', () => {
     expect(listConversationSignals()).toEqual([]);
   });
 
+  it('joins guidance attempts to the latest follow-up within the report window', () => {
+    const now = new Date('2026-10-05T10:00:00Z');
+    recordConversationSignal({ kind: 'guidance_offered', correlationId: 'a', now });
+    recordConversationSignal({ kind: 'guidance_offered', correlationId: 'a', now });
+    recordConversationSignal({ kind: 'guidance_offered', correlationId: 'b', now });
+    recordConversationSignal({ kind: 'guidance_offered', correlationId: 'c', now });
+    for (const [correlationId, outcome] of [
+      ['a', 'error'],
+      ['a', 'response_returned'],
+      ['b', 'input_pending'],
+      ['c', 'approval_pending'],
+      ['orphan', 'response_returned'],
+    ] as const) {
+      recordConversationSignal({
+        kind: 'guidance_followup',
+        correlationId,
+        detail: { outcome },
+        now,
+      });
+    }
+    expect(summarizeConversationSignals(listConversationSignals()).guidance).toEqual({
+      offered: 3,
+      followed_up: 3,
+      response_returned: 1,
+      input_pending: 1,
+      approval_pending: 1,
+    });
+  });
+
   it('stores metadata, a hash and a short excerpt, in a monthly file', () => {
     const long = `${'あ'.repeat(EXCERPT_LENGTH)}いう`;
     const signal = recordConversationSignal({

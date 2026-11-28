@@ -53,6 +53,7 @@
           "comment": { "type": "string", "maxLength": 2000 },
           "correction": { "type": "string", "maxLength": 2000 },
           "source": { "enum": ["user", "operator"] },
+          "retention_key": { "type": "string", "minLength": 1, "maxLength": 80 },
           "recorded_at": { "type": "string", "minLength": 1 }
         }
       }

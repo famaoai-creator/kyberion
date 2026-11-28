@@ -540,7 +540,14 @@ export const runSetupReportCli = defineScript({
     }
     print(
       json
-        ? { status: 'ok', report: result.report, lifecycle_command: SETUP_LIFECYCLE_COMMAND }
+        ? {
+            status: 'ok',
+            ...(result.persona === 'first-time-user'
+              ? { first_request_readiness: result.report.recommendedSurfaces[0].readiness }
+              : {}),
+            report: result.report,
+            lifecycle_command: SETUP_LIFECYCLE_COMMAND,
+          }
         : formatSetupReport(result.report, result.persona)
     );
     return result.report;

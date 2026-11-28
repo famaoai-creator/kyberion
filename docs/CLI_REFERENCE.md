@@ -13,13 +13,13 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 
 ### Start
 
-| Command                | pnpm script       | What it does                                                                                                       |
-| ---------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `pnpm kyberion`        |                   | Home: status digest and next action                                                                                |
-| `pnpm kyberion ask`    |                   | Ask Kyberion in natural language — Needs: local backend (see `kyberion reasoning setup`)                           |
-| `pnpm kyberion doctor` | `pnpm run doctor` | Diagnose health and suggest the next action — **[readiness]**                                                      |
-| `pnpm kyberion help`   |                   | Show this command list                                                                                             |
-| `pnpm kyberion intent` |                   | Deprecated alias of ask (resolve free text into an intent) — Needs: local backend (see `kyberion reasoning setup`) |
+| Command                | pnpm script       | What it does                                                                                                                                        |
+| ---------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm kyberion`        |                   | Home: status digest and next action                                                                                                                 |
+| `pnpm kyberion ask`    |                   | Ask Kyberion in natural language, find lifecycle guidance, or manage your guidance feedback — Needs: local backend (see `kyberion reasoning setup`) |
+| `pnpm kyberion doctor` | `pnpm run doctor` | Diagnose health and suggest the next action — **[readiness]**                                                                                       |
+| `pnpm kyberion help`   |                   | Show this command list                                                                                                                              |
+| `pnpm kyberion intent` |                   | Deprecated alias of ask (resolve free text into an intent) — Needs: local backend (see `kyberion reasoning setup`)                                  |
 
 ### Inspect
 
@@ -105,79 +105,79 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 
 ### Inspect
 
-| Command                                      | pnpm script                       | What it does                                                                                                                                   |
-| -------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm kyberion account preview`              |                                   | Review registration metadata for an existing account — **[readiness]**                                                                         |
-| `pnpm kyberion account status`               |                                   | Show account registration approval status — **[readiness]**                                                                                    |
-| `pnpm kyberion approvals digest`             |                                   | Summarize pending decisions and autonomous actions as a digest (optionally send it).                                                           |
-| `pnpm kyberion audit verify`                 | `pnpm audit:verify`               | Verify the audit chain                                                                                                                         |
-| `pnpm kyberion auth check`                   |                                   | Check reasoning backend authentication                                                                                                         |
-| `pnpm kyberion automation blueprint`         | `pnpm automation:blueprint`       | Preview an automation blueprint                                                                                                                |
-| `pnpm kyberion bindings`                     | `pnpm bindings`                   | Inspect the runtime seam catalog                                                                                                               |
-| `pnpm kyberion browser approval-queue`       |                                   | Show an approval-queue profile's hash and the grant to sign                                                                                    |
-| `pnpm kyberion browser inspect`              |                                   | Inspect a browser page                                                                                                                         |
-| `pnpm kyberion browser profiles`             |                                   | List browser profiles                                                                                                                          |
-| `pnpm kyberion capabilities`                 | `pnpm capabilities`               | Discover actuators without a build                                                                                                             |
-| `pnpm kyberion channels list`                | `pnpm channels:list`              | List channels                                                                                                                                  |
-| `pnpm kyberion config report`                | `pnpm config:report`              | Report operational configuration                                                                                                               |
-| `pnpm kyberion conversation report`          |                                   | Report how the conversation is going: turn outcomes per intent, unanswered clarifications and repeated misses worth adding to the eval corpus. |
-| `pnpm kyberion cost report`                  | `pnpm cost:report`                | Report usage cost                                                                                                                              |
-| `pnpm kyberion dot autonomy`                 |                                   | Show a resident dot's graduated-autonomy level, metrics and shadow decisions                                                                   |
-| `pnpm kyberion dot followups`                |                                   | List a resident dot's pending self-scheduled follow-ups                                                                                        |
-| `pnpm kyberion dot intake`                   |                                   | Show which event or feed source wakes which dot, and what that wake may propose (--json)                                                       |
-| `pnpm kyberion dot kr`                       |                                   | Show a resident dot's latest key-result measurements and goal gaps                                                                             |
-| `pnpm kyberion dot list`                     |                                   | List resident-agent (dot) charters and their status                                                                                            |
-| `pnpm kyberion dot memory`                   |                                   | Show a resident dot's working memory (notes, open items, hypotheses)                                                                           |
-| `pnpm kyberion dot outcomes`                 |                                   | Show the recorded outcome evaluations of a resident dot's actions                                                                              |
-| `pnpm kyberion dot status`                   |                                   | Show wake/heartbeat/token status for dot charters — **[readiness]**                                                                            |
-| `pnpm kyberion dot validate`                 |                                   | Validate dot charters against schema and the activation gate                                                                                   |
-| `pnpm kyberion dot work`                     |                                   | Show recent delegated-work results executed for a resident dot                                                                                 |
-| `pnpm kyberion egress report`                | `pnpm egress:report`              | Report egress warnings                                                                                                                         |
-| `pnpm kyberion halt status`                  |                                   | Show whether autonomous operations are halted, since when and by whom.                                                                         |
-| `pnpm kyberion history search`               | `pnpm history:search`             | Search history                                                                                                                                 |
-| `pnpm kyberion hooks discover`               |                                   | List project-local Claude/Codex hook configs and whether each is trusted.                                                                      |
-| `pnpm kyberion ingress probe`                |                                   | Check which public ingress providers are ready                                                                                                 |
-| `pnpm kyberion ingress status`               |                                   | Show surfaces exposed through public ingress                                                                                                   |
-| `pnpm kyberion intent trace`                 | `pnpm intent:trace`               | Trace intent resolution                                                                                                                        |
-| `pnpm kyberion knowledge rank`               |                                   | Rank knowledge for a context                                                                                                                   |
-| `pnpm kyberion knowledge scope-health`       |                                   | Report tenant knowledge scope health                                                                                                           |
-| `pnpm kyberion learning harvest`             |                                   | Propose recurring runtime failures as learning candidates                                                                                      |
-| `pnpm kyberion learning prepare`             |                                   | Prepare an evidence-backed reusable improvement for review                                                                                     |
-| `pnpm kyberion learning reuse`               |                                   | Inspect reuse outcomes for the current asset revision                                                                                          |
-| `pnpm kyberion marketing review-aggregate`   |                                   | Aggregate review results for marketing content.                                                                                                |
-| `pnpm kyberion meeting preflight`            | `pnpm meeting:preflight`          | Check meeting readiness                                                                                                                        |
-| `pnpm kyberion memory promotion-queue`       |                                   | Summarize the memory promotion queue.                                                                                                          |
-| `pnpm kyberion mesh-hub inspect`             | `pnpm mesh-hub:inspect`           | Inspect the Mesh Hub                                                                                                                           |
-| `pnpm kyberion mission journal`              |                                   | Show the mission journal                                                                                                                       |
-| `pnpm kyberion ops`                          |                                   | List actuator op vocabulary by domain and step kind                                                                                            |
-| `pnpm kyberion ops alerts`                   | `pnpm ops:alerts`                 | Triage undelivered alerts                                                                                                                      |
-| `pnpm kyberion organization identity`        |                                   | Inspect humans, agents and the local owner                                                                                                     |
-| `pnpm kyberion packet`                       |                                   | Render an operator packet or status report                                                                                                     |
-| `pnpm kyberion pr preflight`                 |                                   | Run the pull-request readiness gates and affected tests for changed paths without creating a PR                                                |
-| `pnpm kyberion pr shadow-report`             |                                   | Compare the gate's shadow verdicts on pull requests with what the operator actually did.                                                       |
-| `pnpm kyberion procedure golden`             |                                   | Show procedure success-check status or backfill golden scenarios                                                                               |
-| `pnpm kyberion project-trust`                |                                   | Show project trust requests — **[readiness]**                                                                                                  |
-| `pnpm kyberion provider-capabilities scan`   | `pnpm provider-capabilities:scan` | Scan provider CLI capabilities                                                                                                                 |
-| `pnpm kyberion reasoning compare`            | `pnpm reasoning:compare`          | Compare reasoning backends on the same prompt                                                                                                  |
-| `pnpm kyberion reasoning config`             | `pnpm reasoning:config`           | Show or change reasoning configuration                                                                                                         |
-| `pnpm kyberion report team-decision-support` |                                   | Report how the roster proposer and advisory panel performed, from recorded outcomes.                                                           |
-| `pnpm kyberion scheduler status`             |                                   | Show the selected daemon identity and host service manager query result                                                                        |
-| `pnpm kyberion scope`                        | `pnpm scope`                      | Inspect the active scope                                                                                                                       |
-| `pnpm kyberion scope inspect`                |                                   | Inspect asset scope and the current read policy                                                                                                |
-| `pnpm kyberion secret status`                |                                   | Show secret status — **[readiness]**                                                                                                           |
-| `pnpm kyberion service preflight`            | `pnpm service:preflight`          | Check service readiness                                                                                                                        |
-| `pnpm kyberion stance list`                  | `pnpm stance:list`                | List stance overlays                                                                                                                           |
-| `pnpm kyberion task list`                    | `pnpm task:list`                  | List tasks                                                                                                                                     |
-| `pnpm kyberion task plan`                    |                                   | Preview a task plan without executing it — **[readiness]** · Needs: local backend (see `kyberion reasoning setup`)                             |
-| `pnpm kyberion task scenario`                |                                   | Show task scenario examples — **[readiness]**                                                                                                  |
-| `pnpm kyberion usage weekly`                 | `pnpm usage:weekly`               | Report weekly Kyberion usage                                                                                                                   |
-| `pnpm kyberion vault list`                   |                                   | List vault mounts                                                                                                                              |
-| `pnpm kyberion video filter inspect`         |                                   | Inspect live video filter providers and source filters                                                                                         |
-| `pnpm kyberion voice conversation-config`    | `pnpm voice:conversation-config`  | Show realtime voice conversation config                                                                                                        |
-| `pnpm kyberion voice engine-config`          | `pnpm voice:engine-config`        | Show or set engine runtime defaults                                                                                                            |
-| `pnpm kyberion voice route`                  | `pnpm voice:route`                | Show or set voice routing                                                                                                                      |
-| `pnpm kyberion workspace list`               |                                   | List workspace ledger entries                                                                                                                  |
-| `pnpm kyberion worktree list`                |                                   | List agent worktrees with branch and build freshness                                                                                           |
+| Command                                      | pnpm script                       | What it does                                                                                                       |
+| -------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `pnpm kyberion account preview`              |                                   | Review registration metadata for an existing account — **[readiness]**                                             |
+| `pnpm kyberion account status`               |                                   | Show account registration approval status — **[readiness]**                                                        |
+| `pnpm kyberion approvals digest`             |                                   | Summarize pending decisions and autonomous actions as a digest (optionally send it).                               |
+| `pnpm kyberion audit verify`                 | `pnpm audit:verify`               | Verify the audit chain                                                                                             |
+| `pnpm kyberion auth check`                   |                                   | Check reasoning backend authentication                                                                             |
+| `pnpm kyberion automation blueprint`         | `pnpm automation:blueprint`       | Preview an automation blueprint                                                                                    |
+| `pnpm kyberion bindings`                     | `pnpm bindings`                   | Inspect the runtime seam catalog                                                                                   |
+| `pnpm kyberion browser approval-queue`       |                                   | Show an approval-queue profile's hash and the grant to sign                                                        |
+| `pnpm kyberion browser inspect`              |                                   | Inspect a browser page                                                                                             |
+| `pnpm kyberion browser profiles`             |                                   | List browser profiles                                                                                              |
+| `pnpm kyberion capabilities`                 | `pnpm capabilities`               | Discover actuators without a build                                                                                 |
+| `pnpm kyberion channels list`                | `pnpm channels:list`              | List channels                                                                                                      |
+| `pnpm kyberion config report`                | `pnpm config:report`              | Report operational configuration                                                                                   |
+| `pnpm kyberion conversation report`          |                                   | Report conversation outcomes, unanswered questions, repeated misses, and follow-ups to lifecycle guidance.         |
+| `pnpm kyberion cost report`                  | `pnpm cost:report`                | Report usage cost                                                                                                  |
+| `pnpm kyberion dot autonomy`                 |                                   | Show a resident dot's graduated-autonomy level, metrics and shadow decisions                                       |
+| `pnpm kyberion dot followups`                |                                   | List a resident dot's pending self-scheduled follow-ups                                                            |
+| `pnpm kyberion dot intake`                   |                                   | Show which event or feed source wakes which dot, and what that wake may propose (--json)                           |
+| `pnpm kyberion dot kr`                       |                                   | Show a resident dot's latest key-result measurements and goal gaps                                                 |
+| `pnpm kyberion dot list`                     |                                   | List resident-agent (dot) charters and their status                                                                |
+| `pnpm kyberion dot memory`                   |                                   | Show a resident dot's working memory (notes, open items, hypotheses)                                               |
+| `pnpm kyberion dot outcomes`                 |                                   | Show the recorded outcome evaluations of a resident dot's actions                                                  |
+| `pnpm kyberion dot status`                   |                                   | Show wake/heartbeat/token status for dot charters — **[readiness]**                                                |
+| `pnpm kyberion dot validate`                 |                                   | Validate dot charters against schema and the activation gate                                                       |
+| `pnpm kyberion dot work`                     |                                   | Show recent delegated-work results executed for a resident dot                                                     |
+| `pnpm kyberion egress report`                | `pnpm egress:report`              | Report egress warnings                                                                                             |
+| `pnpm kyberion halt status`                  |                                   | Show whether autonomous operations are halted, since when and by whom.                                             |
+| `pnpm kyberion history search`               | `pnpm history:search`             | Search history                                                                                                     |
+| `pnpm kyberion hooks discover`               |                                   | List project-local Claude/Codex hook configs and whether each is trusted.                                          |
+| `pnpm kyberion ingress probe`                |                                   | Check which public ingress providers are ready                                                                     |
+| `pnpm kyberion ingress status`               |                                   | Show surfaces exposed through public ingress                                                                       |
+| `pnpm kyberion intent trace`                 | `pnpm intent:trace`               | Trace intent resolution                                                                                            |
+| `pnpm kyberion knowledge rank`               |                                   | Rank knowledge for a context                                                                                       |
+| `pnpm kyberion knowledge scope-health`       |                                   | Report tenant knowledge scope health                                                                               |
+| `pnpm kyberion learning harvest`             |                                   | Propose recurring runtime failures as learning candidates                                                          |
+| `pnpm kyberion learning prepare`             |                                   | Prepare an evidence-backed reusable improvement for review                                                         |
+| `pnpm kyberion learning reuse`               |                                   | Inspect reuse outcomes for the current asset revision                                                              |
+| `pnpm kyberion marketing review-aggregate`   |                                   | Aggregate review results for marketing content.                                                                    |
+| `pnpm kyberion meeting preflight`            | `pnpm meeting:preflight`          | Check meeting readiness                                                                                            |
+| `pnpm kyberion memory promotion-queue`       |                                   | Summarize the memory promotion queue.                                                                              |
+| `pnpm kyberion mesh-hub inspect`             | `pnpm mesh-hub:inspect`           | Inspect the Mesh Hub                                                                                               |
+| `pnpm kyberion mission journal`              |                                   | Show the mission journal                                                                                           |
+| `pnpm kyberion ops`                          |                                   | List actuator op vocabulary by domain and step kind                                                                |
+| `pnpm kyberion ops alerts`                   | `pnpm ops:alerts`                 | Triage undelivered alerts                                                                                          |
+| `pnpm kyberion organization identity`        |                                   | Inspect humans, agents and the local owner                                                                         |
+| `pnpm kyberion packet`                       |                                   | Render an operator packet or status report                                                                         |
+| `pnpm kyberion pr preflight`                 |                                   | Run the pull-request readiness gates and affected tests for changed paths without creating a PR                    |
+| `pnpm kyberion pr shadow-report`             |                                   | Compare the gate's shadow verdicts on pull requests with what the operator actually did.                           |
+| `pnpm kyberion procedure golden`             |                                   | Show procedure success-check status or backfill golden scenarios                                                   |
+| `pnpm kyberion project-trust`                |                                   | Show project trust requests — **[readiness]**                                                                      |
+| `pnpm kyberion provider-capabilities scan`   | `pnpm provider-capabilities:scan` | Scan provider CLI capabilities                                                                                     |
+| `pnpm kyberion reasoning compare`            | `pnpm reasoning:compare`          | Compare reasoning backends on the same prompt                                                                      |
+| `pnpm kyberion reasoning config`             | `pnpm reasoning:config`           | Show or change reasoning configuration                                                                             |
+| `pnpm kyberion report team-decision-support` |                                   | Report how the roster proposer and advisory panel performed, from recorded outcomes.                               |
+| `pnpm kyberion scheduler status`             |                                   | Show the selected daemon identity and host service manager query result                                            |
+| `pnpm kyberion scope`                        | `pnpm scope`                      | Inspect the active scope                                                                                           |
+| `pnpm kyberion scope inspect`                |                                   | Inspect asset scope and the current read policy                                                                    |
+| `pnpm kyberion secret status`                |                                   | Show secret status — **[readiness]**                                                                               |
+| `pnpm kyberion service preflight`            | `pnpm service:preflight`          | Check service readiness                                                                                            |
+| `pnpm kyberion stance list`                  | `pnpm stance:list`                | List stance overlays                                                                                               |
+| `pnpm kyberion task list`                    | `pnpm task:list`                  | List tasks                                                                                                         |
+| `pnpm kyberion task plan`                    |                                   | Preview a task plan without executing it — **[readiness]** · Needs: local backend (see `kyberion reasoning setup`) |
+| `pnpm kyberion task scenario`                |                                   | Show task scenario examples — **[readiness]**                                                                      |
+| `pnpm kyberion usage weekly`                 | `pnpm usage:weekly`               | Report weekly Kyberion usage                                                                                       |
+| `pnpm kyberion vault list`                   |                                   | List vault mounts                                                                                                  |
+| `pnpm kyberion video filter inspect`         |                                   | Inspect live video filter providers and source filters                                                             |
+| `pnpm kyberion voice conversation-config`    | `pnpm voice:conversation-config`  | Show realtime voice conversation config                                                                            |
+| `pnpm kyberion voice engine-config`          | `pnpm voice:engine-config`        | Show or set engine runtime defaults                                                                                |
+| `pnpm kyberion voice route`                  | `pnpm voice:route`                | Show or set voice routing                                                                                          |
+| `pnpm kyberion workspace list`               |                                   | List workspace ledger entries                                                                                      |
+| `pnpm kyberion worktree list`                |                                   | List agent worktrees with branch and build freshness                                                               |
 
 ### Operate
 

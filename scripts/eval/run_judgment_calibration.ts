@@ -46,10 +46,22 @@ import {
   type TierLevel,
 } from '@agent/core';
 import { ORGANIZATION_WORK_SHAPE_QUESTION } from '@agent/core/organization';
+import { setupAskJudgmentSmoke } from '../setup/setup-ask-judgment.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
+const askSmokeSuites = {
+  'ask-conversation-smoke': 'conversation',
+  'ask-recovery-smoke': 'recovery',
+  'ask-installation-smoke': 'installation',
+} as const;
+type AskSmokeSuite = keyof typeof askSmokeSuites;
+
 export type BuiltInCalibrationSuiteName =
-  'error' | 'work_shape' | 'semantic_decide' | 'error-corpus' | 'routing';
+  'error' | 'work_shape' | 'semantic_decide' | 'error-corpus' | 'routing' | AskSmokeSuite;
+
+function isAskSmokeSuite(name: string): name is AskSmokeSuite {
+  return Object.prototype.hasOwnProperty.call(askSmokeSuites, name);
+}
 
 const VALID_SUITES: readonly BuiltInCalibrationSuiteName[] = [
   'error',
@@ -57,6 +69,7 @@ const VALID_SUITES: readonly BuiltInCalibrationSuiteName[] = [
   'semantic_decide',
   'error-corpus',
   'routing',
+  ...(Object.keys(askSmokeSuites) as AskSmokeSuite[]),
 ];
 
 export interface CalibrationSuiteSpec {
@@ -124,6 +137,7 @@ export function buildBuiltInCallSiteSuite(
   name: BuiltInCalibrationSuiteName,
   options: { routingLedgerPath?: string } = {}
 ): CalibrationSuiteSpec {
+  if (isAskSmokeSuite(name)) return setupAskJudgmentSmoke(askSmokeSuites[name]);
   if (name === 'error' || name === 'error-corpus') {
     const q = errorCategoryQuestion();
     if (name === 'error-corpus') {
@@ -339,6 +353,10 @@ export function mergeCalibrationEntry(
 export async function runJudgmentCalibration(
   options: RunJudgmentCalibrationOptions
 ): Promise<RunJudgmentCalibrationResult> {
+  if (options.apply && options.suite && isAskSmokeSuite(options.suite))
+    throw new Error(
+      '[JUDGMENT_SMOKE_READ_ONLY] Use representative labelled cases for calibration.'
+    );
   if (!options.skipBootstrap) {
     const boot = ensureJudgmentBackendsRegistered({
       providers: options.provider === BUILTIN_JUDGMENT_PROVIDER ? '' : options.provider,
@@ -492,6 +510,7 @@ function usageText(): string {
     `  --suite <${VALID_SUITES.join('|')}>  Evaluation suite (default: semantic_decide)`,
     '  --routing-ledger <path>                     Mission routing-outcomes.jsonl (for --suite routing)',
     '  --cases <path.json>                         Custom labelled cases JSON',
+    '  ask-*-smoke suites use synthetic cases and cannot be applied.',
     '  --tier <public|confidential|personal>       Data tier (default: public)',
     '  --tenant <slug>                             Optional tenant slug',
     '  --repeats <n>                               Repeated runs per case (default: 3)',

@@ -4,6 +4,24 @@
   "description": "Changed-path -> documented-surface map consumed by `pnpm check:docs-impact`. A rule names the doc paths a change of that shape is expected to reflect in; the check reports each doc as updated (also in the diff) or not_updated. Rules are advisory — a not_updated finding is closed by updating the doc or by recording why the surface does not apply.",
   "rules": [
     {
+      "change": "scripts/eval/run_judgment_calibration.ts",
+      "docs": ["knowledge/product/architecture/judgment-backend-seam.md"],
+      "note": "Judgment calibration, read-only smoke suites, and fit publication rules"
+    },
+    {
+      "change": "scripts/setup/setup-ask-*.ts",
+      "docs": [
+        "docs/user/COMMANDS_GUIDE.md",
+        "knowledge/product/architecture/judgment-backend-seam.md"
+      ],
+      "note": "natural-language lifecycle guidance, feedback, and Judgment behavior"
+    },
+    {
+      "change": "scripts/setup/setup_report.ts",
+      "docs": ["docs/user/COMMANDS_GUIDE.md"],
+      "note": "setup report and first-request readiness output"
+    },
+    {
       "change": "package.json",
       "docs": ["docs/CLI_REFERENCE.md", "AGENTS.md"],
       "note": "package scripts are the operator surface — renamed/added scripts land in the CLI reference and the operating guide"

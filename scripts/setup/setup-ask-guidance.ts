@@ -1,10 +1,14 @@
-import { buildSetupLifecycleGuide, setupLifecycleDomains } from './setup-lifecycle-guide.js';
+import {
+  buildSetupLifecycleGuide,
+  FIRST_REQUEST_READINESS_COMMAND,
+  setupLifecycleDomains,
+} from './setup-lifecycle-guide.js';
 
 // More specific topics precede general topics such as project, organization and runtime.
 const topics = [
   [
     'coordination',
-    /co[- ]session|peer conversations?|別のkyberion|異なるkyberion|同じチェックアウト|エージェント間の会話/iu,
+    /co[- ]session|peer conversations?|別のkyberion|異なるkyberion|同じチェックアウト|エージェント間の会話|別のエージェント.{0,18}連携/iu,
   ],
   [
     'discussion',
@@ -27,13 +31,13 @@ const topics = [
     /global halt|pause and resume|一時停止して安全に再開|中断した作業を復旧|グローバル停止/iu,
   ],
   ['approval', /\bapprovals?\b|承認待ち|承認ゲート|承認依頼|承認キュー|承認状況/iu],
-  ['credentials', /credentials?|api keys?|資格情報|認証情報|APIキー/iu],
+  ['credentials', /credentials?|api keys?|資格情報|認証情報|API\s*キー/iu],
   ['task', /task sessions?|task scenarios?|定型タスク|タスクセッション|タスクシナリオ/iu],
   ['knowledge', /\bknowledge\b|ナレッジ|知識|知識昇格|蒸留結果/iu],
   ['release', /release notes|changelogs?|install smoke|リリースノート|変更履歴/iu],
   [
     'channel',
-    /notifications?|inbox|channels? (?:connection|integration)|通知先|通知設定|通知が届いた会話|受信箱|チャネル連携|(?:slack|telegram|discord|imessage).{0,12}会話|(?:chat|talk).{0,20}(?:slack|telegram|discord|imessage)/iu,
+    /notifications?|inbox|channels? (?:connection|integration)|通知先|通知設定|通知が届いた会話|受信箱|チャネル連携|チームのチャット|(?:slack|telegram|discord|imessage).{0,12}会話|(?:chat|talk).{0,20}(?:slack|telegram|discord|imessage)/iu,
   ],
   ['runtime', /service (?:setup|connection|registration)|サービスの(?:登録|接続|認証)/iu],
   ['objectives', /okr|key results?|組織目標|目標の進捗|成果指標/iu],
@@ -78,7 +82,7 @@ const topics = [
   ['runtime', /runtimes?|backends?|ランタイム|バックエンド/iu],
   [
     'conversation',
-    /\bconversations?\b|\bchat local\b|\bollama\b|(?:chat|talk|speak).{0,22}kyberion|会話|kyberionと話/iu,
+    /\bconversations?\b|\bchat local\b|\bollama\b|(?:chat|talk|speak).{0,22}kyberion|会話|kyberion(?: 本体)? ?と話/iu,
   ],
   ['installation', /onboarding|installation|オンボーディング|初期設定/iu],
 ] as const;
@@ -138,6 +142,55 @@ const conversationChoices = [
 ] as const;
 const conversationThroughKyberion = /kyberion.{0,6}(?:を通|通し|経由)|(?:through|via) kyberion/iu;
 
+const recoveryChoices = [
+  // i18n-exempt: explicit English and Japanese choice text
+  { domain: 'mission', ja: '中断したミッション', en: 'Interrupted mission' },
+  // i18n-exempt: explicit English and Japanese choice text
+  { domain: 'track', ja: '一時停止したトラック', en: 'Paused project track' },
+  {
+    domain: 'surface',
+    // i18n-exempt: explicit English and Japanese choice text
+    ja: '停止した画面や常駐サービス',
+    en: 'Stopped surface or resident service',
+  },
+] as const;
+export const setupAskClarifications = {
+  conversation: {
+    matches: conversationThroughKyberion,
+    // i18n-exempt: explicit English and Japanese choice text
+    ja: '誰と会話したいですか？',
+    en: 'Who do you want to talk with?',
+    choices: conversationChoices,
+  },
+  installation: {
+    readiness_command: FIRST_REQUEST_READINESS_COMMAND,
+    matches:
+      /初期設定.{0,18}(?:どこから|何から|最初)|オンボーディング.{0,18}(?:どこから|何から)|(?:where|how) (?:should i |do i |to )?(?:start|begin).{0,20}onboarding/iu,
+    // i18n-exempt: explicit English and Japanese choice text
+    ja: '何の設定から始めたいですか？',
+    en: 'What do you want to set up first?',
+    choices: [
+      {
+        domain: 'installation',
+        // i18n-exempt: explicit English and Japanese choice text
+        ja: 'ローカル環境と本人設定',
+        en: 'Local installation and identity',
+      },
+      // i18n-exempt: explicit English and Japanese choice text
+      { domain: 'tenant', ja: 'テナントへの参加と有効化', en: 'Tenant access and activation' },
+      // i18n-exempt: explicit English and Japanese choice text
+      { domain: 'runtime', ja: '利用するサービスの設定', en: 'Set up a service' },
+    ],
+  },
+  recovery: {
+    matches: /pause and resume|一時停止して安全に再開|中断した作業を復旧/iu,
+    // i18n-exempt: explicit English and Japanese choice text
+    ja: '何を再開したいですか？',
+    en: 'What do you want to resume?',
+    choices: recoveryChoices,
+  },
+} as const;
+
 export function resolveSetupAskGuidance(text: string) {
   const question = text.normalize('NFKC').trim();
   if (question.length > 512 || liveDefinitionPrefix.test(question)) return undefined;
@@ -147,20 +200,25 @@ export function resolveSetupAskGuidance(text: string) {
   const domain = topics.find(([, pattern]) => pattern.test(question))?.[0];
   if (!domain || !setupLifecycleDomains.includes(domain)) return undefined;
   const guide = buildSetupLifecycleGuide(domain);
-  const conversationAmbiguous =
-    domain === 'conversation' && !definition && conversationThroughKyberion.test(question);
-  const japanese = /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(question);
-  const clarification = conversationAmbiguous
-    ? {
-        // i18n-exempt: explicit English and Japanese choice text
-        question: japanese ? '誰と会話したいですか？' : 'Who do you want to talk with?',
-        choices: conversationChoices.map((choice) => ({
-          domain: choice.domain,
-          label: japanese ? choice.ja : choice.en,
-          guide_command: buildSetupLifecycleGuide(choice.domain).routes[0]!.guide_command,
-        })),
-      }
-    : undefined;
+  const language = /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(question) ? 'ja' : 'en';
+  const kind = Object.keys(setupAskClarifications).find((key) => key === domain) as
+    keyof typeof setupAskClarifications | undefined;
+  const candidate = kind && !definition ? setupAskClarifications[kind] : undefined;
+  const clarification =
+    kind && candidate?.matches.test(question)
+      ? {
+          kind,
+          question: candidate[language],
+          ...('readiness_command' in candidate
+            ? { readiness_command: candidate.readiness_command }
+            : {}),
+          choices: candidate.choices.map((choice) => ({
+            domain: choice.domain,
+            label: choice[language],
+            guide_command: buildSetupLifecycleGuide(choice.domain).routes[0]!.guide_command,
+          })),
+        }
+      : undefined;
   const anchor = definition
     ? (specificDefinitions.find(([pattern]) => pattern.test(question))?.[1] ??
       glossaryAnchors[domain])
