@@ -1218,6 +1218,17 @@ the catalog`, 2026-10). Every `createSeam({ catalog: coreSeamCatalog })` declare
    fresh checkout, so rerun the tests. Never exempt a directory, and never add a switch that turns
    the guard off.
 
+8. **A test clears the run markers and calls a hook/actuator function in-process:** clearing
+   `ALL_TEST_RUN_MARKER_ENV_KEYS` (or deleting `VITEST`) to simulate a real child process also
+   switches off the live-state redirect for every writer reachable inside the called function —
+   not just the mocked ones. Such a test must mock every live-state writer at its module seam,
+   and every writer added _after_ the test was written breaks the suite silently until the next
+   strict run (the `session-length-nudge` recorders added to `recordPostToolUse` /
+   `buildUserPromptSubmitContext` leaked `runtime/session-length/*.json` through
+   `claude-code-hook.test.ts` and `claude-code-hook-provenance.test.ts`, 2026-11). When a test
+   claims "every store is mocked", treat a newly reported live file as a new seam to mock, not
+   as a path to redirect.
+
 **Procedure when a test times out only under load or in a shuffled order:**
 
 1. Reproduce: run the file alone, then with `--sequence.shuffle --sequence.seed=<n>`, then under
