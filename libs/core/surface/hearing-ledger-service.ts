@@ -16,8 +16,9 @@
  *          and the response names who to ask. A greenfield hearing (`web_app_build`)
  *          becomes a product concept (`PC-*`) in the same ledger.
  *
- * Reads of the tenant ledger run under the `decision_ledger` role; the tenant
- * itself is the viewer's server-side namespace, never a request parameter.
+ * Reads of the tenant ledger run under the `decision_ledger_store` declared
+ * grant; the tenant itself is the viewer's server-side namespace, never a
+ * request parameter.
  */
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';

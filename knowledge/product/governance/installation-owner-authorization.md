@@ -175,7 +175,8 @@ Writes are browser requests. Each POST must carry an `Origin` (or `Referer`)
 that matches the Host it was sent to, whatever the credential. A bearer API
 client without one gets 403 `hearing_origin_denied`, as does a cross-site
 page. Decision-ledger hearings answer 503 `hearing_ledger_unavailable`,
-because the concierge role does not assume `decision_ledger`. The gate is in
+because the concierge runs at system scope and cannot bind the tenant-bound
+`decision_ledger_store` grant. The gate is in
 `presence/displays/concierge/src/lib/hearing-access.ts`.
 
 ## Related

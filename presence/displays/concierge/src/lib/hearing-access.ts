@@ -458,10 +458,11 @@ export async function runHearingRoute(
 }
 
 /**
- * The decision-ledger steps are not served here: the concierge role may not
- * assume `decision_ledger` (CD-12, role-assumption-policy.json), so neither the
- * agenda read nor the `decisions import` facade child runs. Answered after the
- * gate, so a refused viewer still learns nothing else.
+ * The decision-ledger steps are not served here: the concierge runs at system
+ * scope and cannot bind the tenant-bound `decision_ledger_store` grant
+ * (CD-12), so neither the agenda read nor the `decisions import` facade child
+ * runs. Answered after the gate, so a refused viewer still learns nothing
+ * else.
  */
 export async function hearingLedgerUnavailable(
   req: NextRequest,

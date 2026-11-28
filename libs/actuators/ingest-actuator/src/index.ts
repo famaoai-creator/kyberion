@@ -14,7 +14,8 @@
  *                                  fetch → parse → structured summary → commit (only writer)
  *
  * ingest:commit is the ONLY op here that writes into knowledge/ (under the
- * narrowly-scoped ingest_commit authority role, fail-closed path guard).
+ * narrowly-scoped ingest_knowledge_store declared grant, fail-closed path
+ * guard).
  * Everything else returns data; the only other write this actuator performs
  * is the dedup registry append under active/shared/runtime/ingest/.
  */

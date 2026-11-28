@@ -27,10 +27,10 @@
  *      The body also passes the SA-03 injection scan — suspected content is
  *      wrapped in the untrusted-content banner ('untrusted_wrap' entry).
  *
- * Writes run under the narrowly-scoped `ingest_commit` authority role
- * (security-policy.json authority_role_permissions.ingest_commit — the LE-03
- * reconcile_config_fallbacks pattern): the ceremony body is the only code
- * that enters that execution context.
+ * Writes run under the narrowly-scoped `ingest_knowledge_store` declared
+ * store grant (security-policy.json store_grants.ingest_knowledge_store —
+ * the LE-03 reconcile_config_fallbacks pattern): the ceremony body is the
+ * only code that opens that grant.
  */
 
 import * as path from 'node:path';
@@ -69,7 +69,7 @@ export const INGEST_COMMIT_ROLE = 'ingest_knowledge_store';
 
 /**
  * DA-06: the ONLY public subtree the ceremony can land in (with steward
- * approval). Matches the ingest_commit allow_write grant in
+ * approval). Matches the ingest_knowledge_store allow_write grant in
  * security-policy.json — keep the two in sync.
  */
 export const PUBLIC_INGEST_ROOT = 'knowledge/public/ingest';
@@ -512,12 +512,13 @@ export async function commitIngest(input: IngestCommitInput): Promise<IngestComm
   const assetId = deriveAssetId(sourceSystem, sourceId);
 
   // Ledger reads/writes and the card write all run under the narrowly-scoped
-  // ingest_commit authority role — the only grant into knowledge/confidential/
-  // this actuator ever uses. The audit record is emitted AFTER leaving the
-  // context so it carries the caller's own identity (and the caller's
-  // customer-mirror permissions, when it has them).
-  // The tenant registry lives in the personal tier, which ingest_commit cannot
-  // read — hand the ledger the root resolved above instead of re-resolving it.
+  // ingest_knowledge_store declared grant — the only grant into
+  // knowledge/confidential/ this actuator ever uses. The audit record is
+  // emitted AFTER leaving the context so it carries the caller's own identity
+  // (and the caller's customer-mirror permissions, when it has them).
+  // The tenant registry lives in the personal tier, which
+  // ingest_knowledge_store cannot read — hand the ledger the root resolved
+  // above instead of re-resolving it.
   const ledgerPathOptions = { ...pathOptions, knowledgeRoot: ledgerKnowledgeRoot };
   const committed = await withStoreGrantAsync(
     INGEST_COMMIT_ROLE,

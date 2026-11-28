@@ -85,8 +85,8 @@ permission_denied 分類は正しい fail-closed であり、本書で扱った�
 
 - **persona `worker`**: base Authority Role `base_worker`（`authority_role_permissions.base_worker.allow_read`、旧 `persona_permissions.worker`）に tenant 展開
   対応の当該 prefix が明示登録されている。
-- **広い tmp grant を持つ role**: `infrastructure_sentinel` / `asset_promoter` /
-  `secret_introduce` / `dot_lifecycle_writer` /
+- **広い tmp grant を持つ role/grant**: `infrastructure_sentinel` / `asset_promoter` /
+  `secret_vault_store` / `dot_lifecycle_runtime_store` /
   finance・sales・marketing・talent・line_manager 系 (`active/shared/tmp/`)。
 - **capability-bound な reader**: `memory_provenance_reader` は当該 prefix の
   allow_read を持つが、`requestResourceDenial` が role 名で capability を強制

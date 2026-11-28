@@ -118,7 +118,7 @@ describe('ingest-asset-ledger (DA-05)', () => {
   });
 
   it('uses a pre-resolved knowledgeRoot without re-reading the tenant registry', () => {
-    // ingest:commit runs under ingest_commit, which cannot read the
+    // ingest:commit runs under ingest_knowledge_store, which cannot read the
     // personal-tier tenant profiles; an unregistered slug proves no lookup ran.
     expect(
       assetLedgerPath('ghost-co', { ...options, knowledgeRoot: 'knowledge/confidential/ghost-co' })
