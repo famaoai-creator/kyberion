@@ -601,6 +601,44 @@ describe('verifyReady', () => {
     expect(report.missing.map((m) => m.capability_id)).toContain('cap.required-missing');
     expect(report.missing.map((m) => m.capability_id)).not.toContain('cap.optional-missing');
   });
+
+  it('accepts a shared-state receipt for a mission-scoped verify, and prefers the newer receipt', async () => {
+    process.env.PROBE_VERIFY_READY = 'set';
+    const manifest: EnvironmentManifest = {
+      manifest_id: 'unit-test-manifest-shared-fallback',
+      version: 'test',
+      capabilities: [
+        {
+          capability_id: 'cap.env-ok',
+          kind: 'env-var',
+          description: 'env present',
+          required_for: ['demo'],
+          probe: { kind: 'env', name: 'PROBE_VERIFY_READY' },
+        },
+      ],
+    };
+    const sharedFile = path.join(
+      ROOT,
+      'active/shared/state/env-setup-receipts',
+      `${manifest.manifest_id}.json`
+    );
+    fs.rmSync(sharedFile, { force: true });
+    try {
+      // A stale mission-scoped receipt must not shadow a fresh shared one.
+      await bootstrapManifest(manifest, { mission_id: FIX_MISSION, apply: true });
+      const stale = JSON.parse(fs.readFileSync(receiptPath(manifest.manifest_id), 'utf8'));
+      stale.generated_at = '2020-01-01T00:00:00.000Z';
+      stale.expires_at = '2020-01-02T00:00:00.000Z';
+      fs.writeFileSync(receiptPath(manifest.manifest_id), JSON.stringify(stale, null, 2));
+
+      await bootstrapManifest(manifest, { apply: true });
+      const report = verifyReady(manifest, { mission_id: FIX_MISSION });
+      expect(report.ready).toBe(true);
+    } finally {
+      fs.rmSync(sharedFile, { force: true });
+      delete process.env.PROBE_VERIFY_READY;
+    }
+  });
 });
 
 describe('loadEnvironmentManifest', () => {

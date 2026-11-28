@@ -97,9 +97,9 @@ describe('reasoning:credentials', () => {
     );
     expect(mocks.introduce).not.toHaveBeenCalled();
   });
-  it('uses secret introduction read authority for status without printing the key', async () => {
+  it('reads the configured key for status without printing it', async () => {
     mocks.resolveKey.mockImplementation(() => {
-      expect(resolveRole()).toBe('secret_introduce');
+      expect(resolveRole()).not.toBe('secret_introduce');
       return 'test-private-key';
     });
     const print = vi.fn();
@@ -108,10 +108,10 @@ describe('reasoning:credentials', () => {
     expect(print).toHaveBeenCalledWith(expect.stringContaining('"configured":true'));
   });
 
-  it('verifies under secret introduction authority and writes metadata after restoring the caller', async () => {
+  it('verifies under the caller role and writes metadata', async () => {
     mocks.verify.mockImplementation(async () => {
       await Promise.resolve();
-      expect(resolveRole()).toBe('secret_introduce');
+      expect(resolveRole()).toBe('reasoning_credentials');
       return { provider: 'anthropic', model: 'test-model', status: 'success', code: 'verified' };
     });
     mocks.write.mockImplementation(() => expect(resolveRole()).toBe('reasoning_credentials'));
@@ -130,11 +130,11 @@ describe('reasoning:credentials', () => {
       /\/runtime\/health\/api-verification\/system\/anthropic\.json$/u
     );
   });
-  it('uses the secret introduction role across awaits and restores the caller role', async () => {
+  it('runs secret introduction under the caller role across awaits', async () => {
     mocks.introduce.mockImplementation(async () => {
-      expect(resolveRole()).toBe('secret_introduce');
+      expect(resolveRole()).toBe('reasoning_credentials');
       await Promise.resolve();
-      expect(resolveRole()).toBe('secret_introduce');
+      expect(resolveRole()).toBe('reasoning_credentials');
       return { status: 'pending' };
     });
     await withExecutionContextAsync('reasoning_credentials', async () => {

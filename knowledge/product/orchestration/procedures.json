@@ -1,4 +1,24 @@
 {
   "schema_version": "procedures.v1",
-  "procedures": []
+  "procedures": [
+    {
+      "procedure_id": "example-com",
+      "substrate": "browser",
+      "adapter": {
+        "recorder": "chrome-extension",
+        "executor": "extension_session",
+        "recording_ref": "active/shared/runtime/recordings/BCR-b3adee11-b8de-4aee-a974-c08937dcd0c2.json"
+      },
+      "target": {
+        "name": "https://example.com",
+        "origins": ["https://example.com"]
+      },
+      "intent_phrases": ["https://example.com"],
+      "execution_substrate": "extension",
+      "pipeline_ref": "pipelines/browser/example-com.json",
+      "risk_class": "medium",
+      "version": "1.0.0",
+      "status": "active"
+    }
+  ]
 }

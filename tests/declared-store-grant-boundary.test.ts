@@ -28,6 +28,11 @@ describeStoreGrantBoundary('Declared store grant trusted import boundary', {
     ['libs/core/foundation/role-narrowing-denial.ts', reader],
     // The installation migration copies only declarations the executing code declares.
     ['libs/core/organization/publication-role-migration.ts', ['isDeclaredStoreGrantName']],
+    // Code that re-assumes the caller's role inside a grant scope must branch on the
+    // name kind: a grant name re-enters withStoreGrant, never withExecutionContext.
+    ['libs/core/governance/accountability-charter-registry.ts', ['isDeclaredStoreGrantName']],
+    ['libs/core/surface/surface-management-mutations.ts', ['isDeclaredStoreGrantName']],
+    ['libs/core/mission/mission-task-evidence-binding.ts', ['isDeclaredStoreGrantName']],
     // Test-only entry that opens a name as its facade would (role or grant).
     ['libs/core/testing/role-or-store-grant.ts', ['isDeclaredStoreGrantName']],
     ['libs/core/tier-guard-tenant-store-partitions.ts', reader],

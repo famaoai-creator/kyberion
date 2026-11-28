@@ -19,6 +19,12 @@ vi.mock('./co-session-hook.js', () => ({
   coSessionHookLeaseGate: vi.fn(() => ({ decision: 'allow' })),
   formatPendingHandoffs: vi.fn(() => ''),
 }));
+// The session-length counter writes through secure-io; with the test-run
+// markers cleared it would land in live state — mock it like every other store.
+vi.mock('./session-length-nudge.js', () => ({
+  recordSessionPromptForNudge: () => null,
+  recordSessionToolEventForNudge: () => undefined,
+}));
 
 import { buildUserPromptSubmitContext, recordPostToolUse } from './claude-code-hook.js';
 import { ALL_TEST_RUN_MARKER_ENV_KEYS } from '../foundation/env.js';

@@ -1,4 +1,4 @@
-import { withExecutionContextAsync } from '@agent/core/authority';
+import { withStoreGrantAsync } from '@agent/core/authority';
 import { credentialExecutionIdentity } from '@agent/core/foundation/credential-binding';
 import {
   requireReasoningApiProvider,
@@ -26,8 +26,8 @@ export async function probeAllocatedCredential(options: {
   if (outer.tenantSlug && outer.tenantSlug !== options.tenant) throw denied();
   const { randomUUID } = await import('node:crypto');
   const task = `credential-probe-${randomUUID()}`;
-  return withExecutionContextAsync(
-    'credential_allocation_probe',
+  return withStoreGrantAsync(
+    'credential_probe_store',
     async () => {
       const { getSecretResolver, installSecretResolverIfAvailable } =
         await import('@agent/core/secret/secret-resolver');
@@ -139,9 +139,9 @@ export async function probeAllocatedCredential(options: {
         return { work_item_id: item.item_id, task_id: task, status: receipt.status, proof };
       });
     },
-    undefined,
-    options.tenant,
-    undefined,
-    { missionId: options.mission, taskId: task }
+    {
+      tenantSlug: options.tenant,
+      identity: { missionId: options.mission, taskId: task },
+    }
   );
 }

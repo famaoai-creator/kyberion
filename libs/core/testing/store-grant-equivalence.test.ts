@@ -77,6 +77,14 @@ const STORE_GRANT_MATRIX_SPECS: readonly StoreGrantMatrixSpec[] = [
   { name: 'tenant_approval_store', bind: 'tenant' },
   { name: 'tenant_approval_partition_index_reader', bind: 'none' },
   { name: 'credential_allocation_reader', bind: 'tenant' },
+  { name: 'credential_allocation_store', bind: 'tenant' },
+  { name: 'credential_probe_store', bind: 'tenant' },
+  // secret-guard/secret-bridge/secret-actuator leaf I/O; open unbound.
+  { name: 'secret_vault_store', bind: 'none' },
+  { name: 'personal_connections_store', bind: 'none' },
+  // decision-ledger + ingest-commit store grants; bound to the tenant they serve.
+  { name: 'decision_ledger_store', bind: 'tenant' },
+  { name: 'ingest_knowledge_store', bind: 'tenant' },
   {
     name: 'concierge_management_reader',
     bind: 'tenant',
@@ -124,6 +132,8 @@ const STORE_GRANT_MATRIX_SPECS: readonly StoreGrantMatrixSpec[] = [
   { name: 'customer_channel_binding_store', bind: 'tenant' },
   { name: 'dot_charter_store', bind: 'tenant', organization: true },
   { name: 'dot_lifecycle_runtime_store', bind: 'tenant' },
+  { name: 'env_setup_receipt_store', bind: 'none' },
+  { name: 'browser_cookie_store', bind: 'none' },
 ];
 
 /** Paths that no store-only role covers, probed for every role. */

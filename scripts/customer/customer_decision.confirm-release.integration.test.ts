@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { withExecutionContext as initialContext } from '@agent/core/authority';
+import { withExecutionContext as initialContext, withStoreGrant } from '@agent/core/authority';
 import { rootDir } from '@agent/core/path-resolver';
 import * as initialIO from '@agent/core/secure-io';
 import {
@@ -226,11 +226,10 @@ describe('customer-decision confirm releases a held task (CD-09, governed entry,
   async function lock() {
     const { readConsumedDecisionLock } = await import('@agent/core/customer-decision');
     const { DECISION_LEDGER_ROLES } = await import('@agent/core/decision-ledger');
-    return initialContext(
+    return withStoreGrant(
       DECISION_LEDGER_ROLES.write,
       () => readConsumedDecisionLock({ tenantSlug: TENANT, caseId: CASE }, CONSUMER),
-      undefined,
-      TENANT
+      { tenantSlug: TENANT }
     );
   }
 
@@ -604,11 +603,10 @@ describe('customer-decision confirm releases a held task (CD-09, governed entry,
       const awaiting = () =>
         lockApi.isTaskAwaitingCustomerDecision(task, { decisionCase: decisionCase(), now: NOW });
       const reaskLock = () =>
-        initialContext(
+        withStoreGrant(
           DECISION_LEDGER_ROLES.write,
           () => readConsumedDecisionLock({ tenantSlug: TENANT, caseId: CASE }, consumer),
-          undefined,
-          TENANT
+          { tenantSlug: TENANT }
         );
       const workItem = coordination.createWorkItem({
         title: TASK,

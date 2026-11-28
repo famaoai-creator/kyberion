@@ -52,7 +52,7 @@ import { scanForInjection, wrapUntrusted } from '@agent/core/untrusted-content';
 import { scrubContent } from '@agent/core/pii-scrubber';
 import { updateMemoryPromotionCandidateStatus } from '@agent/core/knowledge/memory-promotion-queue';
 import { verifyStewardApproval } from '@agent/core/ingest-tier-gate';
-import { withExecutionContextAsync } from '@agent/core/authority';
+import { withStoreGrantAsync } from '@agent/core/authority';
 import type { IngestLedgerPathOptions } from '@agent/core/ingest-asset-ledger';
 import type { IngestQuotaCheck, IngestQuotaLevel } from './ingest-quota.js';
 import type { MemoryCandidate } from '@agent/core/knowledge/memory-promotion-queue';
@@ -64,8 +64,8 @@ import type { DedupResult, IngestRegistryRecord } from './dedup.js';
 import type { NormalizeCardResult } from './normalize-card.js';
 import type { IngestSourceMeta } from './parse-document.js';
 
-/** Authority role the ceremony executes under (security-policy.json). */
-export const INGEST_COMMIT_ROLE = 'ingest_commit';
+/** Store grant the ceremony executes under (security-policy.json store_grants). */
+export const INGEST_COMMIT_ROLE = 'ingest_knowledge_store';
 
 /**
  * DA-06: the ONLY public subtree the ceremony can land in (with steward
@@ -519,89 +519,94 @@ export async function commitIngest(input: IngestCommitInput): Promise<IngestComm
   // The tenant registry lives in the personal tier, which ingest_commit cannot
   // read — hand the ledger the root resolved above instead of re-resolving it.
   const ledgerPathOptions = { ...pathOptions, knowledgeRoot: ledgerKnowledgeRoot };
-  const committed = await withExecutionContextAsync(INGEST_COMMIT_ROLE, async () => {
-    const prior = await findAssetBySource(tenantSlug, sourceSystem, sourceId, ledgerPathOptions);
+  const committed = await withStoreGrantAsync(
+    INGEST_COMMIT_ROLE,
+    async () => {
+      const prior = await findAssetBySource(tenantSlug, sourceSystem, sourceId, ledgerPathOptions);
 
-    let version = 1;
-    let supersedes: string | undefined;
-    let landingRelative = normalized.target_path.split(/[\\/]/).join('/');
-    let landingAbsolute = absTarget;
+      let version = 1;
+      let supersedes: string | undefined;
+      let landingRelative = normalized.target_path.split(/[\\/]/).join('/');
+      let landingAbsolute = absTarget;
 
-    if (prior) {
-      // SUPERSEDE: same target_path as the prior version (overwrite), version+1.
-      version = prior.version + 1;
-      supersedes = `${prior.asset_id}@v${prior.version}`;
-      landingAbsolute = assertTargetInsideTenantRoot(prior.target_path, knowledgeRoot, rootDir);
-      landingRelative = prior.target_path;
-    } else if (input.dedup_result?.supersedes_candidate) {
-      // Same source seen by the dedup registry before any ledger record
-      // existed: keep the registry's landing path when it has one, and
-      // record what content this ingest replaces.
-      const candidate = input.dedup_result.supersedes_candidate;
-      supersedes = `sha256:${candidate.content_sha256}`;
-      if (candidate.target_path) {
-        landingAbsolute = assertTargetInsideTenantRoot(
-          candidate.target_path,
-          knowledgeRoot,
-          rootDir
-        );
-        landingRelative = candidate.target_path;
+      if (prior) {
+        // SUPERSEDE: same target_path as the prior version (overwrite), version+1.
+        version = prior.version + 1;
+        supersedes = `${prior.asset_id}@v${prior.version}`;
+        landingAbsolute = assertTargetInsideTenantRoot(prior.target_path, knowledgeRoot, rootDir);
+        landingRelative = prior.target_path;
+      } else if (input.dedup_result?.supersedes_candidate) {
+        // Same source seen by the dedup registry before any ledger record
+        // existed: keep the registry's landing path when it has one, and
+        // record what content this ingest replaces.
+        const candidate = input.dedup_result.supersedes_candidate;
+        supersedes = `sha256:${candidate.content_sha256}`;
+        if (candidate.target_path) {
+          landingAbsolute = assertTargetInsideTenantRoot(
+            candidate.target_path,
+            knowledgeRoot,
+            rootDir
+          );
+          landingRelative = candidate.target_path;
+        }
       }
-    }
 
-    const record: IngestAssetRecord = {
-      asset_id: assetId,
-      source_system: sourceSystem,
-      source_id: sourceId,
-      ...(input.source_meta?.source_url || frontmatterString(frontmatter, 'source_url')
-        ? {
-            source_url:
-              input.source_meta?.source_url || frontmatterString(frontmatter, 'source_url'),
-          }
-        : {}),
-      ...(input.source_meta?.source_version || frontmatterString(frontmatter, 'source_version')
-        ? {
-            source_version:
-              input.source_meta?.source_version || frontmatterString(frontmatter, 'source_version'),
-          }
-        : {}),
-      content_sha256: contentSha256,
-      retrieved_at:
-        String(input.source_meta?.retrieved_at || '').trim() ||
-        frontmatterString(frontmatter, 'retrieved_at') ||
-        ingestedAt,
-      ingested_at: ingestedAt,
-      ingested_by: ingestedBy,
-      ...(String(input.approval_id || '').trim()
-        ? { approval_id: String(input.approval_id || '').trim() }
-        : {}),
-      ...(stewardApprovalId ? { steward_approval_id: stewardApprovalId } : {}),
-      visible_to:
-        Array.isArray(input.visible_to) && input.visible_to.length > 0
-          ? input.visible_to
-          : [tenantSlug],
-      transform_chain: transformChain,
-      target_path: landingRelative,
-      version,
-      ...(supersedes ? { supersedes } : {}),
-      status: 'active',
-    };
+      const record: IngestAssetRecord = {
+        asset_id: assetId,
+        source_system: sourceSystem,
+        source_id: sourceId,
+        ...(input.source_meta?.source_url || frontmatterString(frontmatter, 'source_url')
+          ? {
+              source_url:
+                input.source_meta?.source_url || frontmatterString(frontmatter, 'source_url'),
+            }
+          : {}),
+        ...(input.source_meta?.source_version || frontmatterString(frontmatter, 'source_version')
+          ? {
+              source_version:
+                input.source_meta?.source_version ||
+                frontmatterString(frontmatter, 'source_version'),
+            }
+          : {}),
+        content_sha256: contentSha256,
+        retrieved_at:
+          String(input.source_meta?.retrieved_at || '').trim() ||
+          frontmatterString(frontmatter, 'retrieved_at') ||
+          ingestedAt,
+        ingested_at: ingestedAt,
+        ingested_by: ingestedBy,
+        ...(String(input.approval_id || '').trim()
+          ? { approval_id: String(input.approval_id || '').trim() }
+          : {}),
+        ...(stewardApprovalId ? { steward_approval_id: stewardApprovalId } : {}),
+        visible_to:
+          Array.isArray(input.visible_to) && input.visible_to.length > 0
+            ? input.visible_to
+            : [tenantSlug],
+        transform_chain: transformChain,
+        target_path: landingRelative,
+        version,
+        ...(supersedes ? { supersedes } : {}),
+        status: 'active',
+      };
 
-    // (d) land the SCRUBBED card and (e) append the ledger record — same ceremony.
-    safeMkdir(path.dirname(landingAbsolute), { recursive: true });
-    safeWriteFile(landingAbsolute, finalCard, { encoding: 'utf8' });
-    await appendAssetRecord(tenantSlug, record, ledgerPathOptions);
+      // (d) land the SCRUBBED card and (e) append the ledger record — same ceremony.
+      safeMkdir(path.dirname(landingAbsolute), { recursive: true });
+      safeWriteFile(landingAbsolute, finalCard, { encoding: 'utf8' });
+      await appendAssetRecord(tenantSlug, record, ledgerPathOptions);
 
-    return {
-      committed: true as const,
-      asset: record,
-      provenance_ref: assetProvenanceRef(record),
-      target_path: landingRelative,
-      absolute_path: landingAbsolute,
-      ...(appliedRuleIds.length > 0 ? { pii_scrub_applied: appliedRuleIds } : {}),
-      ...(untrustedWrapped ? { untrusted_wrap: true } : {}),
-    };
-  });
+      return {
+        committed: true as const,
+        asset: record,
+        provenance_ref: assetProvenanceRef(record),
+        target_path: landingRelative,
+        absolute_path: landingAbsolute,
+        ...(appliedRuleIds.length > 0 ? { pii_scrub_applied: appliedRuleIds } : {}),
+        ...(untrustedWrapped ? { untrusted_wrap: true } : {}),
+      };
+    },
+    { tenantSlug }
+  );
 
   // DA-08: the commit landed — count it against today's quota. Best-effort:
   // a counter write failure must not un-land the card (it is already on disk

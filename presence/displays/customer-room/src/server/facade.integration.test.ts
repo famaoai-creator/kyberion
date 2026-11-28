@@ -11,7 +11,7 @@ import { createServer, type Server } from 'node:http';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { withExecutionContext } from '@agent/core/authority';
+import { withExecutionContext, withStoreGrant } from '@agent/core/authority';
 import {
   agendaContentHash,
   writeAgenda,
@@ -125,12 +125,9 @@ describe.skipIf(!BUILT)('customer-room against the built facade', () => {
       approved_by: 'user:alice',
     };
     hash = agenda.approval.content_hash;
-    withExecutionContext(
-      DECISION_LEDGER_ROLES.write,
-      () => writeAgenda({ dir }, agenda),
-      undefined,
-      TENANT
-    );
+    withStoreGrant(DECISION_LEDGER_ROLES.write, () => writeAgenda({ dir }, agenda), {
+      tenantSlug: TENANT,
+    });
     // The operator verbs of the same built facade register the actor and print the link once.
     const operator = (verb: string[]) =>
       JSON.parse(
@@ -366,7 +363,7 @@ describe.skipIf(!BUILT)('customer-room attachments against the built facade', ()
     dir = pathResolver.sharedTmp(`customer-room-att-${randomUUID()}`);
     safeMkdir(dir, { recursive: true });
     const asWriter = <T>(fn: () => T): T =>
-      withExecutionContext(DECISION_LEDGER_ROLES.write, fn, undefined, ATENANT);
+      withStoreGrant(DECISION_LEDGER_ROLES.write, fn, { tenantSlug: ATENANT });
     image = asWriter(() => writeAgendaAttachment({ dir }, 'screen.png', PNG));
     // Stored in the case but never on the agenda: the invite must not reach it.
     asWriter(() =>
@@ -632,12 +629,9 @@ describe.skipIf(!BUILT)(
         approved_by: 'user:alice',
       };
       hash = agenda.approval.content_hash;
-      withExecutionContext(
-        DECISION_LEDGER_ROLES.write,
-        () => writeAgenda({ dir }, agenda),
-        undefined,
-        CTENANT
-      );
+      withStoreGrant(DECISION_LEDGER_ROLES.write, () => writeAgenda({ dir }, agenda), {
+        tenantSlug: CTENANT,
+      });
       operator(['actor-add', '--customer', 'acme', '--actor', 'customer:cto', '--name', 'CTO']);
       for (let index = 0; index < 4; index += 1) {
         const sent = operator([

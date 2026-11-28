@@ -320,14 +320,18 @@ describe('durable partitioned runtime state', () => {
     // the existing GrantStore. Both grants are confined to the selected tenant;
     // the dispatch reader cannot mutate approvals or allocation records.
     const allocationPartition = 'active/shared/runtime/grants/confidential/${KYBERION_TENANT}/';
-    expect(policy.authority_role_permissions.credential_allocation_manager).toEqual({
-      allow_read: [allocationPartition],
-      allow_write: [allocationPartition],
+    // S4: the allocation store is a declared store grant, not an Authority Role.
+    expect(policy.authority_role_permissions.credential_allocation_manager).toBeUndefined();
+    expect(policy.store_grants.credential_allocation_store).toMatchObject({
+      allow_read: expect.arrayContaining([allocationPartition]),
+      allow_write: expect.arrayContaining([allocationPartition]),
     });
     // S4: the dispatch reader is a declared store grant, not an Authority Role.
+    // The state partition evaluates through its knowledge mirror, so the
+    // knowledge/confidential/<tenant>/ projection stands in allow_read.
     expect(policy.authority_role_permissions.credential_allocation_reader).toBeUndefined();
     expect(policy.store_grants.credential_allocation_reader).toMatchObject({
-      allow_read: [allocationPartition],
+      allow_read: [allocationPartition, 'knowledge/confidential/${KYBERION_TENANT}/'],
     });
     expect(policy.store_grants.credential_allocation_reader.allow_write).toBeUndefined();
     for (const store of ['hearing', 'grants', 'autonomy-learning']) {
@@ -337,12 +341,7 @@ describe('durable partitioned runtime state', () => {
       for (const field of ['default_allow', 'authority_permissions']) {
         expect(JSON.stringify(policy[field])).not.toContain(`runtime/${store}`);
       }
-      for (const [role, grant] of Object.entries(policy.authority_role_permissions)) {
-        if (
-          store === 'grants' &&
-          ['credential_allocation_manager', 'credential_allocation_reader'].includes(role)
-        )
-          continue;
+      for (const grant of Object.values(policy.authority_role_permissions)) {
         expect(JSON.stringify(grant)).not.toContain(`runtime/${store}`);
       }
     }

@@ -63,10 +63,18 @@ vi.mock('../governance/ledger.js', () => ({
   },
 }));
 
-vi.mock('../path-resolver.js', () => ({
-  resolve: mocks.pathResolve,
-  rootDir: mocks.pathRootDir,
-}));
+vi.mock('../path-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../path-resolver.js')>('../path-resolver.js');
+  return {
+    ...actual,
+    resolve: mocks.pathResolve,
+    rootDir: mocks.pathRootDir,
+    pathResolver: new Proxy(actual.pathResolver as Record<string, unknown>, {
+      get: (target, key: string) =>
+        key === 'resolve' ? mocks.pathResolve : key === 'rootDir' ? mocks.pathRootDir : target[key],
+    }),
+  };
+});
 
 function setupDefaultIo() {
   mocks.safeExistsSync.mockReturnValue(false);

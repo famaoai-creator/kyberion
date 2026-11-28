@@ -13,7 +13,8 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "sources": ["runtime-state-roots"],
+      "grants": ["credential_probe_store"],
+      "sources": ["runtime-state-roots", "role-policy"],
       "registration": {
         "family": "state",
         "key": "api_verification",
@@ -287,7 +288,7 @@
       },
       "tiers": ["personal", "confidential", "public"],
       "status": "active",
-      "grants": ["credential_allocation_reader"],
+      "grants": ["credential_allocation_reader", "credential_allocation_store"],
       "sources": ["runtime-state-roots", "role-policy"],
       "registration": {
         "family": "state",
