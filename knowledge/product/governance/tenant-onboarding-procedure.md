@@ -37,6 +37,9 @@ first-work の開始までを含む標準順序は [オンボーディング標�
 
 2. **突合スクリプトで検証する。**
 
+   `tenant:activation plan` と `reconcile` は準備状況の見立てを返し、`verification.persisted` は `false` になります。
+   有効化などの書き込み結果は `activation_receipt_written` で表示されます。保存済みの状態を確認するには `tenant:activation show` を使います。
+
    ```bash
    pnpm check -- --only tenant-registry
    # ビルド前なら: node --import ./scripts/ts-loader.mjs scripts/check/check_tenant_registry_consistency.ts

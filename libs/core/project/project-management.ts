@@ -682,6 +682,11 @@ export function restoreManagedProject(
   return withEntityLifecycleLock(() => restoreManagedProjectUnderLock(projectId, reason));
 }
 
+export function projectStatusAfterRestore(project: ProjectRecord): 'draft' | 'active' | 'paused' {
+  const prior = project.metadata?.status_before_archive;
+  return prior === 'draft' || prior === 'active' || prior === 'paused' ? prior : 'active';
+}
+
 function restoreManagedProjectUnderLock(projectId: string, reason: string): ProjectRecord {
   const current = loadProjectRecord(normalizeId(projectId, 'project_id'));
   if (!current) throw new Error(`Project not found: ${projectId}`);
@@ -694,15 +699,10 @@ function restoreManagedProjectUnderLock(projectId: string, reason: string): Proj
     if (!organization || organization.status !== 'active')
       throw new Error(`Activate organization before restoring project: ${current.organization_id}`);
   }
-  const priorStatus = current.metadata?.status_before_archive;
-  const restoredStatus =
-    priorStatus === 'draft' || priorStatus === 'active' || priorStatus === 'paused'
-      ? priorStatus
-      : 'active';
   return updateManagedProjectInternal(
     projectId,
     {
-      status: restoredStatus,
+      status: projectStatusAfterRestore(current),
       metadata: { lifecycle_reason: reason, restored_at: nowIso() },
     },
     true

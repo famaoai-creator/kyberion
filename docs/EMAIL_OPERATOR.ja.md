@@ -26,9 +26,13 @@ pnpm kyberion email --help
 pnpm kyberion email status
 pnpm kyberion email draft --triage-file active/shared/tmp/email-inbox-triage.md
 pnpm kyberion email latest-draft
+pnpm kyberion email deliver --dry-run --reply-mode reply --message-id <message-id> --body-file active/shared/runtime/presence-studio/email-drafts/latest.md
 pnpm kyberion email deliver --draft-mode --body-file active/shared/runtime/presence-studio/email-drafts/latest.md
-pnpm kyberion email deliver --approved --body-file active/shared/runtime/presence-studio/email-drafts/latest.md
+pnpm kyberion email deliver --approved --to '<reviewed-address>' --body-file active/shared/runtime/presence-studio/email-drafts/latest.md
 ```
+
+返信のプレビューでは元メッセージ ID が必要です。dry-run は入力を確認し、
+アカウントや最終宛先が未解決であることを表示します。
 
 Compat alias (same script, not the operator face): `pnpm email:workflow -- <command>`.
 

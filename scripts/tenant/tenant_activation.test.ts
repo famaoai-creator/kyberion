@@ -98,6 +98,7 @@ describe('tenant activation plan shows LLM availability per data tier', () => {
     const plan = JSON.parse(String(output[0]));
     expect(plan.mode).toBe('dry_run');
     expect(plan.next_action).toMatchObject({ kind: 'resolve_check', check: 'context_binding' });
+    expect(plan.verification).toEqual({ source: 'readiness_projection', persisted: false });
     const tiers = plan.llm_availability.tiers as Array<{
       tier: string;
       usable: Array<{ provider: string }>;

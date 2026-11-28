@@ -16,6 +16,7 @@ import {
 import { defineCatalog, readJson, writeJson } from '@agent/core/foundation';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { withLockSync } from '@agent/core/foundation/lock-utils';
+import { computeApprovalPayloadHash } from '@agent/core/governance/approval-store';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -329,20 +330,51 @@ export function bindCustomerChannel(
   return result!;
 }
 
+/** Inspect the tenant's current binding before requesting deactivation. */
+export function previewCustomerChannelUnbind(input: CustomerChannelBindingChange) {
+  const target = validatedTarget(input);
+  const binding = readTenantCustomerChannelBindings(target.tenantSlug, {
+    rootDir: target.rootDir,
+    strict: true,
+  }).find((entry) => entry.surface === target.surface && entry.channel_id === target.channelId);
+  return {
+    tenant_slug: target.tenantSlug,
+    surface: target.surface,
+    channel_id: target.channelId,
+    current: binding ?? null,
+    ...(binding ? { review_token: channelUnbindReviewToken(target.tenantSlug, binding) } : {}),
+    change: binding && binding.active !== false ? 'deactivate' : 'unchanged',
+    mode: 'dry_run',
+  };
+}
+
+function channelUnbindReviewToken(tenantSlug: string, binding: CustomerChannelBinding): string {
+  return computeApprovalPayloadHash({ operation: 'unbind', tenantSlug, binding });
+}
+
 /**
  * Deactivate the tenant's binding of one surface channel (`active: false`,
  * kept for the record; `bind` reactivates it). Null when there is none.
  */
 export function unbindCustomerChannel(
-  input: CustomerChannelBindingChange
+  input: CustomerChannelBindingChange,
+  reviewToken?: string
 ): CustomerChannelBindingWriteResult | null {
   const target = validatedTarget(input);
   return writeBindingChange(target, 'unbind', (bindings) => {
     const index = bindings.findIndex(
       (item) => item.surface === target.surface && item.channel_id === target.channelId
     );
-    if (index < 0) return { bindings, binding: null, change: 'unchanged' };
     const existing = bindings[index];
+    if (
+      reviewToken !== undefined &&
+      (!existing || channelUnbindReviewToken(target.tenantSlug, existing) !== reviewToken)
+    )
+      throw bindingError(
+        'CUSTOMER_BINDING_REVIEW_CHANGED',
+        'Binding changed. Run preview-unbind again.'
+      );
+    if (!existing) return { bindings, binding: null, change: 'unchanged' };
     const binding: CustomerChannelBinding = { ...existing, active: false };
     const next = [...bindings];
     next[index] = binding;

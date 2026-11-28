@@ -43,6 +43,7 @@ import {
 } from '@agent/core/plugin/plugin-managed-install';
 import {
   deactivatePlugin,
+  listActivePlugins,
   reloadPlugin,
   type PluginLifecycleResult,
 } from '@agent/core/plugin/plugin-lifecycle';
@@ -279,6 +280,7 @@ export async function runPluginLifecycleCommand(
 
   let action: string;
   let result: PluginLifecycleResult;
+  let processEffect: 'deactivated' | 'already_inactive' | undefined;
   if (reloadId) {
     action = 'reload';
     try {
@@ -295,13 +297,24 @@ export async function runPluginLifecycleCommand(
     }
   } else {
     action = 'deactivate';
+    const wasActive = listActivePlugins().includes(deactivateId);
     result = deactivatePlugin(deactivateId);
+    if (result.ok) processEffect = wasActive ? 'deactivated' : 'already_inactive';
   }
 
+  const scope = {
+    scope: 'current_process',
+    other_hosts: 'not_checked',
+    ...(processEffect ? { process_effect: processEffect } : {}),
+  };
   print(
     argv.json
-      ? JSON.stringify({ action, ...result }, null, 2)
-      : formatLifecycleResult(action, result)
+      ? JSON.stringify({ action, ...result, ...scope }, null, 2)
+      : [
+          formatLifecycleResult(action, result),
+          '  scope: current process (other hosts were not checked)',
+          '  next: verify the activation in each long-running host',
+        ].join('\n')
   );
   return result.ok ? 0 : 1;
 }

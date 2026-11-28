@@ -83,9 +83,34 @@ Full routes (personal-only / AI company / existing tenant), the `probe` → `act
 
 Customer-specific identity and onboarding artifacts: `knowledge/personal/stances/{slug}/ preferred when KYBERION_STANCE is set`.
 
+### Find the right command for a job
+
+When you have a task in mind, run `pnpm kyberion setup report --lifecycle --summary`
+to find the area by what you want to do. Open the matching guide with
+`pnpm kyberion setup report --lifecycle --domain <id>` to see what to check first,
+which actions change state, and how to confirm the result. Both guide commands
+display reference information without running the listed operations.
+For example, use `actuator` to find a capability, `workitem` to pick up or
+hand off tracked work, `workspace` to locate or clean up its working
+directory, and `ingress` to receive a public webhook.
+Use `conversation` to choose where and with whom to talk, `discussion` to
+explore a goal or compare viewpoints, and `meeting` for delegated attendance
+and follow-up.
+
+When you know the area, use its command directly. Start with `pnpm organization status`
+for objectives and key results, `pnpm project show` for project state, `pnpm work`
+for task ownership, `pnpm kyberion mission` for mission execution, `pnpm tenant`
+for tenant records, and `pnpm kyberion reasoning config` for role-based model
+selection. The lifecycle index also connects these operations across areas.
+
+For an organization-wide view, use `portfolio` to review change projects or
+`operations` to check services and recurring runs. Within a project, use
+`track` to find the next gate and its required output, then `artifact` to
+find the deliverable and verify its review and delivery status.
+
 ### Onboarding entry points
 
-Several commands and pipelines carry "onboarding" in their name. They are not alternatives for the same job; pick by what you want to achieve.
+Choose the onboarding entry point by the step you need to complete.
 
 | Entry point                                                  | What it does                                                                                                                                                                   | Use it when                                                                                                                                      |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -391,7 +416,11 @@ pnpm control chronos tracks
 pnpm control chronos ref knowledge/public/templates/blueprints/requirements-traceability-matrix.md
 ```
 
-Use these when you want to inspect `Project -> Track -> Gate Readiness -> Next Required Artifact` without opening a surface.
+These commands query the live surfaces from the terminal. If Chronos cannot
+connect, run `pnpm control doctor --surface chronos`. Use
+`pnpm project show <project-id> --json` for stored track state and configured
+artifact requirements while the live gate view is unavailable. See the
+[operator track and gate flow](./OPERATOR_UX_GUIDE.md#control-plane-cli).
 
 ## 10. Where To Read Next
 

@@ -318,7 +318,9 @@ export function formatReconcileReport(report: ReconcileReport): string {
       '',
       `${report.plan.pendingChanges} change(s) pending (dry-run: nothing was changed). Apply with: pnpm kyberion scheduler reconcile --apply`
     );
-  else if (report.status === 'ok') lines.push('', 'Nothing to change.');
+  else if (report.status === 'ok' && !report.applied.length) lines.push('', 'Nothing to change.');
+  if (report.applied.length)
+    lines.push('Verify service state with pnpm kyberion scheduler status --daemon <id>.');
   if (report.state_path) lines.push(`State: ${report.state_path}`);
   return lines.join('\n');
 }

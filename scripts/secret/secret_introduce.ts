@@ -265,15 +265,30 @@ async function runSecretCliImpl(
       throw new ScriptExitError(1, 'Usage: kyberion secret status <serviceId>');
     }
     const readiness = describeIntroductionReadiness(serviceId);
-    if (json) print(JSON.stringify(readiness));
+    const result = {
+      ...readiness,
+      checks: {
+        secret_presence: !readiness.identities.length
+          ? 'no_registered_keys'
+          : readiness.missing.length
+            ? 'missing'
+            : 'present',
+        binding_usage: 'not_checked',
+        provider_validity: 'not_checked',
+      },
+    };
+    if (json) print(JSON.stringify(result));
     else {
       print(`service=${readiness.serviceId}`);
       print(`missing=${readiness.missing.join(',') || '(none)'}`);
       for (const row of readiness.identities) {
         print(`${row.identity.envName}=${row.present ? 'present' : 'missing'}`);
       }
+      for (const [check, outcome] of Object.entries(result.checks)) {
+        print(`${check}=${outcome}`);
+      }
     }
-    return readiness as unknown as Record<string, unknown>;
+    return result;
   }
 
   throw new ScriptExitError(

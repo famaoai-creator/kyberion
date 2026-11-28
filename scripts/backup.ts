@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { baseRoleEnvText } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { GENERATION_QUOTA_COUNTER_REPO_SUBPATH } from '@agent/core/generation-quota';
@@ -13,6 +13,7 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReaddir,
+  safeRealpath,
   safeLstat,
   safeMoveSync,
   safeRmSync,
@@ -1327,6 +1328,22 @@ function quarantineRestoredPeerRuntime(
   return { quarantinePath: quarantineRoot, moved };
 }
 
+export function parseRestoreBaselineStatus(output: string) {
+  const report = parseSafeJsonInput(output, 'Restored checkout Baseline report');
+  const status = isRecord(report) ? report.status : undefined;
+  if (
+    status !== 'all_clear' &&
+    status !== 'needs_attention' &&
+    status !== 'needs_onboarding' &&
+    status !== 'needs_recovery'
+  ) {
+    throw new Error(
+      '[BACKUP_BASELINE_INVALID] Restored checkout did not return a valid Baseline status.'
+    );
+  }
+  return status;
+}
+
 export function restoreBackup(
   options: BackupCliOptions,
   passphraseDeps: BackupPassphraseDeps = {},
@@ -1341,6 +1358,7 @@ export function restoreBackup(
   ledger_verification: RestoredLedgerVerification;
   trimmed_tails: string[];
   withheld: WithheldRestoreRoot[];
+  baseline_status?: ReturnType<typeof parseRestoreBaselineStatus>;
 } {
   if (!options.archive) throw new Error('restore requires an archive path');
   const archive = path.resolve(options.archive);
@@ -1368,7 +1386,8 @@ function restoreBackupToTarget(
   if (safeExistsSync(target) && safeReaddir(target).length > 0 && !options.force) {
     throw new Error(`Restore target is not empty; pass --force to restore into ${target}`);
   }
-  return withPlaintextTempDir(`restore-${stamp()}-${randomUUID().slice(0, 8)}`, (tempDir) => {
+  const tempName = `restore-${stamp()}-${randomUUID().slice(0, 8)}`;
+  return withPlaintextTempDir<ReturnType<typeof restoreBackup>>(tempName, (tempDir) => {
     const plainArchive = archive.endsWith('.enc') ? path.join(tempDir, 'payload.tar.gz') : archive;
     if (archive.endsWith('.enc')) {
       const passphrase = resolveBackupPassphrase(
@@ -1424,15 +1443,18 @@ function restoreBackupToTarget(
     quarantinePaths.push(...extracted.quarantinePaths);
     restoreMissionGitBundles(target);
 
+    let baselineStatus: ReturnType<typeof parseRestoreBaselineStatus> | undefined;
     if (options.verifyBaseline) {
-      const result = safeExecResult(
-        'pnpm',
-        ['pipeline', '--input', 'pipelines/baseline-check.json'],
-        { cwd: target, timeoutMs: 120000, maxOutputMB: 20 }
-      );
+      const result = safeExecResult('node', ['dist/scripts/run_baseline_check.js', '--json'], {
+        cwd: target,
+        timeoutMs: 120000,
+        maxOutputMB: 20,
+        env: { KYBERION_ROOT: target, LOG_LEVEL: 'silent' },
+      });
       if (result.status !== 0) {
         throw new Error(`baseline-check failed after restore: ${result.stderr || result.stdout}`);
       }
+      baselineStatus = parseRestoreBaselineStatus(result.stdout);
     }
 
     return {
@@ -1442,6 +1464,7 @@ function restoreBackupToTarget(
       ledger_verification: ledgerVerification,
       trimmed_tails: trimmedTails,
       withheld,
+      ...(baselineStatus ? { baseline_status: baselineStatus } : {}),
     };
   });
 }
@@ -1458,11 +1481,16 @@ export function runRestoreDrill(options: BackupCliOptions): {
   target: string;
   checkoutPrepared: boolean;
   baselineVerified: boolean;
+  baselineStatus?: ReturnType<typeof parseRestoreBaselineStatus>;
   restoredManifestCount: number;
   quarantinePaths: string[];
   credentialMembers: WithheldRestoreRoot[];
   targetRemoved: boolean;
 } {
+  if (options.verifyBaseline && !options.prepareCheckout)
+    throw new Error(
+      '[BACKUP_DRILL_CHECKOUT_REQUIRED] --verify-baseline requires --prepare-checkout for a restore drill.'
+    );
   const archive =
     options.archive ||
     backupFileEntries(options.backupDir)
@@ -1475,8 +1503,24 @@ export function runRestoreDrill(options: BackupCliOptions): {
   }
   const scratchRoot = path.resolve(pathResolver.sharedTmp());
   const target = path.resolve(
-    options.target || path.join(scratchRoot, `backup-restore-drill-${stamp()}`)
+    options.target ||
+      path.join(scratchRoot, `backup-restore-drill-${stamp()}-${randomUUID().slice(0, 8)}`)
   );
+  assertDrillTargetConfined(target, scratchRoot, Boolean(options.force));
+  const key = createHash('sha256').update(safeRealpath(target)).digest('hex');
+  return withLockSync(
+    `backup-restore-drill-${key}`,
+    () => runRestoreDrillAtTarget(options, archive, target, scratchRoot),
+    0
+  );
+}
+
+function runRestoreDrillAtTarget(
+  options: BackupCliOptions,
+  archive: string,
+  target: string,
+  scratchRoot: string
+): ReturnType<typeof runRestoreDrill> {
   assertDrillTargetConfined(target, scratchRoot, Boolean(options.force));
   if (options.force && safeExistsSync(target)) {
     safeRmSync(target, { recursive: true, force: true });
@@ -1513,7 +1557,8 @@ export function runRestoreDrill(options: BackupCliOptions): {
       archive: result.archive,
       target: result.target,
       checkoutPrepared: Boolean(options.prepareCheckout),
-      baselineVerified: Boolean(options.verifyBaseline),
+      baselineVerified: result.baseline_status === 'all_clear',
+      ...(result.baseline_status ? { baselineStatus: result.baseline_status } : {}),
       restoredManifestCount: findRestoredManifests(result.target).length,
       quarantinePaths: result.quarantinePaths,
       credentialMembers,
@@ -1616,6 +1661,7 @@ export function main(argv: string[], print: (value: unknown) => void = () => und
       quarantine_paths: result.quarantinePaths,
       ledger_verification: result.ledger_verification,
       trimmed_tails: result.trimmed_tails,
+      ...(result.baseline_status ? { baseline_status: result.baseline_status } : {}),
     });
     return;
   }

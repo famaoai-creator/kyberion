@@ -1,5 +1,6 @@
 import { pickByLocale } from '@agent/core/foundation/locale-normalize';
 import { activationNextStep, prepareActivationSetup } from './onboarding_apply.js';
+import { onboardingSetupHandoff } from '../setup/setup-lifecycle-guide.js';
 import * as path from 'node:path';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
@@ -1129,7 +1130,35 @@ async function runSummaryPhase(state: OnboardingState, print: Print): Promise<vo
   const flowPolicy = resolveOnboardingFlowPolicy();
   print(`\n📊 Phase 6 — ${pt(flowPolicy.phase_titles.summary)}\n`);
   const ownerAuthority = activationNextStep(await prepareActivationSetup(new Date()));
-  const summary = buildSummaryMarkdown(state) + '\n\n' + ownerAuthority + '\n';
+  const handoff = onboardingSetupHandoff(Boolean(state.tenants?.entries.length));
+  const handoffSteps = [
+    t(
+      `Run \`${handoff.baseline_command}\` and follow its next step. Continue when it reports all_clear.`,
+      `\`${handoff.baseline_command}\` を実行し、次の手順に従ってください。all_clear になったら先へ進めます。`
+    ),
+    ...(handoff.tenant_activation_guide
+      ? [
+          t(
+            `Review tenant activation before tenant work: \`${handoff.tenant_activation_guide}\`.`,
+            `テナントで作業を始める前に有効化の手順を確認してください。\`${handoff.tenant_activation_guide}\``
+          ),
+        ]
+      : []),
+    t(
+      `Check readiness and get the next Concierge action: \`${handoff.readiness_command}\`.`,
+      `準備状況と Concierge での次の操作を確認してください。\`${handoff.readiness_command}\``
+    ),
+    t(
+      `For ongoing lifecycle management: \`${handoff.lifecycle_command}\`.`,
+      `運用中の変更・停止・再開の手順を確認できます。\`${handoff.lifecycle_command}\``
+    ),
+  ];
+  const summary = [
+    buildSummaryMarkdown(state),
+    ownerAuthority,
+    ...handoffSteps.map((step) => `- ${step}`),
+    '',
+  ].join('\n\n');
   print(ownerAuthority);
   const runbookSkill = generateOnboardingRunbookSkill({
     profileRoot: profileRoot(),
@@ -1169,11 +1198,14 @@ async function runSummaryPhase(state: OnboardingState, print: Print): Promise<vo
       // i18n-exempt: bilingual prompt pair (JA side intentional)
       `\`${path.join(profileRoot(), 'connections')}/\` のサービス接続ドラフトを確認してください。`
     ),
-    t(
-      `Review the tenant draft in \`${path.join(profileRoot(), 'tenants')}/\`.`,
-      // i18n-exempt: bilingual prompt pair (JA side intentional)
-      `\`${path.join(profileRoot(), 'tenants')}/\` のテナントドラフトを確認してください。`
-    ),
+    ...(handoff.tenant_activation_guide
+      ? [
+          t(
+            `Review the tenant draft in \`${path.join(profileRoot(), 'tenants')}/\`.`,
+            `\`${path.join(profileRoot(), 'tenants')}/\` のテナントドラフトを確認してください。`
+          ),
+        ]
+      : []),
     t(
       'If the tutorial should become real work, create a mission explicitly after review.',
       // i18n-exempt: bilingual prompt pair (JA side intentional)
@@ -1185,6 +1217,7 @@ async function runSummaryPhase(state: OnboardingState, print: Print): Promise<vo
       'ワークスペースの準備ができたら `pnpm surfaces reconcile` を再実行してください。'
     ),
     ...(state.operations ? operationsNextSteps(state.operations) : []),
+    ...handoffSteps,
   ];
   nextSteps.forEach((step, index) => {
     print(`${index + 1}. ${step}`);

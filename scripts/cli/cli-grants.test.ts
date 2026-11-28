@@ -99,7 +99,7 @@ function deps(overrides: Partial<GrantsDeps> = {}): GrantsDeps {
       revoked: { at: NOW.toISOString(), by: 'user:owner', reason: 'done', audit_event_id: 'a2' },
     })),
     find: vi.fn(() => record),
-    revoker: () => ({ kind: 'human' as const, id: 'user:owner' }),
+    revoker: vi.fn(() => ({ kind: 'human' as const, id: 'user:owner' })),
     readiness: vi.fn(({ profile }: { profile: string }) => ({
       profile,
       description: `${profile} work`,
@@ -301,6 +301,24 @@ describe('cli grants commands', () => {
     await expect(
       run(['revoke', record.grant_id, '--reason', 'x'], deps({ find: vi.fn(() => null) }))
     ).rejects.toThrow(/not found/);
+  });
+
+  it('previews a scoped grant without revoking it or resolving a revoker', async () => {
+    const { out, d } = await run([
+      'revoke',
+      record.grant_id,
+      '--tenant',
+      'acme',
+      '--dry-run',
+      '--json',
+    ]);
+    expect(JSON.parse(out)).toMatchObject({
+      mode: 'dry_run',
+      grant: { grant_id: record.grant_id },
+    });
+    expect(d.find).toHaveBeenCalledWith(record.grant_id, 'acme');
+    expect(d.revoke).not.toHaveBeenCalled();
+    expect(d.revoker).not.toHaveBeenCalled();
   });
 
   it('library errors surface as script exit errors', async () => {

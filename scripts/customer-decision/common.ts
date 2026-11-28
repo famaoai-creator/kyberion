@@ -104,7 +104,7 @@ export function usage(): string {
     'pnpm kyberion customer-decision actor-add --tenant <slug> --case <id> --customer <slug> --actor customer:<id> --name <text> [--confirm-target <text>] [--channel <surface>:<channel_id>|none]',
     'pnpm kyberion customer-decision send      --tenant <slug> --case <id> --agenda <id> --name <participant> --role decider|contributor --actor customer:<id> [--ttl-days 14] [--by user:<member>]',
     'pnpm kyberion customer-decision bolt-review --tenant <slug> --case <id> --mission <MSN> --customer <slug> --summary-file <path> [--attach <png|jpeg|webp>]... [--preview-url <https URL>] [--title <t>] [--from <text>] [--locale ja|en] [--project <id>] [--by user:<member>]',
-    'pnpm kyberion customer-decision status    --tenant <slug> --case <id> [--agenda <id>]',
+    'pnpm kyberion customer-decision status    --tenant <slug> --case <id> [--agenda <id>]   (runs reconciliation)',
     'pnpm kyberion customer-decision confirm   --tenant <slug> --case <id> --agenda <id> --entry <entry_id> --by user:<member>',
     'pnpm kyberion customer-decision close     --tenant <slug> --case <id> --agenda <id> --by user:<member> [--reason <text>]',
     'pnpm kyberion customer-decision withdraw  --tenant <slug> --case <id> --agenda <id> --by user:<member> [--reason <text>]',

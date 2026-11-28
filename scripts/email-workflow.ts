@@ -5,6 +5,7 @@ import {
   listEmailAccountProviders,
   readEmailDraftArtifact,
   resolveEmailTriagePath,
+  type EmailDeliveryRequest,
 } from '@agent/core/integrations/email-workflow';
 import { readTextFile } from '@agent/core/foundation';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
@@ -55,6 +56,7 @@ function helpText(): string {
     '  draft         Generate a reply draft from inbox triage (gws read)',
     '  latest-draft  Show the latest stored draft artifact',
     '  deliver       Create a Gmail draft or send an approved reply (email-actuator)',
+    '                --dry-run previews inputs without resolving an account or recipients',
     '  archive-inbox Organize the inbox (--account auto|gmail|outlook)',
   ].join('\n');
 }
@@ -71,6 +73,48 @@ function getBoolean(args: ArgMap, key: string): boolean {
 function readTextFileIfExists(filePath: string): string {
   if (!safeExistsSync(filePath)) return '';
   return readEmailWorkflowTextFile(filePath);
+}
+
+export async function deliverEmailWorkflow(
+  input: Omit<EmailDeliveryRequest, 'reply_mode'> & { reply_mode?: string },
+  dryRun: boolean
+) {
+  const replyMode = input.reply_mode ?? 'new';
+  if (replyMode !== 'new' && replyMode !== 'reply' && replyMode !== 'reply-all')
+    throw new Error('--reply-mode must be new, reply, or reply-all');
+  const request: EmailDeliveryRequest = { ...input, reply_mode: replyMode };
+  if (!request.body_markdown.trim())
+    throw new Error('body_markdown is required; provide --body-markdown or --body-file');
+  if ((request.reply_mode === 'reply' || request.reply_mode === 'reply-all') && !request.message_id)
+    throw new Error('--message-id is required for reply or reply-all');
+  if (
+    (!request.reply_mode || request.reply_mode === 'new') &&
+    !request.draft_mode &&
+    !request.to?.trim()
+  )
+    throw new Error(
+      '--to is required to send a new email. Use --draft-mode to prepare an incomplete message.'
+    );
+  if (dryRun) {
+    const { body_markdown, ...inputs } = request;
+    return {
+      ok: true,
+      dry_run: true,
+      action: 'deliver',
+      ...inputs,
+      body_chars: body_markdown.length,
+      verification: {
+        account: 'not_resolved',
+        recipients: 'not_resolved',
+        approval: request.draft_mode ? 'not_required_for_draft' : 'checked_on_delivery',
+      },
+    };
+  }
+  if (!request.draft_mode && !request.approved)
+    throw new Error(
+      'approval is required before sending an email; add --approved or use --draft-mode'
+    );
+  return executeEmailDelivery(request);
 }
 
 async function main(argv: string[], dryRun = false) {
@@ -120,42 +164,22 @@ async function main(argv: string[], dryRun = false) {
   if (command === 'deliver') {
     const bodyFile = getString(args, '--body-file');
     const bodyMarkdown = getString(args, '--body-markdown') || readTextFileIfExists(bodyFile);
-    if (!bodyMarkdown.trim()) {
-      throw new Error('body_markdown is required; provide --body-markdown or --body-file');
-    }
     const draftMode = getBoolean(args, '--draft-mode');
     const approved = getBoolean(args, '--approved');
-    if (!draftMode && !approved) {
-      throw new Error(
-        'approval is required before sending an email; add --approved or use --draft-mode'
-      );
-    }
-    if (dryRun) {
-      return {
-        ok: true,
-        dry_run: true,
-        action: 'deliver',
-        draft_mode: draftMode,
+    const messageId = getString(args, '--message-id').trim();
+    return deliverEmailWorkflow(
+      {
         approved,
-        account: getString(args, '--account') || getString(args, '--provider') || 'auto',
-        to: getString(args, '--to'),
+        draft_mode: draftMode,
+        reply_mode: getString(args, '--reply-mode', 'new'),
+        body_markdown: bodyMarkdown,
         subject: getString(args, '--subject'),
-        body_chars: bodyMarkdown.length,
-      };
-    }
-    const replyModeValue = getString(args, '--reply-mode');
-    const result = await executeEmailDelivery({
-      approved,
-      draft_mode: draftMode,
-      reply_mode:
-        replyModeValue === 'reply' || replyModeValue === 'reply-all' ? replyModeValue : 'new',
-      body_markdown: bodyMarkdown,
-      subject: getString(args, '--subject'),
-      to: getString(args, '--to'),
-      message_id: getString(args, '--message-id'),
-      account: getString(args, '--account') || getString(args, '--provider') || 'auto',
-    });
-    return result;
+        to: getString(args, '--to'),
+        ...(messageId ? { message_id: messageId } : {}),
+        account: getString(args, '--account') || getString(args, '--provider') || 'auto',
+      },
+      dryRun
+    );
   }
 
   if (command === 'archive-inbox') {

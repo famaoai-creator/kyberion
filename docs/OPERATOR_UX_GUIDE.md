@@ -826,6 +826,21 @@ Use this flow when you want to follow the governed operator path directly from t
 Project -> Track -> Gate Readiness -> Next Required Artifact -> Template/Skeleton -> Mission Seed -> Mission
 ```
 
+`pnpm kyberion setup report --lifecycle --domain track` connects this flow to
+the project, mission, and artifact guides. Start at the Track when you need
+to know what a gate expects. Start at Concierge Deliverables or the owning
+work item when you need to find an existing output and check its review or
+delivery status.
+
+If the Track view cannot connect, run `pnpm control doctor --surface chronos`.
+Use `pnpm project show <project-id> --json` to inspect track status and
+configured artifact requirements while the live gate view is unavailable.
+
+For WorkItem context and linked artifacts, check the customer binding with
+`pnpm onboarding:context show --customer-slug <customer-slug> --json` and run
+`pnpm work session-summary --item-id <item-id> --tenant-slug <tenant-slug> --json`
+from the matching authorized tenant context.
+
 `chronos seed-track` remains permission-gated by Chronos localadmin access.
 
 ### Mission startup preflight

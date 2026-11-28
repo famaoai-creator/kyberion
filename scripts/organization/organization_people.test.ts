@@ -65,6 +65,7 @@ describe('organization participant/agent CLI transport', () => {
     s.show.mockResolvedValue({
       nhi_id: 'kyberion://agent/org-a/helper',
       home_organization_id: 'org-a',
+      lifecycle_status: 'active',
       version,
     });
   });
@@ -166,6 +167,19 @@ describe('organization participant/agent CLI transport', () => {
     );
   });
   it('routes lifecycle and accountability changes with reviewed versions and reasons', async () => {
+    const preview = vi.fn();
+    await runOrganizationPeople(
+      'agent',
+      ['suspend', '--nhi-id', 'kyberion://agent/org-a/helper', '--expected-version', version],
+      preview
+    );
+    expect(preview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        current: { home_organization_id: 'org-a', lifecycle_status: 'active', version },
+        verification: { source: 'agent_record', runtime_status: 'not_checked' },
+      })
+    );
+    expect(s.lifecycle).not.toHaveBeenCalled();
     await runOrganizationPeople(
       'agent',
       [

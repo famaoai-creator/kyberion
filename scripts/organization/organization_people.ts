@@ -203,20 +203,24 @@ export async function runOrganizationPeople(
   if (selectedAgent.version !== expectedVersion)
     throw new Error('The agent changed. Refresh agent list before retrying.');
   if (!args.apply) {
-    const agent = await showManagedOrganizationAgent(auth, nhiId);
-    if (!agent) throw new Error('Agent not found.');
     print({
       status: 'dry-run',
       operation: `agent.${args.action}`,
       nhi_id: nhiId,
       expected_version: expectedVersion,
+      current: {
+        home_organization_id: selectedAgent.home_organization_id,
+        lifecycle_status: selectedAgent.lifecycle_status,
+        version: selectedAgent.version,
+      },
+      verification: { source: 'agent_record', runtime_status: 'not_checked' },
       reason: args.reason,
       accountable_human_id: args.accountableHuman,
       note: 'Repeat with --apply to save.',
     });
     return;
   }
-  print(
+  const result =
     args.action === 'reassign-accountable'
       ? await reassignManagedOrganizationAgentAccountable(auth, {
           nhiId,
@@ -229,6 +233,6 @@ export async function runOrganizationPeople(
           expectedVersion,
           action: args.action as 'activate' | 'suspend' | 'retire',
           reason: args.reason,
-        })
-  );
+        });
+  print({ ...result, verification: { source: 'write_result', runtime_status: 'not_checked' } });
 }

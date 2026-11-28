@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeExistsSync,
   safeExecResult,
   safeLinkExclusiveSync,
   safeReaddir,
+  safeRealpath,
   safeMkdir,
   safeReadFile,
   safeRmSync,
@@ -31,6 +33,7 @@ import {
   createBackup,
   createMissionGitBundles,
   parseBackupArgs,
+  parseRestoreBaselineStatus,
   parseRestoredBackupManifest,
   main,
   pruneBackups,
@@ -39,6 +42,14 @@ import {
   runRestoreDrill,
   summarizeBackupStatus,
 } from './backup.js';
+
+it('requires a recognized Baseline verdict for a restored checkout', () => {
+  expect(parseRestoreBaselineStatus('{"status":"all_clear"}')).toBe('all_clear');
+  expect(parseRestoreBaselineStatus('{"status":"needs_attention"}')).toBe('needs_attention');
+  expect(() => parseRestoreBaselineStatus('{"status":"completed"}')).toThrow(
+    'valid Baseline status'
+  );
+});
 import {
   computeLedgerEntryHash,
   GENESIS_HASH,
@@ -1693,6 +1704,26 @@ describe('backup file selection', () => {
         false
       );
       expect(safeExistsSync(drillTarget)).toBe(false);
+    });
+
+    it('refuses to replace the target while another drill owns its lock', () => {
+      const target = path.resolve(drillTarget);
+      const marker = path.join(target, 'active-drill.txt');
+      safeWriteFile(marker, 'in progress', { mkdir: true });
+      const key = createHash('sha256').update(safeRealpath(target)).digest('hex');
+      withLockSync(`backup-restore-drill-${key}`, () => {
+        expect(() => runRestoreDrill(drillOptions())).toThrow('[LOCK_TIMEOUT]');
+        expect(safeReadFile(marker, { encoding: 'utf8' })).toBe('in progress');
+      });
+    });
+
+    it('requires a prepared checkout for Baseline verification before replacing a target', () => {
+      const marker = path.join(drillTarget, 'keep.txt');
+      safeWriteFile(marker, 'keep', { mkdir: true });
+      expect(() => runRestoreDrill({ ...drillOptions(), verifyBaseline: true })).toThrow(
+        '[BACKUP_DRILL_CHECKOUT_REQUIRED]'
+      );
+      expect(safeReadFile(marker, { encoding: 'utf8' })).toBe('keep');
     });
 
     it('removes the default drill target it created', () => {

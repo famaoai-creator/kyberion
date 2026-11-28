@@ -400,13 +400,17 @@ it('expires bindings and revokes them through the journal', async () => {
   // Revocation removes the binding → inspection fails closed again.
   const list = f.run(() => api.listNhiSessionAdmissions({ tenant_slug: ORG_TENANT }));
   expect(list.some((entry) => entry.instance.instance_id === applied.instance_id)).toBe(true);
-  f.run(() =>
+  const revoked = f.run(() =>
     api.revokeNhiSessionAdmission(principal, {
       nhi_id: agent.nhi_id,
       tenant_slug: ORG_TENANT,
       instance_id: applied.instance_id,
     })
   );
+  expect(revoked).toMatchObject({
+    released_instance_id: applied.instance_id,
+    released_session_id: applied.session_id,
+  });
   claimSession(agent.nhi_id, applied.session_id);
   expect(f.run(() => inspect.inspectInstalledOnboardingRuntime(SCOPE))).toMatchObject({
     ready: false,
@@ -544,6 +548,23 @@ it('consumes an attested legacy session only in its approved tenant, never throu
     api.findLiveSessionAdmission(legacy.nhi_id, 'kns1.legacy-fixture', 'fixture-b')
   ).toBeUndefined();
   expect(api.listNhiSessionAdmissions({ tenant_slug: 'fixture-b' })).toHaveLength(0);
+  const foreignInstance = `${api.ADMISSION_INSTANCE_PREFIX}foreign`;
+  f.governIdentity(() =>
+    f.identities.bindRuntimeInstance({
+      nhiId: legacy.nhi_id,
+      instanceId: foreignInstance,
+      sessionId: 'kns1.foreign-fixture',
+      tenantSlug: 'fixture-b',
+    })
+  );
+  expect(() =>
+    f.run(() =>
+      api.revokeNhiSessionAdmission(
+        { ...f.principal, tenantSlugs: [ORG_TENANT] },
+        { nhi_id: legacy.nhi_id, tenant_slug: ORG_TENANT, instance_id: foreignInstance }
+      )
+    )
+  ).toThrow('no live admission binding matches');
 });
 
 it('does not ignore a malformed profile when consuming an otherwise valid tenant admission', async () => {

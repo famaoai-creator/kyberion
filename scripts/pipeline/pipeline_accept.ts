@@ -1,5 +1,6 @@
 import {
   acceptPromotedPipelineBinding,
+  inspectPipelineBindingAcceptance,
   requestPipelineBindingApproval,
 } from '@agent/core/accepted-pipeline-bindings';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -29,7 +30,13 @@ export async function acceptPipelineFromArgs(args: string[]) {
     })
     .option('approval-id', {
       type: 'string',
-      description: 'Approved governed request ID for the exact binding effect',
+      description:
+        'Approved request for the exact effect. Retry with the same inputs to complete a pending receipt.',
+    })
+    .option('status', {
+      type: 'boolean',
+      description: 'Read the published binding and approval receipt without applying',
+      conflicts: 'request-approval',
     })
     .option('approval-storage-channel', { type: 'string', default: 'pipeline-binding' })
     .option('tier', {
@@ -58,11 +65,14 @@ export async function acceptPipelineFromArgs(args: string[]) {
   if (!argv.approvalId) {
     throw new Error('Acceptance requires --approval-id from a prior --request-approval flow');
   }
-  return acceptPromotedPipelineBinding({
+  const acceptance = {
     ...input,
     approval_request_id: argv.approvalId,
     approval_storage_channel: argv.approvalStorageChannel,
-  });
+  };
+  return argv.status
+    ? inspectPipelineBindingAcceptance(acceptance)
+    : acceptPromotedPipelineBinding(acceptance);
 }
 
 export const runPipelineAcceptance = defineScript({

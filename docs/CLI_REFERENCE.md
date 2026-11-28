@@ -98,7 +98,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion reasoning setup`        | `pnpm reasoning:setup`    | Set up a reasoning backend — **[state change]**                                                                      |
 | `pnpm kyberion service setup`          | `pnpm service:setup`      | Set up external service connections — **[state change]**                                                             |
 | `pnpm kyberion setup`                  |                           | Set up one area (onboarding, reasoning, env, services, tools, voice, ...) — **[state change]**                       |
-| `pnpm kyberion setup report`           |                           | Report setup status and missing steps                                                                                |
+| `pnpm kyberion setup report`           |                           | Report setup readiness or show lifecycle commands with --lifecycle                                                   |
 | `pnpm kyberion tool setup`             | `pnpm tool:setup`         | Install or inspect tool runtimes — **[state change]**                                                                |
 | `pnpm kyberion vital`                  |                           | Check operator readiness (vital signs) — **[readiness]**                                                             |
 | `pnpm kyberion voice setup`            |                           | Check and set up voice readiness — **[state change]**                                                                |
@@ -161,7 +161,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion reasoning compare`            | `pnpm reasoning:compare`          | Compare reasoning backends on the same prompt                                                                                                  |
 | `pnpm kyberion reasoning config`             | `pnpm reasoning:config`           | Show or change reasoning configuration                                                                                                         |
 | `pnpm kyberion report team-decision-support` |                                   | Report how the roster proposer and advisory panel performed, from recorded outcomes.                                                           |
-| `pnpm kyberion scheduler status`             |                                   | Show this checkout's Chronos service identity and status                                                                                       |
+| `pnpm kyberion scheduler status`             |                                   | Show the selected daemon identity and host service manager query result                                                                        |
 | `pnpm kyberion scope`                        | `pnpm scope`                      | Inspect the active scope                                                                                                                       |
 | `pnpm kyberion scope inspect`                |                                   | Inspect asset scope and the current read policy                                                                                                |
 | `pnpm kyberion secret status`                |                                   | Show secret status — **[readiness]**                                                                                                           |

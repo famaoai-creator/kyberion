@@ -2,6 +2,7 @@
 /** CLI compatibility wrapper for the canonical company onboarding service. */
 import * as path from 'node:path';
 import { onboardAiCompany } from '@agent/core/organization/company-onboarding';
+import { onboardingSetupHandoff } from '../setup/setup-lifecycle-guide.js';
 import { listCompanyVerticals } from '@agent/core/organization/company-bootstrap';
 import { defineScript, isDirectScript } from '../lib/harness.js';
 
@@ -37,7 +38,9 @@ export function main(argv: string[], print: (value: unknown) => void = () => und
     force: argv.includes('--force'),
     dryRun: argv.includes('--dry-run'),
   });
-  print(result);
+  print(
+    result.status === 'ready' ? { ...result, setup_handoff: onboardingSetupHandoff(true) } : result
+  );
   return 0;
 }
 

@@ -26,7 +26,7 @@
  *   send     --agenda <id> --name <participant> --role decider|contributor --actor customer:<id> [--ttl-days 14] [--by user:<member>]
  *   bolt-review --mission <MSN> --customer <slug> --summary-file <path> [--attach <png|jpeg|webp>]... [--preview-url <https URL>]
  *            draft the review agenda of a finished mission (CD-10): one approval entry, open until the next bolt starts
- *   status   [--agenda <id>]                            also completes interrupted responses; lists task proposals and held tasks;
+ *   status   [--agenda <id>]                            repairs interrupted processing; use overview for read-only inspection;
  *            retries the routing of bolt-review answers (request_changes → backlog WorkItem, reject → operator)
  *   confirm  --agenda <id> --entry <entry_id> --by user:<member>   confirm a customer decision on a requires_customer entry (approval gate)
  *   close    --agenda <id> --by user:<member> [--reason <text>]   stop taking answers; links answer `closed`

@@ -5,6 +5,7 @@ import { main as resetOnboardingMain } from './onboarding/onboarding_reset.js';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 import { guardCliArgs } from './lib/cli/cli-guard.js';
 import { ONBOARD_CLI } from './onboarding/onboarding_mode.js';
+import { onboardingSetupPreview } from './setup/setup-lifecycle-guide.js';
 
 /**
  * Single onboarding facade. The legacy implementations remain focused and
@@ -70,6 +71,7 @@ export async function main(
           required_input: 'reviewed_identity_file',
           input_example: 'knowledge/public/templates/onboarding/identity.example.json',
           guide: 'knowledge/product/orchestration/prompt-first-onboarding.md',
+          ...onboardingSetupPreview(false),
           next_command: [
             'pnpm',
             'onboarding',

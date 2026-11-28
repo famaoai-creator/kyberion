@@ -165,6 +165,17 @@ describe('customer-channel bind / unbind / list (D8, real paths)', () => {
       change: 'created',
       file: `knowledge/confidential/${TENANT}/connections/channel-bindings.json`,
     });
+    const listArgs = ['list', '--tenant', TENANT];
+    const beforePreview = run(listArgs);
+    const channelArgs = ['--tenant', TENANT, '--surface', 'slack', '--channel', 'C-ACME'];
+    const preview = run(['preview-unbind', ...channelArgs]);
+    expect(preview).toMatchObject({
+      mode: 'dry_run',
+      tenant_slug: TENANT,
+      change: 'deactivate',
+      review_token: expect.any(String),
+    });
+    expect(run(listArgs)).toEqual(beforePreview);
     expect(readBindings(TENANT).bindings).toEqual([
       {
         surface: 'slack',
@@ -208,7 +219,12 @@ describe('customer-channel bind / unbind / list (D8, real paths)', () => {
     ).toMatch(/CUSTOMER_BINDING_CONFLICT/u);
 
     expect(
-      run(['unbind', '--tenant', TENANT, '--surface', 'slack', '--channel', 'C-ACME'])
+      exitOf(['unbind', ...channelArgs, '--review-token', String(preview.review_token)])
+    ).toMatch(/CUSTOMER_BINDING_REVIEW_CHANGED/u);
+    expect(findTenantCustomerChannelBinding(TENANT, 'slack', 'C-ACME')).not.toBeNull();
+    const refreshed = run(['preview-unbind', ...channelArgs]);
+    expect(
+      run(['unbind', ...channelArgs, '--review-token', String(refreshed.review_token)])
     ).toMatchObject({ change: 'deactivated', binding: { active: false } });
     expect(findTenantCustomerChannelBinding(TENANT, 'slack', 'C-ACME')).toBeNull();
     expect(resolveCustomerBinding('slack', 'C-ACME')).toBeNull();

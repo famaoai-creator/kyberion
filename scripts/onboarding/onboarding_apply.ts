@@ -31,6 +31,7 @@ import {
   findLatestCharterForRenewal,
 } from '@agent/core/governance/accountability-charter-registry';
 import { shellQuoteArg } from '@agent/core/organization/tenant-governance';
+import { onboardingSetupHandoff, onboardingSetupPreview } from '../setup/setup-lifecycle-guide.js';
 import {
   resolveOnboardingFlowPolicy,
   resolveOnboardingText,
@@ -689,7 +690,9 @@ export function buildSummary(
     `- ${activationNextStep(activation)}`,
     ...(operations ? operationsNextSteps(operations).map((s) => `- ${s}`) : []),
     '- Run `pnpm pipeline vital-check --format=json` to verify the live ecosystem health.',
-    '- Open Chronos at http://127.0.0.1:3000 — your Identity Badge should appear in the header.',
+    ...Object.values(onboardingSetupHandoff(tenantEntries.length > 0)).map(
+      (command) => `- \`${command}\``
+    ),
     '',
     '## Runbook Skill',
     `- Generated: ${path.join(onboardingRoot(), 'skills', 'kyberion-onboarding-runbook', 'SKILL.md')}`,
@@ -705,6 +708,16 @@ export function buildApplySummary(
   reasoning: OnboardingReasoningState,
   paths: { statePath: string; summaryPath: string; activation?: ActivationSetup }
 ): string {
+  const handoff = onboardingSetupHandoff(tenantEntries.length > 0);
+  const nextSteps = [
+    `Export the persona in your shell: \`export KYBERION_BASE_ROLE=${resolveInputPersona(input)}\` (.env.local is not loaded by pnpm scripts).`,
+    activationNextStep(paths.activation),
+    `Run \`${handoff.baseline_command}\` and follow its next step. Continue when it reports all_clear.`,
+    ...(handoff.tenant_activation_guide
+      ? [`Review tenant activation before tenant work: \`${handoff.tenant_activation_guide}\`.`]
+      : []),
+    `Check readiness and get the next Concierge action: \`${handoff.readiness_command}\`.`,
+  ];
   const lines = [
     'Onboarding profile applied successfully. Execution and human approval are separate setup steps.',
     `Identity: ${input.identity.name} (${input.identity.agent_id})`,
@@ -716,11 +729,9 @@ export function buildApplySummary(
     `Summary: ${paths.summaryPath}`,
     '',
     'Next steps:',
-    `1. Export the persona in your shell: \`export KYBERION_BASE_ROLE=${resolveInputPersona(input)}\` (.env.local is not loaded by pnpm scripts).`,
-    `2. ${activationNextStep(paths.activation)}`,
-    '3. Run `pnpm pipeline --input pipelines/baseline-check.json` and continue the onboarding flow from its status.',
-    '4. Open Concierge and inspect First Job readiness at /first-job.',
-    '5. For an explicit public diagnostic setup, preview pnpm onboarding first-job --tenant <new-test-tenant> --json. See docs/developer/FIRST_JOB_DIAGNOSTIC_OPERATIONS.ja.md.',
+    ...nextSteps.map((step, index) => `${index + 1}. ${step}`),
+    'Optional public diagnostic: open /first-job in Concierge, or preview pnpm onboarding first-job --tenant <new-test-tenant> --json.',
+    `For ongoing lifecycle management: \`${handoff.lifecycle_command}\`.`,
   ];
   return lines.join('\n');
 }
@@ -784,6 +795,7 @@ export async function applyOnboardingInput(
     state_path: statePath(),
     summary_path: summaryPath(),
     activation_setup: activation,
+    setup_handoff: onboardingSetupHandoff(tenantEntries.length > 0),
     runbook_skill_path: runbookSkill.skillPath,
     tutorial,
   };
@@ -817,7 +829,26 @@ export async function main(argv: string[] = [], print: Print = () => undefined) 
   validateInput(input);
 
   if (parsed['dry-run']) {
-    print(JSON.stringify({ status: 'validated', identity: input.identity }, null, 2));
+    print(
+      JSON.stringify(
+        {
+          status: 'validated',
+          identity: input.identity,
+          next_command: [
+            'pnpm',
+            'onboarding',
+            'apply',
+            '--identity',
+            parsed.identity ?? '<reviewed-file>',
+            ...(parsed['verify-repository-visibility'] ? ['--verify-repository-visibility'] : []),
+          ],
+          next_command_requires_confirmation: true,
+          ...onboardingSetupPreview(Boolean(input.tenants?.length)),
+        },
+        null,
+        2
+      )
+    );
     return;
   }
 

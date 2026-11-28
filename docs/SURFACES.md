@@ -120,9 +120,13 @@ FD-08 で廃止した旧 Companion Hub(Home / Learn / Discover / Work / Connect 
 | **`pnpm deck`**(mission-deck)         | **会話中心のマルチエージェント TUI**(Ink): 判断待ち・レビュー待ち・実行中をアテンションレールに集め、会話に判断カードと意図プレビュー、herdr エージェントのタイル(のぞく / 返信 / 指示 / 中断 / 接続)を表示。承認は公認 `kyberion approvals` へ TTY 引き渡し([README](../presence/displays/mission-deck/README.md))                                                                               | 会話・判断・エージェント操作向け                                                                                                                                                                                                              |
 | MCP(mcp-server-cowork)                | Claude Cowork など MCP クライアント向けの MCP サーバー(facade、stdio。base role `sovereign` で起動)。秘書室(concierge)アプリとは別物。**discover** (`capability.*` / `skill.*` / knowledge) · **act** (allowlist pipeline / `service.*` / bounded `actuator.invoke`) · **govern** (mission / approval / audit)。モデル: [mcp-facade-model](../knowledge/product/architecture/mcp-facade-model.md) | `pnpm mcp:server`                                                                                                                                                                                                                             |
 
+会話の相手や目的から探すには `pnpm kyberion setup report --lifecycle --domain conversation` を使う。会話する相手がまだ決まっていなければ、`pnpm kyberion ask "Kyberion を通して会話するには？"` で選択肢を確認できる。組織の議論や会議は `discussion`、`meeting` ガイドを参照。
+
 **共有 Slack チャンネルの `team` モード**: `KYBERION_SURFACE_CHANNEL_MODES` でチャンネルを `team`(`tenant_slug` / `max_tier` / `approvers`)と宣言すると、@メンションまたは参加済みスレッドにだけ応答し、発話者をメンバー registry で組織メンバーに解決して役割に応じた操作(承認 / 依頼 / 質問)だけを許す。ターンは tenant・tier ごとの tool-less runtime で動き、実作業は tenant スコープのミッション提案を経由する。メモリは `覚えて:` / `remember:` の明示時のみ保存する。
 
 **公開 ingress**: `pnpm kyberion ingress probe` / `ingress status` / `ingress up` / `ingress down` は、manifest の `ingress.allowed` で opt-in した 1 つの loopback サーフェス(例: event-intake は `/events` のみ)を公開 HTTPS URL へ出す(承認済み `ingress:expose` が必要。Tailscale Funnel が最初の実プロバイダ)。
+
+公開前の準備から公開終了までの入口は `pnpm kyberion setup report --lifecycle --domain ingress`。接続と承認の詳細は [公開 ingress の手順](../knowledge/public/procedures/expose-surface-public-ingress.md)を参照。
 
 **常駐サービス(UI なし)**: `voice-hub`(3032)、`oauth-callback-surface`(8787。Personal tier の接続へトークン交換を完了する loopback 受信)、`terminal-bridge`(4000)、`nexus-daemon`(刺激ルーティング)。いずれも manifest で有効(`enabled:true`)。
 

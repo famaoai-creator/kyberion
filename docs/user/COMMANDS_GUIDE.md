@@ -75,6 +75,8 @@ pnpm kyberion schedule remove <id>
 
 `register` stores a cron-triggered entry for a pipeline file (for example `knowledge/product/pipeline-templates/daily-routine.json`); `remove` deletes it by id.
 
+`schedule list` shows whether each schedule is enabled and reports its last run and result separately. Use Baseline's L10 findings for missed and failed runs that need attention.
+
 ## See the world: capture and record
 
 | Command                                                  | Result                                                                                                                             |
@@ -132,9 +134,11 @@ pnpm kyberion vault cleanup      # remove broken mounts
 pnpm kyberion workspace list           # registered workspaces and unregistered directories
 pnpm kyberion workspace gc             # dry run: report orphaned workspaces
 pnpm kyberion workspace gc --apply     # delete orphaned, ledger-registered workspaces
+pnpm kyberion workspace gc --apply --only <workspace-id>
 ```
 
 `gc` only ever deletes workspaces the ledger registered, never arbitrary directories.
+When `--only` is supplied, the result reports whether the ID was missing, ineligible, eligible, deleted, or failed.
 
 ### Agent worktrees (parallel provider agents)
 
@@ -147,6 +151,49 @@ pnpm kyberion worktree remove codex-a                             # refuses unco
 
 One worktree per agent keeps each agent's branch and `dist/` its own. Run these from an operator shell, not from inside a delegated worker.
 
+## Find a command by what you want to do
+
+You can also ask for directions, for example
+`pnpm kyberion ask "How do I find the next gate for a project track?"`.
+A recognized guidance question returns the matching lifecycle guide and
+inspection commands. With `--json`, the response has
+`kind: "lifecycle_guidance"` and `verification: "not_run"`.
+For a definition, ask “What is a Track?” to get the glossary reference
+alongside the guide. A direct request for the current status of a mission or
+its approvals uses the regular ask flow. If you ask to talk through Kyberion, choose who you
+want to reach. Use `conversation` for Kyberion itself, `channel` for a
+team chat, and `coordination` for another provider agent or runtime.
+Use `discussion` to develop a goal or compare viewpoints, and `meeting`
+for preflight, consent and follow-up. Use `calendar` for work dates,
+`audit` for activity and evidence, and `recovery` for interrupted work.
+
+Use `task` for a task session or repeatable scenario,
+`knowledge` for scoped knowledge, `approval` for pending requests,
+`channel` for inbox and notifications, and `release` for repository release checks.
+
+Start with `pnpm kyberion setup report --lifecycle --summary` to find an area
+by your goal. Open its inspection, change and verification commands with
+`pnpm kyberion setup report --lifecycle --domain <id>`. Follow related guides
+when work crosses areas, such as from `track` to `artifact`. Add `--json` for
+structured output. Each entry in `inspection_commands` is an independent command template.
+Replace placeholders with the desired scope. The guide describes available
+operations without inspecting live state. Use the listed verification command
+for the state of a specific resource.
+
+### Verify a lifecycle change
+
+- Use `customer-decision overview --tenant <slug> --case <id> --detail` for read-only inspection. `customer-decision status` also reconciles interrupted responses and routing.
+- `email deliver --dry-run` shows the requested reply mode and inputs without resolving the account or recipients. Live sending still requires approval.
+- After an interrupted `pipeline accept`, add `--status` to inspect the binding and approval receipt. If it reports `receipt_pending`, retry with the same inputs and approval ID, omitting `--status`. The matching binding is reused and its approval receipt is recorded.
+- Use `dot status <id> --json` to copy `transition_expectations` into an activate, pause, or retire call. They require the reviewed status and scope to match at apply time.
+- Use `grants revoke <id> --dry-run` to inspect the grant and its scope. Apply with `--reason <text>`.
+
+- `pnpm onboarding nhi-session revoke` reports the released admission identifiers. It leaves process status unchecked.
+- Use `pnpm kyberion customer-channel preview-unbind --tenant <slug> --surface <surface> --channel <id>` to inspect the current binding. Pass its `review_token` to `unbind --review-token <token>` to require the binding to match the preview.
+- Use `pnpm project archive <id> --dry-run` or `pnpm project restore <id> --dry-run` to inspect the target and current state. Apply evaluates eligibility and reports the resulting status.
+- `pnpm kyberion account status` reports credential registration generation. `account consent-revoke` reports local usage-grant withdrawal. Provider revocation requires a separate check.
+- Surface stop output reports whether the managed process record was absent, retained, or removed. If the process is still present after the signal, `stop_requested` retains its record. A live process without a verifiable start marker also retains its record. Use `pnpm surfaces status` to check endpoint health.
+
 ## Secrets
 
 The secret value is never passed on the command line. It comes from a hidden prompt, or from `--from-file` under `active/shared/tmp/`.
@@ -158,6 +205,11 @@ pnpm kyberion secret apply <approvalId> [--from-file <path>]
 ```
 
 `introduce` opens an approval request and, when approved locally, stores the value. If approval is still pending it prints the next steps: `pnpm kyberion approve <id>`, then `secret apply`.
+
+`secret status` checks whether the registered keys can be resolved. A service
+with no registered keys reports `no_registered_keys`. Binding usage and validity
+at the provider require separate checks and appear as `not_checked` in the
+status output.
 
 ## Install a skill bundle
 

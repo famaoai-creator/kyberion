@@ -40,6 +40,7 @@ import { DiagnosticError } from '@agent/core/logger';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { createCliCommandHandlers, type CliCommandHandler } from './cli/cli-command-handlers.js';
 export { parseOffboardArgs } from './cli/cli-offboard-args.js';
+import { isWorkflowDryRun, parseCliWorkflowOptions } from './cli/cli-offboard-args.js';
 import {
   printBranchBanner,
   printHeader,
@@ -1299,6 +1300,12 @@ export function cliCredentialRequirement(args: string[]): CredentialRequirement 
   // Command-level help is discovery, including model-backed command nouns.
   if (normalizedArgs.slice(0, 2).some((arg) => arg === '--help' || arg === '-h')) return 'none';
   if (READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP.has(command)) return 'none';
+  if (
+    command === 'email' &&
+    normalizedArgs[1] === 'deliver' &&
+    isWorkflowDryRun(parseCliWorkflowOptions(normalizedArgs.slice(2)))
+  )
+    return 'none';
   return cliCommandCredentialRequirement({ command, subcommand: normalizedArgs[1] });
 }
 

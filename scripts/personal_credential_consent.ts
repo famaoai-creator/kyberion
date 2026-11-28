@@ -240,7 +240,15 @@ export async function runPersonalCredentialConsentCli(argv: string[]): Promise<u
             grantId!,
             String(flags.reason)
           );
-          return { grant_id: revoked.grant_id, status: 'revoked' };
+          return {
+            grant_id: revoked.grant_id,
+            status: 'revoked',
+            verification: {
+              usage_grant: 'revoked',
+              credential_registration: 'not_checked',
+              provider_revocation: 'not_checked',
+            },
+          };
         });
       }
       const selection = withSensitivePathMediation(() => {

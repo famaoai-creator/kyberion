@@ -25,6 +25,7 @@ import {
 import {
   bindCustomerChannel,
   unbindCustomerChannel,
+  previewCustomerChannelUnbind,
   type CustomerChannelBindingChange,
 } from '../customer-channel/bindings.js';
 import {
@@ -41,7 +42,8 @@ import {
 
 const USAGE = [
   'customer-channel bind --tenant <slug> --surface <s> --channel <id> [--name <text>] [--org <text>] [--language <tag>] [--mode sales|support|requirements_hearing]',
-  'customer-channel unbind --tenant <slug> --surface <s> --channel <id>',
+  'customer-channel unbind --tenant <slug> --surface <s> --channel <id> [--review-token <token>]',
+  'customer-channel preview-unbind --tenant <slug> --surface <s> --channel <id>',
   'customer-channel list --tenant <slug>',
   'customer-channel outbound --tenant <slug> --source <deals/<deal>/<quote|contract>-v<n>.md> [--sha256 <hex>]',
   'customer-channel question --tenant <slug> --deal <id> --sha256 <hex>',
@@ -58,6 +60,7 @@ const VALUE_OPTIONS = new Set([
   'source',
   'sha256',
   'deal',
+  'review-token',
 ]);
 
 function usageError(message: string): ScriptExitError {
@@ -130,6 +133,8 @@ function governed<T>(fn: () => T): T {
 
 export function runCustomerChannel(argv: readonly string[]): unknown {
   const { verb, opts } = parseCustomerChannelArgs(argv);
+  if (opts['review-token'] !== undefined && verb !== 'unbind')
+    throw usageError('--review-token is only accepted by unbind');
   switch (verb) {
     case 'help':
     case '--help':
@@ -137,12 +142,14 @@ export function runCustomerChannel(argv: readonly string[]): unknown {
       return { usage: USAGE };
     case 'bind':
       return governed(() => bindCustomerChannel(change(opts)));
+    case 'preview-unbind':
     case 'unbind': {
       const target = change(opts);
       for (const key of ['name', 'org', 'language', 'mode'] as const) {
-        if (opts[key] !== undefined) throw usageError(`unbind takes no --${key}`);
+        if (opts[key] !== undefined) throw usageError(`${verb} takes no --${key}`);
       }
-      const result = governed(() => unbindCustomerChannel(target));
+      if (verb === 'preview-unbind') return governed(() => previewCustomerChannelUnbind(target));
+      const result = governed(() => unbindCustomerChannel(target, opts['review-token']));
       if (!result) {
         throw new ScriptExitError(
           2,

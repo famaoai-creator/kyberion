@@ -13,6 +13,12 @@ import { collectDoctorReport } from '../run_doctor.js';
 import { buildVitalReport } from '../vital/vital_check.js';
 import { defineScript, isDirectScript } from '../lib/harness.js';
 import { formatSetupSummaryLine } from './setup-report-format.js';
+import {
+  SETUP_LIFECYCLE_COMMAND,
+  buildSetupLifecycleGuide,
+  formatSetupLifecycleGuide,
+  setupLifecycleDomains,
+} from './setup-lifecycle-guide.js';
 import { inspectResidentServices } from '../reconcile/reconcile_resident_services.js';
 import type { ResidentServicesPlan } from '@agent/core/daemon/resident-services';
 export {
@@ -423,7 +429,8 @@ export function formatSetupReport(report: SetupReport, persona: SetupPersona): s
     lines.push(
       '',
       'Optional service and messaging setup is informational; configure only what your request needs.',
-      'For all service/auth details: pnpm service:setup. For runtime diagnostics: pnpm surfaces status.'
+      'For all service/auth details: pnpm service:setup. For runtime diagnostics: pnpm surfaces status.',
+      `For changes or re-onboarding: ${SETUP_LIFECYCLE_COMMAND}`
     );
     return lines.join('\n');
   }
@@ -460,6 +467,7 @@ export function formatSetupReport(report: SetupReport, persona: SetupPersona): s
       lines.push(...summary.lines.map((line) => `    ${line}`));
     }
   }
+  lines.push(`For changes or re-onboarding: ${SETUP_LIFECYCLE_COMMAND}`);
   return lines.join('\n');
 }
 
@@ -475,7 +483,10 @@ export function formatResidentServicesLines(summary?: ResidentServicesSummary): 
 async function main(
   args: string[] = [],
   quiet = false
-): Promise<{ report: SetupReport; persona: SetupPersona }> {
+): Promise<
+  | { report: SetupReport; persona: SetupPersona }
+  | { guide: ReturnType<typeof buildSetupLifecycleGuide> }
+> {
   const normalizedArgs = args.filter((arg) => arg !== '--');
   const argv = await createStandardYargs(['node', 'setup_report', ...normalizedArgs])
     .option('persona', {
@@ -483,8 +494,25 @@ async function main(
       choices: ['operator', 'first-time-user'] as const,
       default: 'operator',
     })
+    .option('lifecycle', {
+      type: 'boolean',
+      description: 'Show lifecycle commands and their scope without running readiness checks',
+    })
+    .option('domain', {
+      type: 'string',
+      choices: setupLifecycleDomains,
+      description: 'Limit the lifecycle guide to one area',
+    })
+    .option('summary', {
+      type: 'boolean',
+      description: 'List lifecycle areas and when to use each one',
+    })
+    .implies('domain', 'lifecycle')
+    .implies('summary', 'lifecycle')
     .parseSync();
 
+  if (argv.lifecycle)
+    return { guide: buildSetupLifecycleGuide(argv.domain as string | undefined, argv.summary) };
   const report = await runSetupReportWithPersona({ persona: argv.persona as SetupPersona, quiet });
   return { report, persona: argv.persona as SetupPersona };
 }
@@ -493,9 +521,26 @@ export const runSetupReportCli = defineScript({
   name: 'setup:report',
   run: async ({ argv, json, quiet, print }) => {
     const result = await main(argv, quiet || json);
+    if ('guide' in result) {
+      if (json && result.guide.summary) {
+        const index = {
+          ...result.guide,
+          routes: result.guide.routes.map(({ id, title, use_when, guide_command }) => ({
+            id,
+            title,
+            use_when,
+            guide_command,
+          })),
+        };
+        print(index);
+        return index;
+      }
+      print(json ? result.guide : formatSetupLifecycleGuide(result.guide));
+      return result.guide;
+    }
     print(
       json
-        ? { status: 'ok', report: result.report }
+        ? { status: 'ok', report: result.report, lifecycle_command: SETUP_LIFECYCLE_COMMAND }
         : formatSetupReport(result.report, result.persona)
     );
     return result.report;

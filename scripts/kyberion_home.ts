@@ -42,6 +42,8 @@ import {
   buildAskConversationInput,
   scopedAskIntakeReceipt,
 } from './lib/operator-ask-scope.js';
+import { formatSetupLifecycleGuide } from './setup/setup-lifecycle-guide.js';
+import { resolveSetupAskGuidance } from './setup/setup-ask-guidance.js';
 import { promoteDesktopProcedure } from '@agent/core/virtual/desktop-recording-compiler';
 import { reconcileDesktopPromotionTransaction } from '@agent/core/virtual/desktop-promotion-transaction';
 import {
@@ -241,6 +243,24 @@ async function handleAskSubcommand(
   if (!text.trim()) {
     printOutput(ui('recorder:recorder_ask_usage'));
     throw new ScriptExitError(1, '', true);
+  }
+  const guidance = resolveSetupAskGuidance(text);
+  if (guidance) {
+    printOutput(
+      json
+        ? JSON.stringify({ kind: 'lifecycle_guidance', ...guidance }, null, 2)
+        : [
+            guidance.definition_ref,
+            guidance.clarification?.question,
+            ...(guidance.clarification?.choices.map(
+              ({ label, guide_command }) => `  ${label} — ${guide_command}`
+            ) ?? []),
+            formatSetupLifecycleGuide(guidance),
+          ]
+            .filter(Boolean)
+            .join('\n')
+    );
+    return;
   }
   // A selected organization with an active dot takes the ask as a dot intake
   // event; only that path relaxes the scoped-ask refusal below.

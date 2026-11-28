@@ -6,8 +6,6 @@ describe('project controller resource boundaries', () => {
   it('rejects unsupported lifecycle flags and missing values before changing state', async () => {
     for (const args of [
       ['track', 'archive', 'TRK-NONEXISTENT', '--dry-run'],
-      ['archive', 'PRJ-NONEXISTENT', '--dry-run'],
-      ['restore', 'PRJ-NONEXISTENT', '--dry-run'],
       ['track', 'pause', 'TRK-NONEXISTENT', '--statuz', 'active'],
       ['track', 'update', 'TRK-NONEXISTENT', '--name'],
       ['restore', 'PRJ-NONEXISTENT', '--reason'],
@@ -22,6 +20,11 @@ describe('project controller resource boundaries', () => {
         /Unknown option|requires a value|requires a track lifecycle command/
       );
     }
+  });
+  it.each(['archive', 'restore'])('resolves the target for %s previews', async (command) => {
+    await expect(main([command, 'PRJ-NONEXISTENT', '--dry-run'], () => undefined)).rejects.toThrow(
+      'Project not found'
+    );
   });
   it('accepts metadata objects and rejects unsafe or non-object JSON', () => {
     expect(parseProjectMetadata('{"owner":"ops"}')).toEqual({ owner: 'ops' });
