@@ -85,8 +85,13 @@
     },
     {
       "id": "eval-exec",
-      "command_regex": ["\\beval\\b", "\\bexec\\s*\\("],
-      "reason": "Eval/exec style shell execution is blocked."
+      "executables": ["eval", "exec"],
+      "reason": "The eval/exec shell builtins are blocked in command position. Matching by executable name after QM-05 de-obfuscation keeps path segments (scripts/eval/) and search arguments (grep 'eval') from false-matching."
+    },
+    {
+      "id": "eval-call",
+      "command_regex": ["\\beval\\s*\\(", "\\bexec\\s*\\("],
+      "reason": "eval()/exec() payloads embedded in one-liner interpreters are blocked."
     },
     {
       "id": "base64-decode",
