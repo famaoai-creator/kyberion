@@ -1,5 +1,6 @@
 import { safeWriteFile, safeExec, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import * as secureIo from '@agent/core/secure-io';
+import { withStoreGrant } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
 import {
   getRegisteredEnvBool,
@@ -38,7 +39,7 @@ const KEYCHAIN_REGISTRY_PATH = pathResolver.vault('secrets/keychain-registry.jso
 // the global sensitive-path deny layer intact for callers, but mediate this
 // actuator's own deliberate registry access explicitly.
 function withVaultIo<T>(operation: () => T): T {
-  return secureIo.withSensitivePathMediation(operation);
+  return withStoreGrant('secret_vault_store', () => secureIo.withSensitivePathMediation(operation));
 }
 
 const DEFAULT_SECRET_RETRY = getRetryDefaults('secret-actuator:defaults');

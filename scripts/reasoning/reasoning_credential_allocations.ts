@@ -1,9 +1,5 @@
 import { parseArgs } from 'node:util';
-import {
-  withExecutionContext,
-  withExecutionContextAsync,
-  withStoreGrant,
-} from '@agent/core/authority';
+import { withExecutionContext, withStoreGrant } from '@agent/core/authority';
 import { credentialExecutionIdentity } from '@agent/core/foundation/credential-binding';
 import {
   resolveCliApprovalRequester,
@@ -158,22 +154,16 @@ async function registerCredential(
   })();
   const { collectSecret } = await import('../secret/secret_introduce.js');
   const value = await collectSecret(fromFile ? { 'from-file': fromFile } : {});
-  const stored = withExecutionContext(
-    'credential_allocation_manager',
-    () =>
-      registerTenantCredential({
-        credentialRef,
-        value,
-        plan,
-        tokenExpiresAt,
-        contractTenant,
-        registeredBy: operator ?? '',
-        requester: resolveCliApprovalRequester({ legacy: 'operator' }),
-        ...(approval ? { approvalRequestId: approval } : {}),
-      }),
-    undefined,
-    owner
-  );
+  const stored = registerTenantCredential({
+    credentialRef,
+    value,
+    plan,
+    tokenExpiresAt,
+    contractTenant,
+    registeredBy: operator ?? '',
+    requester: resolveCliApprovalRequester({ legacy: 'operator' }),
+    ...(approval ? { approvalRequestId: approval } : {}),
+  });
   print(
     JSON.stringify({
       ...stored,
@@ -296,274 +286,267 @@ export async function runCredentialAllocationCommand(
     print(JSON.stringify(result));
     return result.proof?.status === 'success' ? 0 : 1;
   }
-  return withExecutionContextAsync(
-    'credential_allocation_manager',
-    async () => {
-      if (action === 'assign') {
-        const profile = withStoreGrant(
-          'workspace_tenant_registry_reader',
-          () => readTenantProfile(tenant),
-          { tenantSlug: tenant }
-        );
-        if (!profile || profile.status !== 'active')
-          throw new ScriptExitError(2, 'An existing active tenant is required.');
-        if (!values.purpose) throw new ScriptExitError(2, '--purpose is required.');
-        if (values.credential && values.provider)
-          throw new ScriptExitError(2, 'Use either --credential or --provider, not both.');
-        let provider: string;
-        let draft: Parameters<typeof requestGrantApproval>[0];
-        if (values.credential) {
-          // Design §2.2 / review S2: lending terms come from the REGISTERED record;
-          // --plan / --token-expires / --contract-tenant are consistency checks only.
-          let lending;
-          try {
-            const record = readCredentialRecord(tenant, values.credential);
-            lending = lendingFromRecord(record, {
-              backends: values.backends
-                ?.split(',')
-                .map((entry) => entry.trim())
-                .filter(Boolean),
-              budgetMonthlyUsd:
-                values['budget-usd'] !== undefined ? Number(values['budget-usd']) : undefined,
-              expect: {
-                ...(values.plan ? { plan: values.plan } : {}),
-                ...(values['token-expires'] ? { tokenExpiresAt: values['token-expires'] } : {}),
-                ...(values['contract-tenant'] ? { contractTenant: values['contract-tenant'] } : {}),
-              },
-            });
-          } catch (error) {
-            throw new ScriptExitError(2, error instanceof Error ? error.message : String(error));
-          }
-          const spec = requireCredentialService(lending.service);
-          provider = spec.primaryBackend;
-          draft = {
-            capability: CREDENTIAL_USE_CAPABILITY,
-            tenant_slug: tenant,
-            credential_provider: provider,
-            credential_ref: `${spec.service}/${spec.secretKey}`,
-            credential_lending: lending,
-            purpose: values.purpose,
-            ...(values.days ? { ttl_days: Number(values.days) } : {}),
-          };
-        } else {
-          if (values.backends || values['budget-usd'] || values.plan || values['token-expires'])
-            throw new ScriptExitError(
-              2,
-              '--backends/--budget-usd/--plan/--token-expires need --credential.'
-            );
-          provider = requireReasoningApiProvider(values.provider ?? '').mode;
-          const reference = requireReasoningApiProvider(provider).secret_refs![0]!;
-          draft = {
-            capability: CREDENTIAL_USE_CAPABILITY,
-            tenant_slug: tenant,
-            credential_provider: provider,
-            purpose: values.purpose,
-            credential_ref: `${reference.service_id}/${reference.secret_key}`,
-            ...(values.days ? { ttl_days: Number(values.days) } : {}),
-          };
-        }
-        const request = values.approval
-          ? undefined
-          : requestGrantApproval(draft, {
-              requester: resolveCliApprovalRequester({ legacy: 'operator' }),
-            });
-        const approvalRequestId =
-          values.approval ?? (request?.status === 'approved' ? request.id : undefined);
-        if (approvalRequestId) {
-          const grant = grantStanding(draft, { approvalRequestId });
-          print(
-            JSON.stringify({
-              status: 'allocated',
-              grant_id: grant.grant_id,
-              tenant,
-              provider,
-              ...(draft.credential_lending
-                ? { credential_ref: draft.credential_lending.credential_ref }
-                : {}),
-              expires_at: grant.expires_at,
-            })
-          );
-        } else if (request) {
-          print(
-            JSON.stringify({
-              status: 'approval_required',
-              approval_id: request.id,
-              tenant,
-              provider,
-              ...(draft.credential_lending
-                ? {
-                    credential_ref: draft.credential_lending.credential_ref,
-                    approver:
-                      draft.credential_lending.custody === 'person'
-                        ? `user:${draft.credential_lending.owner}`
-                        : `an owner of tenant ${draft.credential_lending.owner}`,
-                  }
-                : {}),
-              next: request.scope?.tenant_slug
-                ? [
-                    'Owner: open Concierge /inbox?reason=approval and review this approval ID.',
-                    `Or, from an interactive Owner terminal in the request scope: pnpm kyberion approvals --approve ${request.id}`,
-                  ]
-                : [
-                    `pnpm scope use --tier confidential --tenant ${tenant}`,
-                    `pnpm kyberion approvals --approve ${request.id}`,
-                  ],
-              ...(!request.scope?.tenant_slug
-                ? {
-                    scope_note:
-                      'Stash with scope push before changing scope, unless already stashed; restore with scope pop after the workflow.',
-                  }
-                : {}),
-              apply:
-                'After human approval, rerun this assign command with the same options. The CLI applies the matching approved request.',
-            })
-          );
-        }
-        return 0;
-      }
-      if (action === 'extend') {
-        // Same grant (id, principal, scope): only expires_at moves, by at most the
-        // capability maximum from approval, after an owner approval of exactly this step.
-        if (!values.grant) throw new ScriptExitError(2, '--grant is required.');
-        const eligible = listCredentialAllocations(tenant).find((g) => g.grant_id === values.grant);
-        if (!eligible) throw new ScriptExitError(1, 'Credential allocation not found.');
-        if (values.days !== undefined && !/^\d+$/u.test(values.days))
-          throw new ScriptExitError(2, '--days must be a positive integer.');
-        const draft = {
-          grant_id: values.grant,
-          tenant_slug: tenant,
-          ...(values.days ? { extend_days: Number(values.days) } : {}),
-        };
-        if (values.approval) {
-          const grant = extendStandingGrant(draft, { approvalRequestId: values.approval });
-          print(
-            JSON.stringify({
-              status: 'extended',
-              grant_id: grant.grant_id,
-              tenant,
-              expires_at: grant.expires_at,
-              days_left: grantDaysLeft(grant, new Date()),
-            })
-          );
-        } else {
-          const requester = resolveCliApprovalRequester({ legacy: 'operator' });
-          const request = requestGrantExtension(draft, { requester });
-          print(
-            JSON.stringify({
-              status: 'approval_required',
-              approval_id: request.id,
-              grant_id: values.grant,
-              tenant,
-              current_expires_at: eligible.expires_at,
-              next: [`pnpm kyberion approvals --approve ${request.id}`],
-              apply:
-                'Repeat the same extend options with --approval <approval_id> after the owner approves.',
-              grace: `An expired grant can be extended for ${GRANT_EXTENSION_GRACE_DAYS} days after expiry; a revoked one never.`,
-            })
-          );
-        }
-        return 0;
-      }
-      if (action === 'revoke') {
-        if (!values.grant || !values.reason)
-          throw new ScriptExitError(2, '--grant and --reason are required.');
-        const eligible = listCredentialAllocations(tenant).find((g) => g.grant_id === values.grant);
-        if (!eligible) throw new ScriptExitError(1, 'Credential allocation not found.');
-        const grant = revokeGrant(values.grant, {
-          tenant_slug: tenant,
-          by: resolveRevoker(),
-          reason: values.reason,
-        });
-        print(
-          JSON.stringify({
-            status: 'revoked',
-            grant_id: grant.grant_id,
-            effect:
-              'New bindings and subsequent managed API sends are denied; in-flight calls are not cancelled.',
-          })
-        );
-        return 0;
-      }
-      if (action === 'usage') {
-        const month = values.month ?? monthOf(new Date());
-        if (!/^\d{4}-\d{2}$/u.test(month)) throw new ScriptExitError(2, '--month must be YYYY-MM.');
-        const now = new Date();
-        const budgets = listCredentialAllocations(tenant)
-          .filter((g) => g.scope.credential_lending?.budget_monthly_usd && !g.revoked)
-          .map((g) => ({
-            grant_id: g.grant_id,
-            credential_ref: g.scope.credential_lending!.credential_ref,
-            ...assessCredentialBudget(g.scope.credential_lending!, tenant, now),
-          }));
-        print(
-          JSON.stringify({ tenant, month, usage: summarizeCredentialUsage(tenant, month), budgets })
-        );
-        return 0;
-      }
-      const provider = values.provider
-        ? requireReasoningApiProvider(values.provider).mode
-        : undefined;
-      const grants = listCredentialAllocations(tenant).filter(
-        (g) => !provider || g.scope.credential_provider === provider
+  return await (async () => {
+    if (action === 'assign') {
+      const profile = withStoreGrant(
+        'workspace_tenant_registry_reader',
+        () => readTenantProfile(tenant),
+        { tenantSlug: tenant }
       );
-      const rows = grants.map((g) => ({
-        grant_id: g.grant_id,
-        provider: g.scope.credential_provider,
-        credential_ref: g.scope.credential_lending?.credential_ref ?? g.scope.credential_ref,
-        ...(g.scope.credential_lending
-          ? {
-              custody: g.scope.credential_lending.custody,
-              kind: g.scope.credential_lending.kind,
-              plan: g.scope.credential_lending.plan,
-              backends: g.scope.credential_lending.allowed_backends,
-              ...(g.scope.credential_lending.budget_monthly_usd !== undefined
-                ? { budget_monthly_usd: g.scope.credential_lending.budget_monthly_usd }
-                : {}),
-              ...(g.scope.credential_lending.token_expires_at
-                ? {
-                    token_expires_at: g.scope.credential_lending.token_expires_at,
-                    token_days_left: subscriptionTokenDaysLeft(
-                      g.scope.credential_lending,
-                      new Date()
-                    ),
-                  }
-                : {}),
-            }
-          : { custody: 'person', kind: 'api_key' }),
-        status: grantStatusAt(g, new Date()),
-        expires_at: g.expires_at,
-        days_left: grantDaysLeft(g, new Date()),
-        ...(g.extensions?.length ? { extensions: g.extensions.length } : {}),
-        purpose: g.purpose,
-      }));
-      if (action === 'check') {
-        if (!provider) throw new ScriptExitError(2, '--provider is required for check.');
-        const active = grants.some((g) => {
-          try {
-            assertCredentialAllocation(tenant, g.grant_id, provider);
-            return true;
-          } catch {
-            return false;
-          }
-        });
+      if (!profile || profile.status !== 'active')
+        throw new ScriptExitError(2, 'An existing active tenant is required.');
+      if (!values.purpose) throw new ScriptExitError(2, '--purpose is required.');
+      if (values.credential && values.provider)
+        throw new ScriptExitError(2, 'Use either --credential or --provider, not both.');
+      let provider: string;
+      let draft: Parameters<typeof requestGrantApproval>[0];
+      if (values.credential) {
+        // Design §2.2 / review S2: lending terms come from the REGISTERED record;
+        // --plan / --token-expires / --contract-tenant are consistency checks only.
+        let lending;
+        try {
+          const record = readCredentialRecord(tenant, values.credential);
+          lending = lendingFromRecord(record, {
+            backends: values.backends
+              ?.split(',')
+              .map((entry) => entry.trim())
+              .filter(Boolean),
+            budgetMonthlyUsd:
+              values['budget-usd'] !== undefined ? Number(values['budget-usd']) : undefined,
+            expect: {
+              ...(values.plan ? { plan: values.plan } : {}),
+              ...(values['token-expires'] ? { tokenExpiresAt: values['token-expires'] } : {}),
+              ...(values['contract-tenant'] ? { contractTenant: values['contract-tenant'] } : {}),
+            },
+          });
+        } catch (error) {
+          throw new ScriptExitError(2, error instanceof Error ? error.message : String(error));
+        }
+        const spec = requireCredentialService(lending.service);
+        provider = spec.primaryBackend;
+        draft = {
+          capability: CREDENTIAL_USE_CAPABILITY,
+          tenant_slug: tenant,
+          credential_provider: provider,
+          credential_ref: `${spec.service}/${spec.secretKey}`,
+          credential_lending: lending,
+          purpose: values.purpose,
+          ...(values.days ? { ttl_days: Number(values.days) } : {}),
+        };
+      } else {
+        if (values.backends || values['budget-usd'] || values.plan || values['token-expires'])
+          throw new ScriptExitError(
+            2,
+            '--backends/--budget-usd/--plan/--token-expires need --credential.'
+          );
+        provider = requireReasoningApiProvider(values.provider ?? '').mode;
+        const reference = requireReasoningApiProvider(provider).secret_refs![0]!;
+        draft = {
+          capability: CREDENTIAL_USE_CAPABILITY,
+          tenant_slug: tenant,
+          credential_provider: provider,
+          purpose: values.purpose,
+          credential_ref: `${reference.service_id}/${reference.secret_key}`,
+          ...(values.days ? { ttl_days: Number(values.days) } : {}),
+        };
+      }
+      const request = values.approval
+        ? undefined
+        : requestGrantApproval(draft, {
+            requester: resolveCliApprovalRequester({ legacy: 'operator' }),
+          });
+      const approvalRequestId =
+        values.approval ?? (request?.status === 'approved' ? request.id : undefined);
+      if (approvalRequestId) {
+        const grant = grantStanding(draft, { approvalRequestId });
         print(
           JSON.stringify({
+            status: 'allocated',
+            grant_id: grant.grant_id,
             tenant,
             provider,
-            allocated: active,
-            source: 'local-standing-grant',
-            task_binding: 'created_only_by_claimed_task_dispatch',
-            api_verification: 'not_checked',
+            ...(draft.credential_lending
+              ? { credential_ref: draft.credential_lending.credential_ref }
+              : {}),
+            expires_at: grant.expires_at,
           })
         );
-        return active ? 0 : 1;
+      } else if (request) {
+        print(
+          JSON.stringify({
+            status: 'approval_required',
+            approval_id: request.id,
+            tenant,
+            provider,
+            ...(draft.credential_lending
+              ? {
+                  credential_ref: draft.credential_lending.credential_ref,
+                  approver:
+                    draft.credential_lending.custody === 'person'
+                      ? `user:${draft.credential_lending.owner}`
+                      : `an owner of tenant ${draft.credential_lending.owner}`,
+                }
+              : {}),
+            next: request.scope?.tenant_slug
+              ? [
+                  'Owner: open Concierge /inbox?reason=approval and review this approval ID.',
+                  `Or, from an interactive Owner terminal in the request scope: pnpm kyberion approvals --approve ${request.id}`,
+                ]
+              : [
+                  `pnpm scope use --tier confidential --tenant ${tenant}`,
+                  `pnpm kyberion approvals --approve ${request.id}`,
+                ],
+            ...(!request.scope?.tenant_slug
+              ? {
+                  scope_note:
+                    'Stash with scope push before changing scope, unless already stashed; restore with scope pop after the workflow.',
+                }
+              : {}),
+            apply:
+              'After human approval, rerun this assign command with the same options. The CLI applies the matching approved request.',
+          })
+        );
       }
-      print(JSON.stringify({ tenant, allocations: rows }));
       return 0;
-    },
-    undefined,
-    tenant,
-    undefined,
-    { missionId: identity.missionId ?? null, taskId: identity.taskId ?? null }
-  );
+    }
+    if (action === 'extend') {
+      // Same grant (id, principal, scope): only expires_at moves, by at most the
+      // capability maximum from approval, after an owner approval of exactly this step.
+      if (!values.grant) throw new ScriptExitError(2, '--grant is required.');
+      const eligible = listCredentialAllocations(tenant).find((g) => g.grant_id === values.grant);
+      if (!eligible) throw new ScriptExitError(1, 'Credential allocation not found.');
+      if (values.days !== undefined && !/^\d+$/u.test(values.days))
+        throw new ScriptExitError(2, '--days must be a positive integer.');
+      const draft = {
+        grant_id: values.grant,
+        tenant_slug: tenant,
+        ...(values.days ? { extend_days: Number(values.days) } : {}),
+      };
+      if (values.approval) {
+        const grant = extendStandingGrant(draft, { approvalRequestId: values.approval });
+        print(
+          JSON.stringify({
+            status: 'extended',
+            grant_id: grant.grant_id,
+            tenant,
+            expires_at: grant.expires_at,
+            days_left: grantDaysLeft(grant, new Date()),
+          })
+        );
+      } else {
+        const requester = resolveCliApprovalRequester({ legacy: 'operator' });
+        const request = requestGrantExtension(draft, { requester });
+        print(
+          JSON.stringify({
+            status: 'approval_required',
+            approval_id: request.id,
+            grant_id: values.grant,
+            tenant,
+            current_expires_at: eligible.expires_at,
+            next: [`pnpm kyberion approvals --approve ${request.id}`],
+            apply:
+              'Repeat the same extend options with --approval <approval_id> after the owner approves.',
+            grace: `An expired grant can be extended for ${GRANT_EXTENSION_GRACE_DAYS} days after expiry; a revoked one never.`,
+          })
+        );
+      }
+      return 0;
+    }
+    if (action === 'revoke') {
+      if (!values.grant || !values.reason)
+        throw new ScriptExitError(2, '--grant and --reason are required.');
+      const eligible = listCredentialAllocations(tenant).find((g) => g.grant_id === values.grant);
+      if (!eligible) throw new ScriptExitError(1, 'Credential allocation not found.');
+      const grant = revokeGrant(values.grant, {
+        tenant_slug: tenant,
+        by: resolveRevoker(),
+        reason: values.reason,
+      });
+      print(
+        JSON.stringify({
+          status: 'revoked',
+          grant_id: grant.grant_id,
+          effect:
+            'New bindings and subsequent managed API sends are denied; in-flight calls are not cancelled.',
+        })
+      );
+      return 0;
+    }
+    if (action === 'usage') {
+      const month = values.month ?? monthOf(new Date());
+      if (!/^\d{4}-\d{2}$/u.test(month)) throw new ScriptExitError(2, '--month must be YYYY-MM.');
+      const now = new Date();
+      const budgets = listCredentialAllocations(tenant)
+        .filter((g) => g.scope.credential_lending?.budget_monthly_usd && !g.revoked)
+        .map((g) => ({
+          grant_id: g.grant_id,
+          credential_ref: g.scope.credential_lending!.credential_ref,
+          ...assessCredentialBudget(g.scope.credential_lending!, tenant, now),
+        }));
+      print(
+        JSON.stringify({ tenant, month, usage: summarizeCredentialUsage(tenant, month), budgets })
+      );
+      return 0;
+    }
+    const provider = values.provider
+      ? requireReasoningApiProvider(values.provider).mode
+      : undefined;
+    const grants = listCredentialAllocations(tenant).filter(
+      (g) => !provider || g.scope.credential_provider === provider
+    );
+    const rows = grants.map((g) => ({
+      grant_id: g.grant_id,
+      provider: g.scope.credential_provider,
+      credential_ref: g.scope.credential_lending?.credential_ref ?? g.scope.credential_ref,
+      ...(g.scope.credential_lending
+        ? {
+            custody: g.scope.credential_lending.custody,
+            kind: g.scope.credential_lending.kind,
+            plan: g.scope.credential_lending.plan,
+            backends: g.scope.credential_lending.allowed_backends,
+            ...(g.scope.credential_lending.budget_monthly_usd !== undefined
+              ? { budget_monthly_usd: g.scope.credential_lending.budget_monthly_usd }
+              : {}),
+            ...(g.scope.credential_lending.token_expires_at
+              ? {
+                  token_expires_at: g.scope.credential_lending.token_expires_at,
+                  token_days_left: subscriptionTokenDaysLeft(
+                    g.scope.credential_lending,
+                    new Date()
+                  ),
+                }
+              : {}),
+          }
+        : { custody: 'person', kind: 'api_key' }),
+      status: grantStatusAt(g, new Date()),
+      expires_at: g.expires_at,
+      days_left: grantDaysLeft(g, new Date()),
+      ...(g.extensions?.length ? { extensions: g.extensions.length } : {}),
+      purpose: g.purpose,
+    }));
+    if (action === 'check') {
+      if (!provider) throw new ScriptExitError(2, '--provider is required for check.');
+      const active = grants.some((g) => {
+        try {
+          assertCredentialAllocation(tenant, g.grant_id, provider);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+      print(
+        JSON.stringify({
+          tenant,
+          provider,
+          allocated: active,
+          source: 'local-standing-grant',
+          task_binding: 'created_only_by_claimed_task_dispatch',
+          api_verification: 'not_checked',
+        })
+      );
+      return active ? 0 : 1;
+    }
+    print(JSON.stringify({ tenant, allocations: rows }));
+    return 0;
+  })();
 }

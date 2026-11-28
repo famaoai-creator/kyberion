@@ -6,7 +6,6 @@ import { humanActor } from '@agent/core/actor';
 import {
   isBoundTenantInvalid,
   resolveIdentityContext,
-  withExecutionContext,
   withStoreGrant,
 } from '@agent/core/authority';
 import { getRegisteredEnvText, isVitestProcess } from '@agent/core/foundation';
@@ -231,7 +230,7 @@ export function withCaseLock<T>(location: DecisionLedgerLocation, fn: () => T): 
 }
 
 export function asLedgerWriter<T>(tenant: string, fn: () => T): T {
-  return withExecutionContext(LEDGER_ROLE, fn, undefined, tenant);
+  return withStoreGrant(LEDGER_ROLE, fn, { tenantSlug: tenant });
 }
 
 export function audit(

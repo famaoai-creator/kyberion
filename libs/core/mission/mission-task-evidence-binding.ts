@@ -1,7 +1,9 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { normalizeEventScope, type EventScope } from '../event/event-scope.js';
-import { resolveRole, withExecutionContext } from '../authority.js';
+import { resolveRole, withExecutionContext, withStoreGrant } from '../authority.js';
+import { isDeclaredStoreGrantName } from '../foundation/declared-store-grant.js';
+import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { safeReadFileSnapshot, safeRealpath } from '../secure-io.js';
 import { getWorkItem, listActiveWorkLeases } from '../workforce/work-coordination.js';
 import { withCoordinationMutation } from '../workforce/work-coordination-ledger.js';
@@ -86,8 +88,15 @@ export function withTaskEvidenceFence<T>(
   const binding = parseTaskEvidenceBinding(proof);
   const role = resolveRole();
   if (!role) throw new Error('[TASK_EVIDENCE_BINDING_INVALID] Caller authority required');
+  // A declared store grant name is re-entered the way its facade opens it
+  // (withStoreGrant): it is never an assumable role, and the same grant
+  // bound to the caller's active tenant is what its I/O already runs under.
+  const reenter = (action: () => T): T =>
+    isDeclaredStoreGrantName(role)
+      ? withStoreGrant(role, action, { tenantSlug: currentExecutionScope()?.tenantSlug })
+      : withExecutionContext(role, action);
   return withCoordinationMutation(() =>
-    withExecutionContext(role, () => {
+    reenter(() => {
       const item = getWorkItem(binding.workItemId);
       const lease = listActiveWorkLeases().find((entry) => entry.lease_id === binding.leaseId);
       if (

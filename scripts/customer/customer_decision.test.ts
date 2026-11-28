@@ -103,7 +103,7 @@ vi.mock('@agent/core/deal-store', async (importOriginal) => ({
 import { parseCustomerDecisionArgs, runCustomerDecision } from './customer_decision.js';
 import { tenantOf } from '../customer-decision/common.js';
 import { frozenLockStatus } from '../customer-decision/task-proposals.js';
-import { withExecutionContext } from '@agent/core/authority';
+import { withExecutionContext, withStoreGrant } from '@agent/core/authority';
 
 const TENANT = 'cd-facade-test';
 const CASE = 'case-cd';
@@ -1607,9 +1607,17 @@ describe('customer-decision facade', () => {
             '"from the operator"',
             '--json',
           ],
-          { cwd: pathResolver.rootDir(), stdio: ['ignore', 'pipe', 'pipe'] }
+          {
+            cwd: pathResolver.rootDir(),
+            stdio: ['ignore', 'pipe', 'pipe'],
+            // The parent respond runs inside a live store grant, which mirrors
+            // MISSION_ROLE=<grant> into process.env; an operator CLI inherits
+            // none of it (it re-opens the grant itself when given --tenant).
+            env: { MISSION_ROLE: '', SYSTEM_ROLE: '', KYBERION_DELEGATED_ROLE: '' },
+          }
         );
         child.stdout?.on('data', (chunk) => (childOut += String(chunk)));
+        child.stderr?.on('data', (chunk) => (childOut += String(chunk)));
         // Give the child ample time to start and reach the ledger (it runs in ~0.2 s unblocked).
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2500);
         return written;
@@ -1621,6 +1629,7 @@ describe('customer-decision facade', () => {
       });
       expect(response.out).toMatchObject({ ok: true });
       const code = await new Promise<number | null>((resolve) => child!.on('close', resolve));
+      if (code !== 0) console.log('CHILD_OUT:', childOut);
       expect(code).toBe(0);
       const ledger = readLedger({ dir });
       const [receipt] = listReceipts({ dir });
@@ -1802,13 +1811,10 @@ describe('customer-decision facade', () => {
     // A withdrawn agenda no longer holds its keys.
     const withdrawn = { ...agendaOf(first), status: 'withdrawn' as const };
     const { writeAgenda } = await import('@agent/core/customer-decision');
-    const { withExecutionContext } = await import('@agent/core/authority');
-    withExecutionContext(
-      'decision_ledger',
-      () => writeAgenda({ dir }, withdrawn),
-      undefined,
-      TENANT
-    );
+    const { withStoreGrant } = await import('@agent/core/authority');
+    withStoreGrant('decision_ledger_store', () => writeAgenda({ dir }, withdrawn), {
+      tenantSlug: TENANT,
+    });
     await run(['draft', ...base(), '--agenda', secondId, '--file', file]);
     expect(agendaOf(secondId).entries.map((entry) => entry.entry_id)).toEqual(['again']);
   });
@@ -2816,11 +2822,12 @@ describe('tenantOf (the bound-tenant check every verb runs)', () => {
 
   it('refuses another tenant inside a tenant-bound execution scope', () => {
     vi.stubEnv('KYBERION_TENANT', '');
-    withExecutionContext(
-      'decision_ledger',
+    withStoreGrant(
+      'decision_ledger_store',
       () => mismatch(() => tenantOf({ tenant: 'cd-other-tenant' })),
-      undefined,
-      TENANT
+      {
+        tenantSlug: TENANT,
+      }
     );
   });
 });

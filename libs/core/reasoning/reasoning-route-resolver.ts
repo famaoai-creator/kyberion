@@ -6,6 +6,7 @@ import {
   safeLstat,
   safeWriteFile,
 } from '../secure-io.js';
+import { withStoreGrant } from '../authority.js';
 import { compileSchema } from '../foundation/ajv.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -47,6 +48,9 @@ const USER_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/reasoning-route-user-config.schema.json'
 );
 const USER_CONFIG_PATH = pathResolver.shared('state/reasoning-route-user-config.json');
+
+/** Declared store grant owning the reasoning-route user config, backup and history files. */
+export const REASONING_SETTINGS_GRANT = 'reasoning_settings_writer';
 
 export type ReasoningRole = string;
 export type ReasoningCapability = BackendRouteCapability;
@@ -306,10 +310,12 @@ function saveReasoningRouteUserConfigLocked(config: ReasoningRouteUserConfig): v
         throw new Error(`Unknown profile in user config: ${ref}`);
     }
   }
-  safeWriteFile(USER_CONFIG_PATH, JSON.stringify(config, null, 2) + '\n', {
-    mkdir: true,
-    encoding: 'utf8',
-  });
+  withStoreGrant(REASONING_SETTINGS_GRANT, () =>
+    safeWriteFile(USER_CONFIG_PATH, JSON.stringify(config, null, 2) + '\n', {
+      mkdir: true,
+      encoding: 'utf8',
+    })
+  );
   reasoningRouteUserConfigCatalog.reset();
 }
 

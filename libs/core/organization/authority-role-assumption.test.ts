@@ -420,8 +420,11 @@ describe('RA-02 role assumption policy', () => {
     expect(isRoleAssumptionAllowed('oauth_callback_surface', 'ecosystem_architect')).toBe(false);
     expect(isRoleAssumptionAllowed('surface_runtime', 'mission_controller')).toBe(true);
     expect(isRoleAssumptionAllowed('surface_runtime', 'ecosystem_architect')).toBe(false);
-    // Reachable through child processes that inherit SYSTEM_ROLE.
-    expect(isRoleAssumptionAllowed('concierge', 'ingest_commit')).toBe(true);
+    // Reachable through child processes that inherit SYSTEM_ROLE; the former
+    // ingest_commit role is retired — its issuance right is the shared-core
+    // ingest_knowledge_store store grant (RA-02, opened with withStoreGrant).
+    expect(isRoleAssumptionAllowed('concierge', 'ingest_commit')).toBe(false);
+    expect(isRoleAssumptionAllowed('concierge', 'ingest_knowledge_store')).toBe(true);
     expect(isRoleAssumptionAllowed('nexus_daemon', 'reconcile_config_fallbacks')).toBe(true);
   });
 
@@ -576,7 +579,9 @@ describe('DR-01 delegated child role', () => {
     expect(() => withExecutionContext('dot_lifecycle_writer', () => undefined)).toThrow(
       '[ROLE_ASSUMPTION_DENIED]'
     );
-    expect(withExecutionContext('ingest_commit', () => resolveRole())).toBe('ingest_commit');
+    expect(withExecutionContext('concierge_operator', () => resolveRole())).toBe(
+      'concierge_operator'
+    );
   });
 
   it('lets an in-process assumption outrank the delegation, then returns to it', async () => {

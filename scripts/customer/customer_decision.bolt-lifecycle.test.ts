@@ -33,7 +33,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { readAgenda, listAgendaIds } from '@agent/core/customer-decision';
-import { withExecutionContext } from '@agent/core/authority';
+import { withExecutionContext, withStoreGrant } from '@agent/core/authority';
 import { finishMission } from '@agent/core/mission/mission-lifecycle';
 import { startMission } from '@agent/core/mission/mission-creation';
 import { loadMissionStateIncludingArchive } from '@agent/core/mission/mission-state';
@@ -136,15 +136,14 @@ describe('bolt review through the real mission lifecycle (CD-10)', () => {
       pathResolver.archivedMissionDir(MISSION_C, { tier: 'confidential', tenant: TENANT }),
       { recursive: true, force: true }
     );
-    withExecutionContext(
-      'decision_ledger',
+    withStoreGrant(
+      'decision_ledger_store',
       () =>
         safeRmSync(pathResolver.rootResolve(`knowledge/confidential/${TENANT}/decisions/${CASE}`), {
           recursive: true,
           force: true,
         }),
-      undefined,
-      TENANT
+      { tenantSlug: TENANT }
     );
     safeRmSync(pathResolver.rootResolve(`customer/${TENANT}`), { recursive: true, force: true });
     safeRmSync(path.dirname(queuePath), { recursive: true, force: true });
@@ -202,22 +201,20 @@ describe('bolt review through the real mission lifecycle (CD-10)', () => {
         rootDir: pathResolver.rootDir(),
       });
 
-      const agenda = withExecutionContext(
-        'decision_ledger',
+      const agenda = withStoreGrant(
+        'decision_ledger_store',
         () => readAgenda(location, drafted.agenda_id),
-        undefined,
-        TENANT
+        { tenantSlug: TENANT }
       );
       expect(agenda?.milestones_passed).toEqual([`bolt-after:${MISSION_A}`]);
       // Only the review agenda changed; the other agenda of the case did not.
-      const others = withExecutionContext(
-        'decision_ledger',
+      const others = withStoreGrant(
+        'decision_ledger_store',
         () =>
           listAgendaIds(location)
             .filter((id) => id !== drafted.agenda_id)
             .map((id) => readAgenda(location, id)),
-        undefined,
-        TENANT
+        { tenantSlug: TENANT }
       );
       expect(others.every((other) => !other?.milestones_passed?.length)).toBe(true);
     } finally {
@@ -305,11 +302,10 @@ describe('bolt review through the real mission lifecycle (CD-10)', () => {
       safeRmSync(summary, { force: true });
     }
     expect(drafted.bolt_mission_id).toBe(MISSION_C);
-    const agenda = withExecutionContext(
-      'decision_ledger',
+    const agenda = withStoreGrant(
+      'decision_ledger_store',
       () => readAgenda(location, drafted.agenda_id),
-      undefined,
-      TENANT
+      { tenantSlug: TENANT }
     );
     // D5: the review agenda (and so its bolt WorkItem) carries the mission's project.
     expect(agenda?.project_id).toBe(CASE);

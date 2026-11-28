@@ -74,6 +74,26 @@ export const DECLARED_STORE_GRANTS: Readonly<Record<string, DeclaredStoreGrantDe
     }),
     // secret/credential-allocations.ts: a tenant's credential allocation records.
     credential_allocation_reader: Object.freeze({ tenantBound: true }),
+    // governance/grant-store.ts: one tenant's standing-grant record partition.
+    credential_allocation_store: Object.freeze({ tenantBound: true }),
+    // scripts/reasoning/reasoning_credential_probe.ts: the probe's mission read
+    // and API-verification proof partition, bound to the probed tenant.
+    credential_probe_store: Object.freeze({ tenantBound: true }),
+    // secret/secret-bridge.ts, secret-actuator helpers, secret/secret-guard.ts:
+    // the operator's file vault under vault/secrets/ (not a tenant partition).
+    secret_vault_store: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
+    // secret/secret-guard.ts: the operator's personal connection documents
+    // (knowledge/personal/connections/) shared by every introduction flow.
+    personal_connections_store: Object.freeze({
+      baseRole: 'base_worker',
+      tenantBound: false,
+    }),
+    // decision-ledger/ledger.ts call sites: one tenant's decision ledger and
+    // customer actor registries.
+    decision_ledger_store: Object.freeze({ baseRole: 'base_worker', tenantBound: true }),
+    // actuators/ingest-actuator commit.ts: the landing card + asset ledger of
+    // the ingested tenant (public/ingest on steward approval).
+    ingest_knowledge_store: Object.freeze({ baseRole: 'base_worker', tenantBound: true }),
     // governance/ledger.ts: one tenant's hybrid ledger partition.
     tenant_ledger_store: Object.freeze({ baseRole: 'base_worker', tenantBound: true }),
     // workforce/delegation-store-partition.ts: one tenant's delegated-task partition.
@@ -133,6 +153,10 @@ export const DECLARED_STORE_GRANTS: Readonly<Record<string, DeclaredStoreGrantDe
       tenantBound: true,
       disclosure: true,
     }),
+    // daemon/environment-capability.ts: the env:bootstrap setup receipt store (system scope).
+    env_setup_receipt_store: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
+    // actuators/meeting-browser-driver cookie-store.ts: persisted session cookie jars.
+    browser_cookie_store: Object.freeze({ baseRole: 'base_worker', tenantBound: false }),
   });
 
 export function isDeclaredStoreGrantName(name: string | undefined): boolean {
@@ -145,7 +169,16 @@ export function declaredStoreGrantDefinition(
   return Object.hasOwn(DECLARED_STORE_GRANTS, name) ? DECLARED_STORE_GRANTS[name] : undefined;
 }
 
-const liveTokens = new WeakMap<object, string>();
+// Global like the execution-scope registry: a src module and its built dist
+// copy are two module instances in the same process, and a token opened by
+// one must still resolve in the other's liveDeclaredStoreGrant() — otherwise
+// dev/tsx mixes (script importing src paths while packages resolve to dist)
+// see every grant's I/O denied as STORE_GRANT_REQUIRED.
+const LIVE_TOKENS_KEY = Symbol.for('kyberion.core.declared-store-grant-tokens.v1');
+const liveTokens: WeakMap<object, string> =
+  (globalThis as Record<symbol, WeakMap<object, string> | undefined>)[LIVE_TOKENS_KEY] ??
+  ((globalThis as Record<symbol, WeakMap<object, string> | undefined>)[LIVE_TOKENS_KEY] =
+    new WeakMap());
 
 /** Open a grant token for `name`. Import-restricted to authority.ts (boundary test). */
 export function openDeclaredStoreGrantToken(name: string): object {

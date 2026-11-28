@@ -542,9 +542,9 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
     };
     const deliver = vi.fn(async () => undefined);
     // Tenant-bound, like the sweep: the gate reads the charter through its exact scope.
-    const { withExecutionContextAsync } = await import('@agent/core/authority');
+    const { withStoreGrantAsync } = await import('@agent/core/authority');
     const bound = <T>(fn: () => Promise<T>) =>
-      withExecutionContextAsync('decision_ledger', fn, undefined, CHARTERED);
+      withStoreGrantAsync('decision_ledger_store', fn, { tenantSlug: CHARTERED });
     const exact = await bound(() =>
       sendToCustomer({
         binding,

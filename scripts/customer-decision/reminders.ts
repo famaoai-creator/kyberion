@@ -46,7 +46,7 @@
 import { createHash } from 'node:crypto';
 import { logger } from '@agent/core/core';
 import { t } from '@agent/core/t';
-import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
+import { withExecutionContext, withStoreGrantAsync } from '@agent/core/authority';
 import {
   cancelApprovalRequest,
   listApprovalRequests,
@@ -219,7 +219,7 @@ async function deliverReminder(
   // Bound to the tenant (the facade's tenant-bound role), so the gate reads
   // the tenant's charter through its exact charter scope — the same binding
   // a chronos tenant run has from its environment.
-  const result = await withExecutionContextAsync(
+  const result = await withStoreGrantAsync(
     LEDGER_ROLE,
     () =>
       sendToCustomer({
@@ -263,8 +263,7 @@ async function deliverReminder(
             scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenant },
           }),
       }),
-    undefined,
-    tenant
+    { tenantSlug: tenant }
   );
   // A rejected (or lapsed, or rebound) request is final: record it denied and
   // stop asking. `human_required` would mean no request was opened — not a

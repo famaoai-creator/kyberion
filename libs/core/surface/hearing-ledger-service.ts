@@ -25,7 +25,7 @@ import { nowIso } from '../foundation/time.js';
 import { t as catalogT } from '../localization/t.js';
 import type { SupportedLocale } from '../foundation/locale-normalize.js';
 import { readSurfaceStringParam } from './surface-request-input.js';
-import { withExecutionContext } from '../authority.js';
+import { withExecutionContext, withStoreGrant } from '../authority.js';
 import { humanActor } from '../contracts/actor.js';
 import { resolveMemberByPrincipal } from '../organization/member-registry.js';
 import { frontDeskRoleFromViewerScope, type FrontDeskRole } from './front-desk-identity.js';
@@ -123,11 +123,10 @@ export function resolveLedgerScenarioRef(
   const tenant = tenantOfNamespace(namespace);
   if (!isValidCaseId(parsed.case_id))
     throw new HearingLedgerRequestError('Invalid decision case id.');
-  const ledger = withExecutionContext(
+  const ledger = withStoreGrant(
     DECISION_LEDGER_ROLES.read,
     () => readLedger({ tenantSlug: tenant, caseId: parsed.case_id }),
-    undefined,
-    tenant
+    { tenantSlug: tenant }
   );
   const scenario = buildHearingScenarioFromAsk(askLedger(ledger), {
     caseId: parsed.case_id,
@@ -290,14 +289,13 @@ export function renderLedgerCanvasForRecord(
   if (namespace === 'all' || namespace === 'unscoped') return undefined;
   if (!isValidCaseId(parsed.case_id)) return undefined;
   const location = { tenantSlug: namespace, caseId: parsed.case_id };
-  const { ledger, observed } = withExecutionContext(
+  const { ledger, observed } = withStoreGrant(
     DECISION_LEDGER_ROLES.read,
     () => ({
       ledger: readLedger(location),
       observed: readObserved(location),
     }),
-    undefined,
-    namespace
+    { tenantSlug: namespace }
   );
   const brief = buildProjectionBrief(ledger, observed, {
     caseId: parsed.case_id,
@@ -319,11 +317,10 @@ export function readHearingLedgerAgenda(
   const actor = actorParam === 'customer' ? 'customer' : 'product';
   if (!isValidCaseId(caseId)) throw new HearingLedgerRequestError('Invalid decision case id.');
   const locale = hearingQueryLocale(query);
-  const ledger = withExecutionContext(
+  const ledger = withStoreGrant(
     DECISION_LEDGER_ROLES.read,
     () => readLedger({ tenantSlug: tenant, caseId }),
-    undefined,
-    tenant
+    { tenantSlug: tenant }
   );
   const scenario = buildHearingScenarioFromAsk(askLedger(ledger), { caseId, actor });
   return {

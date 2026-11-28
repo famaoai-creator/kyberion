@@ -24,7 +24,7 @@
  */
 import * as path from 'node:path';
 import { humanActor } from '@agent/core/actor';
-import { withExecutionContext } from '@agent/core/authority';
+import { withStoreGrant } from '@agent/core/authority';
 import { nowIso, readJson, readJsonLines } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import {
@@ -60,15 +60,17 @@ import {
   ScriptExitError,
 } from './lib/harness.js';
 
-/** Writes run as the ledger's write role (see `DECISION_LEDGER_ROLES` in the model). */
+/** Writes open the ledger's store grant (see `DECISION_LEDGER_ROLES` in the model). */
 const LEDGER_WRITE_ROLE = DECISION_LEDGER_ROLES.write;
 
 /**
- * Run `fn` as the ledger write role bound to the request's tenant: the role's grant is
- * `knowledge/confidential/${KYBERION_TENANT}/decisions/`, so without a tenant it writes nothing.
+ * Run `fn` inside the ledger store grant bound to the request's tenant: the grant is
+ * `knowledge/confidential/${KYBERION_TENANT}/decisions/`. A `--dir` run (tests only)
+ * has no tenant to bind — the tmp case dir it writes needs no grant.
  */
 function asLedgerWriter<T>(opts: Record<string, string>, fn: () => T): T {
-  return withExecutionContext(LEDGER_WRITE_ROLE, fn, undefined, opts.tenant);
+  if (!opts.tenant) return fn();
+  return withStoreGrant(LEDGER_WRITE_ROLE, fn, { tenantSlug: opts.tenant });
 }
 
 interface ParsedArgs {

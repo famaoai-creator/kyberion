@@ -825,7 +825,7 @@ function prepareExecutionContext(
     // installation whose catalogs still declare an old role from granting its policy.
     if (RETIRED_STORE_ROLE_NAMES.has(normalizedRole))
       throw new Error(
-        `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a retired store role name, not an assumable role`
+        `[ROLE_ASSUMPTION_DENIED] '${normalizedRole}' is a retired store role name, not an assumable role — its store is a declared store grant its facade opens (withStoreGrant)`
       );
     if (isDeclaredStoreGrantName(normalizedRole))
       throw new Error(

@@ -14,6 +14,7 @@
 import * as path from 'node:path';
 import { isRecord, readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import { withStoreGrant } from '@agent/core/authority';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -23,6 +24,9 @@ import {
 } from '@agent/core/secure-io';
 
 const COOKIE_DIR_REL = 'active/shared/state/browser-cookies';
+
+/** Declared store grant owning the browser-cookies directory. */
+const BROWSER_COOKIE_STORE_GRANT = 'browser_cookie_store';
 
 export interface PersistedBrowserCookie {
   name: string;
@@ -135,8 +139,10 @@ export function writeCookies(accountSlug: string, cookies: unknown[]): void {
   const parsed = parsePersistedCookies(cookies);
   if (!parsed) throw new Error('[browser-cookie-store] cookie payload has an invalid shape');
   const file = cookiePathFor(accountSlug);
-  safeMkdir(assertSafeRepositoryPath(path.dirname(file), { allowMissingLeaf: true }), {
-    recursive: true,
+  withStoreGrant(BROWSER_COOKIE_STORE_GRANT, () => {
+    safeMkdir(assertSafeRepositoryPath(path.dirname(file), { allowMissingLeaf: true }), {
+      recursive: true,
+    });
+    safeWriteFile(file, JSON.stringify(parsed, null, 2));
   });
-  safeWriteFile(file, JSON.stringify(parsed, null, 2));
 }

@@ -491,7 +491,7 @@ describe('lent credential binding (design §3 output)', () => {
 
 describe('tenant credential registration (S3)', () => {
   const asOperator = <T>(run: () => T) =>
-    withExecutionContext('credential_allocation_manager', run, undefined, 'parent');
+    withExecutionContext('sovereign_concierge', run, 'sovereign', 'parent');
 
   it('registers first, then requires an owner approval bound to the new fingerprint to overwrite', () => {
     const first = asOperator(() =>
