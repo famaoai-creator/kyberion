@@ -14,8 +14,13 @@
 
 import { runGoalDrivenLoop } from '../workforce/worker-goal-driver.js';
 import { buildTaskReasoningBackend } from '../workforce/task-execution-port.js';
+import { createLogger } from '../logger.js';
 import type { ReasoningBackendMode } from '../reasoning/reasoning-backend-policy.js';
+import type { LiveJudgmentInvokePort } from '../organization/semantic-judgment-live-provider.js';
 import type { DotCharter, LoadedDotCharter } from './dot-charter.js';
+import type { DotProposal } from './dot-proposals.js';
+import type { DotSemanticLiveBudgetPort } from './dot-semantic-budget.js';
+import { observeLiveDotProposals, reconcileDotSemanticFeedback } from './dot-semantic-loop.js';
 import {
   runDotWake,
   type DotRuntimeDeps,
@@ -39,6 +44,8 @@ export { remindDotCredentialGrantExpiry } from './dot-standing-binding.js';
 // leaf, so the orchestration entry populates it.
 import './dot-extension-bootstrap.js';
 
+const logger = createLogger('dot-wake-orchestration');
+
 export type DotWakeOrchestrationDeps = Omit<DotRuntimeDeps, 'runLoop' | 'backendUnavailable'> & {
   trigger?: DueDotTrigger;
   /** Named-backend lookup for `charter.runtime.reasoning_backend`. */
@@ -49,6 +56,10 @@ export type DotWakeOrchestrationDeps = Omit<DotRuntimeDeps, 'runLoop' | 'backend
   standing?: DotStandingDeps;
   /** Claimed-task backend for a bound tenant wake; defaults to buildTaskReasoningBackend. */
   taskBackend?: (charter: DotCharter) => DotWakeBackend;
+  /** Optional live semantic_judgment invoke port override (test seam). */
+  liveSemanticInvoke?: LiveJudgmentInvokePort | null;
+  /** Optional live semantic_judgment shared budget port override (test seam). */
+  liveSemanticBudget?: DotSemanticLiveBudgetPort;
 };
 
 /**
@@ -99,7 +110,15 @@ export async function runDotWakeWithGoalDriver(
   loaded: LoadedDotCharter,
   deps: DotWakeOrchestrationDeps = {}
 ): Promise<DotWakeReceipt> {
-  const { backendFor, goalDriver, standing, taskBackend, ...runtimeDeps } = deps;
+  const {
+    backendFor,
+    goalDriver,
+    standing,
+    taskBackend,
+    liveSemanticInvoke,
+    liveSemanticBudget,
+    ...runtimeDeps
+  } = deps;
   const wake = (mode: { bound: boolean; refusal?: string }) =>
     runDotWake(loaded, {
       ...runtimeDeps,
@@ -138,23 +157,79 @@ export async function runDotWakeWithGoalDriver(
         };
       },
     });
+  let receipt: DotWakeReceipt;
   // Injected backends are explicit hosts / test seams; tenantless dots need no binding.
-  if (deps.backend !== undefined || !dotStandingLineage(loaded.charter))
-    return wake({ bound: false });
-  let entered = false;
+  if (deps.backend !== undefined || !dotStandingLineage(loaded.charter)) {
+    receipt = await wake({ bound: false });
+  } else {
+    let entered = false;
+    try {
+      receipt = await withDotStandingBinding(
+        loaded,
+        'wake',
+        () => {
+          entered = true;
+          return wake({ bound: true });
+        },
+        standing
+      );
+    } catch (error) {
+      if (entered) throw error;
+      receipt = await wake({
+        bound: false,
+        refusal: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  await runPostWakeLiveSemanticLoop(loaded.charter, receipt, {
+    rootDir: deps.rootDir,
+    now: deps.now,
+    liveSemanticInvoke,
+    liveSemanticBudget,
+    hasOfflineFixture: deps.semanticJudgment !== undefined,
+  });
+  return receipt;
+}
+
+async function runPostWakeLiveSemanticLoop(
+  charter: DotCharter,
+  receipt: DotWakeReceipt,
+  options: {
+    rootDir?: string;
+    now?: () => Date;
+    liveSemanticInvoke?: LiveJudgmentInvokePort | null;
+    liveSemanticBudget?: DotSemanticLiveBudgetPort;
+    hasOfflineFixture: boolean;
+  }
+): Promise<void> {
+  if (options.hasOfflineFixture || receipt.outcome !== 'delivered') return;
+  const mode = charter.runtime.semantic_judgment?.mode ?? 'off';
+  if (mode !== 'shadow' && mode !== 'advisory') return;
   try {
-    return await withDotStandingBinding(
-      loaded,
-      'wake',
-      () => {
-        entered = true;
-        return wake({ bound: true });
-      },
-      standing
+    const proposals: DotProposal[] = (receipt.actions ?? []).map(
+      (action) =>
+        action.admission?.proposal ?? {
+          action_id: action.action_id,
+          title: action.title,
+          objective: action.objective,
+          execution_shape: action.execution_shape,
+          ...(action.pipeline_ref ? { pipeline_ref: action.pipeline_ref } : {}),
+        }
     );
+    const loopDeps = {
+      rootDir: options.rootDir,
+      now: options.now,
+      invoke: options.liveSemanticInvoke,
+      budget: options.liveSemanticBudget,
+    };
+    if (proposals.length > 0) {
+      await observeLiveDotProposals(charter, proposals, loopDeps);
+    }
+    await reconcileDotSemanticFeedback(charter, loopDeps);
   } catch (error) {
-    if (entered) throw error;
-    return wake({ bound: false, refusal: error instanceof Error ? error.message : String(error) });
+    logger.warn(
+      `[dot-wake-orchestration] post-wake semantic judgment loop skipped for ${charter.dot_id}: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
 

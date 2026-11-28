@@ -529,7 +529,7 @@ describe('dot charter', () => {
       expect(parsed.runtime.semantic_judgment?.mode ?? 'off').toBe('off');
     });
 
-    it.each(['off', 'shadow'] as const)(
+    it.each(['off', 'shadow', 'advisory'] as const)(
       'accepts and round-trips the optional %s mode without provider configuration',
       (mode) => {
         const charter = {

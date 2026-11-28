@@ -26,7 +26,10 @@ import {
   DOT_FLOOR_CONTRIBUTORS,
   DOT_PRE_GATE_CHECKS,
 } from './dot-extension-registry.js';
-import { DOT_L4_NOTIFY_TO_AUTO_EXCEPTION } from './dot-extensions.js';
+import {
+  DOT_L4_NOTIFY_TO_AUTO_EXCEPTION,
+  DOT_SEMANTIC_APPROVE_TO_NOTIFY_EXCEPTION,
+} from './dot-extensions.js';
 import { recordDotFeedback } from './dot-feedback.js';
 import type { DotProposal } from './dot-proposals.js';
 
@@ -238,6 +241,66 @@ describe('dot-dispatch extension hooks', () => {
     DOT_DECISION_RELAXERS.length = 0;
     DOT_DECISION_RELAXERS.push({ id: 'plain', relax: () => ({ decision: 'auto', reason: 'x' }) });
     expect(decisionOf({ ...harness('notify').deps, ...relaxable })).toBe('notify');
+  });
+
+  it('lets the semantic approve->notify exception relax only in advisory mode and never undercuts hard gates', () => {
+    DOT_DECISION_RELAXERS.push({
+      id: 'semantic-judgment',
+      relax: () => ({
+        decision: 'notify',
+        reason: 'verified apply_precedent with high agreement',
+        exception: DOT_SEMANTIC_APPROVE_TO_NOTIFY_EXCEPTION,
+      }),
+    });
+    const relaxable = { relaxableActions: ['dot_delegate_work'] };
+    const advisoryCharter: DotCharter = {
+      ...CHARTER,
+      runtime: { ...CHARTER.runtime, semantic_judgment: { mode: 'advisory' } },
+    };
+    const result = evaluateDotProposalGate(advisoryCharter, PROPOSAL, {
+      ...harness('approve', { vetoWindowMinutes: 30 }).deps,
+      ...relaxable,
+    });
+    expect(result.gate).toMatchObject({ decision: 'notify', allowed: true });
+    expect(result).toMatchObject({ floor: 'notify', relaxed_by: 'semantic-judgment' });
+
+    const decisionOf = (
+      deps: DotDispatchDeps,
+      charter: DotCharter = advisoryCharter,
+      proposal: DotProposal = PROPOSAL
+    ) => evaluateDotProposalGate(charter, proposal, deps).gate.decision;
+
+    // Must remain approve when semantic_judgment is off or shadow.
+    expect(decisionOf({ ...harness('approve').deps, ...relaxable }, CHARTER)).toBe('approve');
+    expect(
+      decisionOf(
+        { ...harness('approve').deps, ...relaxable },
+        { ...CHARTER, runtime: { ...CHARTER.runtime, semantic_judgment: { mode: 'shadow' } } }
+      )
+    ).toBe('approve');
+    // Must remain approve for non-relaxable actions or charter approve default.
+    expect(decisionOf({ ...harness('approve').deps, relaxableActions: [] })).toBe('approve');
+    expect(
+      decisionOf(
+        { ...harness('approve').deps, ...relaxable },
+        { ...advisoryCharter, decisions: { default_decision: 'approve' } }
+      )
+    ).toBe('approve');
+    // Hard escalations, high-risk paths, irreversibility, and shadow actions never relax.
+    for (const extra of [
+      { escalations: ['never_auto'] },
+      { escalations: ['high_risk_path'] },
+      { escalations: ['axis_max'] },
+      { escalations: ['budget'] },
+      { highRiskPathMatches: ['libs/core/**'] },
+      { axes: { scope: 0, reversibility: 2, sensitivity: 0, confidence: 0 } },
+      { shadow: true },
+    ]) {
+      expect(
+        decisionOf({ ...harness('approve', extra).deps, ...relaxable }),
+        JSON.stringify(extra)
+      ).toBe('approve');
+    }
   });
 
   it('a shadow disposition records only and an unavailable override keeps it record-only', () => {

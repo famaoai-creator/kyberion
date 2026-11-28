@@ -21,6 +21,12 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { createLogger } from '../logger.js';
 import { registerOrganizationWorkJudgment } from '../organization/organization-operating-model-persistence.js';
 import {
+  GEMINI_DECISION_PROVIDER,
+  OPENAI_DECISION_PROVIDER,
+  registerGeminiDecisionBackend,
+  registerOpenAiDecisionBackend,
+} from '../provider/decision-api-judgment-backend.js';
+import {
   LAYA_MLX_PROVIDER,
   registerLayaMlxBackend,
 } from '../provider/laya-mlx-judgment-backend.js';
@@ -41,6 +47,8 @@ export const JUDGMENT_PROVIDERS_ENV_VAR = 'KYBERION_JUDGMENT_PROVIDERS';
 /** Opt-in providers this bootstrap can register, keyed by judgment_id. */
 const OPTIONAL_JUDGMENT_PROVIDERS: Readonly<Record<string, () => () => void>> = {
   [LAYA_MLX_PROVIDER]: () => registerLayaMlxBackend(),
+  [GEMINI_DECISION_PROVIDER]: () => registerGeminiDecisionBackend(),
+  [OPENAI_DECISION_PROVIDER]: () => registerOpenAiDecisionBackend(),
   [TYPESAFE_JEV_PROVIDER]: () => registerTypeSafeJevBackend(),
 };
 

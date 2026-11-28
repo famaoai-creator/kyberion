@@ -10,6 +10,8 @@ export * from './provider/typesafe-jev-judgment-backend.js';
 
 export * from './provider/laya-mlx-judgment-backend.js';
 
+export * from './provider/decision-api-judgment-backend.js';
+
 export * from './reasoning/judgment-provider-bootstrap.js';
 
 export * from './reasoning/judgment-assist.js';

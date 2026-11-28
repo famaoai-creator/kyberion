@@ -120,3 +120,38 @@ export * from './tenant-knowledge-retrieval.js';
 export * from './tenant-rate-limiter.js';
 export * from './tenant-registry-exceptions.js';
 export * from './tenant-registry.js';
+export {
+  createAnthropicJudgmentInvokePort,
+  createGeminiDecisionJudgmentInvokePort,
+  createGeminiJudgmentInvokePort,
+  createHybridSemanticJudgmentInvokePort,
+  createLayaMlxJudgmentInvokePort,
+  createOpenAiCompatibleJudgmentInvokePort,
+  createOpenAiDecisionJudgmentInvokePort,
+  evaluateLiveDotProposalJudgment,
+  evaluateLiveSemanticJudgment,
+  liveSemanticJudgmentModelConfigHash,
+  resolveLiveJudgmentInvokePort,
+  type DotProposalJudgmentAssessment,
+  type DotProposalJudgmentInput,
+  type DotProposalJudgmentResult,
+  type DotProposalJudgmentVerdict,
+  type HybridJudgmentInvokeOptions,
+  type HybridJudgmentRouteEvent,
+  type LiveDotProposalJudgmentDeps,
+  type LiveDotProposalJudgmentRequest,
+  type LiveJudgmentInvocation,
+  type LiveJudgmentInvokeMeta,
+  type LiveJudgmentInvokePort,
+  type LiveSemanticJudgmentDeps,
+  type LiveSemanticJudgmentRequest,
+  type LiveSemanticJudgmentResult,
+} from './semantic-judgment-live-provider.js';
+export {
+  createJudgmentLatencyFixture,
+  resolveSyntheticLatencyProposal,
+  SYNTHETIC_LATENCY_OPERATIONS,
+} from './judgment-latency-fixture.js';
+export { createJudgmentPrecedentSnapshot } from './judgment-precedents.js';
+export { buildJudgmentModelInput, judgmentModelInputHashes } from './judgment-validation.js';
+export type { JudgmentModelInput, SemanticDisposition } from './judgment-contract.js';

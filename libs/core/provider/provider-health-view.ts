@@ -23,6 +23,13 @@ export function registerHealthyInstancesResolver(
   return healthyInstancesResolverSeam.register('provider-health-registry', resolver, metadata);
 }
 
+/** Whether every configured instance of `provider` is currently demoted. */
+export function isProviderDemoted(provider: string, now: number = Date.now()): boolean {
+  const resolveHealthyInstances =
+    healthyInstancesResolverSeam.getOptional() ?? (() => ['default'] as readonly string[]);
+  return resolveHealthyInstances(provider, now).length === 0;
+}
+
 /** Providers whose every configured instance is currently demoted. */
 export function listDemotedProviders(
   providers: ProviderInfo[] = [],

@@ -88,7 +88,26 @@ describe('ensureJudgmentBackendsRegistered', () => {
     expect(result.registered.sort()).toEqual(
       [BUILTIN_JUDGMENT_PROVIDER, 'laya-mlx', 'typesafe-jev'].sort()
     );
-    expect(listOptionalJudgmentProviders().sort()).toEqual(['laya-mlx', 'typesafe-jev']);
+    expect(listOptionalJudgmentProviders().sort()).toEqual([
+      'gemini-decision',
+      'laya-mlx',
+      'openai-decision',
+      'typesafe-jev',
+    ]);
+
+    const decisionResult = ensureJudgmentBackendsRegistered({
+      providers: 'gemini-decision,openai-decision',
+    });
+    expect(decisionResult.registered.sort()).toEqual(['gemini-decision', 'openai-decision']);
+    expect(registeredIds()).toEqual(
+      [
+        BUILTIN_JUDGMENT_PROVIDER,
+        'gemini-decision',
+        'laya-mlx',
+        'openai-decision',
+        'typesafe-jev',
+      ].sort()
+    );
   });
 
   it('refuses an unknown provider id with a reason instead of ignoring it', () => {

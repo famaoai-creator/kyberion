@@ -2,6 +2,10 @@ import { createLogger } from '../logger.js';
 import { tryRepairJson } from '../foundation/json-repair.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord } from '../foundation/text.js';
+import type { TierLevel } from '../types.js';
+import { assistWithJudgment, choiceAnswer } from './judgment-assist.js';
+import { BUILTIN_JUDGMENT_PROVIDER, listJudgmentBackends } from './judgment-backend.js';
+import { ensureJudgmentBackendsRegistered } from './judgment-provider-bootstrap.js';
 
 // AR-07: in-loop semantic decision primitive. Deterministic ops distill an
 // observation (DOM inventory, UI tree, log tail); this helper asks the
@@ -19,8 +23,20 @@ export interface DecideFromObservationInput {
   observation: string;
   /** When present, the decision MUST be one of these values (selection mode). */
   options?: string[];
+  /** Optional descriptions keyed by option value to boost System-1 accuracy. */
+  optionDescriptions?: Readonly<Record<string, string>>;
   /** Extra instruction appended to the prompt (output shape hints etc.). */
   guidance?: string;
+  /** Highest data tier present in observation; defaults fail-closed to confidential. */
+  tier?: TierLevel;
+  /** Optional tenant slug for provider egress checks. */
+  tenantSlug?: string;
+  /** Minimum confidence accepted from System-1 judgment-backend. Default 0.65. */
+  minJudgmentConfidence?: number;
+  /** Timeout budget in ms for System-1 judgment-backend lookup. Default 4000. */
+  timeoutMs?: number;
+  /** Whether to consult registered System-1 judgment-backend providers first. Default true. */
+  useJudgmentBackend?: boolean;
   /** Injectable for tests / stub environments. */
   generate?: (prompt: string) => Promise<string>;
 }
@@ -28,6 +44,9 @@ export interface DecideFromObservationInput {
 export interface SemanticDecision {
   decision: string;
   reason?: string;
+  source?: 'singleton' | 'judgment' | 'reasoning';
+  provider_id?: string;
+  confidence?: number;
 }
 
 /**
@@ -68,14 +87,77 @@ export function resetSemanticDecideDegradations(): void {
 }
 
 const OBSERVATION_CAP = 12000;
+const DEFAULT_MIN_JUDGMENT_CONFIDENCE = 0.65;
+const DEFAULT_JUDGMENT_TIMEOUT_MS = 4_000;
+export const SEMANTIC_DECIDE_QUESTION = 'semantic_decide.option';
+
+async function tryJudgmentSelection(
+  input: DecideFromObservationInput,
+  options: readonly string[]
+): Promise<SemanticDecision | null> {
+  if (options.length < 2 || input.generate || input.useJudgmentBackend === false) {
+    return null;
+  }
+  ensureJudgmentBackendsRegistered();
+  const hasNonFloor = listJudgmentBackends().some(
+    (backend) => backend.judgment_id !== BUILTIN_JUDGMENT_PROVIDER
+  );
+  if (!hasNonFloor) return null;
+
+  const assisted = await assistWithJudgment<string | null>({
+    baseline: null,
+    state: input.observation.slice(0, OBSERVATION_CAP),
+    questions: [
+      {
+        kind: 'choice',
+        id: SEMANTIC_DECIDE_QUESTION,
+        options,
+        instructions: input.guidance ? `${input.goal}\n${input.guidance}` : input.goal,
+        ...(input.optionDescriptions ? { optionDescriptions: input.optionDescriptions } : {}),
+      },
+    ],
+    tier: input.tier ?? 'confidential',
+    ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
+    minConfidence: input.minJudgmentConfidence ?? DEFAULT_MIN_JUDGMENT_CONFIDENCE,
+    timeoutMs: input.timeoutMs ?? DEFAULT_JUDGMENT_TIMEOUT_MS,
+    requireCalibrated: false,
+    label: 'semantic-decide',
+    accept: (answers) => {
+      const answer = choiceAnswer(answers, SEMANTIC_DECIDE_QUESTION);
+      if (!answer || typeof answer.value !== 'string') return undefined;
+      return options.includes(answer.value) ? answer.value : undefined;
+    },
+  });
+
+  if (assisted.source !== 'judgment' || !assisted.value) {
+    logger.debug(
+      `[semantic-decide] judgment declined (${assisted.reason}); falling back to reasoning backend`
+    );
+    return null;
+  }
+  consecutiveModelErrors = 0;
+  const confidence = assisted.answers?.[0]?.confidence;
+  return {
+    decision: assisted.value,
+    reason: assisted.reason.slice(0, 300),
+    source: 'judgment',
+    ...(assisted.provider_id ? { provider_id: assisted.provider_id } : {}),
+    ...(typeof confidence === 'number' && Number.isFinite(confidence) ? { confidence } : {}),
+  };
+}
 
 export async function decideFromObservation(
   input: DecideFromObservationInput
 ): Promise<SemanticDecision | null> {
-  const selection = Array.isArray(input.options) && input.options.length > 0;
-  if (selection && input.options!.length === 1) {
-    return { decision: input.options![0], reason: 'only candidate' };
+  const uniqueOptions = Array.isArray(input.options)
+    ? Array.from(new Set(input.options))
+    : undefined;
+  const selection = Array.isArray(uniqueOptions) && uniqueOptions.length > 0;
+  if (selection && uniqueOptions.length === 1) {
+    return { decision: uniqueOptions[0], reason: 'only candidate' };
   }
+  const judgmentHit = uniqueOptions ? await tryJudgmentSelection(input, uniqueOptions) : null;
+  if (judgmentHit) return judgmentHit;
   const prompt = [
     'You are a precise automation assistant making ONE decision inside a running pipeline.',
     `Goal: ${input.goal}`,
@@ -83,7 +165,7 @@ export async function decideFromObservation(
     input.observation.slice(0, OBSERVATION_CAP),
     '',
     selection
-      ? `Pick exactly one of these options (verbatim):\n${input.options!.map((option) => `- ${option}`).join('\n')}`
+      ? `Pick exactly one of these options (verbatim):\n${uniqueOptions.map((option) => `- ${option}`).join('\n')}`
       : 'Answer concisely.',
     input.guidance ?? '',
     'Reply with ONLY a JSON object: { "decision": string, "reason": string }',
@@ -112,7 +194,7 @@ export async function decideFromObservation(
       recordDegradation('empty_decision', input.goal);
       return null;
     }
-    if (selection && !input.options!.includes(decision)) {
+    if (selection && !uniqueOptions.includes(decision)) {
       logger.warn(
         `decision "${decision.slice(0, 80)}" is not among the offered options — rejected`
       );
@@ -159,9 +241,34 @@ export async function executeLlmDecideOp(input: {
   const options = Array.isArray(params.options)
     ? params.options.map((option) => String(resolve(option)))
     : undefined;
+  const tierRaw = params.tier !== undefined ? String(resolve(params.tier) ?? '').trim() : '';
+  const tier: TierLevel | undefined =
+    tierRaw === 'public' || tierRaw === 'confidential' || tierRaw === 'personal'
+      ? tierRaw
+      : undefined;
+  const tenantRaw =
+    params.tenant_slug !== undefined ? String(resolve(params.tenant_slug) ?? '').trim() : '';
+  const rawDescriptions =
+    params.option_descriptions !== undefined ? resolve(params.option_descriptions) : undefined;
+  const optionDescriptions = isRecord(rawDescriptions)
+    ? Object.fromEntries(
+        Object.entries(rawDescriptions).filter(
+          (entry): entry is [string, string] => typeof entry[1] === 'string'
+        )
+      )
+    : undefined;
 
   const degradationsBefore = getSemanticDecideDegradations().length;
-  const decision = await decideFromObservation({ goal, observation, options });
+  const decision = await decideFromObservation({
+    goal,
+    observation,
+    options,
+    ...(tier ? { tier } : {}),
+    ...(tenantRaw ? { tenantSlug: tenantRaw } : {}),
+    ...(optionDescriptions && Object.keys(optionDescriptions).length > 0
+      ? { optionDescriptions }
+      : {}),
+  });
   let degradedReason: string | null = null;
   if (!decision) {
     const record = getSemanticDecideDegradations()[degradationsBefore];
@@ -185,6 +292,7 @@ export async function executeLlmDecideOp(input: {
   return {
     ...ctx,
     [exportAs]: decision,
+    [`${exportAs}_source`]: decision ? (decision.source ?? 'reasoning') : null,
     [`${exportAs}_degraded`]: degradedReason,
   };
 }

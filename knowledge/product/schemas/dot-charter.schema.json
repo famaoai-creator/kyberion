@@ -899,10 +899,10 @@
           "required": ["mode"],
           "properties": {
             "mode": {
-              "enum": ["off", "shadow"]
+              "enum": ["off", "shadow", "advisory"]
             }
           },
-          "description": "Absent means off. Advisory shadow grants no execution or effect approval. No production shared-budget/provider adapter is supplied; without explicit injected fixture ports it performs no inference."
+          "description": "Absent means off. Shadow observes post-wake without altering dispatch. Advisory enables evidence-backed gate relaxation (approve -> notify on reversible relaxable actions only) without lowering hard boundaries or granting execution authority."
         },
         "max_idle_wake_ms": {
           "type": "integer",

@@ -41,6 +41,11 @@ import {
 import { dotEventIntakeStatusSection } from './dot-event-intake-diagnostics.js';
 import { dotArbitrationPreGateCheck } from './dot-arbitration.js';
 import { dotProgressPromptSection, dotProgressStatusSection } from './dot-progress.js';
+import {
+  dotSemanticJudgmentDecisionRelaxer,
+  dotSemanticJudgmentDigestSection,
+  dotSemanticJudgmentStatusSection,
+} from './dot-semantic-loop.js';
 
 let registered = false;
 
@@ -63,7 +68,7 @@ export function ensureDotExtensionsRegistered(): void {
       wakeTools: [dotUpdateMemoryTool, dotScheduleFollowupTool],
       floorContributors: [DOT_BUDGET_FLOOR_CONTRIBUTOR, dotAutonomyFloorContributor()],
       preGateChecks: [dotArbitrationPreGateCheck()],
-      decisionRelaxers: [dotAutonomyDecisionRelaxer()],
+      decisionRelaxers: [dotAutonomyDecisionRelaxer(), dotSemanticJudgmentDecisionRelaxer()],
       dispositionOverrides: [dotAutonomyDispositionOverride()],
       statusSections: [
         DOT_KEY_RESULTS_STATUS_SECTION,
@@ -73,12 +78,14 @@ export function ensureDotExtensionsRegistered(): void {
         dotAutonomyStatusSection(),
         dotExecutorStatusSection(),
         dotEventIntakeStatusSection(),
+        dotSemanticJudgmentStatusSection(),
       ],
       digestSections: [
         DOT_KEY_RESULTS_DIGEST_SECTION,
         DOT_BUDGET_DIGEST_SECTION,
         dotOutcomesDigestSection(),
         dotAutonomyDigestSection(),
+        dotSemanticJudgmentDigestSection(),
       ],
     },
   });

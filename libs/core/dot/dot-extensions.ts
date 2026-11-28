@@ -65,10 +65,20 @@ export interface DotPreGateCheck {
 export const DOT_L4_NOTIFY_TO_AUTO_EXCEPTION = 'l4_notify_to_auto' as const;
 
 /**
+ * Marker a relaxer sets to claim the evidence-backed semantic-judgment
+ * exception: in `advisory` mode, an `approve` gate for a reversible
+ * `autonomy.relaxable_actions` action may relax to `notify`. dot-dispatch
+ * re-verifies every policy/charter/hard-escalation invariant in
+ * `dotSemanticApproveToNotifyExceptionApplies`; the marker alone never lowers anything.
+ */
+export const DOT_SEMANTIC_APPROVE_TO_NOTIFY_EXCEPTION = 'semantic_approve_to_notify' as const;
+
+/**
  * May lower the LEARNED floor only. dot-dispatch clamps the result so it is
  * never below the policy gate's own decision or the charter default — except
- * the one {@link DOT_L4_NOTIFY_TO_AUTO_EXCEPTION}, which dispatch re-verifies.
- * Relaxers are consulted when a learned floor exists or the gate says notify.
+ * the named {@link DOT_L4_NOTIFY_TO_AUTO_EXCEPTION} and
+ * {@link DOT_SEMANTIC_APPROVE_TO_NOTIFY_EXCEPTION}, which dispatch re-verifies.
+ * Relaxers are consulted when a learned floor exists or the gate says notify/approve.
  */
 export interface DotDecisionRelaxer {
   id: string;
@@ -82,7 +92,8 @@ export interface DotDecisionRelaxer {
     | {
         decision: DotDecisionLevel;
         reason: string;
-        exception?: typeof DOT_L4_NOTIFY_TO_AUTO_EXCEPTION;
+        exception?:
+          typeof DOT_L4_NOTIFY_TO_AUTO_EXCEPTION | typeof DOT_SEMANTIC_APPROVE_TO_NOTIFY_EXCEPTION;
       }
     | undefined;
 }

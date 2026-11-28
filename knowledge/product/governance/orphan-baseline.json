@@ -40,10 +40,6 @@
       "reason": "Documented extension point: docs/developer/EXTENSION_POINTS.md §2.4 (Skill Format, Beta) declares the runSkill(name, fn) / runAsyncSkill(name, fn) signatures as the contract for external skills, published as @agent/core/skill-wrapper and via the barrel. No in-repo caller imports it; core.test.ts covers it."
     },
     {
-      "id": "libs/core/reasoning/judgment-callsite-eval.ts",
-      "reason": "Per-call-site calibration harness (evaluateCallSite / recommendRequireCalibrated), published as @agent/core/judgment-callsite-eval. Run by hand: its caller is the measurement script active/missions/public/JUDGMENT-SEAM-20260921/evidence/eval_callsites.ts (gitignored mission evidence), and the requireCalibrated settings in browser/browser-judgment.ts and knowledge/knowledge-relevance-judgment.ts cite its recommendation. No committed module imports it."
-    },
-    {
       "id": "libs/core/secret/secret-guard-entry.ts",
       "reason": "Public subpath @agent/core/secret-guard, listed in docs/PACKAGING_CONTRACT.md (\"Contracts and policy helpers\") and libs/core/package.json exports: registers the risky-op approval handler before re-exporting secret-guard. In-repo callers import @agent/core/secret/secret-guard directly; this entry serves package-name consumers."
     },

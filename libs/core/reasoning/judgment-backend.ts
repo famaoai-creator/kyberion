@@ -48,6 +48,7 @@ import {
   type SeamProviderMetadata,
 } from '../seam.js';
 import { checkProviderEgress, type ProviderEgressLabel } from '../provider/provider-egress-gate.js';
+import { isProviderDemoted } from '../provider/provider-health-view.js';
 import { pathResolver } from '../path-resolver.js';
 import { readJsonIfPresent } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
@@ -134,6 +135,8 @@ export interface JudgmentRequest {
   tier: TierLevel;
   /** Optional tenant upper bound; can only narrow the allowed provider set. */
   tenantSlug?: string;
+  /** Optional cancellation signal propagated to providers on timeout or abort. */
+  signal?: AbortSignal;
 }
 
 export interface JudgmentAnswer {
@@ -311,34 +314,28 @@ export interface JudgmentSelection {
  * with a reason when nothing else qualifies. The saved default never bypasses
  * the image / question / egress filters below.
  */
-export function selectJudgmentBackend(request: JudgmentRequest): JudgmentSelection {
-  const builtin = judgmentSeam.getOptional(BUILTIN_JUDGMENT_PROVIDER);
+function orderedNonFloorCandidates(): JudgmentBackend[] {
   const saved = savedSeamDefaultFor(JUDGMENT_BACKEND_SEAM)?.provider;
   const registered = judgmentSeam
     .list()
     .map((entry) => entry.implementation)
     .filter((backend) => backend.judgment_id !== BUILTIN_JUDGMENT_PROVIDER);
-  const candidates = saved
+  return saved
     ? [
         ...registered.filter((backend) => backend.judgment_id === saved),
         ...registered.filter((backend) => backend.judgment_id !== saved),
       ]
     : registered;
+}
 
+function listEligibleNonFloorBackends(request: JudgmentRequest): {
+  eligible: JudgmentBackend[];
+  rejected: string[];
+} {
   const needsImage = stateHasImage(request.state);
-  if (
-    saved === BUILTIN_JUDGMENT_PROVIDER &&
-    builtin &&
-    (!needsImage || builtin.acceptsImages) &&
-    request.questions.every((question) => builtin.supports(question))
-  ) {
-    return {
-      backend: builtin,
-      reason: `selected '${BUILTIN_JUDGMENT_PROVIDER}' (saved seam default) for tier=${request.tier}`,
-    };
-  }
+  const eligible: JudgmentBackend[] = [];
   const rejected: string[] = [];
-  for (const backend of candidates) {
+  for (const backend of orderedNonFloorCandidates()) {
     if (needsImage && !backend.acceptsImages) {
       rejected.push(`${backend.judgment_id}: cannot see images`);
       continue;
@@ -357,6 +354,33 @@ export function selectJudgmentBackend(request: JudgmentRequest): JudgmentSelecti
       rejected.push(`${backend.judgment_id}: ${egress.reason || 'egress denied'}`);
       continue;
     }
+    if (isProviderDemoted(backend.judgment_id)) {
+      rejected.push(`${backend.judgment_id}: temporarily demoted`);
+      continue;
+    }
+    eligible.push(backend);
+  }
+  return { eligible, rejected };
+}
+
+export function selectJudgmentBackend(request: JudgmentRequest): JudgmentSelection {
+  const builtin = judgmentSeam.getOptional(BUILTIN_JUDGMENT_PROVIDER);
+  const saved = savedSeamDefaultFor(JUDGMENT_BACKEND_SEAM)?.provider;
+  const needsImage = stateHasImage(request.state);
+  if (
+    saved === BUILTIN_JUDGMENT_PROVIDER &&
+    builtin &&
+    (!needsImage || builtin.acceptsImages) &&
+    request.questions.every((question) => builtin.supports(question))
+  ) {
+    return {
+      backend: builtin,
+      reason: `selected '${BUILTIN_JUDGMENT_PROVIDER}' (saved seam default) for tier=${request.tier}`,
+    };
+  }
+  const { eligible, rejected } = listEligibleNonFloorBackends(request);
+  if (eligible.length > 0) {
+    const backend = eligible[0];
     return {
       backend,
       reason: `selected '${backend.judgment_id}' (${backend.egress}) for tier=${request.tier}`,
@@ -423,22 +447,57 @@ export async function judge(request: JudgmentRequest): Promise<JudgmentResult> {
   try {
     answers = validateJudgmentAnswers(await backend.judge(request), request.questions);
   } catch (error: unknown) {
-    const builtin = judgmentSeam.getOptional(BUILTIN_JUDGMENT_PROVIDER);
-    if (!builtin || backend.judgment_id === BUILTIN_JUDGMENT_PROVIDER) throw error;
-    // Same rule as selection, and it has to be repeated here because this is
-    // a second way to reach the floor. Degrading to a provider that cannot
-    // answer the question produces an answer to a different question — the
-    // rules replied to 'test.category' with an organization work shape —
-    // which is worse than the failure being degraded from.
-    if (request.questions.some((question) => !builtin.supports(question))) throw error;
-    if (stateHasImage(request.state) && !builtin.acceptsImages) throw error;
+    if (request.signal?.aborted) throw error;
     const message = error instanceof Error ? error.message : String(error);
-    logger.warn(
-      `[judgment-backend] provider '${backend.judgment_id}' failed; degrading to '${BUILTIN_JUDGMENT_PROVIDER}': ${message}`
-    );
-    reason = `${reason}; then '${backend.judgment_id}' failed (${message}) and degraded to '${BUILTIN_JUDGMENT_PROVIDER}'`;
-    backend = builtin;
-    answers = validateJudgmentAnswers(await builtin.judge(request), request.questions);
+    let lastError: unknown = error;
+    let resolved = false;
+
+    if (backend.judgment_id !== BUILTIN_JUDGMENT_PROVIDER) {
+      const remaining = listEligibleNonFloorBackends(request).eligible.filter(
+        (candidate) => candidate.judgment_id !== backend.judgment_id
+      );
+      for (const fallbackBackend of remaining) {
+        if (request.signal?.aborted) throw lastError;
+        const failedId = backend.judgment_id;
+        const failMessage = lastError instanceof Error ? lastError.message : String(lastError);
+        logger.warn(
+          `[judgment-backend] provider '${failedId}' failed; failing over to '${fallbackBackend.judgment_id}': ${failMessage}`
+        );
+        try {
+          answers = validateJudgmentAnswers(
+            await fallbackBackend.judge(request),
+            request.questions
+          );
+          reason = `${reason}; then '${failedId}' failed (${failMessage}) and failed over to '${fallbackBackend.judgment_id}'`;
+          backend = fallbackBackend;
+          resolved = true;
+          break;
+        } catch (nextErr: unknown) {
+          if (request.signal?.aborted) throw nextErr;
+          lastError = nextErr;
+          backend = fallbackBackend;
+        }
+      }
+    }
+
+    if (!resolved) {
+      const builtin = judgmentSeam.getOptional(BUILTIN_JUDGMENT_PROVIDER);
+      if (!builtin || backend.judgment_id === BUILTIN_JUDGMENT_PROVIDER) throw lastError;
+      // Same rule as selection, and it has to be repeated here because this is
+      // a second way to reach the floor. Degrading to a provider that cannot
+      // answer the question produces an answer to a different question — the
+      // rules replied to 'test.category' with an organization work shape —
+      // which is worse than the failure being degraded from.
+      if (request.questions.some((question) => !builtin.supports(question))) throw lastError;
+      if (stateHasImage(request.state) && !builtin.acceptsImages) throw lastError;
+      const finalMsg = lastError instanceof Error ? lastError.message : String(lastError);
+      logger.warn(
+        `[judgment-backend] provider '${backend.judgment_id}' failed; degrading to '${BUILTIN_JUDGMENT_PROVIDER}': ${finalMsg}`
+      );
+      reason = `${reason}; then '${backend.judgment_id}' failed (${finalMsg || message}) and degraded to '${BUILTIN_JUDGMENT_PROVIDER}'`;
+      backend = builtin;
+      answers = validateJudgmentAnswers(await builtin.judge(request), request.questions);
+    }
   }
 
   const providerId = backend.judgment_id;

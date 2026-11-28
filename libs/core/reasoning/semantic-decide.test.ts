@@ -1,5 +1,25 @@
-import { describe, expect, it } from 'vitest';
-import { decideFromObservation } from './semantic-decide.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  decideFromObservation,
+  executeLlmDecideOp,
+  SEMANTIC_DECIDE_QUESTION,
+} from './semantic-decide.js';
+import { registerJudgmentBackend, resetJudgmentBackends } from './judgment-backend.js';
+import { registerOrganizationWorkJudgment } from '../organization/organization-operating-model-persistence.js';
+
+const mockPrompt = vi.fn(async () =>
+  JSON.stringify({ decision: 'abort', reason: 'reasoning fallback' })
+);
+vi.mock('./reasoning-backend.js', () => ({
+  getReasoningBackend: () => ({
+    prompt: mockPrompt,
+  }),
+}));
+
+afterEach(() => {
+  resetJudgmentBackends();
+  mockPrompt.mockClear();
+});
 
 // AR-07: in-loop decisions prefer selection over generation; anything the
 // model says outside the offered options is rejected and callers fall back.
@@ -123,5 +143,113 @@ describe('semantic-decide degradation registry (LC-09)', () => {
 
     resetSemanticDecideDegradations();
     expect(getSemanticDecideDegradations()).toHaveLength(0);
+  });
+
+  it('routes selection mode through local-only judgment-backend at default confidential tier and enforces tier egress for external-api providers', async () => {
+    registerOrganizationWorkJudgment();
+    const localJudge = vi.fn(async () => [
+      {
+        id: SEMANTIC_DECIDE_QUESTION,
+        value: '#submit-btn',
+        confidence: 0.92,
+        calibrated: false,
+      },
+    ]);
+    registerJudgmentBackend({
+      judgment_id: 'laya-mlx',
+      egress: 'local-only',
+      supports: (q) => q.kind === 'choice',
+      judge: localJudge,
+    });
+
+    const localHit = await decideFromObservation({
+      goal: 'Pick the submit button selector',
+      observation: '<button id="submit-btn">Save</button>',
+      options: ['#cancel-btn', '#submit-btn'],
+    });
+    expect(localJudge).toHaveBeenCalledTimes(1);
+    expect(localHit).toMatchObject({
+      decision: '#submit-btn',
+      source: 'judgment',
+      provider_id: 'laya-mlx',
+      confidence: 0.92,
+    });
+
+    resetJudgmentBackends();
+    registerOrganizationWorkJudgment();
+    const externalJudge = vi.fn(async () => [
+      {
+        id: SEMANTIC_DECIDE_QUESTION,
+        value: 'retry',
+        confidence: 0.96,
+        calibrated: false,
+      },
+    ]);
+    registerJudgmentBackend({
+      judgment_id: 'gemini-decision',
+      egress: 'external-api',
+      supports: (q) => q.kind === 'choice',
+      judge: externalJudge,
+    });
+
+    // External API is allowed on public tier
+    const publicHit = await decideFromObservation({
+      goal: 'Choose next action',
+      observation: 'Transient HTTP 503',
+      options: ['retry', 'abort'],
+      tier: 'public',
+    });
+    expect(externalJudge).toHaveBeenCalledTimes(1);
+    expect(publicHit).toMatchObject({
+      decision: 'retry',
+      source: 'judgment',
+      provider_id: 'gemini-decision',
+      confidence: 0.96,
+    });
+
+    // External API is blocked on personal tier (never called, falls back to reasoning)
+    const personalFallback = await decideFromObservation({
+      goal: 'Choose next action',
+      observation: 'Personal memo',
+      options: ['retry', 'abort'],
+      tier: 'personal',
+    });
+    expect(externalJudge).toHaveBeenCalledTimes(1);
+    expect(mockPrompt).toHaveBeenCalledTimes(1);
+    expect(personalFallback).toMatchObject({ decision: 'abort' });
+    expect(personalFallback?.source).not.toBe('judgment');
+  });
+
+  it('deduplicates repeated options and exports _source in executeLlmDecideOp', async () => {
+    const dedup = await decideFromObservation({
+      goal: 'Pick one',
+      observation: 'obs',
+      options: ['retry', 'retry'],
+    });
+    expect(dedup).toEqual({ decision: 'retry', reason: 'only candidate' });
+    expect(mockPrompt).not.toHaveBeenCalled();
+
+    registerOrganizationWorkJudgment();
+    registerJudgmentBackend({
+      judgment_id: 'laya-mlx',
+      egress: 'local-only',
+      supports: (q) => q.kind === 'choice',
+      judge: async () => [
+        { id: SEMANTIC_DECIDE_QUESTION, value: 'retry', confidence: 0.9, calibrated: false },
+      ],
+    });
+    const out = await executeLlmDecideOp({
+      params: {
+        goal: 'Choose action',
+        options: ['retry', 'abort'],
+        export_as: 'next_step',
+      },
+      ctx: { obs: 'HTTP 503' },
+      resolve: (v) => v,
+      defaultFromKey: 'obs',
+    });
+    expect(out.next_step).toMatchObject({ decision: 'retry', source: 'judgment' });
+    expect(out.next_step_source).toBe('judgment');
+    expect(out.next_step_degraded).toBeNull();
   });
 });
