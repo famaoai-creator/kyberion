@@ -1134,22 +1134,26 @@ async function runSummaryPhase(state: OnboardingState, print: Print): Promise<vo
   const handoffSteps = [
     t(
       `Run \`${handoff.baseline_command}\` and follow its next step. Continue when it reports all_clear.`,
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       `\`${handoff.baseline_command}\` を実行し、次の手順に従ってください。all_clear になったら先へ進めます。`
     ),
     ...(handoff.tenant_activation_guide
       ? [
           t(
             `Review tenant activation before tenant work: \`${handoff.tenant_activation_guide}\`.`,
+            // i18n-exempt: bilingual prompt pair (JA side intentional)
             `テナントで作業を始める前に有効化の手順を確認してください。\`${handoff.tenant_activation_guide}\``
           ),
         ]
       : []),
     t(
       `Check readiness and get the next Concierge action: \`${handoff.readiness_command}\`.`,
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       `準備状況と Concierge での次の操作を確認してください。\`${handoff.readiness_command}\``
     ),
     t(
       `For ongoing lifecycle management: \`${handoff.lifecycle_command}\`.`,
+      // i18n-exempt: bilingual prompt pair (JA side intentional)
       `運用中の変更・停止・再開の手順を確認できます。\`${handoff.lifecycle_command}\``
     ),
   ];
@@ -1202,6 +1206,7 @@ async function runSummaryPhase(state: OnboardingState, print: Print): Promise<vo
       ? [
           t(
             `Review the tenant draft in \`${path.join(profileRoot(), 'tenants')}/\`.`,
+            // i18n-exempt: bilingual prompt pair (JA side intentional)
             `\`${path.join(profileRoot(), 'tenants')}/\` のテナントドラフトを確認してください。`
           ),
         ]

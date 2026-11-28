@@ -125,10 +125,13 @@ const liveDefinitionPrefix =
   /^what (?:is|are)\b.*\b(?:status|state|progress|current|latest|pending|my|our)\b/iu;
 
 const conversationChoices = [
+  // i18n-exempt: explicit English and Japanese choice text
   { domain: 'conversation', ja: 'Kyberion 本体と話す', en: 'Talk with Kyberion' },
+  // i18n-exempt: explicit English and Japanese choice text
   { domain: 'channel', ja: 'チームのチャットで話す', en: 'Use a team chat' },
   {
     domain: 'coordination',
+    // i18n-exempt: explicit English and Japanese choice text
     ja: '別のエージェントや Kyberion と連携する',
     en: 'Coordinate with another agent or Kyberion runtime',
   },
@@ -149,6 +152,7 @@ export function resolveSetupAskGuidance(text: string) {
   const japanese = /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(question);
   const clarification = conversationAmbiguous
     ? {
+        // i18n-exempt: explicit English and Japanese choice text
         question: japanese ? '誰と会話したいですか？' : 'Who do you want to talk with?',
         choices: conversationChoices.map((choice) => ({
           domain: choice.domain,
