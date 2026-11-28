@@ -11,13 +11,10 @@
 
 import * as path from 'node:path';
 import { z } from 'zod';
+import { readJson, writeJson, writeJsonLines } from '@agent/core/foundation/json';
 import { pathResolver } from '@agent/core/path-resolver';
-import {
-  assertSafeRepositoryPath,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { cliOptionValue, hasCliFlag, hasHelpFlag } from '../lib/cli/cli-guard.js';
 import { recordExecutionFeedback } from '@agent/core/execution-feedback';
 import {
   buildJudgmentModelInput,
@@ -180,8 +177,7 @@ export interface RunSemanticJudgmentEvalOptions {
 
 function loadDataset(datasetPath = pathResolver.rootResolve(T14_DATASET_PATH)): Dataset {
   const safePath = assertSafeRepositoryPath(datasetPath);
-  const raw = String(safeReadFile(safePath, { encoding: 'utf8' }));
-  return datasetSchema.parse(JSON.parse(raw));
+  return datasetSchema.parse(readJson<unknown>(safePath));
 }
 
 function setupLiveCase(
@@ -735,11 +731,6 @@ export function formatSemanticJudgmentEvalMarkdown(
   return lines.join('\n');
 }
 
-function readArgValue(argv: readonly string[], flag: string): string | undefined {
-  const idx = argv.indexOf(flag);
-  return idx >= 0 && idx + 1 < argv.length ? argv[idx + 1] : undefined;
-}
-
 export interface OpenAiEvalsBundleResult {
   datasetPath: string;
   configPath: string;
@@ -768,7 +759,7 @@ export async function exportOpenAiEvalsBundle(options: {
     allowMissingLeaf: true,
   });
 
-  const jsonlLines: string[] = [];
+  const jsonlItems: Array<Record<string, unknown>> = [];
   for (const row of positiveCases) {
     let capturedPrompt = '';
     const capturePort: LiveJudgmentInvokePort = {
@@ -801,18 +792,16 @@ export async function exportOpenAiEvalsBundle(options: {
     if (!capturedPrompt) {
       throw new Error(`Failed to capture framed prompt for positive case ${row.id}`);
     }
-    jsonlLines.push(
-      JSON.stringify({
-        item: {
-          id: row.id,
-          language: row.language,
-          paraphrase_group: row.paraphrase_group,
-          operation: row.operation,
-          expected_disposition: row.author_expected,
-          prompt: capturedPrompt,
-        },
-      })
-    );
+    jsonlItems.push({
+      item: {
+        id: row.id,
+        language: row.language,
+        paraphrase_group: row.paraphrase_group,
+        operation: row.operation,
+        expected_disposition: row.author_expected,
+        prompt: capturedPrompt,
+      },
+    });
   }
 
   const evalConfig = {
@@ -821,7 +810,7 @@ export async function exportOpenAiEvalsBundle(options: {
       dataset_version: dataset.dataset_version,
       rubric_version: dataset.rubric_version,
       prompt_version: dataset.prompt_version,
-      case_count: jsonlLines.length,
+      case_count: jsonlItems.length,
     },
     data_source_config: {
       type: 'custom',
@@ -881,9 +870,9 @@ export async function exportOpenAiEvalsBundle(options: {
   };
 
   safeMkdir(resolvedDir, { recursive: true });
-  safeWriteFile(datasetPath, `${jsonlLines.join('\n')}\n`);
-  safeWriteFile(configPath, `${JSON.stringify(evalConfig, null, 2)}\n`);
-  return { datasetPath, configPath, caseCount: jsonlLines.length };
+  writeJsonLines(datasetPath, jsonlItems);
+  writeJson(configPath, evalConfig);
+  return { datasetPath, configPath, caseCount: jsonlItems.length };
 }
 
 const USAGE_TEXT = [
@@ -908,13 +897,13 @@ export async function main(
   argv: string[] = [],
   print: (line: string) => void = (line) => process.stdout.write(`${line}\n`)
 ): Promise<number> {
-  if (argv.includes('--help') || argv.includes('-h')) {
+  if (hasHelpFlag(argv)) {
     print(USAGE_TEXT);
     return 0;
   }
-  const model = readArgValue(argv, '--model');
-  const exportDir = readArgValue(argv, '--export-openai-evals');
-  const json = argv.includes('--json');
+  const model = cliOptionValue(argv, '--model');
+  const exportDir = cliOptionValue(argv, '--export-openai-evals');
+  const json = hasCliFlag(argv, '--json');
   if (exportDir) {
     const bundle = await exportOpenAiEvalsBundle({
       outputDir: exportDir,
@@ -928,7 +917,7 @@ export async function main(
     return 0;
   }
 
-  const preferredRaw = readArgValue(argv, '--provider') ?? 'auto';
+  const preferredRaw = cliOptionValue(argv, '--provider') ?? 'auto';
   if (
     ![
       'auto',
@@ -944,7 +933,7 @@ export async function main(
   ) {
     throw new ScriptExitError(2, `Unsupported --provider: ${preferredRaw}`);
   }
-  const hybridFallbackRaw = readArgValue(argv, '--hybrid-fallback');
+  const hybridFallbackRaw = cliOptionValue(argv, '--hybrid-fallback');
   if (
     hybridFallbackRaw !== undefined &&
     !['anthropic', 'openai', 'openai-decision', 'gemini', 'gemini-decision', 'local'].includes(
@@ -953,7 +942,7 @@ export async function main(
   ) {
     throw new ScriptExitError(2, `Unsupported --hybrid-fallback: ${hybridFallbackRaw}`);
   }
-  const hybridMinConfidenceRaw = readArgValue(argv, '--hybrid-min-confidence');
+  const hybridMinConfidenceRaw = cliOptionValue(argv, '--hybrid-min-confidence');
   let hybridMinConfidence: number | undefined;
   if (hybridMinConfidenceRaw !== undefined) {
     hybridMinConfidence = Number(hybridMinConfidenceRaw);
@@ -965,19 +954,17 @@ export async function main(
       throw new ScriptExitError(2, `Invalid --hybrid-min-confidence: ${hybridMinConfidenceRaw}`);
     }
   }
-  const limitRaw = readArgValue(argv, '--limit');
+  const limitRaw = cliOptionValue(argv, '--limit');
   const limit = limitRaw ? Number(limitRaw) : undefined;
-  const outputPath = readArgValue(argv, '--output');
-  const comparePath = readArgValue(argv, '--compare');
-  const onlyPositive = argv.includes('--only-positive');
-  const recordFeedback = argv.includes('--record-feedback');
+  const outputPath = cliOptionValue(argv, '--output');
+  const comparePath = cliOptionValue(argv, '--compare');
+  const onlyPositive = hasCliFlag(argv, '--only-positive');
+  const recordFeedback = hasCliFlag(argv, '--record-feedback');
 
   let baselineReport: SemanticJudgmentEvalReport | undefined;
   if (comparePath) {
     const safeBaseline = assertSafeRepositoryPath(pathResolver.rootResolve(comparePath));
-    baselineReport = JSON.parse(
-      String(safeReadFile(safeBaseline, { encoding: 'utf8' }))
-    ) as SemanticJudgmentEvalReport;
+    baselineReport = readJson<SemanticJudgmentEvalReport>(safeBaseline);
   }
 
   const port = resolveLiveJudgmentInvokePort({
@@ -1017,15 +1004,19 @@ export async function main(
     const comparison = baselineReport
       ? compareSemanticJudgmentEvalReports(report, baselineReport)
       : undefined;
-    const formatted = json
-      ? JSON.stringify(comparison ? { ...report, comparison } : report, null, 2)
-      : formatSemanticJudgmentEvalMarkdown(report, comparison);
+    const payload = comparison ? { ...report, comparison } : report;
+    const markdown = formatSemanticJudgmentEvalMarkdown(report, comparison);
+    const formatted = json ? JSON.stringify(payload, null, 2) : markdown;
     if (outputPath) {
       const resolved = assertSafeRepositoryPath(pathResolver.rootResolve(outputPath), {
         allowMissingLeaf: true,
       });
       safeMkdir(path.dirname(resolved), { recursive: true });
-      safeWriteFile(resolved, formatted + '\n');
+      if (json) {
+        writeJson(resolved, payload);
+      } else {
+        safeWriteFile(resolved, markdown + '\n');
+      }
     }
     print(formatted);
     return 0;

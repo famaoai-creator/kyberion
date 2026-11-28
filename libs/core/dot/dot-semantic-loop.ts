@@ -15,9 +15,10 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
+import { safeMkdir } from '../secure-io.js';
 import { withLockSync } from '../foundation/lock-utils.js';
-import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { appendJsonLine, writeJsonLines } from '../foundation/json.js';
+import { readJsonLinesBackward, streamJsonLines } from '../storage/jsonl-read.js';
 import { VETO_WINDOW_DECIDER } from '../governance/approval-veto-window.js';
 import type { AutonomousOpsGateResult } from '../governance/autonomous-ops-gate.js';
 import type { ExecutionFeedbackOutcome } from '../knowledge/execution-feedback.js';
@@ -166,12 +167,17 @@ function appendScopedRow(c: DotCharter, file: string, row: unknown, rootDir?: st
   withLockSync(lockKey, () => {
     safeMkdir(path.dirname(target), { recursive: true });
     appendJsonLine(target, row);
-    const lines = String(safeReadFile(target, { encoding: 'utf8' }))
-      .split('\n')
-      .filter((line) => line.trim().length > 0);
-    if (lines.length > DOT_SEMANTIC_LEDGER_MAX_ROWS + COMPACT_HEADROOM) {
-      const compacted = lines.slice(-DOT_SEMANTIC_LEDGER_MAX_ROWS).join('\n') + '\n';
-      safeWriteFile(target, compacted);
+    const keepReversed: unknown[] = [];
+    let exceeded = false;
+    for (const entry of readJsonLinesBackward<unknown>(target, { onMalformed: 'skip' })) {
+      keepReversed.push(entry);
+      if (keepReversed.length > DOT_SEMANTIC_LEDGER_MAX_ROWS + COMPACT_HEADROOM) {
+        exceeded = true;
+        break;
+      }
+    }
+    if (exceeded) {
+      writeJsonLines(target, keepReversed.slice(0, DOT_SEMANTIC_LEDGER_MAX_ROWS).reverse());
     }
   });
 }
@@ -195,20 +201,24 @@ export function readDotSemanticJudgmentLedger(
   c: DotCharter,
   deps: Pick<DotSemanticLoopDeps, 'rootDir'> = {}
 ): DotSemanticJudgmentRecord[] {
-  return readJsonLines<DotSemanticJudgmentRecord>(
-    ledgerAbs(c, DOT_SEMANTIC_JUDGMENT_LEDGER_FILE, deps.rootDir),
-    { onMalformed: 'skip' }
-  ).filter((row) => row?.dot_id === c.dot_id && typeof row.action_id === 'string');
+  return [
+    ...streamJsonLines<DotSemanticJudgmentRecord>(
+      ledgerAbs(c, DOT_SEMANTIC_JUDGMENT_LEDGER_FILE, deps.rootDir),
+      { onMalformed: 'skip' }
+    ),
+  ].filter((row) => row?.dot_id === c.dot_id && typeof row.action_id === 'string');
 }
 
 export function readDotSemanticReconciliations(
   c: DotCharter,
   deps: Pick<DotSemanticLoopDeps, 'rootDir'> = {}
 ): DotSemanticReconciliationRow[] {
-  return readJsonLines<DotSemanticReconciliationRow>(
-    ledgerAbs(c, DOT_SEMANTIC_RECONCILIATION_FILE, deps.rootDir),
-    { onMalformed: 'skip' }
-  ).filter((row) => row?.dot_id === c.dot_id && typeof row.action_ref === 'string');
+  return [
+    ...streamJsonLines<DotSemanticReconciliationRow>(
+      ledgerAbs(c, DOT_SEMANTIC_RECONCILIATION_FILE, deps.rootDir),
+      { onMalformed: 'skip' }
+    ),
+  ].filter((row) => row?.dot_id === c.dot_id && typeof row.action_ref === 'string');
 }
 
 function knownUsageFrom(usage: SemanticJudgmentUsage): DotSemanticKnownUsage | null {
@@ -553,9 +563,11 @@ export async function reconcileDotSemanticFeedback(
     readDotSemanticReconciliations(charter, deps).map((row) => [row.action_ref, row])
   );
   const outcomes = new Map<string, DotOutcomeRow>(
-    readJsonLines<DotOutcomeRow>(ledgerAbs(charter, DOT_OUTCOMES_FILE, deps.rootDir), {
-      onMalformed: 'skip',
-    })
+    [
+      ...streamJsonLines<DotOutcomeRow>(ledgerAbs(charter, DOT_OUTCOMES_FILE, deps.rootDir), {
+        onMalformed: 'skip',
+      }),
+    ]
       .filter((row) => row?.dot_id === charter.dot_id && typeof row.action_ref === 'string')
       .map((row) => [row.action_ref, row])
   );
@@ -700,10 +712,11 @@ export function dotSemanticJudgmentMetrics(
   const ledger = readDotSemanticJudgmentLedger(charter, deps);
   const reconciled = latestReconciliationsByRef(readDotSemanticReconciliations(charter, deps));
   const feedback = readDotFeedback(charter.dot_id, deps);
-  const outcomes = readJsonLines<DotOutcomeRow>(
-    ledgerAbs(charter, DOT_OUTCOMES_FILE, deps.rootDir),
-    { onMalformed: 'skip' }
-  ).filter((row) => row?.dot_id === charter.dot_id && typeof row.verdict === 'string');
+  const outcomes = [
+    ...streamJsonLines<DotOutcomeRow>(ledgerAbs(charter, DOT_OUTCOMES_FILE, deps.rootDir), {
+      onMalformed: 'skip',
+    }),
+  ].filter((row) => row?.dot_id === charter.dot_id && typeof row.verdict === 'string');
 
   const evaluated = ledger.filter((row) => row.status === 'evaluated').length;
   const unavailable = ledger.length - evaluated;

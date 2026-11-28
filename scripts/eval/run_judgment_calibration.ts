@@ -13,6 +13,7 @@
 
 import * as path from 'node:path';
 import { z } from 'zod';
+import { readJson, writeJson } from '@agent/core/foundation/json';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -21,6 +22,7 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
+import { cliOptionValue, hasCliFlag, hasHelpFlag } from '../lib/cli/cli-guard.js';
 import {
   BUILTIN_JUDGMENT_PROVIDER,
   ensureJudgmentBackendsRegistered,
@@ -430,16 +432,8 @@ export async function runJudgmentCalibration(
   };
 }
 
-function readArgValue(argv: readonly string[], flag: string): string | undefined {
-  const index = argv.indexOf(flag);
-  if (index === -1) return undefined;
-  const next = argv[index + 1];
-  if (next === undefined || next.startsWith('--')) return undefined;
-  return next;
-}
-
 function parsePositiveIntFlag(argv: readonly string[], flag: string): number | undefined {
-  const raw = readArgValue(argv, flag);
+  const raw = cliOptionValue(argv, flag);
   if (raw === undefined) return undefined;
   const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed < 1) {
@@ -449,7 +443,7 @@ function parsePositiveIntFlag(argv: readonly string[], flag: string): number | u
 }
 
 function parseMaxEceFlag(argv: readonly string[]): number | undefined {
-  const raw = readArgValue(argv, '--max-ece');
+  const raw = cliOptionValue(argv, '--max-ece');
   if (raw === undefined) return undefined;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 1) {
@@ -517,12 +511,12 @@ export async function main(
   print: (line: string) => void = (line) => process.stdout.write(`${line}\n`),
   options: { preserveRegisteredBackends?: boolean; calibrationFilePath?: string } = {}
 ): Promise<number> {
-  if (argv.includes('--help') || argv.includes('-h')) {
+  if (hasHelpFlag(argv)) {
     print(usageText());
     return 0;
   }
 
-  const provider = readArgValue(argv, '--provider');
+  const provider = cliOptionValue(argv, '--provider');
   const knownProviders = [...listOptionalJudgmentProviders(), BUILTIN_JUDGMENT_PROVIDER];
   if (!provider) {
     throw new ScriptExitError(
@@ -537,7 +531,7 @@ export async function main(
     );
   }
 
-  const suiteRaw = (readArgValue(argv, '--suite') ??
+  const suiteRaw = (cliOptionValue(argv, '--suite') ??
     'semantic_decide') as BuiltInCalibrationSuiteName;
   if (!VALID_SUITES.includes(suiteRaw)) {
     throw new ScriptExitError(
@@ -546,7 +540,7 @@ export async function main(
     );
   }
 
-  const tierRaw = readArgValue(argv, '--tier') ?? 'public';
+  const tierRaw = cliOptionValue(argv, '--tier') ?? 'public';
   if (tierRaw !== 'public' && tierRaw !== 'confidential' && tierRaw !== 'personal') {
     throw new ScriptExitError(
       2,
@@ -558,15 +552,14 @@ export async function main(
   const minSamples = parsePositiveIntFlag(argv, '--min-samples');
   const minPerBin = parsePositiveIntFlag(argv, '--min-per-bin');
   const maxEce = parseMaxEceFlag(argv);
-  const routingLedgerPath = readArgValue(argv, '--routing-ledger');
-  const outputPath = readArgValue(argv, '--output');
-  const casesPath = readArgValue(argv, '--cases');
+  const routingLedgerPath = cliOptionValue(argv, '--routing-ledger');
+  const outputPath = cliOptionValue(argv, '--output');
+  const casesPath = cliOptionValue(argv, '--cases');
 
   let customSpec: CalibrationSuiteSpec | undefined;
   if (casesPath) {
     const safePath = assertSafeRepositoryPath(pathResolver.rootResolve(casesPath));
-    const raw = JSON.parse(String(safeReadFile(safePath, { encoding: 'utf8' })));
-    const parsed = customCasesSchema.parse(raw);
+    const parsed = customCasesSchema.parse(readJson<unknown>(safePath));
     const questionObj: JudgmentQuestion = {
       kind: 'choice',
       id: parsed.question.id ?? parsed.questionId,
@@ -597,27 +590,31 @@ export async function main(
     routingLedgerPath,
     customSpec,
     tier: tierRaw,
-    tenantSlug: readArgValue(argv, '--tenant'),
+    tenantSlug: cliOptionValue(argv, '--tenant'),
     repeats,
     minSamples,
     minPerBin,
     maxEce,
-    requireDeterministic: !argv.includes('--no-require-deterministic'),
-    apply: argv.includes('--apply'),
+    requireDeterministic: !hasCliFlag(argv, '--no-require-deterministic'),
+    apply: hasCliFlag(argv, '--apply'),
     skipBootstrap: options.preserveRegisteredBackends,
     ...(options.calibrationFilePath ? { calibrationFilePath: options.calibrationFilePath } : {}),
   });
 
-  const formatted = argv.includes('--json')
-    ? JSON.stringify(result, null, 2)
-    : formatSummaryText(result);
+  const isJson = hasCliFlag(argv, '--json');
+  const summaryText = formatSummaryText(result);
+  const formatted = isJson ? JSON.stringify(result, null, 2) : summaryText;
 
   if (outputPath) {
     const resolved = assertSafeRepositoryPath(pathResolver.rootResolve(outputPath), {
       allowMissingLeaf: true,
     });
     safeMkdir(path.dirname(resolved), { recursive: true });
-    safeWriteFile(resolved, formatted + '\n');
+    if (isJson) {
+      writeJson(resolved, result);
+    } else {
+      safeWriteFile(resolved, summaryText + '\n');
+    }
   }
   print(formatted);
   return 0;

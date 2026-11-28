@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   registerJudgmentBackend,
   resetJudgmentBackends,
@@ -13,7 +14,7 @@ import {
 } from '@agent/core';
 import { main, mergeCalibrationEntry, runJudgmentCalibration } from './run_judgment_calibration.js';
 
-const TMP_DIR = path.join(process.cwd(), 'active/shared/tmp/test-judgment-calibration');
+const TMP_DIR = pathResolver.rootResolve('active/shared/tmp/test-judgment-calibration');
 
 afterEach(() => {
   resetJudgmentBackends();

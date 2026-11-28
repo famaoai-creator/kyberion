@@ -86,29 +86,37 @@ function formatBoundedDecisionInput(state: JudgmentState): string {
   return frameUntrustedInput({ source: 'judgment state', data: bounded });
 }
 
+const DECISION_PROVIDER_CREDENTIALS: Record<
+  'gemini' | 'openai',
+  {
+    apiProvider: 'gemini-api' | 'openai';
+    envKeys: readonly string[];
+  }
+> = {
+  gemini: {
+    apiProvider: 'gemini-api',
+    envKeys: ['KYBERION_GEMINI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+  },
+  openai: {
+    apiProvider: 'openai',
+    envKeys: ['OPENAI_API_KEY'],
+  },
+};
+
 function createDecisionKeyAccessor(
   provider: 'gemini' | 'openai',
   options: DecisionApiJudgmentOptions
 ): { getKey(): string; invalidate(): void } {
+  const credentialSpec = DECISION_PROVIDER_CREDENTIALS[provider];
   let cachedManagedKey: string | undefined;
   return {
     getKey(): string {
       const explicit = options.apiKey?.trim();
       if (explicit) return explicit;
 
-      const envValue =
-        provider === 'gemini'
-          ? selectProviderCredential(
-              ['KYBERION_GEMINI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'],
-              getRegisteredEnvText('KYBERION_GEMINI_API_KEY')?.trim() ||
-                getRegisteredEnvText('GEMINI_API_KEY')?.trim() ||
-                getRegisteredEnvText('GOOGLE_API_KEY')?.trim() ||
-                ''
-            )
-          : selectProviderCredential(
-              ['OPENAI_API_KEY'],
-              getRegisteredEnvText('OPENAI_API_KEY')?.trim() || ''
-            );
+      const rawEnvValue =
+        credentialSpec.envKeys.map((key) => getRegisteredEnvText(key)?.trim()).find(Boolean) ?? '';
+      const envValue = selectProviderCredential([...credentialSpec.envKeys], rawEnvValue);
       if (envValue) return envValue;
 
       if (cachedManagedKey) return cachedManagedKey;
@@ -121,9 +129,10 @@ function createDecisionKeyAccessor(
 
       if (isVitestProcess()) return '';
       try {
-        const apiProvider = provider === 'gemini' ? 'gemini-api' : 'openai';
         const resolved =
-          withSecretResolutionSession(() => resolveReasoningApiKey(apiProvider))?.trim() ?? '';
+          withSecretResolutionSession(() =>
+            resolveReasoningApiKey(credentialSpec.apiProvider)
+          )?.trim() ?? '';
         if (resolved) cachedManagedKey = resolved;
         return resolved;
       } catch (error) {

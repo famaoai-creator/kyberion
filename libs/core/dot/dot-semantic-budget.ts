@@ -13,6 +13,7 @@ import { pathResolver } from '../path-resolver.js';
 import { safeMkdir } from '../secure-io.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { appendJsonLine, readJsonIfPresent, writeJson } from '../foundation/json.js';
+import { PARTITIONED_RUNTIME_STATE_ROOTS } from '../foundation/runtime-state-roots.js';
 import { evaluateBudgetThrottle, type OrgBudgetScope } from '../governance/org-budget-governor.js';
 import type { DotCharter } from './dot-charter.js';
 import {
@@ -26,7 +27,7 @@ import type { DotSemanticBudgetOwner, DotSemanticKnownUsage } from './dot-semant
 
 const logger = createLogger('dot-semantic-budget');
 
-export const DOT_SEMANTIC_BUDGET_STORE_PATH = 'active/shared/runtime/dot/semantic-budget.json';
+export const DOT_SEMANTIC_BUDGET_STORE_PATH = `${PARTITIONED_RUNTIME_STATE_ROOTS.dot}/semantic-budget.json`;
 const DEFAULT_SEMANTIC_DAILY_TOKEN_CAP = 100_000;
 const RESERVATION_TTL_MS = 10 * 60_000;
 

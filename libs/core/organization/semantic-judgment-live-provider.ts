@@ -583,7 +583,15 @@ export function resolveLiveJudgmentInvokePort(
     }
     if (isVitestProcess()) return '';
     try {
-      const apiProvider = provider === 'gemini' ? 'gemini-api' : provider;
+      const apiProviderByKey: Record<
+        'anthropic' | 'openai' | 'gemini',
+        'anthropic' | 'openai' | 'gemini-api'
+      > = {
+        anthropic: 'anthropic',
+        openai: 'openai',
+        gemini: 'gemini-api',
+      };
+      const apiProvider = apiProviderByKey[provider];
       return withSecretResolutionSession(() => resolveReasoningApiKey(apiProvider))?.trim() ?? '';
     } catch (error) {
       logger.debug(
