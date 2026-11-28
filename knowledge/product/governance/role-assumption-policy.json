@@ -42,7 +42,6 @@
       "personal_connections_store",
       "pipeline_journal_store",
       "pr_publication_store",
-      "reasoning_settings_writer",
       "run_manifest_gate_store",
       "scope_locale_reader",
       "secret_vault_store",

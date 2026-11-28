@@ -17,6 +17,13 @@ const recordSpy = vi.fn((entry: any) => ({ id: 'AUD-TEST-1', ...entry }));
 vi.mock('../governance/audit-chain.js', () => ({
   auditChain: { record: (e: any) => recordSpy(e) },
 }));
+// The marker-cleared cases below simulate a real hook process; the nudge
+// counter writes through secure-io and would land in live state — mock it out
+// like the audit chain so nothing resolves outside the test sandbox.
+vi.mock('./session-length-nudge.js', () => ({
+  recordSessionPromptForNudge: () => null,
+  recordSessionToolEventForNudge: () => undefined,
+}));
 vi.mock('../shell/shell-command-policy.js', () => ({
   evaluateShellCommandPolicy: (command: string) =>
     command.startsWith('pdftotext')

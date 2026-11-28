@@ -207,31 +207,7 @@
         "active/shared/state/reasoning-route-user-config.json",
         "active/shared/state/reasoning-route-user-config.json.previous",
         "active/shared/state/reasoning-route-user-config.json.history/"
-      ],
-      "narrow": {
-        "only": {
-          "write": [
-            {
-              "pattern": "^active/shared/state/reasoning-route-user-config\\.json$"
-            },
-            {
-              "pattern": "^active/shared/state/reasoning-route-user-config\\.json\\.previous$"
-            },
-            {
-              "pattern": "^active/shared/state/reasoning-route-user-config\\.json\\.history/reasoning-route-user-config-[0-9]+-[0-9]+\\.json$"
-            }
-          ],
-          "mkdir": [
-            {
-              "path": "active/shared/state"
-            },
-            {
-              "path": "active/shared/state/reasoning-route-user-config.json.history"
-            }
-          ]
-        },
-        "only_reason": "[REASONING_SETTINGS_STORE_SCOPE] The reasoning settings store writes only reasoning-route-user-config.json, its .previous backup, and .history/ snapshots"
-      }
+      ]
     },
     "metrics_cap_reader": {
       "description": "R4: least-privilege, read-only reader of the tier/tenant-partitioned metrics ledgers (active/shared/runtime/execution-metrics/, active/shared/runtime/usage-ledger/). libs/core metrics.ts assumes it only inside aggregateMetricsForEnforcement, bound to the caller's tenant, so cap enforcers (spend guard, org budget governor, generation-cost dedup) count every tier of their scope whatever the caller's persona; the call returns numbers only, never rows. No write, no knowledge/ access (persona worker).",
@@ -522,6 +498,9 @@
           "write": [
             {
               "pattern": "^knowledge/personal/connections/[a-z0-9][a-z0-9._-]{0,63}\\.json(\\.bak)?$"
+            },
+            {
+              "prefix": "active/shared/tmp/"
             }
           ],
           "mkdir": [
@@ -533,16 +512,28 @@
             },
             {
               "path": "knowledge/personal/connections"
+            },
+            {
+              "path": "active/shared/tmp"
+            },
+            {
+              "pattern": "^active/shared/tmp/.+$"
             }
           ],
           "read": [
             {
               "prefix": "knowledge/personal/connections/"
+            },
+            {
+              "prefix": "active/shared/tmp/"
             }
           ],
           "metadata": [
             {
               "prefix": "knowledge/personal/connections/"
+            },
+            {
+              "prefix": "active/shared/tmp/"
             }
           ]
         },

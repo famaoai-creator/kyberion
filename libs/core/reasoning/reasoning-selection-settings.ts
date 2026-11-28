@@ -1,7 +1,7 @@
 import { safeExistsSync, safeUnlinkSync } from '../secure-io.js';
 import { writeJson } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
-import { resolveIdentityContext, withStoreGrant } from '../authority.js';
+import { resolveIdentityContext } from '../authority.js';
 import { recordGovernanceAction } from '../governance/governance-action-recorder.js';
 import { loadModelRegistry } from './reasoning-model-routing.js';
 import { getReasoningProviderDescriptor } from './reasoning-provider-registry.js';
@@ -13,7 +13,6 @@ import {
 import { currentScope } from '../scope-context.js';
 import { peekReasoningSelectionReadiness } from './reasoning-selection-readiness.js';
 import {
-  REASONING_SETTINGS_GRANT,
   loadReasoningRoutePolicy,
   loadReasoningRouteUserConfigAtPath,
   normalizeReasoningRole,
@@ -211,27 +210,23 @@ function publishConfig(
     : undefined;
   let backupPublished = false;
   try {
-    withStoreGrant(REASONING_SETTINGS_GRANT, () => {
-      writeJson(filePath + '.previous', current);
-      backupPublished = true;
-      writeJson(
-        filePath +
-          '.history/reasoning-route-user-config-' +
-          next.revision +
-          '-' +
-          Date.now() +
-          '.json',
-        current
-      );
-    });
+    writeJson(filePath + '.previous', current);
+    backupPublished = true;
+    writeJson(
+      filePath +
+        '.history/reasoning-route-user-config-' +
+        next.revision +
+        '-' +
+        Date.now() +
+        '.json',
+      current
+    );
     saveReasoningRouteUserConfig(next, current.revision ?? 0);
   } catch (error) {
     if (backupPublished) {
       try {
-        withStoreGrant(REASONING_SETTINGS_GRANT, () => {
-          if (oldBackup) writeJson(filePath + '.previous', oldBackup);
-          else safeUnlinkSync(filePath + '.previous');
-        });
+        if (oldBackup) writeJson(filePath + '.previous', oldBackup);
+        else safeUnlinkSync(filePath + '.previous');
       } catch {
         throw new Error(
           'Reasoning settings publication failed and the previous rollback snapshot could not be restored',
