@@ -54,6 +54,14 @@ export function formatConversationReport(summary: ConversationSignalSummary, day
     lines.push(`Clarification: ${asked} asked, ${abandoned} unanswered after 24 h (${rate})`);
   }
 
+  if (summary.guidance) {
+    const { offered, followed_up, response_returned, input_pending, approval_pending } =
+      summary.guidance;
+    lines.push(
+      `Guidance: ${offered} offered, ${followed_up} followed up, ${response_returned} latest replies returned, ${input_pending} awaiting input, ${approval_pending} awaiting approval`
+    );
+  }
+
   const problem = summary.by_intent.filter(
     (intent) =>
       intent.failed + intent.unhandled + intent.dissatisfied + intent.clarification_abandoned > 0

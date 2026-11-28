@@ -42,8 +42,12 @@ import {
   buildAskConversationInput,
   scopedAskIntakeReceipt,
 } from './lib/operator-ask-scope.js';
-import { formatSetupLifecycleGuide } from './setup/setup-lifecycle-guide.js';
-import { resolveSetupAskGuidance } from './setup/setup-ask-guidance.js';
+import { classifyGuidanceFollowUp, observeSetupAsk } from './setup/setup-ask-observation.js';
+import { formatAskGuidance } from './setup/setup-ask-output.js';
+import {
+  recordSetupAskPreference,
+  resolveSetupAskGuidanceWithJudgment,
+} from './setup/setup-ask-judgment.js';
 import { promoteDesktopProcedure } from '@agent/core/virtual/desktop-recording-compiler';
 import { reconcileDesktopPromotionTransaction } from '@agent/core/virtual/desktop-promotion-transaction';
 import {
@@ -244,22 +248,23 @@ async function handleAskSubcommand(
     printOutput(ui('recorder:recorder_ask_usage'));
     throw new ScriptExitError(1, '', true);
   }
-  const guidance = resolveSetupAskGuidance(text);
+  const preference = recordSetupAskPreference(text, suppliedCorrelationId);
+  if (preference) {
+    printOutput(JSON.stringify(preference));
+    if (!preference.ok) throw new ScriptExitError(1, '', true);
+    return;
+  }
+  const guidance = await resolveSetupAskGuidanceWithJudgment(text, explain);
   if (guidance) {
-    printOutput(
-      json
-        ? JSON.stringify({ kind: 'lifecycle_guidance', ...guidance }, null, 2)
-        : [
-            guidance.definition_ref,
-            guidance.clarification?.question,
-            ...(guidance.clarification?.choices.map(
-              ({ label, guide_command }) => `  ${label} — ${guide_command}`
-            ) ?? []),
-            formatSetupLifecycleGuide(guidance),
-          ]
-            .filter(Boolean)
-            .join('\n')
-    );
+    const correlationId = guidance.clarification
+      ? suppliedCorrelationId?.trim() || `guidance:${randomUUID()}`
+      : undefined;
+    if (guidance.clarification) {
+      observeSetupAsk('guidance_offered', correlationId, {
+        topic: guidance.clarification.kind,
+      });
+    }
+    printOutput(formatAskGuidance(guidance, { correlationId, explain, json }));
     return;
   }
   // A selected organization with an active dot takes the ask as a dot intake
@@ -271,7 +276,13 @@ async function handleAskSubcommand(
   }
   const result = await runSurfaceMessageConversation(
     buildAskConversationInput(text, cliLocale, suppliedCorrelationId)
-  );
+  ).catch((error: unknown) => {
+    observeSetupAsk('guidance_followup', suppliedCorrelationId?.trim(), { outcome: 'error' });
+    throw error;
+  });
+  observeSetupAsk('guidance_followup', suppliedCorrelationId?.trim(), {
+    outcome: classifyGuidanceFollowUp(result),
+  });
   const intentResolution = result.intentResolution;
   const improvement = result.executionFeedbackRecord
     ? materializeExecutionFeedbackCandidate({ feedback: result.executionFeedbackRecord })

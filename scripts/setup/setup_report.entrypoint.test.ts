@@ -13,7 +13,10 @@ describe('setup report entrypoint', () => {
     expect(source).toContain(
       'function formatSetupReport(report: SetupReport, persona: SetupPersona)'
     );
-    expect(source).toContain("? { status: 'ok', report: result.report, lifecycle_command:");
+    expect(source).toContain("status: 'ok'");
+    expect(source).toContain(
+      'first_request_readiness: result.report.recommendedSurfaces[0].readiness'
+    );
     expect(source).toContain("const normalizedArgs = args.filter((arg) => arg !== '--');");
     expect(source).toContain('runReasoningSetup({ quiet })');
     expect(source).toContain('const quiet = options.quiet || options.persona ===');

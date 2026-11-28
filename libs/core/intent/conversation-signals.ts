@@ -36,6 +36,8 @@ export const CONVERSATION_SIGNAL_KINDS = [
   'feedback_dissatisfied',
   'turn_succeeded',
   'turn_failed',
+  'guidance_offered',
+  'guidance_followup',
 ] as const;
 
 export type ConversationSignalKind = (typeof CONVERSATION_SIGNAL_KINDS)[number];
@@ -245,6 +247,13 @@ export interface ConversationSignalSummary {
   by_kind: Partial<Record<ConversationSignalKind, number>>;
   by_intent: IntentSignalSummary[];
   clarification: { asked: number; abandoned: number; abandon_rate: number | null };
+  guidance?: {
+    offered: number;
+    followed_up: number;
+    response_returned: number;
+    input_pending: number;
+    approval_pending: number;
+  };
   /** Repeated misses and dissatisfaction, grouped by utterance. Review candidates only. */
   miss_clusters: MissCluster[];
 }
@@ -280,6 +289,23 @@ export function summarizeConversationSignals(
       Math.max(lastAnswerAt.get(String(key)) ?? 0, Date.parse(signal.ts))
     );
   }
+  const guidanceOffered = new Map<string, string>();
+  const guidanceFollowup = new Map<string, { ts: string; outcome: unknown }>();
+  for (const signal of signals) {
+    const id = signal.correlation_id;
+    if (!id) continue;
+    const offeredAt = guidanceOffered.get(id);
+    if (signal.kind === 'guidance_offered' && (!offeredAt || signal.ts < offeredAt)) {
+      guidanceOffered.set(id, signal.ts);
+    }
+    if (signal.kind === 'guidance_followup' && signal.ts >= (guidanceFollowup.get(id)?.ts ?? '')) {
+      guidanceFollowup.set(id, { ts: signal.ts, outcome: signal.detail?.outcome });
+    }
+  }
+  const followedUp = [...guidanceOffered].flatMap(([id, offeredAt]) => {
+    const followup = guidanceFollowup.get(id);
+    return followup && followup.ts >= offeredAt ? [followup] : [];
+  });
   const byKind: Partial<Record<ConversationSignalKind, number>> = {};
   const intents = new Map<string, IntentSignalSummary>();
   const clusters = new Map<string, MissCluster>();
@@ -345,6 +371,19 @@ export function summarizeConversationSignals(
   return {
     total: signals.length,
     by_kind: byKind,
+    ...(guidanceOffered.size
+      ? {
+          guidance: {
+            offered: guidanceOffered.size,
+            followed_up: followedUp.length,
+            input_pending: followedUp.filter(({ outcome }) => outcome === 'input_pending').length,
+            approval_pending: followedUp.filter(({ outcome }) => outcome === 'approval_pending')
+              .length,
+            response_returned: followedUp.filter(({ outcome }) => outcome === 'response_returned')
+              .length,
+          },
+        }
+      : {}),
     by_intent: [...intents.values()].sort(
       (a, b) =>
         b.unhandled + b.failed + b.dissatisfied - (a.unhandled + a.failed + a.dissatisfied) ||

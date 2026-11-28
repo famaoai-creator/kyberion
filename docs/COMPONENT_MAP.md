@@ -24,6 +24,13 @@ The Mission CLI binds the selected tenant for lifecycle commands and their clean
 
 `libs/core/governance/autonomous-loop-readiness.ts` reports operational blockers and learning warnings with a prioritized diagnostic. Within one process, callers can opt into a reasoning data-use restriction in `libs/core/reasoning/reasoning-egress-scope.ts`. The endpoint gate applies it across nested calls, and `libs/core/mission/mission-llm.ts` refuses direct profiles while that restriction is active.
 
+The CLI lifecycle guidance in `scripts/setup/setup-ask-guidance.ts` connects
+ambiguous requests to domain guides. `setup-ask-judgment.ts` can highlight
+a candidate using scoped operator feedback or calibrated Judgment.
+`libs/core/knowledge/execution-feedback.ts` stores the private feedback,
+and `libs/core/intent/conversation-signals.ts` counts public CLI
+guidance follow-ups. [Judgment backend](../knowledge/product/architecture/judgment-backend-seam.md)
+
 ```text
 Sovereign intent
   -> AGENTS.md governance and 5-phase lifecycle

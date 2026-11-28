@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import {
   executionFeedbackScopeKey,
@@ -14,6 +14,7 @@ export {
 } from './execution-feedback-candidates.js';
 import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '../secure-io.js';
@@ -44,6 +45,8 @@ export interface ExecutionFeedbackInput {
   comment?: string;
   correction?: string;
   source?: 'user' | 'operator';
+  /** Keep the latest record for this key within its intent, scenario, and scope. */
+  retention_key?: string;
   /** Explicit canonical scope; omitted legacy records stay unscoped. */
   scope?: MemoryScopeEnvelope;
 }
@@ -59,6 +62,7 @@ export interface ExecutionFeedbackRecord extends Required<
   comment?: string;
   correction?: string;
   source: 'user' | 'operator';
+  retention_key?: string;
   recorded_at: string;
   scope?: MemoryScopeEnvelope;
 }
@@ -318,7 +322,32 @@ export function loadExecutionFeedbackStore(scope?: MemoryScopeEnvelope): Executi
   };
 }
 
-export function recordExecutionFeedback(input: ExecutionFeedbackInput): ExecutionFeedbackRecord {
+function retainExecutionFeedback(entries: ExecutionFeedbackRecord[]): ExecutionFeedbackRecord[] {
+  const settings = new Map<string, number>();
+  const history: number[] = [];
+  entries.forEach((entry, index) => {
+    if (entry.retention_key) {
+      settings.set(
+        JSON.stringify([entry.intent_id, entry.scenario_id, entry.retention_key]),
+        index
+      );
+    } else {
+      history.push(index);
+    }
+  });
+  const remaining = MAX_FEEDBACK_ENTRIES - settings.size;
+  if (remaining < 0) throw new Error('[FEEDBACK_SETTINGS_LIMIT] Too many retained settings');
+  const retained = [
+    ...settings.values(),
+    ...history.slice(Math.max(0, history.length - remaining)),
+  ];
+  return retained.sort((left, right) => left - right).map((index) => entries[index]!);
+}
+
+export function recordExecutionFeedback(
+  input: ExecutionFeedbackInput,
+  check?: (entries: readonly ExecutionFeedbackRecord[]) => void
+): ExecutionFeedbackRecord {
   executionFeedbackScopeKey(input.scope);
   const scope = input.scope ? assertMemoryScope(input.scope) : undefined;
   const record: ExecutionFeedbackRecord = {
@@ -329,6 +358,7 @@ export function recordExecutionFeedback(input: ExecutionFeedbackInput): Executio
     intent_id: input.intent_id.trim(),
     outcome: input.outcome,
     source: input.source || 'user',
+    ...(input.retention_key ? { retention_key: input.retention_key } : {}),
     recorded_at: nowIso(),
     ...(scope ? { scope } : {}),
     ...(input.correlation_id?.trim() ? { correlation_id: input.correlation_id.trim() } : {}),
@@ -340,15 +370,22 @@ export function recordExecutionFeedback(input: ExecutionFeedbackInput): Executio
       ? { correction: normalizeFeedbackText(input.correction) }
       : {}),
   };
-  const store = loadStoreFromDisk(scope);
-  const nextStore = validateStore({
-    version: '1.0.0',
-    entries: [...store.entries, record].slice(-MAX_FEEDBACK_ENTRIES),
-  });
   const filePath = resolveExecutionFeedbackPath(scope);
-  safeMkdir(path.dirname(filePath), { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(nextStore, null, 2));
-  return record;
+  const lockKey = createHash('sha256').update(filePath).digest('hex');
+  return withLockSync(`execution-feedback:${lockKey}`, () => {
+    const store = loadStoreFromDisk(scope);
+    if (check) {
+      const key = executionFeedbackScopeKey(scope);
+      check(store.entries.filter((entry) => executionFeedbackScopeKey(entry.scope) === key));
+    }
+    const nextStore = validateStore({
+      version: '1.0.0',
+      entries: retainExecutionFeedback([...store.entries, record]),
+    });
+    safeMkdir(path.dirname(filePath), { recursive: true });
+    safeWriteFile(filePath, JSON.stringify(nextStore, null, 2));
+    return record;
+  });
 }
 
 export function summarizeExecutionFeedback(input: {

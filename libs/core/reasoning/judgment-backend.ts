@@ -135,6 +135,8 @@ export interface JudgmentRequest {
   tier: TierLevel;
   /** Optional tenant upper bound; can only narrow the allowed provider set. */
   tenantSlug?: string;
+  /** Restrict selection and failover to providers fitted for every question. */
+  requireCalibrated?: boolean;
   /** Optional cancellation signal propagated to providers on timeout or abort. */
   signal?: AbortSignal;
 }
@@ -345,6 +347,13 @@ function listEligibleNonFloorBackends(request: JudgmentRequest): {
       rejected.push(`${backend.judgment_id}: cannot answer ${unsupported[0].kind}`);
       continue;
     }
+    if (
+      request.requireCalibrated &&
+      request.questions.some((question) => !resolveCalibration(backend.judgment_id, question.id))
+    ) {
+      rejected.push(`${backend.judgment_id}: not calibrated for all requested questions`);
+      continue;
+    }
     const egress = checkProviderEgress({
       provider: backend.judgment_id,
       dataTier: request.tier,
@@ -373,6 +382,8 @@ export function selectJudgmentBackend(request: JudgmentRequest): JudgmentSelecti
     (!needsImage || builtin.acceptsImages) &&
     request.questions.every((question) => builtin.supports(question))
   ) {
+    if (request.requireCalibrated)
+      throw new Error('[JUDGMENT_BACKEND] the saved builtin provider is not calibrated');
     return {
       backend: builtin,
       reason: `selected '${BUILTIN_JUDGMENT_PROVIDER}' (saved seam default) for tier=${request.tier}`,
@@ -388,6 +399,9 @@ export function selectJudgmentBackend(request: JudgmentRequest): JudgmentSelecti
   }
 
   const why = rejected.length > 0 ? `; rejected: ${rejected.join('; ')}` : '';
+
+  if (request.requireCalibrated)
+    throw new Error(`[JUDGMENT_BACKEND] no calibrated provider available${why}`);
 
   if (!builtin) {
     // Registration is explicit rather than an import side effect, so this is
@@ -482,7 +496,12 @@ export async function judge(request: JudgmentRequest): Promise<JudgmentResult> {
 
     if (!resolved) {
       const builtin = judgmentSeam.getOptional(BUILTIN_JUDGMENT_PROVIDER);
-      if (!builtin || backend.judgment_id === BUILTIN_JUDGMENT_PROVIDER) throw lastError;
+      if (
+        request.requireCalibrated ||
+        !builtin ||
+        backend.judgment_id === BUILTIN_JUDGMENT_PROVIDER
+      )
+        throw lastError;
       // Same rule as selection, and it has to be repeated here because this is
       // a second way to reach the floor. Degrading to a provider that cannot
       // answer the question produces an answer to a different question — the

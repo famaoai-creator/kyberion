@@ -163,6 +163,78 @@ alongside the guide. A direct request for the current status of a mission or
 its approvals uses the regular ask flow. If you ask to talk through Kyberion, choose who you
 want to reach. Use `conversation` for Kyberion itself, `channel` for a
 team chat, and `coordination` for another provider agent or runtime.
+You can also restate the chosen destination as a question. When calibrated
+judgment is available for an ambiguous destination with a recognized hint,
+`ask` can highlight a guide. All choices remain available. The classifier
+receives a fixed destination hint rather than the user’s original text.
+Add `--explain` to see the guidance decision and the first inspection command.
+For an ambiguous recovery request, the same guide flow asks whether to resume
+a mission, a track, or a surface. For “初期設定は何から始めればいいですか？”,
+it offers local installation and identity, tenant access, and service setup.
+The guide shows `pnpm kyberion setup report --persona first-time-user` first
+so you can check the current environment before following a recommended route.
+With `--json`, check `first_request_readiness` for readiness and
+`report.nextActions` for the next step. The envelope’s `status` describes
+whether the report was produced.
+To reuse an explicit choice for a later ambiguous question, a registered
+operator can run `pnpm kyberion ask "guide preference conversation: channel"`.
+The matching choice is highlighted in that operator's current scope.
+For recovery, use `guide preference recovery: track` and replace `track` with
+the intended choice. Use `clear` in place of the destination to reset the
+preference and start learning from newly issued guidance. Evaluations of
+requests issued before the reset no longer count. Use
+`guide preference conversation: off` to stop collecting and using feedback
+for this topic in the current scope. Use `clear` to start learning again,
+or set an explicit preference to re-enable learning with that preference.
+The latest setting for each topic is retained as old evaluations roll out of the store.
+
+After trying the suggested route, run
+`pnpm kyberion ask "guide feedback conversation: channel helpful" --correlation-id <id>`
+or use `missed` if the route did not help. Use `recovery` for recovery guidance and `installation` for onboarding guidance.
+For an ambiguous request, a clear lead in the last eight evaluations of
+guidance issued within 30 days can highlight one choice. Each `helpful` adds one point and each `missed` subtracts
+one. The choice needs at least two points and must lead all alternatives.
+When feedback drives the recommendation, `--explain` shows the number of
+evaluated attempts in the window and the highlighted choice’s net score.
+If those attempts included a recommendation, it also shows how often the
+reported route differed and how often the recommendation itself helped.
+These counts cover the current operator’s reported attempts.
+Run `pnpm kyberion ask "guide status conversation"` to inspect the same
+window even when the guide has no learned recommendation.
+`feedback_coverage` counts the distinct retained guides issued and evaluated
+within 30 days and since the last reset. The recommendation still uses at
+most the eight most recently evaluated guides.
+`recommendations_by_source` shows counts for learned feedback, explicit
+preferences, and calibrated Judgment. Compare within the reported sample.
+Older receipts without a source contribute to the overall totals.
+Use `recovery` or `installation` to inspect those topics.
+An explicit preference takes priority over past evaluations. A hint for a
+different route in the current question takes precedence over both.
+All choices remain available.
+For an eligible operator, the guide includes a feedback command template.
+`--explain` shows ready-to-run evaluation commands
+and JSON output provides the same commands as argument arrays in `feedback_actions`.
+For manual feedback, copy the correlation ID shown with `--explain`
+(or `correlation_id` in JSON) and pass it as `--correlation-id <id>`
+when reporting the outcome. The latest evaluation for that ID counts once.
+The feedback receipt shows how many attempts are in the recommendation window
+and whether a route now has enough support to be suggested on a later
+ambiguous request.
+Feedback without an ID is saved but excluded from recommendation scores.
+An ID must match a retained receipt for the same operator, scope, and
+guidance topic. Request new guidance when the receipt is older than 30 days
+or has been evicted from the bounded store.
+To talk with Kyberion in the terminal, the default public-scope guide includes
+a follow-up command with the ID already filled in. Replace `MESSAGE` with
+your first message. JSON clients can use `follow_up.argv`, substituting the
+message at `follow_up.message_arg_index`. In the default public CLI
+scope, `pnpm kyberion conversation report` counts guidance and follow-up
+signals. These signals store the topic or runtime outcome with the ID.
+Your question, reply, and personal evaluation stay outside those signals.
+A returned reply measures runtime progress. The report counts requests still
+awaiting input or approval separately. Use feedback to report whether
+it helped.
+
 Use `discussion` to develop a goal or compare viewpoints, and `meeting`
 for preflight, consent and follow-up. Use `calendar` for work dates,
 `audit` for activity and evidence, and `recovery` for interrupted work.
