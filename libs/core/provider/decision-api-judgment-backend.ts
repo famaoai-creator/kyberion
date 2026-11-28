@@ -17,6 +17,7 @@
 import { selectProviderCredential } from '../foundation/credential-binding.js';
 import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
 import { withSecretResolutionSession } from '../foundation/secret-resolution-session.js';
+import { trimEndChars, trimStartChars } from '../foundation/text.js';
 import { frameUntrustedInput } from '../governance/untrusted-input-framing.js';
 import { createLogger } from '../logger.js';
 import { validateUrl } from '../secure-io.js';
@@ -310,10 +311,10 @@ async function postDecisionRequest(params: {
 }
 
 function toGeminiWireQuestionKey(questionId: string, index: number, used: Set<string>): string {
-  const sanitized = questionId
-    .replace(/[^A-Za-z0-9_-]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 64);
+  const sanitized = trimStartChars(
+    trimEndChars(questionId.replace(/[^A-Za-z0-9_-]+/g, '_'), '_'),
+    '_'
+  ).slice(0, 64);
   const base = sanitized || `q_${index}`;
   let candidate = base;
   let disambiguator = index;
@@ -337,10 +338,7 @@ function toOpenAiWireQuestionName(questionId: string, index: number, used: Set<s
 export function createGeminiDecisionBackend(
   options: DecisionApiJudgmentOptions = {}
 ): JudgmentBackend {
-  const endpoint = (options.endpoint?.trim() || DEFAULT_GEMINI_DECISION_ENDPOINT).replace(
-    /\/+$/u,
-    ''
-  );
+  const endpoint = trimEndChars(options.endpoint?.trim() || DEFAULT_GEMINI_DECISION_ENDPOINT, '/');
   if (!isLocalReasoningEndpoint(endpoint)) validateUrl(endpoint);
   const model = (options.model?.trim() || DEFAULT_GEMINI_DECISION_MODEL).replace(/^models\//u, '');
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -413,10 +411,7 @@ export function createGeminiDecisionBackend(
 export function createOpenAiDecisionBackend(
   options: DecisionApiJudgmentOptions = {}
 ): JudgmentBackend {
-  const endpoint = (options.endpoint?.trim() || DEFAULT_OPENAI_DECISION_ENDPOINT).replace(
-    /\/+$/u,
-    ''
-  );
+  const endpoint = trimEndChars(options.endpoint?.trim() || DEFAULT_OPENAI_DECISION_ENDPOINT, '/');
   if (!isLocalReasoningEndpoint(endpoint)) validateUrl(endpoint);
   const model = options.model?.trim() || DEFAULT_OPENAI_DECISION_MODEL;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;

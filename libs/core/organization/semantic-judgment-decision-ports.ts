@@ -6,7 +6,9 @@
  */
 
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { trimEndChars } from '../foundation/text.js';
 import { decodeEntities } from '../foundation/text-escaping.js';
+import { extractFramedUntrustedData } from '../governance/untrusted-input-framing.js';
 import { validateUrl } from '../secure-io.js';
 import {
   createLayaMlxBackend,
@@ -112,9 +114,9 @@ export function throwIfAborted(signal: AbortSignal): void {
 }
 
 export function extractFramedJsonPayload(prompt: string): Record<string, unknown> {
-  const match = prompt.match(/<untrusted_data\s+source="[^"]*">([\s\S]*?)<\/untrusted_data>/u);
-  if (!match) return { raw_prompt: prompt.slice(0, 2000) };
-  const decoded = decodeEntities(match[1]);
+  const framed = extractFramedUntrustedData(prompt);
+  if (!framed) return { raw_prompt: prompt.slice(0, 2000) };
+  const decoded = decodeEntities(framed.data);
   try {
     const parsed = JSON.parse(decoded);
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
@@ -395,9 +397,10 @@ export function createGeminiDecisionJudgmentInvokePort(options: {
   const apiKey = options.apiKey.trim();
   if (!apiKey) throw new Error('Gemini API key is required');
   const model = (options.model?.trim() || DEFAULT_GEMINI_DECISION_MODEL).replace(/^models\//u, '');
-  const baseUrl = (
-    options.baseUrl?.trim() || 'https://generativelanguage.googleapis.com/v1beta'
-  ).replace(/\/+$/u, '');
+  const baseUrl = trimEndChars(
+    options.baseUrl?.trim() || 'https://generativelanguage.googleapis.com/v1beta',
+    '/'
+  );
   const endpoint = `${baseUrl}/decisions`;
   if (!isLocalReasoningEndpoint(endpoint)) validateUrl(endpoint);
   const fetchFn = options.fetchImpl ?? fetch;
@@ -494,7 +497,7 @@ export function createOpenAiDecisionJudgmentInvokePort(options: {
   const apiKey = options.apiKey.trim();
   if (!apiKey) throw new Error('OpenAI API key is required');
   const model = options.model?.trim() || DEFAULT_OPENAI_DECISION_MODEL;
-  const baseUrl = (options.baseUrl?.trim() || 'https://api.openai.com/v1').replace(/\/+$/u, '');
+  const baseUrl = trimEndChars(options.baseUrl?.trim() || 'https://api.openai.com/v1', '/');
   const endpoint = `${baseUrl}/decisions`;
   if (!isLocalReasoningEndpoint(endpoint)) validateUrl(endpoint);
   const fetchFn = options.fetchImpl ?? fetch;

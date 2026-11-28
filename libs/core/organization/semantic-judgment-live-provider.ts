@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { createLogger } from '../logger.js';
 import { validateUrl } from '../secure-io.js';
 import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
+import { trimEndChars } from '../foundation/text.js';
 import { selectProviderCredential } from '../foundation/credential-binding.js';
 import { withSecretResolutionSession } from '../foundation/secret-resolution-session.js';
 import { resolveReasoningApiKey } from '../reasoning/reasoning-api-credentials.js';
@@ -184,7 +185,7 @@ export function createAnthropicJudgmentInvokePort(
 }
 
 function normalizeChatCompletionsEndpoint(baseUrl: string): string {
-  const trimmed = baseUrl.trim().replace(/\/+$/u, '');
+  const trimmed = trimEndChars(baseUrl.trim(), '/');
   if (!trimmed) throw new Error('OpenAI-compatible baseUrl is required');
   return trimmed.endsWith('/chat/completions') ? trimmed : `${trimmed}/chat/completions`;
 }
@@ -291,9 +292,10 @@ export function createGeminiJudgmentInvokePort(options: {
   const apiKey = options.apiKey.trim();
   if (!apiKey) throw new Error('Gemini API key is required');
   const model = (options.model?.trim() || DEFAULT_GEMINI_MODEL).replace(/^models\//u, '');
-  const baseUrl = (
-    options.baseUrl?.trim() || 'https://generativelanguage.googleapis.com/v1beta'
-  ).replace(/\/+$/u, '');
+  const baseUrl = trimEndChars(
+    options.baseUrl?.trim() || 'https://generativelanguage.googleapis.com/v1beta',
+    '/'
+  );
   const endpoint = `${baseUrl}/models/${encodeURIComponent(model)}:generateContent`;
   if (!isLocalReasoningEndpoint(endpoint)) validateUrl(endpoint);
   const fetchFn = options.fetchImpl ?? fetch;
