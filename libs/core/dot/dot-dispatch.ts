@@ -18,7 +18,16 @@ import {
   recordDotApprovalFeedback,
   recordDeferredDotJudgmentApprovalFeedback,
 } from './dot-judgment-approval.js';
-import { isDotIntakeAdmission, loadDotExecutionPolicy } from './dot-execution-policy.js';
+import {
+  isDotIntakeAdmission,
+  loadDotExecutionPolicy,
+  policyRelaxableActions,
+  resolveNamedDotGateRelaxation,
+} from './dot-execution-policy.js';
+export {
+  dotNotifyToAutoExceptionApplies,
+  dotSemanticApproveToNotifyExceptionApplies,
+} from './dot-execution-policy.js';
 import { canResumeDotDigest, sendDueDotDigest } from './dot-digest-delivery.js';
 import {
   dotSignalTriageEntries,
@@ -85,7 +94,6 @@ import { sameVersionOneAdmission } from './dot-action-ledger-version.js';
 import type { RoutingDecision } from '../contracts/routing-decision.js';
 import {
   evaluateAutonomousOpsAction,
-  getAutonomousOpsPolicy,
   type AutonomousOpsGateInput,
   type AutonomousOpsGateResult,
 } from '../governance/autonomous-ops-gate.js';
@@ -151,11 +159,7 @@ import {
   DOT_FLOOR_CONTRIBUTORS,
   DOT_PRE_GATE_CHECKS,
 } from './dot-extension-registry.js';
-import {
-  DOT_L4_NOTIFY_TO_AUTO_EXCEPTION,
-  type DotDecisionRelaxer,
-  type DotExtCtx,
-} from './dot-extensions.js';
+import { type DotDecisionRelaxer, type DotExtCtx } from './dot-extensions.js';
 
 const logger = createLogger('dot-dispatch');
 
@@ -392,9 +396,13 @@ export function evaluateDotProposalGate(
   let relaxedBy: string | undefined;
   // Relaxers may only lower what the learned floor added: the result is
   // clamped to the policy gate's own decision (without the learned floor) and
-  // to the charter default / hard floor. The one exception is the policy-listed
-  // L4 notify → auto, re-verified here by dotNotifyToAutoExceptionApplies.
-  if (DOT_DECISION_RELAXERS.length > 0 && ((floor && learned) || gate.decision === 'notify')) {
+  // to the charter default / hard floor. The named exceptions are L4
+  // notify -> auto (dotNotifyToAutoExceptionApplies) and advisory semantic
+  // approve -> notify (dotSemanticApproveToNotifyExceptionApplies).
+  if (
+    DOT_DECISION_RELAXERS.length > 0 &&
+    ((floor && learned) || gate.decision === 'notify' || gate.decision === 'approve')
+  ) {
     let policyGate: AutonomousOpsGateResult | undefined;
     for (const relaxer of DOT_DECISION_RELAXERS) {
       let relaxed: ReturnType<DotDecisionRelaxer['relax']>;
@@ -407,23 +415,18 @@ export function evaluateDotProposalGate(
       if (!relaxed) continue;
       policyGate ??= runGate(hardFloor);
       const relaxableActions = deps.relaxableActions ?? policyRelaxableActions();
-      if (
-        dotNotifyToAutoExceptionApplies({
-          proposal,
-          relaxed,
-          policyGate,
-          hardFloor,
-          relaxableActions,
-        })
-      ) {
-        floor = 'auto';
-        gate = {
-          ...policyGate,
-          decision: 'auto',
-          allowed: true,
-          vetoWindowMinutes: undefined,
-          reason: `${policyGate.reason}; ${DOT_L4_NOTIFY_TO_AUTO_EXCEPTION} by ${relaxer.id}: ${relaxed.reason}`,
-        };
+      const named = resolveNamedDotGateRelaxation({
+        charter,
+        proposal,
+        relaxerId: relaxer.id,
+        relaxed,
+        policyGate,
+        hardFloor,
+        relaxableActions,
+      });
+      if (named) {
+        floor = named.floor;
+        gate = named.gate;
         relaxedBy = relaxer.id;
         break;
       }
@@ -433,8 +436,8 @@ export function evaluateDotProposalGate(
         gate = runGate(floor);
         gate = { ...gate, reason: `${gate.reason}; relaxed by ${relaxer.id}: ${relaxed.reason}` };
         relaxedBy = relaxer.id;
+        break;
       }
-      break;
     }
   }
   // The charter may lengthen a veto window, never shorten the policy's (an
@@ -455,65 +458,6 @@ export function evaluateDotProposalGate(
     ...(floor ? { floor } : {}),
     ...(relaxedBy ? { relaxed_by: relaxedBy } : {}),
   };
-}
-
-/**
- * Policy `autonomy.relaxable_actions`, read straight from the policy (not via
- * dot-autonomy, which imports this module). Fails closed: no section, no
- * exception.
- */
-function policyRelaxableActions(): readonly string[] {
-  try {
-    const autonomy = (getAutonomousOpsPolicy() as { autonomy?: { relaxable_actions?: unknown } })
-      .autonomy;
-    const list = autonomy?.relaxable_actions;
-    return Array.isArray(list) ? list.filter((id): id is string => typeof id === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
-/** Gate escalations the L4 exception never undercuts. */
-const DOT_NON_RELAXABLE_ESCALATIONS = new Set([
-  'never_auto',
-  'high_risk_path',
-  'axis_max',
-  'budget',
-]);
-
-/**
- * The single permitted decision below the policy gate (DL-10): a relaxer that
- * claims {@link DOT_L4_NOTIFY_TO_AUTO_EXCEPTION} may turn `notify` into `auto`
- * only when, on the policy side,
- *   - the action is in policy `autonomy.relaxable_actions`;
- *   - the policy gate (with the hard floor, without the learned floor) says
- *     exactly `notify` — never `approve`;
- *   - no hard floor (charter default, the dot's own request, floor
- *     contributors such as budget) is `notify` or stricter;
- *   - no never_auto / high-risk-path / axis-max / budget escalation, no
- *     high-risk path match, the action is not a policy shadow, and its
- *     reversibility axis is below 2.
- * The relaxer owns the dot side (L4, learned floor released, outcome success).
- */
-export function dotNotifyToAutoExceptionApplies(input: {
-  proposal: Pick<DotProposal, 'action_id'>;
-  relaxed: { decision: DotDecisionLevel; exception?: string };
-  policyGate: AutonomousOpsGateResult;
-  hardFloor: DotDecisionLevel | undefined;
-  relaxableActions: readonly string[];
-}): boolean {
-  const { proposal, relaxed, policyGate, hardFloor } = input;
-  if (relaxed.exception !== DOT_L4_NOTIFY_TO_AUTO_EXCEPTION || relaxed.decision !== 'auto') {
-    return false;
-  }
-  if (!input.relaxableActions.includes(proposal.action_id)) return false;
-  if (policyGate.decision !== 'notify' || policyGate.shadow) return false;
-  if (hardFloor && DECISION_RANK[hardFloor] >= DECISION_RANK.notify) return false;
-  if ((policyGate.escalations ?? []).some((rule) => DOT_NON_RELAXABLE_ESCALATIONS.has(rule))) {
-    return false;
-  }
-  if ((policyGate.highRiskPathMatches ?? []).length > 0) return false;
-  return (policyGate.axes?.reversibility ?? 3) < 2;
 }
 
 function dotDispatchExtCtx(deps: DotDispatchDeps): DotExtCtx {

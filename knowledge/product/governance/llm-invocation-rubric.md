@@ -1,6 +1,6 @@
 ---
 title: 'LLM Invocation Rubric — どのポイントで LLM に頼むか'
-last_updated: 2026-11-21
+last_updated: 2026-11-28
 ---
 
 # LLM Invocation Rubric — どのポイントで LLM に頼むか
@@ -11,14 +11,16 @@ last_updated: 2026-11-21
 
 ## ラダー(上から順に検討し、最初に成立した段で止める)
 
-| 段                     | 手段                                         | 成立条件                                                                     | コスト/決定性                                    |
-| ---------------------- | -------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------ |
-| **0. 決定論 op**       | 既存 actuator op / `core:*` 制御 op          | 入力→出力が規則で書ける。観測の解釈が不要                                    | ゼロトークン・完全再現                           |
-| **1. 蒸留 + 一点選択** | `distill_*` → `llm_decide`(**options 付き**) | 判断は必要だが、**候補が列挙できる**(セレクタ・分岐・分類)                   | 1呼び出し・options 外は拒否され決定論 fallback   |
-| **2. 蒸留 + 一点生成** | `distill_*` → `llm_decide`(options なし)     | 候補列挙が不可能で、短い自由出力が要る                                       | 1呼び出し・`on_degraded` の宣言必須(lint)        |
-| **3. schema 強制委譲** | `delegateStructured<T>`(HN-02)               | 構造化された成果物の生成(計画・タスク結果・契約)。**出力が schema 化できる** | retry-on-mismatch 付き・検証済みオブジェクト返却 |
-| **4. 品質最大化委譲**  | best-of-N + judge / draft→refine(MO-07)      | リスク tier が high / high_stakes、または品質クリティカルな文書              | N倍コスト。opt-out は `KYBERION_BEST_OF_N=0`     |
-| **5. 人間**            | 承認ゲート / ask-why(LC-10)                  | 不可逆・対外・規制、または機械の判断根拠が立たない                           | 最終責任は常に人間(CO-06)                        |
+| 段                     | 手段                                         | 成立条件                                                   | コスト/決定性                                  |
+| ---------------------- | -------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------- |
+| **0. 決定論 op**       | 既存 actuator op / `core:*` 制御 op          | 入力→出力が規則で書ける。観測の解釈が不要                  | ゼロトークン・完全再現                         |
+| **1. 蒸留 + 一点選択** | `distill_*` → `llm_decide`(**options 付き**) | 判断は必要だが、**候補が列挙できる**(セレクタ・分岐・分類) | 1呼び出し・options 外は拒否され決定論 fallback |
+
+> **System-1 優先経路 (`semantic-decide.ts`)**: `options` が 2 つ以上あり、かつ `KYBERION_JUDGMENT_PROVIDERS` 等で `judgment-backend` の System-1 プロバイダ（`laya-mlx` / `gemini-decision` / `openai-decision` / `typesafe-jev`）が登録されている場合、`decideFromObservation` は先に `assistWithJudgment` を呼ぶ（`tier` 未指定時は安全側で `confidential` 扱い・`egress` フィルタ適用）。System-1 が回答できない場合のみ従来の `ReasoningBackend` へフォールバックする。
+> | **2. 蒸留 + 一点生成** | `distill_*` → `llm_decide`(options なし) | 候補列挙が不可能で、短い自由出力が要る | 1呼び出し・`on_degraded` の宣言必須(lint) |
+> | **3. schema 強制委譲** | `delegateStructured<T>`(HN-02) | 構造化された成果物の生成(計画・タスク結果・契約)。**出力が schema 化できる** | retry-on-mismatch 付き・検証済みオブジェクト返却 |
+> | **4. 品質最大化委譲** | best-of-N + judge / draft→refine(MO-07) | リスク tier が high / high_stakes、または品質クリティカルな文書 | N倍コスト。opt-out は `KYBERION_BEST_OF_N=0` |
+> | **5. 人間** | 承認ゲート / ask-why(LC-10) | 不可逆・対外・規制、または機械の判断根拠が立たない | 最終責任は常に人間(CO-06) |
 
 ## 各段の判定質問
 

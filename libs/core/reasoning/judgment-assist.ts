@@ -103,17 +103,29 @@ export async function assistWithJudgment<T>(
   if (!input.questions?.length) return baselineResult(input.baseline, `${label}: no questions`);
 
   let result: Awaited<ReturnType<typeof judge>>;
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(new Error(`${label} timed out after ${timeoutMs}ms`)),
+    timeoutMs
+  );
+  timer.unref?.();
   try {
-    result = await withTimeout(
+    result = await Promise.race([
       judge({
         state: input.state,
         questions: input.questions,
         tier: input.tier,
         ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
+        signal: controller.signal,
       }),
-      timeoutMs,
-      label
-    );
+      new Promise<never>((_, reject) => {
+        controller.signal.addEventListener(
+          'abort',
+          () => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
+          { once: true }
+        );
+      }),
+    ]);
   } catch (error: any) {
     // Includes "no provider registered": not having a model is the normal
     // state of this repo, not an incident.
@@ -123,6 +135,8 @@ export async function assistWithJudgment<T>(
       : `${label}: judgment unavailable (${message})`;
     logger.debug(`[judgment-assist] ${reason}`);
     return baselineResult(input.baseline, reason);
+  } finally {
+    clearTimeout(timer);
   }
 
   const answers = result.answers || [];
@@ -188,22 +202,6 @@ export async function assistWithJudgment<T>(
     answers,
     provider_id: result.provider_id,
   };
-}
-
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        clearTimeout(timer);
-        reject(error);
-      }
-    );
-  });
 }
 
 /** Convenience for the common single-choice shape. */

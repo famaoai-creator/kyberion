@@ -280,8 +280,8 @@ export interface DotCharter {
     reasoning_backend?: string;
     /** Operator-authored data posture; provider attestation and egress gates still apply. */
     reasoning_training_use?: 'local_only' | 'no_training' | 'zero_retention';
-    /** Off when absent. Shadow requires injected fixture ports; no production budget/provider adapter. */
-    semantic_judgment?: { mode: 'off' | 'shadow' };
+    /** Off when absent. Shadow observes post-wake; advisory enables evidence-backed approve->notify relaxation. */
+    semantic_judgment?: { mode: 'off' | 'shadow' | 'advisory' };
     max_idle_wake_ms?: number;
     /**
      * Upper bound between REAL (model-calling) cron wakes. A cron wake with no

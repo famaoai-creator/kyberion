@@ -2138,7 +2138,7 @@
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "Comma-separated judgment providers to register in addition to the built-in rule floor (known: laya-mlx, typesafe-jev). Unset keeps judgment-assisted call sites such as task routing inert. Unknown ids are refused with a warning; every call is still filtered by the provider egress policy.",
+      "description": "Comma-separated judgment providers to register in addition to the built-in rule floor (known: laya-mlx, gemini-decision, openai-decision, typesafe-jev). Unset keeps judgment-assisted call sites such as task routing inert. Unknown ids are refused with a warning; every call is still filtered by the provider egress policy.",
       "documented": true,
       "subsystem": "reasoning"
     },

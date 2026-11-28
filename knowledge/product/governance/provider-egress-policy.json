@@ -23,6 +23,16 @@
       "training_use": "unknown",
       "endpoint_domains": ["generativelanguage.googleapis.com"]
     },
+    "gemini-decision": {
+      "egress": "external-api",
+      "training_use": "unknown",
+      "endpoint_domains": ["generativelanguage.googleapis.com"]
+    },
+    "openai-decision": {
+      "egress": "external-api",
+      "training_use": "unknown",
+      "endpoint_domains": ["api.openai.com"]
+    },
     "copilot": {
       "egress": "external-api",
       "training_use": "unknown",

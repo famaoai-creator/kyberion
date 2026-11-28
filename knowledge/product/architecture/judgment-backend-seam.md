@@ -1,7 +1,7 @@
 ---
 title: Judgment Backend Seam
 tags: [architecture, seam, judgment, calibration, confidence, tier, egress, classification]
-last_updated: 2026-10-01
+last_updated: 2026-11-28
 ---
 
 # Judgment Backend Seam
@@ -20,6 +20,94 @@ that a caller must parse. A judgment returns a typed value. Do not register a
 judgment provider as a reasoning mode, and do not add `delegateTask` to a
 judgment provider — the seams answer different questions and have different
 failure modes.
+
+## Unified Judgment Architecture & Work-Loop Placement
+
+Kyberion does not need separate judgment engines per call site. All typed
+judgments share **one System-1 Judgment Backend (`judgment-backend.ts`)** with
+**two contract weights** placed across the
+[Organization Work Loop](./organization-work-loop.md):
+
+1. **Shared System-1 Judgment Backend (`libs/core/reasoning/judgment-backend.ts`)**:
+   Enforces data-tier egress (`checkProviderEgress`), `acceptsImages`,
+   calibration gating (`judgment-calibration.json`), timeouts, and deterministic
+   floor fallback in one place. Opt-in providers:
+   - `laya-mlx` (`local-only`, 34ms p50, 0 tokens, deterministic — handles `personal` / `confidential` / `public`)
+   - `gemini-decision` (`gemini-decision-1`, `external-api`, T14 60/60, 412ms p50, 0 output tokens)
+   - `openai-decision` (`gpt-6-luna`, `external-api`, T14 59/60, 191ms p50, 0 output tokens)
+   - `typesafe-jev` (`external-api`)
+   - `builtin-rules` (always-present local rule floor)
+2. **Lightweight Assist contract (`assistWithJudgment` & `llm_decide` selection mode)**:
+   Unidirectional refinement over a deterministic baseline (filling `unknown`,
+   downgrading model tier on mechanical tasks, pruning confidently irrelevant
+   context documents, or picking from enumerated `options` in actuator
+   `llm_decide` via `semantic-decide.ts`). No receipt/hash ledger overhead.
+3. **Audited Evidence contract (`semantic_judgment`)**:
+   Full server-owned scope/snapshot/precedent binding, immutable receipt & TTL,
+   fixed routing (`judge-route.ts`), pre-effect verification, and existing
+   approval gates (`libs/core/organization/semantic-judgment*.ts`,
+   `libs/core/dot/dot-semantic-loop.ts`). Reserved for autonomous governance
+   decisions (Dot `shadow`/`advisory`, future Mission escalation/continuation).
+
+```mermaid
+flowchart LR
+  subgraph Loop["Organization Work Loop"]
+    S1["1. Intent / Context / Resolution"]
+    S2["2. Runtime / Teaming"]
+    S3["3. Authority / Autonomous Proposals"]
+    S4["4. Execution (Actuators)"]
+    S5["5. Accounting / Learning"]
+    S1 --> S2 --> S3 --> S4 --> S5
+    S5 -. "calibration / precedent" .-> S1
+  end
+
+  subgraph Engine["Shared System-1 Judgment Backend (tier / egress / calibration)"]
+    P1["Local: laya-mlx (personal/conf/public, 34ms)"]
+    P2["Cloud Decision API: gemini-decision-1 / gpt-6-luna (public or tenant-approved)"]
+  end
+
+  S1 -. "work_shape / knowledge.relevance" .-> Engine
+  S2 -. "task.model_tier (downgrade only)" .-> Engine
+  S3 -. "semantic_judgment (receipt + judge-route + approval)" .-> Engine
+  S4 -. "error.category / browser.* / llm_decide(options)" .-> Engine
+```
+
+### Work-Loop Placement Map
+
+| Loop Stage                       | Call Site / Question ID                                                                      | Contract Weight                                                    | Unidirectional / Governance Guard                                                                                                     |
+| -------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Intent / Context / Resolution    | `organization.work_shape`, `knowledge.relevance`                                             | Lightweight (`assistWithJudgment`)                                 | May mark ambiguous requests for human confirmation or drop confidently irrelevant docs above `minKeep` (never pinned)                 |
+| Runtime / Teaming                | `task.model_tier` (`task-routing-judgment.ts`)                                               | Lightweight (`assistWithJudgment`)                                 | Downgrade only (`standard → small`) when retryable; retries record labels for `judgment-calibration.json`                             |
+| Authority / Autonomous Proposals | `semantic_judgment` (`dot_proposal_v1` / `latency_goal_v1`)                                  | Audited Evidence (`semantic-judgment.ts` + `dot-semantic-loop.ts`) | Advisory verdict (`apply_precedent` / `reframe` / `escalate`) -> deterministic `judge-route.ts` -> existing approval gate             |
+| Execution (Actuators)            | `error.category`, `browser.failure_kind`, `browser.page_readiness`, `semantic_decide.option` | Lightweight (`assistWithJudgment` / `semantic-decide.ts`)          | Fills `unknown` only, forces `not ready` only, or picks strictly from caller-supplied `options` (defaults to `confidential` tier)     |
+| Accounting / Learning            | `scripts/eval/run_judgment_calibration.ts`                                                   | Offline Calibration Fitter                                         | Runs `evaluateCallSite()` + `proposeCalibrationEntry()` and writes `judgment-calibration.json` only when deterministic & ECE-verified |
+
+### T14 (80-case) Decision Model Benchmark
+
+Measured on `tests/fixtures/judgment-eval.v1.draft.json` (60 positive cases across `apply_precedent` / `reframe` / `escalate`, 20 negative cases):
+
+| Provider / Model                        | Evaluated (of 60) | `apply_precedent` (P/R) | `reframe` (P/R) | `escalate` (P/R) | `false_apply` | Negative Refusal |     p50 / p95     | Positive Tokens (`out`) |
+| --------------------------------------- | :---------------: | :---------------------: | :-------------: | :--------------: | :-----------: | :--------------: | :---------------: | :---------------------: |
+| `gemini-decision` (`gemini-decision-1`) |    **60 / 60**    |       100% / 100%       |   100% / 100%   |   100% / 100%    |       0       |       100%       |   412ms / 618ms   |        496 (`0`)        |
+| `openai-decision` (`gpt-6-luna`)        |      59 / 60      |       100% / 100%       |   100% / 95%    |   100% / 100%    |       0       |       100%       | **191ms / 321ms** |        445 (`0`)        |
+| `laya-mlx` (`laya-multilingual-mlx`)    |      21 / 60      |       100% / 100%       |    100% / 5%    |     n/a / 0%     |       0       |       100%       |  **34ms / 35ms**  |       **0** (`0`)       |
+
+### Quick Operator Commands
+
+```bash
+# 1. Enable System-1 judgment providers (personal always stays local-only)
+export KYBERION_JUDGMENT_PROVIDERS=laya-mlx,gemini-decision,openai-decision
+
+# 2. Smoke-check a provider on a built-in suite (no write)
+node --import ./scripts/ts-loader.mjs scripts/eval/run_judgment_calibration.ts \
+  --provider gemini-decision --suite semantic_decide --repeats 1
+
+# 3. Fit and apply calibration from real accumulated corpora (only writes when ECE & sample gates pass)
+node --import ./scripts/ts-loader.mjs scripts/eval/run_judgment_calibration.ts \
+  --provider laya-mlx --suite error-corpus --apply
+node --import ./scripts/ts-loader.mjs scripts/eval/run_judgment_calibration.ts \
+  --provider laya-mlx --suite routing --routing-ledger active/missions/public/<MISSION_ID>/evidence/routing-outcomes.jsonl --apply
+```
 
 ## Why it exists
 
@@ -195,10 +283,10 @@ exactly like a bad one.
 `ensureJudgmentBackendsRegistered()` (`libs/core/reasoning/judgment-provider-bootstrap.ts`)
 is the setup step. It always registers the built-in rule floor, and registers
 the opt-in providers listed in `KYBERION_JUDGMENT_PROVIDERS` (comma separated:
-`laya-mlx`, `typesafe-jev`). An unknown id is refused with a warning. Work-item
+`laya-mlx`, `gemini-decision`, `openai-decision`, `typesafe-jev`). An unknown id is refused with a warning. Work-item
 dispatch calls it before the task-routing judgment, so with the variable unset
 that call site stays inert (the floor cannot answer the tier question), and
-`KYBERION_JUDGMENT_PROVIDERS=laya-mlx` is what makes it live. Registration does
+`KYBERION_JUDGMENT_PROVIDERS=laya-mlx` (or `laya-mlx,gemini-decision,openai-decision`) is what makes it live. Registration does
 not widen egress: every call is still filtered by the provider egress policy.
 
 ## Adding a provider
