@@ -888,6 +888,32 @@ describe('run_pipeline compatibility', () => {
     expect(trace.summary().artifacts).toBe(1);
   });
 
+  it('keeps a large baseline report available to the status step', async () => {
+    const { steps } = await readValidatedWorkflowAdf('pipelines/baseline-check.json', {
+      trustResolved: true,
+    });
+    const [source, sink] = steps;
+    const report = {
+      status: 'needs_attention',
+      next_action: 'inspect_attention',
+      next_step: 'Inspect the detailed Baseline report.',
+      failed_layer: 'L10',
+      details: 'x'.repeat(20000),
+    };
+    const result = await runSteps(
+      [{ ...source, op: 'system:json_query', params: { from: 'fixture', path: 'report' } }, sink],
+      { fixture: { report }, __pipeline_options: { max_inline_output_chars: 1000 } },
+      { quiet: true }
+    );
+    expect(result.status).toBe('succeeded');
+    expect(resolveLogMessage(sink.params ?? {}, result.context)).toContain(
+      'status=needs_attention next_action=inspect_attention failed_layer=L10'
+    );
+    expect(resolveLogMessage(sink.params ?? {}, result.context)).toContain(
+      'Next step: Inspect the detailed Baseline report.'
+    );
+  });
+
   it('parses JSON shell output into structured context when possible', async () => {
     const result = await runSteps([
       {

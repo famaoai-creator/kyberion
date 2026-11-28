@@ -11,6 +11,7 @@ import {
 } from '../governance/approval-store.js';
 import { withExecutionContext } from '../authority.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { nowIso } from '../foundation/time.js';
 import {
   loadResolvedStandardIntentCatalog,
@@ -261,16 +262,13 @@ export function validateAcceptedPipelineRunState(
   };
 }
 
-export function buildPipelineBindingEffect(
-  input: PipelineBindingRequestInput
-): PipelineBindingEffect {
+function resolvePipelineBindingEffect(input: PipelineBindingRequestInput): PipelineBindingEffect {
   const pipelineRef = normalizePipelineRef(input.pipeline_ref);
   loadPromotedPipeline(pipelineRef);
   const scope = normalizedScope(input.scope);
   const intentId = input.intent_id.trim();
   requirePipelineIntent(intentId, scope);
   const pipelineSha256 = hashAcceptedPipeline(pipelineRef);
-  requireSuccessfulRun(pipelineRef, input.successful_run_id, pipelineSha256);
   return {
     pipeline_ref: pipelineRef,
     intent_id: intentId,
@@ -278,6 +276,14 @@ export function buildPipelineBindingEffect(
     successful_run_id: input.successful_run_id.trim(),
     pipeline_sha256: pipelineSha256,
   };
+}
+
+export function buildPipelineBindingEffect(
+  input: PipelineBindingRequestInput
+): PipelineBindingEffect {
+  const effect = resolvePipelineBindingEffect(input);
+  requireSuccessfulRun(effect.pipeline_ref, effect.successful_run_id, effect.pipeline_sha256);
+  return effect;
 }
 
 export function requestPipelineBindingApproval(
@@ -468,7 +474,19 @@ export function resolveAcceptedPipelineBindingFromCatalog(
 export function acceptPromotedPipelineBinding(
   input: AcceptPromotedPipelineBindingInput
 ): AcceptedPipelineBinding {
-  const effect = buildPipelineBindingEffect(input);
+  const effect = resolvePipelineBindingEffect(input);
+  const targetPath = acceptedPipelineBindingCatalogPath(effect.scope);
+  const lock = createHash('sha256').update(targetPath).digest('hex');
+  return withLockSync(`pipeline-binding-acceptance-${lock}`, () =>
+    completePipelineBindingAcceptance(input, effect, targetPath)
+  );
+}
+
+function readPipelineBindingAcceptance(
+  input: AcceptPromotedPipelineBindingInput,
+  effect: PipelineBindingEffect,
+  targetPath: string
+) {
   const payloadHash = computeApprovalPayloadHash({ ...effect });
   const storageChannel =
     input.approval_storage_channel?.trim() || PIPELINE_BINDING_APPROVAL_CHANNEL;
@@ -476,45 +494,107 @@ export function acceptPromotedPipelineBinding(
     loadApprovalRequest(storageChannel, input.approval_request_id),
     payloadHash
   );
-  const evidence = requireSuccessfulRun(
-    effect.pipeline_ref,
-    effect.successful_run_id,
-    effect.pipeline_sha256
-  );
-  const targetPath = acceptedPipelineBindingCatalogPath(effect.scope);
   const targetCatalog = catalogForPath(targetPath);
   const expectedGeneration = targetCatalog.generation();
   const current = targetCatalog.load();
+  const existing = current.bindings.find(
+    (binding) =>
+      binding.status === 'active' &&
+      binding.intent_ids.includes(effect.intent_id) &&
+      scopeMatches(binding.scope, effect.scope as ScopeContext)
+  );
+  const bindingId = `accepted-${payloadHash.slice(0, 16)}`;
   if (
-    current.bindings.some(
-      (binding) =>
-        binding.status === 'active' &&
-        binding.intent_ids.includes(effect.intent_id) &&
-        scopeMatches(binding.scope, effect.scope as ScopeContext)
-    )
+    existing &&
+    (existing.binding_id !== bindingId ||
+      existing.pipeline_ref !== effect.pipeline_ref ||
+      existing.approval_request_id !== approval.id ||
+      existing.successful_run_evidence.pipeline_sha256 !== effect.pipeline_sha256)
   ) {
     throw new Error(
       `[PIPELINE_BINDING_INVALID] an active binding already exists for ${effect.intent_id} in this scope`
     );
   }
-  const binding: AcceptedPipelineBinding = {
-    binding_id: `accepted-${payloadHash.slice(0, 16)}`,
+  return {
+    bindingId,
+    approval,
+    existing,
+    storageChannel,
+    current,
+    targetCatalog,
+    expectedGeneration,
+  };
+}
+
+export function inspectPipelineBindingAcceptance(input: AcceptPromotedPipelineBindingInput) {
+  const effect = resolvePipelineBindingEffect(input);
+  const targetPath = acceptedPipelineBindingCatalogPath(effect.scope);
+  const { approval, existing } = readPipelineBindingAcceptance(input, effect, targetPath);
+  return {
+    binding_id: existing?.binding_id ?? null,
+    catalog: targetPath,
+    approval_request_id: approval.id,
+    approval_receipt: approval.applyResult?.result ?? 'not_recorded',
+    status: existing
+      ? approval.applyResult?.result === 'success' && approval.applyResult.auditRef === targetPath
+        ? 'accepted'
+        : approval.applyClaim || approval.applyResult
+          ? 'receipt_conflict'
+          : 'receipt_pending'
+      : approval.applyClaim || approval.applyResult
+        ? 'binding_missing'
+        : 'not_published',
+  };
+}
+
+function completePipelineBindingAcceptance(
+  input: AcceptPromotedPipelineBindingInput,
+  effect: PipelineBindingEffect,
+  targetPath: string
+): AcceptedPipelineBinding {
+  const {
+    bindingId,
+    approval,
+    existing,
+    storageChannel,
+    current,
+    targetCatalog,
+    expectedGeneration,
+  } = readPipelineBindingAcceptance(input, effect, targetPath);
+  if (
+    approval.applyResult?.result === 'success' &&
+    existing &&
+    approval.applyResult.auditRef === targetPath
+  )
+    return existing;
+  if (approval.applyClaim || approval.applyResult) {
+    throw new Error('[PIPELINE_BINDING_INVALID] approval already has an apply claim or result');
+  }
+  if (!existing && current.bindings.some((binding) => binding.binding_id === bindingId))
+    throw new Error('[PIPELINE_BINDING_INVALID] the matching binding is no longer active');
+  const binding: AcceptedPipelineBinding = existing ?? {
+    binding_id: bindingId,
     pipeline_ref: effect.pipeline_ref,
     intent_ids: [effect.intent_id],
     scope: effect.scope,
-    successful_run_evidence: evidence,
+    successful_run_evidence: requireSuccessfulRun(
+      effect.pipeline_ref,
+      effect.successful_run_id,
+      effect.pipeline_sha256
+    ),
     approval_request_id: approval.id,
     accepted_at: nowIso(),
     status: 'active',
   };
-  withExecutionContext('ecosystem_architect', () => {
-    const directory = nodePath.dirname(pathResolver.rootResolve(targetPath));
-    if (!safeExistsSync(directory)) safeMkdir(directory, { recursive: true });
-    targetCatalog.publish(
-      { ...current, bindings: [...current.bindings, binding] },
-      expectedGeneration
-    );
-  });
+  if (!existing)
+    withExecutionContext('ecosystem_architect', () => {
+      const directory = nodePath.dirname(pathResolver.rootResolve(targetPath));
+      if (!safeExistsSync(directory)) safeMkdir(directory, { recursive: true });
+      targetCatalog.publish(
+        { ...current, bindings: [...current.bindings, binding] },
+        expectedGeneration
+      );
+    });
   recordApprovalApplyResult('mission_controller', {
     channel: approval.channel,
     storageChannel,

@@ -25,6 +25,10 @@ This phase is triggered by the **Phase Detection Protocol** under two distinct c
 
 If the physical or neural base of the ecosystem is broken or uninitialized, the agent MUST auto-fix it before proceeding.
 
+The Baseline output includes `next_step` (shown as `Next step` in the pipeline log).
+Follow that instruction for the current observation. In particular, a deferred
+check asks you to wait, and an open recovery circuit asks for operator review.
+
 ### 1. Neural Layer (L1) Recovery
 
 - **Condition**: Missing or incomplete `node_modules`.

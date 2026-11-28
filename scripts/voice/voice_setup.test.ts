@@ -1,7 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
-import { formatVoiceSetupReport, runVoiceSetupScript, type VoiceSetupRow } from './voice_setup.js';
+import {
+  formatVoiceSetupReport,
+  runVoiceSetupScript,
+  summarizeVoiceSetupStatus,
+  type VoiceSetupRow,
+} from './voice_setup.js';
 
 describe('voice setup report', () => {
+  it('reports unsupported when none of the selected runtimes can be used', () => {
+    expect(summarizeVoiceSetupStatus([{ status: 'unsupported' }])).toBe('unsupported');
+    expect(summarizeVoiceSetupStatus([{ status: 'unsupported' }, { status: 'ready' }])).toBe(
+      'ready'
+    );
+  });
   it('formats recovery guidance without direct process output', () => {
     const row: VoiceSetupRow = {
       toolId: 'mlx_audio',
@@ -14,7 +25,7 @@ describe('voice setup report', () => {
     };
 
     expect(formatVoiceSetupReport([row], false)).toContain(
-      'Next step: `pnpm kyberion voice setup --apply`'
+      'Next step: `pnpm kyberion voice setup --apply --tool mlx_audio`'
     );
     expect(formatVoiceSetupReport([row], false)).toContain(
       'Verify: `pnpm pipeline voice-health-check`'
@@ -28,7 +39,7 @@ describe('voice setup report', () => {
 
     const output = logSpy.mock.calls.flat().join('');
     const parsed = JSON.parse(output) as { status: string; rows: unknown[] };
-    expect(['ready', 'needs_install']).toContain(parsed.status);
+    expect(['ready', 'needs_install', 'unsupported']).toContain(parsed.status);
     expect(parsed.rows).toHaveLength(1);
   });
 });

@@ -146,7 +146,15 @@ describe('personal credential consent CLI full chain', () => {
       input.pipe.mockClear();
       await expect(
         x.cli(['revoke', grant, '--reason', 'Owner withdraws synthetic consent'])
-      ).resolves.toEqual({ grant_id: grant, status: 'revoked' });
+      ).resolves.toEqual({
+        grant_id: grant,
+        status: 'revoked',
+        verification: {
+          usage_grant: 'revoked',
+          credential_registration: 'not_checked',
+          provider_revocation: 'not_checked',
+        },
+      });
       expect(input.read).not.toHaveBeenCalled();
       expect(input.pipe).not.toHaveBeenCalled();
       expect(
@@ -267,7 +275,15 @@ describe('personal credential consent CLI full chain', () => {
       input.read.mockClear();
       await expect(
         x.cli(['revoke', grant, '--reason', 'Withdraw without an active assistant'])
-      ).resolves.toEqual({ grant_id: grant, status: 'revoked' });
+      ).resolves.toEqual({
+        grant_id: grant,
+        status: 'revoked',
+        verification: {
+          usage_grant: 'revoked',
+          credential_registration: 'not_checked',
+          provider_revocation: 'not_checked',
+        },
+      });
       expect(input.read).not.toHaveBeenCalled();
       const scope = await import('@agent/core/scope-envelope');
       const historical = scope.mintScopeEnvelope({

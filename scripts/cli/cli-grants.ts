@@ -71,7 +71,7 @@ export const GRANTS_USAGE = `Usage: pnpm kyberion grants <list|check|status|upco
                                   an external service need a human approval first:
                                   --request-approval, then \`pnpm kyberion approvals --approve <id>\`,
                                   then the same command with --approval-request-id <id>.
-  revoke <grant_id> --reason <text> [--tenant <slug>]
+  revoke <grant_id> [--dry-run | --reason <text>] [--tenant <slug>]
                                   Revoke a grant (the record is kept)`;
 
 export interface GrantsDeps {
@@ -144,7 +144,7 @@ const VALUE_FLAGS = new Set([
   '--service-allocation',
 ]);
 const REPEATABLE_FLAGS = new Set(['--meeting-url', '--meeting-series', '--calendar']);
-const BOOLEAN_FLAGS = new Set(['--json', '--request-approval', '--verbose']);
+const BOOLEAN_FLAGS = new Set(['--json', '--request-approval', '--verbose', '--dry-run']);
 
 const ALLOWED_FLAGS: Record<string, Set<string>> = {
   list: new Set(['--tenant', '--capability', '--json']),
@@ -185,7 +185,7 @@ const ALLOWED_FLAGS: Record<string, Set<string>> = {
     '--approval-request-id',
     '--json',
   ]),
-  revoke: new Set(['--reason', '--tenant', '--json']),
+  revoke: new Set(['--reason', '--tenant', '--json', '--dry-run']),
 };
 
 export interface ParsedGrantsArgs {
@@ -517,9 +517,18 @@ export async function runGrantsCommand(
     if (!grantId || parsed.positionals.length > 1) {
       throw new ScriptExitError(1, `grants revoke takes exactly one <grant_id>\n\n${GRANTS_USAGE}`);
     }
-    const reason = required(parsed, '--reason');
     const tenant = parsed.values['--tenant'];
-    if (!deps.find(grantId, tenant)) throw new ScriptExitError(1, `grant ${grantId} not found`);
+    const grant = deps.find(grantId, tenant);
+    if (!grant) throw new ScriptExitError(1, `grant ${grantId} not found`);
+    if (parsed.flags.has('--dry-run')) {
+      print(
+        json
+          ? JSON.stringify({ mode: 'dry_run', operation: 'revoke', grant }, null, 2)
+          : renderGrantRecord('Grant revocation preview (dry-run)', grant, false)
+      );
+      return;
+    }
+    const reason = required(parsed, '--reason');
     const revoked = deps.revoke(grantId, {
       by: deps.revoker(),
       reason,

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { baseRoleEnvText } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { GENERATION_QUOTA_COUNTER_REPO_SUBPATH } from '@agent/core/generation-quota';
@@ -13,6 +13,7 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReaddir,
+  safeRealpath,
   safeLstat,
   safeMoveSync,
   safeRmSync,
@@ -47,7 +48,6 @@ import { isRecord, nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/
 import {
   backupArchiveTimeoutMs,
   interpretTarResult,
-  parseManifestCredentialReads,
   repoCredentialRoots,
   resolveBackupExclusions,
   selectBackupFiles,
@@ -77,7 +77,13 @@ import {
 } from './lib/harness.js';
 import { logger } from '@agent/core/core';
 
-export type BackupScope = 'all' | 'mission' | 'tenant';
+import {
+  parseRestoredBackupManifest,
+  type BackupScope,
+  type RestoredBackupManifest,
+} from './lib/backup/backup-manifest.js';
+
+export { parseRestoredBackupManifest, type BackupScope } from './lib/backup/backup-manifest.js';
 type BackupCommand = 'create' | 'restore' | 'list' | 'prune' | 'drill';
 
 export interface BackupCliOptions {
@@ -897,128 +903,6 @@ export function createBackup(
   });
 }
 
-interface RestoredBackupManifest {
-  format?: string;
-  scope?: BackupScope;
-  tenant?: string | null;
-  entries?: string[];
-  mission_git_repos?: Array<{
-    repo_relative_path?: string;
-    bundle_path?: string | null;
-  }>;
-  tenant_runtime_partitions?: Array<{
-    key: string;
-    path: string;
-    append_only: boolean;
-    hash_chained: boolean;
-  }>;
-  chain_key_id?: string;
-  credential_reads?: ManifestCredentialRead[];
-}
-
-const CHAIN_KEY_ID_PATTERN = /^[0-9a-f]{16}$/u;
-
-function parseTenantRuntimePartitions(
-  value: unknown
-): RestoredBackupManifest['tenant_runtime_partitions'] {
-  if (!Array.isArray(value))
-    throw new Error('Backup manifest tenant runtime partitions are invalid.');
-  return value.map((entry) => {
-    if (
-      !isRecord(entry) ||
-      typeof entry.key !== 'string' ||
-      typeof entry.path !== 'string' ||
-      typeof entry.append_only !== 'boolean' ||
-      typeof entry.hash_chained !== 'boolean'
-    ) {
-      throw new Error('Backup manifest tenant runtime partition is invalid.');
-    }
-    return {
-      key: entry.key,
-      path: normalizeArchiveMember(entry.path),
-      append_only: entry.append_only,
-      hash_chained: entry.hash_chained,
-    };
-  });
-}
-
-export function parseRestoredBackupManifest(raw: string): RestoredBackupManifest {
-  let parsed: unknown;
-  try {
-    parsed = parseSafeJsonInput(raw, 'Backup manifest');
-  } catch (error) {
-    throw new Error(
-      `Backup manifest is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
-  if (!isRecord(parsed)) throw new Error('Backup manifest root must be a JSON object.');
-  if (parsed.format !== 'kyberion-backup-v1') {
-    throw new Error('Unsupported or missing backup manifest format.');
-  }
-  if (parsed.scope !== 'all' && parsed.scope !== 'mission' && parsed.scope !== 'tenant') {
-    throw new Error('Backup manifest has an invalid scope.');
-  }
-  if (!Array.isArray(parsed.entries) || parsed.entries.some((entry) => typeof entry !== 'string')) {
-    throw new Error('Backup manifest entries are missing or invalid.');
-  }
-  if (parsed.tenant !== undefined && parsed.tenant !== null && typeof parsed.tenant !== 'string') {
-    throw new Error('Backup manifest tenant is invalid.');
-  }
-  let chainKeyId: string | undefined;
-  if (parsed.chain_key_id !== undefined) {
-    if (
-      typeof parsed.chain_key_id !== 'string' ||
-      !CHAIN_KEY_ID_PATTERN.test(parsed.chain_key_id)
-    ) {
-      throw new Error('Backup manifest chain key id is invalid.');
-    }
-    chainKeyId = parsed.chain_key_id;
-  }
-  const credentialReads =
-    parsed.credential_reads === undefined
-      ? undefined
-      : parseManifestCredentialReads(parsed.credential_reads, normalizeArchiveMember);
-  let missionGitRepos: RestoredBackupManifest['mission_git_repos'];
-  if (parsed.mission_git_repos !== undefined) {
-    if (!Array.isArray(parsed.mission_git_repos)) {
-      throw new Error('Backup manifest mission git metadata is invalid.');
-    }
-    missionGitRepos = [];
-    for (const entry of parsed.mission_git_repos) {
-      if (!isRecord(entry) || typeof entry.repo_relative_path !== 'string') {
-        throw new Error('Backup manifest mission repository path is invalid.');
-      }
-      if (
-        entry.bundle_path !== undefined &&
-        entry.bundle_path !== null &&
-        typeof entry.bundle_path !== 'string'
-      ) {
-        throw new Error('Backup manifest mission bundle path is invalid.');
-      }
-      missionGitRepos.push({
-        repo_relative_path: entry.repo_relative_path,
-        ...(entry.bundle_path !== undefined
-          ? { bundle_path: entry.bundle_path as string | null }
-          : {}),
-      });
-    }
-  }
-  return {
-    format: parsed.format,
-    scope: parsed.scope,
-    ...(parsed.tenant !== undefined ? { tenant: parsed.tenant as string | null } : {}),
-    entries: parsed.entries,
-    ...(missionGitRepos ? { mission_git_repos: missionGitRepos } : {}),
-    ...(parsed.tenant_runtime_partitions !== undefined
-      ? {
-          tenant_runtime_partitions: parseTenantRuntimePartitions(parsed.tenant_runtime_partitions),
-        }
-      : {}),
-    ...(chainKeyId !== undefined ? { chain_key_id: chainKeyId } : {}),
-    ...(credentialReads ? { credential_reads: credentialReads } : {}),
-  };
-}
-
 const TENANT_PHYSICAL_BACKUP_ROOTS = [
   'active/shared/coordination/channels',
   'active/shared/runtime/presence',
@@ -1327,6 +1211,22 @@ function quarantineRestoredPeerRuntime(
   return { quarantinePath: quarantineRoot, moved };
 }
 
+export function parseRestoreBaselineStatus(output: string) {
+  const report = parseSafeJsonInput(output, 'Restored checkout Baseline report');
+  const status = isRecord(report) ? report.status : undefined;
+  if (
+    status !== 'all_clear' &&
+    status !== 'needs_attention' &&
+    status !== 'needs_onboarding' &&
+    status !== 'needs_recovery'
+  ) {
+    throw new Error(
+      '[BACKUP_BASELINE_INVALID] Restored checkout did not return a valid Baseline status.'
+    );
+  }
+  return status;
+}
+
 export function restoreBackup(
   options: BackupCliOptions,
   passphraseDeps: BackupPassphraseDeps = {},
@@ -1341,6 +1241,7 @@ export function restoreBackup(
   ledger_verification: RestoredLedgerVerification;
   trimmed_tails: string[];
   withheld: WithheldRestoreRoot[];
+  baseline_status?: ReturnType<typeof parseRestoreBaselineStatus>;
 } {
   if (!options.archive) throw new Error('restore requires an archive path');
   const archive = path.resolve(options.archive);
@@ -1368,7 +1269,8 @@ function restoreBackupToTarget(
   if (safeExistsSync(target) && safeReaddir(target).length > 0 && !options.force) {
     throw new Error(`Restore target is not empty; pass --force to restore into ${target}`);
   }
-  return withPlaintextTempDir(`restore-${stamp()}-${randomUUID().slice(0, 8)}`, (tempDir) => {
+  const tempName = `restore-${stamp()}-${randomUUID().slice(0, 8)}`;
+  return withPlaintextTempDir<ReturnType<typeof restoreBackup>>(tempName, (tempDir) => {
     const plainArchive = archive.endsWith('.enc') ? path.join(tempDir, 'payload.tar.gz') : archive;
     if (archive.endsWith('.enc')) {
       const passphrase = resolveBackupPassphrase(
@@ -1424,15 +1326,18 @@ function restoreBackupToTarget(
     quarantinePaths.push(...extracted.quarantinePaths);
     restoreMissionGitBundles(target);
 
+    let baselineStatus: ReturnType<typeof parseRestoreBaselineStatus> | undefined;
     if (options.verifyBaseline) {
-      const result = safeExecResult(
-        'pnpm',
-        ['pipeline', '--input', 'pipelines/baseline-check.json'],
-        { cwd: target, timeoutMs: 120000, maxOutputMB: 20 }
-      );
+      const result = safeExecResult('node', ['dist/scripts/run_baseline_check.js', '--json'], {
+        cwd: target,
+        timeoutMs: 120000,
+        maxOutputMB: 20,
+        env: { KYBERION_ROOT: target, LOG_LEVEL: 'silent' },
+      });
       if (result.status !== 0) {
         throw new Error(`baseline-check failed after restore: ${result.stderr || result.stdout}`);
       }
+      baselineStatus = parseRestoreBaselineStatus(result.stdout);
     }
 
     return {
@@ -1442,6 +1347,7 @@ function restoreBackupToTarget(
       ledger_verification: ledgerVerification,
       trimmed_tails: trimmedTails,
       withheld,
+      ...(baselineStatus ? { baseline_status: baselineStatus } : {}),
     };
   });
 }
@@ -1458,11 +1364,16 @@ export function runRestoreDrill(options: BackupCliOptions): {
   target: string;
   checkoutPrepared: boolean;
   baselineVerified: boolean;
+  baselineStatus?: ReturnType<typeof parseRestoreBaselineStatus>;
   restoredManifestCount: number;
   quarantinePaths: string[];
   credentialMembers: WithheldRestoreRoot[];
   targetRemoved: boolean;
 } {
+  if (options.verifyBaseline && !options.prepareCheckout)
+    throw new Error(
+      '[BACKUP_DRILL_CHECKOUT_REQUIRED] --verify-baseline requires --prepare-checkout for a restore drill.'
+    );
   const archive =
     options.archive ||
     backupFileEntries(options.backupDir)
@@ -1475,8 +1386,24 @@ export function runRestoreDrill(options: BackupCliOptions): {
   }
   const scratchRoot = path.resolve(pathResolver.sharedTmp());
   const target = path.resolve(
-    options.target || path.join(scratchRoot, `backup-restore-drill-${stamp()}`)
+    options.target ||
+      path.join(scratchRoot, `backup-restore-drill-${stamp()}-${randomUUID().slice(0, 8)}`)
   );
+  assertDrillTargetConfined(target, scratchRoot, Boolean(options.force));
+  const key = createHash('sha256').update(safeRealpath(target)).digest('hex');
+  return withLockSync(
+    `backup-restore-drill-${key}`,
+    () => runRestoreDrillAtTarget(options, archive, target, scratchRoot),
+    0
+  );
+}
+
+function runRestoreDrillAtTarget(
+  options: BackupCliOptions,
+  archive: string,
+  target: string,
+  scratchRoot: string
+): ReturnType<typeof runRestoreDrill> {
   assertDrillTargetConfined(target, scratchRoot, Boolean(options.force));
   if (options.force && safeExistsSync(target)) {
     safeRmSync(target, { recursive: true, force: true });
@@ -1513,7 +1440,8 @@ export function runRestoreDrill(options: BackupCliOptions): {
       archive: result.archive,
       target: result.target,
       checkoutPrepared: Boolean(options.prepareCheckout),
-      baselineVerified: Boolean(options.verifyBaseline),
+      baselineVerified: result.baseline_status === 'all_clear',
+      ...(result.baseline_status ? { baselineStatus: result.baseline_status } : {}),
       restoredManifestCount: findRestoredManifests(result.target).length,
       quarantinePaths: result.quarantinePaths,
       credentialMembers,
@@ -1616,6 +1544,7 @@ export function main(argv: string[], print: (value: unknown) => void = () => und
       quarantine_paths: result.quarantinePaths,
       ledger_verification: result.ledger_verification,
       trimmed_tails: result.trimmed_tails,
+      ...(result.baseline_status ? { baseline_status: result.baseline_status } : {}),
     });
     return;
   }

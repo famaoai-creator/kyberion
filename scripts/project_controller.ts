@@ -7,6 +7,7 @@ import {
   ensureProjectOsScaffold,
   getProjectManagementView,
   listManagedProjects,
+  projectStatusAfterRestore,
   reconcileProjectOperationalState,
   restoreManagedProject,
   updateManagedProjectTrack,
@@ -96,8 +97,8 @@ function printHelp(): void {
       '  track update <TRACK_ID> [--name <TEXT>] [--summary <TEXT>] [--status <planned|active|paused|completed|archived>] [--tenant-slug <SLUG>] [--track-type <TYPE>] [--lifecycle-model <MODEL>] [--primary-locale <LOCALE>] [--release-id <ID>] [--change-scope <TEXT>] [--gate-profile-id <ID>] [--required-artifacts <CSV>] [--metadata <JSON>] [--json]',
       '  track pause|resume|complete|archive <TRACK_ID> [--reason <TEXT>] [--json]',
       '  update|update-status <PROJECT_ID> [--name <NAME>] [--summary <TEXT>] [--status <STATUS>] [--primary-locale <LOCALE>] [--pipeline-refs <CSV>] [--objective-ids <CSV>] [--metadata <JSON>] [--json]',
-      '  archive <PROJECT_ID> [--reason <TEXT>] [--json]',
-      '  restore <PROJECT_ID> [--reason <TEXT>] [--json]',
+      '  archive <PROJECT_ID> [--reason <TEXT>] [--dry-run] [--json]',
+      '  restore <PROJECT_ID> [--reason <TEXT>] [--dry-run] [--json]',
       '  reconcile [PROJECT_ID] [--dry-run|--apply] [--cross-scope] [--json]',
       '  bootstrap --project-id <ID> --name <NAME> --summary <TEXT> --tier <personal|confidential|public> [--organization-id <ID>] [--tenant-slug <SLUG>] [--utterance <TEXT>] [--track-id <ID>] [--track-name <NAME>] [--pipeline-refs <CSV>] [--service-bindings <CSV>] [--json]',
       '',
@@ -286,7 +287,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
             : requiredOption(trackArgv, '--track-id');
         const record = updateManagedProjectTrack(trackId, patch);
         if (hasFlag(trackArgv, '--json')) jsonOutput(record);
-        else printOutput(`Updated project track ${record.track_id}`);
+        else printOutput(`Updated project track ${record.track_id} status=${record.status}`);
         return;
       }
       if (trackCommand !== 'create')
@@ -434,20 +435,33 @@ async function mainImpl(args: string[] = []): Promise<void> {
       else printOutput(`Updated project ${record.project_id}`);
       return;
     }
-    case 'archive': {
-      validateOptions(argv, ['--project-id', '--reason']);
-      const projectId = positional || requiredOption(argv, '--project-id');
-      const record = archiveManagedProject(projectId, optionValue(argv, '--reason'));
-      if (json) jsonOutput(record);
-      else printOutput(`Archived project ${record.project_id}`);
-      return;
-    }
+    case 'archive':
     case 'restore': {
-      validateOptions(argv, ['--project-id', '--reason']);
+      validateOptions(argv, ['--project-id', '--reason'], ['--dry-run', '--json']);
       const projectId = positional || requiredOption(argv, '--project-id');
-      const record = restoreManagedProject(projectId, optionValue(argv, '--reason'));
+      if (hasFlag(argv, '--dry-run')) {
+        const { project } = getProjectManagementView(projectId);
+        const { project_id, tenant_slug, organization_id, tier, status } = project;
+        jsonOutput({
+          mode: 'dry_run',
+          operation: command,
+          project_id,
+          tenant_slug,
+          organization_id,
+          tier,
+          current_status: status,
+          expected_status: command === 'archive' ? 'archived' : projectStatusAfterRestore(project),
+          eligibility: 'checked_on_apply',
+        });
+        return;
+      }
+      const update = command === 'archive' ? archiveManagedProject : restoreManagedProject;
+      const record = update(projectId, optionValue(argv, '--reason'));
       if (json) jsonOutput(record);
-      else printOutput(`Restored project ${record.project_id}`);
+      else
+        printOutput(
+          `${command === 'archive' ? 'Archived' : 'Restored'} project ${record.project_id} status=${record.status}`
+        );
       return;
     }
     case 'reconcile': {

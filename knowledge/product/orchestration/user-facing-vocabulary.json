@@ -9456,9 +9456,9 @@
         "qps-ploc": "⟦Ƈħėƈķ őṗėřȧŧőř řėȧḓïñėşş (ṽïŧȧŀ şïɠñş) ŀőřėɱ ïṗşůɱ ⟧"
       },
       "cli_cmd_operator_setup_report": {
-        "en": "Report setup status and missing steps",
-        "ja": "セットアップ状況と未完了の手順を報告",
-        "qps-ploc": "⟦Řėṗőřŧ şėŧůṗ şŧȧŧůş ȧñḓ ɱïşşïñɠ şŧėṗş ŀőřėɱ ïṗşůɱ ⟧"
+        "en": "Report setup readiness or show lifecycle commands with --lifecycle",
+        "ja": "セットアップ状況を報告し、--lifecycle で運用手順を表示",
+        "qps-ploc": "⟦Řėṗőřŧ şėŧůṗ řėȧḓïñėşş őř şħőẇ ŀïƒėƈẏƈŀė ƈőɱɱȧñḓş ẇïŧħ --ŀïƒėƈẏƈŀė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
       },
       "cli_cmd_operator_voice_setup": {
         "en": "Check and set up voice readiness",
@@ -10511,9 +10511,9 @@
         "qps-ploc": "⟦Řėşŧȧřŧ ŧħïş ƈħėƈķőůŧ'ş Ƈħřőñőş şėřṽïƈė ṽïȧ ŧħė ħőşŧ şėřṽïƈė ɱȧñȧɠėř ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
       },
       "cli_cmd_script_chronos_status": {
-        "en": "Show this checkout's Chronos service identity and status",
-        "ja": "このcheckoutのChronosサービスの識別情報と状態を表示",
-        "qps-ploc": "⟦Şħőẇ ŧħïş ƈħėƈķőůŧ'ş Ƈħřőñőş şėřṽïƈė ïḓėñŧïŧẏ ȧñḓ şŧȧŧůş ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+        "en": "Show the selected daemon identity and host service manager query result",
+        "ja": "対象デーモンの識別情報とホストのサービスマネージャへの問い合わせ結果を表示",
+        "qps-ploc": "⟦Şħőẇ ŧħė şėŀėƈŧėḓ ḓȧėɱőñ ïḓėñŧïŧẏ ȧñḓ ħőşŧ şėřṽïƈė ɱȧñȧɠėř ɋůėřẏ řėşůŀŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
       "cli_cmd_script_learning_harvest": {
         "en": "Propose recurring runtime failures as learning candidates",

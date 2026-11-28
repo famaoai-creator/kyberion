@@ -294,7 +294,9 @@ export async function main(
   if (argv.status) {
     const status = manager.statusCommand(spec, ctx);
     if (!status) {
-      print(`no status command for platform '${manager.platform}'`);
+      print(
+        `${identityHint}\nmanager_query=unsupported\nno status command for platform '${manager.platform}'`
+      );
       return;
     }
     const [command, ...commandArgs] = status.run;
@@ -302,6 +304,7 @@ export async function main(
     print(
       identityHint +
         '\n' +
+        `manager_query=${result.status === 0 ? 'succeeded' : 'failed'} exit_status=${result.status} workload_health=not_checked\n` +
         (result.stdout.trim() ||
           result.stderr.trim() ||
           `${status.run.join(' ')} exited ${result.status}`)
@@ -365,6 +368,9 @@ export async function main(
   }
   logger.success(
     `[daemon-manager] ${verb}ed ${spec.label} via ${manager.platform} — verify: ${plan.verificationHint}`
+  );
+  print(
+    `${identityHint}\noperation=${verb} manager_commands=completed service_state=not_checked\nVerify with pnpm kyberion scheduler status${verbFlag}`
   );
 }
 

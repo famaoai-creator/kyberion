@@ -100,6 +100,25 @@ onboarding company の help が返す vertical から用途に合う候補を確
 コマンドの正確な引数は標準フローの該当 Step と各 facade の help で確認する。
 利用者の自由文をシェル構文へ直接連結せず、引数または reviewed JSON として渡す。
 
+導入後の相談は、利用者が達成したいことを
+`pnpm kyberion setup report --lifecycle --summary --json` の各領域の `use_when`
+と照合し、該当する `guide_command` から最初の確認手順を案内する。
+この一覧は導入前にも参照できる。ガイドを表示した時点では確認は未実行なので、
+現在の環境の状態は対象領域の確認コマンドで判定する。
+「目標の進捗を見たい」は `objectives`、「ミッションを再開したい」は
+`mission`、「この役割のモデルを確認したい」は `model` から案内する。
+領域の詳細にある `related_guides` は、たとえば目標からプロジェクトや
+WorkItem に進むときに使える。操作自体は案内先の各 CLI から直接行える。
+
+CLI の `ask` で手順を尋ねると該当ガイドが表示される。用語の意味を尋ねるときは
+「Track とは何ですか？」のように聞くと用語集への参照も返る。
+`task` はタスクセッションと定型タスク、`knowledge` は知識、
+`approval` は承認、`channel` は受信箱と通知、`release` はリポジトリのリリースの入口。
+
+顧客がまだ選択されていない場合も、コンテキストの確認には
+`pnpm onboarding:context show --customer-slug <customer-slug> --json` を使える。
+binding が空ならテナントガイドからスコープを確認し、紐付けをプレビューする。
+
 ## 5. 二種類のサービスを準備する
 
 | 種類             | 意味                                     | 入口                                                          |

@@ -15,6 +15,10 @@ export function parseCliWorkflowOptions(args: string[]): Record<string, string |
   return parsed;
 }
 
+export function isWorkflowDryRun(options: Record<string, string | boolean>): boolean {
+  return options['--dry-run'] === true || options['--check'] === true;
+}
+
 export interface ParsedOffboardCommand {
   scopeType: 'tenant' | 'project';
   scopeId: string;

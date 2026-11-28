@@ -135,6 +135,10 @@ is `active/shared/runtime/state/resident-services.json`. The per-daemon verbs
 (`pnpm kyberion scheduler install|start|stop|restart|uninstall [--daemon <id>]`) remain
 for single-service work.
 
+The per-daemon apply output identifies the target instance and gives the status
+command for that daemon. Status distinguishes a successful manager query from
+a failed query. Application workload health is outside that query.
+
 See [multi-instance scheduler operations](../../knowledge/product/orchestration/multi-instance-scheduler.md)
 for schedule ownership and explicit legacy-global management (`--legacy-global`).
 
@@ -551,6 +555,14 @@ pnpm backup restore /Volumes/backup/kyberion-2026-07-04.tar.gz.enc --target /pat
 KYBERION_BACKUP_PASSPHRASE='from-your-password-manager' \
   pnpm backup restore /Volumes/backup/kyberion-2026-07-04.tar.gz.enc --target /path/to/clean/kyberion --verify-baseline
 ```
+
+With `--verify-baseline`, the restore output includes `baseline_status`. A drill
+reports `baselineVerified: true` only when the restored checkout reports
+`all_clear`. Archive extraction and checkout readiness have separate results.
+Concurrent drills targeting the same directory are refused before replacement.
+Use `pnpm backup drill --prepare-checkout --verify-baseline` to check readiness
+in a disposable checkout. The drill rejects `--verify-baseline` without
+`--prepare-checkout` before touching the restore target.
 
 For a tenant export, repeat the scope and tenant explicitly during restore so
 the archive boundary is checked before extraction:

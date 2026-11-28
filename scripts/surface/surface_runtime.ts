@@ -144,21 +144,24 @@ function isRunning(record: SurfacePidRecord): boolean {
  * identity cannot be proven. A live pid with a different marker is
  * 'pid_recycled' — the recorded surface is gone and the pid is unrelated.
  */
-function stopRecordedProcess(
+export function stopRecordedProcess(
   record: SurfacePidRecord
-): 'stopped' | 'pid_recycled' | 'not_running' | 'identity_unknown' {
+): 'stopped' | 'stop_requested' | 'pid_recycled' | 'not_running' | 'identity_unknown' {
   if (!isPidAlive(record.pid)) return 'not_running';
-  if (record.pidStartMarker) {
-    const current = processStartMarker(record.pid);
-    if (current === undefined) return 'identity_unknown';
-    if (current !== record.pidStartMarker) return 'pid_recycled';
-  }
+  if (!record.pidStartMarker) return 'identity_unknown';
+  const current = processStartMarker(record.pid);
+  if (current === undefined) return 'identity_unknown';
+  if (current !== record.pidStartMarker) return 'pid_recycled';
   try {
     process.kill(record.pid, 'SIGTERM');
-  } catch (_) {
-    /* best-effort cleanup */
+  } catch {
+    return 'identity_unknown';
   }
-  return 'stopped';
+  return isPidAlive(record.pid) ? 'stop_requested' : 'stopped';
+}
+
+function surfaceStopNeedsVerification(status: string): boolean {
+  return status === 'identity_unknown' || status === 'stop_requested';
 }
 
 function registerRunningSurfaceFromState(record: any) {
@@ -203,8 +206,8 @@ function stopSurfaceRecord(record: SurfacePidRecord | undefined): void {
   // A cleanup that could not prove the process died has not completed —
   // throwing lets runtimeSupervisor.cleanup() retain the record instead of
   // reporting 'removed' for a possibly-running process.
-  if (outcome === 'identity_unknown') {
-    throw new Error(`process identity unresolved for pid ${record.pid} — not signaled`);
+  if (surfaceStopNeedsVerification(outcome)) {
+    throw new Error(`surface process exit not confirmed for pid ${record.pid} (${outcome})`);
   }
 }
 
@@ -491,15 +494,28 @@ export async function startSurfaceById(surfaceId: string, manifestPath: string) 
 function stopSurfaceById(surfaceId: string) {
   const state = loadSurfaceState();
   const record = state.surfaces[surfaceId];
+  const verification = {
+    endpoint_reachability: 'not_checked',
+    next_command: 'pnpm surfaces status',
+  };
   if (!record) {
-    return { status: 'not_found', id: surfaceId };
+    return {
+      status: 'not_found',
+      id: surfaceId,
+      verification: { ...verification, managed_record: 'absent' },
+    };
   }
 
   const outcome = stopRecordedProcess(record);
-  if (outcome === 'identity_unknown') {
+  if (surfaceStopNeedsVerification(outcome)) {
     // Keep the record — the process may still be running and a delete here
     // would orphan it for the next reconcile to respawn a duplicate.
-    return { status: 'identity_unknown', id: surfaceId, pid: record.pid };
+    return {
+      status: outcome,
+      id: surfaceId,
+      pid: record.pid,
+      verification: { ...verification, managed_record: 'retained' },
+    };
   }
   runtimeSupervisor.unregister(record.resourceId);
   delete state.surfaces[surfaceId];
@@ -509,6 +525,11 @@ function stopSurfaceById(surfaceId: string) {
     status: outcome === 'stopped' ? 'stopped' : outcome,
     id: surfaceId,
     pid: record.pid,
+    verification: {
+      ...verification,
+      managed_record: 'removed',
+      process_exit: 'recorded_process_absent',
+    },
   };
 }
 
@@ -867,9 +888,9 @@ async function repairSurfaceById(surfaceId: string, manifestPath: string) {
   if (!record || !isRunning(record)) {
     if (record) {
       const stopResult = stopSurfaceById(surfaceId);
-      if (stopResult.status === 'identity_unknown') {
+      if (surfaceStopNeedsVerification(stopResult.status)) {
         return {
-          status: 'identity_unknown',
+          status: stopResult.status,
           id: surfaceId,
           repairHint: 'stop inconclusive — record kept, not restarted',
           health,
@@ -913,9 +934,9 @@ async function repairSurfaceById(surfaceId: string, manifestPath: string) {
   }
 
   const stopResult = stopSurfaceById(surfaceId);
-  if (stopResult.status === 'identity_unknown') {
+  if (surfaceStopNeedsVerification(stopResult.status)) {
     return {
-      status: 'identity_unknown',
+      status: stopResult.status,
       id: surfaceId,
       repairHint: `stop inconclusive after ${health.detail} — record kept, not restarted`,
       health,
@@ -1056,10 +1077,10 @@ async function unregisterSurfaceById(surfaceId: string, manifestPath: string) {
   const index = manifest.surfaces.findIndex((s) => s.id === surfaceId);
   if (index === -1) throw new Error(`Surface "${surfaceId}" not found.`);
 
+  const stopResult = stopSurfaceById(surfaceId);
+  if (surfaceStopNeedsVerification(stopResult.status)) return stopResult;
   const [removed] = manifest.surfaces.splice(index, 1);
   saveSurfaceManifest(manifest, manifestPath);
-
-  await stopSurfaceById(surfaceId);
 
   auditChain.record({
     agentId: executionAgentId('worker'),
@@ -1086,7 +1107,7 @@ async function reconcileHealth(manifestPath: string) {
       const stopResult = stopSurfaceById(definition.id);
       // An inconclusive stop kept the record and possibly the process —
       // restarting here would spawn a duplicate; the next pass re-evaluates.
-      if (stopResult.status === 'identity_unknown') continue;
+      if (surfaceStopNeedsVerification(stopResult.status)) continue;
       await startSurfaceById(definition.id, manifestPath);
       recordProtocolSurfaceLifecycle(definition.id, 'reconnect', 'reconnected', {
         reason: 'health_probe_unhealthy',

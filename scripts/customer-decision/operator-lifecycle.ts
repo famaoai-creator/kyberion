@@ -76,6 +76,20 @@ export function runStatus(opts: Record<string, string>, now: string): unknown {
   const caseId = requireOpt(opts, 'case');
   const location = locationOf(opts, caseId);
   const agendaId = opts.agenda?.trim();
+  const observation = {
+    mode: 'status_with_reconciliation',
+    read_only_command: [
+      'pnpm',
+      'kyberion',
+      'customer-decision',
+      'overview',
+      '--tenant',
+      tenant,
+      '--case',
+      caseId,
+      '--detail',
+    ],
+  };
   // CD-10: retry the routing of bolt-review answers a respond could not
   // finish — after completing interrupted responses, so their receipts count.
   let early: ReturnType<typeof reconcileCase> | undefined;
@@ -89,6 +103,7 @@ export function runStatus(opts: Record<string, string>, now: string): unknown {
     const reconciled = early ?? reconcileCase(tenant, location, now);
     if (!agendaId) {
       return {
+        observation,
         case_id: caseId,
         reconciled,
         task_proposals: asLedgerWriter(tenant, () =>
@@ -106,6 +121,7 @@ export function runStatus(opts: Record<string, string>, now: string): unknown {
       const hash = agendaContentHash(agenda);
       return {
         ...agendaSummary(agenda),
+        observation,
         approval: agenda.approval ?? null,
         approval_current: agenda.approval?.content_hash === hash,
         in_force: agenda.in_force ?? null,

@@ -128,7 +128,15 @@ export async function main(
           ...(args.instance ? { instance_id: args.instance } : {}),
           ...(args.session ? { session_id: args.session } : {}),
         });
-        return { ok: true as const, nhi_id: record?.nhi_id, released: true };
+        return {
+          ok: true as const,
+          tenant_slug: tenant,
+          nhi_id: record.nhi_id,
+          instance_id: record.released_instance_id,
+          session_id: record.released_session_id,
+          released: true,
+          verification: { admission_binding: 'absent', process_status: 'not_checked' },
+        };
       }
       default:
         throw new Error(`Unknown action: ${args.action}`);

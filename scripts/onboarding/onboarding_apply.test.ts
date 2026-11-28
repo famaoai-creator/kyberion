@@ -271,6 +271,12 @@ describe('onboarding_apply', () => {
     expect(summary).toContain('onboarding/activation-input.json');
     expect(summary).toContain('onboarding authority preview --file');
     expect(summary).toContain('human approval');
+    expect(summary).toContain('pnpm kyberion setup report --persona first-time-user');
+    expect(summary).toContain('pnpm kyberion setup report --lifecycle --summary');
+    expect(summary).toContain('pnpm kyberion setup report --lifecycle --domain tenant');
+    expect(summary.indexOf('pipelines/baseline-check.json')).toBeLessThan(
+      summary.indexOf('--lifecycle --domain tenant')
+    );
   });
 
   it('guides active setups to their existing authority rather than a new activation plan', () => {
@@ -288,6 +294,7 @@ describe('onboarding_apply', () => {
     expect(summary).toContain('onboarding authority show --scope person --json');
     expect(summary).not.toContain('authority preview --file');
     expect(summary).toContain('Already active identities need no new activation consent');
+    expect(summary).not.toContain('--lifecycle --domain tenant');
   });
 
   it('uses the active customer root for onboarding artifacts', () => {

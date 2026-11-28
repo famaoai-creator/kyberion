@@ -42,6 +42,26 @@ vi.mock('@agent/core/secret/secret-introduction', () => ({
 }));
 
 describe('secret_introduce CLI', () => {
+  it('reports the limits of a presence check when there are no registered keys', async () => {
+    const { runSecretCli } = await import('./secret_introduce.js');
+    const { describeIntroductionReadiness } =
+      await import('@agent/core/secret/secret-introduction');
+    vi.mocked(describeIntroductionReadiness).mockReturnValueOnce({
+      serviceId: 'no-keys',
+      identities: [],
+      missing: [],
+    });
+    const print = vi.fn();
+    await runSecretCli(['status', 'no-keys', '--json'], { print });
+    expect(JSON.parse(String(print.mock.calls[0]?.[0]))).toMatchObject({
+      checks: {
+        secret_presence: 'no_registered_keys',
+        binding_usage: 'not_checked',
+        provider_validity: 'not_checked',
+      },
+    });
+  });
+
   it('refuses --value on argv', async () => {
     const { runSecretCli } = await import('./secret_introduce.js');
     await expect(

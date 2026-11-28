@@ -280,6 +280,14 @@ describe('kyberion command router', () => {
     expect(help).toContain('ask default');
   });
 
+  it('shows registered ingress subcommands when the group is queried for help', async () => {
+    const output: unknown[] = [];
+    await main(['ingress', '--help'], (value) => output.push(value));
+    for (const verb of ['probe', 'status', 'up', 'down']) {
+      expect(output.join('\n')).toContain(`ingress ${verb}`);
+    }
+  });
+
   it('routes help output through the supplied harness printer', async () => {
     const output: unknown[] = [];
     const { main } = await import('./kyberion.js');

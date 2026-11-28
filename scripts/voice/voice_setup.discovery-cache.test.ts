@@ -9,6 +9,7 @@ import * as path from 'node:path';
 const sim = vi.hoisted(() => ({
   envPath: '',
   installed: false,
+  failImport: false,
   calls: [] as string[],
 }));
 
@@ -56,7 +57,7 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
       }
       if (command === path.join(sim.envPath, 'bin', 'python') && args[0] === '-c') {
         if (args[1]?.includes('sys.version_info')) return ok('3.11\n');
-        return sim.installed ? ok('0.4.2\n') : fail();
+        return sim.installed && !sim.failImport ? ok('0.4.2\n') : fail();
       }
       return fail();
     },
@@ -101,4 +102,19 @@ describe('voice setup and local STT discovery cache', () => {
       expect.objectContaining({ python_bin: binPath(), version: '0.4.2' }),
     ]);
   }, 60_000);
+
+  it('does not report ready when install exits successfully but the package cannot be imported', async () => {
+    sim.failImport = true;
+    try {
+      const result = await voiceSetup.main(['--apply', '--tool', 'mlx_whisper']);
+      expect(result.rows[0]).toMatchObject({
+        status: 'needs_install',
+        installed: false,
+        installAction: 'failed',
+        detail: expect.stringContaining('Post-install'),
+      });
+    } finally {
+      sim.failImport = false;
+    }
+  });
 });

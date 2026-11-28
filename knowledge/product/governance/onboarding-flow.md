@@ -688,7 +688,7 @@ pnpm mission start <mission-id>
 開始前に `pnpm mission start <mission-id> --dry-run --json` でスコープと前提条件を確認し、ミッションのゲートと作業内容に必須の人間承認が含まれる場合は、その経路を保留として記録する。
 登録済みのミッションは `pnpm mission workflow-select <mission-id>` の `machine_gate_preview` で、テンプレートに明記された人間・レビュー担当の確認ゲートを調べる。監査台帳による保留、委任先、権限、証跡は、実行前にそれぞれのゲートで確認する。
 
-1. `pnpm onboarding llm show`（テナント経路では `--tenant <tenant-slug>` を付ける）で対象スコープの backend とモデルを確認する。Codex CLI や Claude Code に学習利用を許さない条件で委任する場合は、実際のアカウントに対応する有効な attest（Step 5.1 の `training_use: none`）と、各送信経路の `training_use: no_training` を確認する。データ利用条件は委任、助言、コンテキスト圧縮、判定、蒸留の経路ごとに決まる。条件が揃わなければ、送信を保留して Step 5.1 の事前確認に戻る。ローカル接続の確認には別途 `local_only` のプローブを利用できる。
+1. `pnpm onboarding llm show`（テナント経路では `--tenant <tenant-slug>` を付ける）で対象スコープの backend とモデルを確認する。Codex CLI や Claude Code に学習利用を許さない条件で委任する場合は、実際のアカウントに対応する有効な attest（Step 5.1 の `training_use: none`）と、各送信経路の `training_use: no_training` を確認する。データ利用条件は委任、助言、コンテキスト圧縮、判定、蒸留の経路ごとに決まる。条件が揃わなければ、送信を保留して Step 5.1 の事前確認に戻る。ローカル接続の確認には別途 `local_only` のプローブを利用できる。試行中に attest や権限を変更しない。
 2. ミッションコントローラーで開始し、タスクを WorkItem としてワーカーに委任する。各タスクの担当、成果物、検証結果を WorkItem の証跡で照合する。委任の受付だけで完了とせず、必要な独立レビューを含め、ミッションの終端状態まで確認する。
 3. 結果には実行したモデルとデータ利用条件、完了した委任タスク数、実行中に発生した承認要求数、終端状態を残す。スタブやテスト用のゲートで検証した場合は、実際に通った段階と代替した処理を明記する。実モデルによる一周は、実モデルが委任を受けた証跡と、同じミッションが終端まで進んだ証跡の両方で確認する。オンボーディングに還元するのは再利用できる手順と診断結果に絞り、知識昇格は既存のレビューを通す。
 
@@ -759,15 +759,16 @@ pnpm organization operation run list $O --operation-id <op-id>
 
 ### Step 11: 目標から作業へ（E）
 
-組織の目標（objective）を測れる形にし、その目標のための仕事を project → mission → task / work item
-の順に流す。各要素がどこにぶら下がるかは次のとおりである。
+組織の目標（objective）を測れる形にし、関連する project で仕事を進める。
+必要に応じて [Track](../../../docs/GLOSSARY.md#track) でリリースや変更の進行を管理する。
 
 ```text
 organization ─ purpose ─ objective ─ key result（計測できる指標）
      │
      ├─ project（organization_id で組織に属し、objective_ids で目標を指す）
-     │     ├─ mission（--project-id でプロジェクトに属する）── task（NEXT_TASKS.json）
-     │     └─ work item（project の backlog。project-next-tasks で mission の task に取り込む）
+     │     ├─ track（リリースや変更の進行、ゲート、成果物要件）
+     │     ├─ mission（--project-id でプロジェクトに属し、必要に応じて --track-id を指定）
+     │     └─ work item（担当、依存関係、実行スコープを持つ作業レコード）
      └─ dot（常駐エージェント。goal_ref で objective を指し、KR を自動で計測・改善提案する）
 ```
 
@@ -813,16 +814,22 @@ pnpm mission kickoff MSN-<TOPIC>-<YYYYMMDD> --tier confidential --tenant-slug <t
   --organization-id <organization-id> --project-id PRJ-<ID> --mission-type operations \
   --goal "<この mission で達成すること>" --success-condition "<受け入れ条件>"
 
-# 5. project の backlog に work item を積み、mission の task に取り込む
+# 5. WorkItem の作成時に project と mission の実行スコープを指定する
 pnpm work create-item --item-id WI-<ID> --title "<作業>" --description "<目的と完了条件>" \
   --project-id PRJ-<ID> --organization-id <organization-id> --tenant-slug <tenant-slug> \
   --mission-id MSN-<...> --work-shape solution_project
-pnpm work list-items --project-id PRJ-<ID>
+pnpm work list-items --project-id PRJ-<ID> --tenant-slug <tenant-slug>
+# 既存の NEXT_TASKS.json を使う手順では、project の Work Graph を投影する
 pnpm work project-next-tasks --mission-id MSN-<...> --project-id PRJ-<ID> --tenant-slug <tenant-slug>          # 差分を確認
-pnpm work project-next-tasks --mission-id MSN-<...> --project-id PRJ-<ID> --tenant-slug <tenant-slug> --apply  # 取り込む
+pnpm work project-next-tasks --mission-id MSN-<...> --project-id PRJ-<ID> --tenant-slug <tenant-slug> --apply  # 投影を更新
 ```
 
 注意点:
+
+- WorkItem の関連付けは作成時の `--mission-id` などの実行スコープ、担当は WorkItem の
+  リース、作業の依存関係は `--dependencies` で管理する。`project-next-tasks` は指定した
+  project と tenant の Work Graph を、指定した mission の `NEXT_TASKS.json` に投影する。
+  投影先の mission ID は出力先を指定するため、適用前に差分を確認する。
 
 - `file` 型の KR は、参照する JSON ファイルが存在しないと計測できない（`measure` が警告を出し、
   その目標は「unmeasured」のままになる。KR が 1 つでも未計測なら目標全体の進捗も出ない）。

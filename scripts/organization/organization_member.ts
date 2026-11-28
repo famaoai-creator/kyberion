@@ -181,6 +181,12 @@ export async function runOrganizationMember(
       throw new Error('--role <owner|approver|operator|viewer> is required.');
     if (command.action === 'create' && !command.displayName) throw new Error('--name is required.');
     if (command.action === 'update' && !command.displayName) throw new Error('--name is required.');
+    const verification = {
+      change_scope: ['create', 'grant', 'revoke'].includes(command.action)
+        ? 'tenant_membership'
+        : 'member_record',
+      version_fence: command.expectedVersion ? 'requested' : 'not_requested',
+    };
     if (!command.apply) {
       print(
         JSON.stringify(
@@ -192,6 +198,7 @@ export async function runOrganizationMember(
             display_name: command.displayName,
             role: command.role,
             expected_version: command.expectedVersion,
+            verification: { ...verification, source: 'requested_change' },
             note: 'Repeat with --apply to save.',
           },
           null,
@@ -223,7 +230,16 @@ export async function runOrganizationMember(
                 }
               : {}),
           });
-    print(JSON.stringify(result, null, 2));
+    print(
+      JSON.stringify(
+        {
+          ...result,
+          verification: { ...verification, source: 'write_result', tenant_slug: tenant },
+        },
+        null,
+        2
+      )
+    );
     return;
   }
   const identity = {

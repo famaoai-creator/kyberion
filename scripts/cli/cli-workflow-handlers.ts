@@ -26,13 +26,13 @@ import {
 } from '@agent/core/task/task-session';
 import { getReasoningBackend } from '@agent/core/reasoning/reasoning-backend';
 import {
-  executeEmailDelivery,
   generateEmailReplyDraft,
   organizeEmailInbox,
   listEmailAccountProviders,
   readEmailDraftArtifact,
   resolveEmailTriagePath,
 } from '@agent/core/integrations/email-workflow';
+import { deliverEmailWorkflow } from '../email-workflow.js';
 import {
   createCalendarEvent,
   listCalendarAgenda,
@@ -47,7 +47,11 @@ import { main as taskRunMain } from '../task/task_run.js';
 import { main as taskSmokeMain } from '../task/task_smoke.js';
 import { ScriptExitError } from '../lib/harness.js';
 import { credentialBindingReadiness } from '@agent/core/foundation/credential-binding';
-import { parseCliWorkflowOptions, parseOffboardArgs } from './cli-offboard-args.js';
+import {
+  isWorkflowDryRun,
+  parseCliWorkflowOptions,
+  parseOffboardArgs,
+} from './cli-offboard-args.js';
 export { parseOffboardArgs, type ParsedOffboardCommand } from './cli-offboard-args.js';
 
 type Print = (value: unknown) => void;
@@ -511,35 +515,31 @@ export async function handleEmailWorkflowCommand(
         : bodyFile
           ? readWorkflowTextFile(resolveWorkflowPath(bodyFile, 'body file'), 'body file')
           : '';
-    if (!bodyMarkdown.trim()) {
-      throw new Error('body_markdown is required; provide --body-markdown or --body-file');
-    }
     const draftMode = options['--draft-mode'] === true || options['--draft-mode'] === 'true';
     const approved = options['--approved'] === true || options['--approved'] === 'true';
-    if (!draftMode && !approved) {
-      throw new Error(
-        'approval is required before sending an email; add --approved or use --draft-mode'
-      );
-    }
+    const dryRun = isWorkflowDryRun(options);
     const replyModeValue =
       typeof options['--reply-mode'] === 'string' ? options['--reply-mode'] : 'new';
-    const result = await executeEmailDelivery({
-      approved,
-      draft_mode: draftMode,
-      reply_mode:
-        replyModeValue === 'reply' || replyModeValue === 'reply-all' ? replyModeValue : 'new',
-      body_markdown: bodyMarkdown,
-      subject: typeof options['--subject'] === 'string' ? options['--subject'] : undefined,
-      to: typeof options['--to'] === 'string' ? options['--to'] : undefined,
-      message_id: typeof options['--message-id'] === 'string' ? options['--message-id'] : undefined,
-      account:
-        typeof options['--account'] === 'string'
-          ? options['--account']
-          : typeof options['--provider'] === 'string'
-            ? options['--provider']
-            : 'auto',
-    });
-    printHeader();
+    const result = await deliverEmailWorkflow(
+      {
+        approved,
+        draft_mode: draftMode,
+        reply_mode: replyModeValue,
+        body_markdown: bodyMarkdown,
+        subject: typeof options['--subject'] === 'string' ? options['--subject'] : undefined,
+        to: typeof options['--to'] === 'string' ? options['--to'] : undefined,
+        message_id:
+          typeof options['--message-id'] === 'string' ? options['--message-id'].trim() : undefined,
+        account:
+          typeof options['--account'] === 'string'
+            ? options['--account']
+            : typeof options['--provider'] === 'string'
+              ? options['--provider']
+              : 'auto',
+      },
+      dryRun
+    );
+    if (!dryRun) printHeader();
     printText(JSON.stringify(result, null, 2));
     return;
   }

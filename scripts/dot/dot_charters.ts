@@ -33,6 +33,7 @@ import {
   type DotCharterStatus,
 } from '@agent/core/dot/dot-charter';
 import { DOT_STATUS_SECTIONS } from '@agent/core/dot/dot-extension-registry';
+import { dotAdmissionScopeHash } from '@agent/core/dot/dot-admission-identity';
 import '@agent/core/dot/dot-extension-bootstrap';
 import { readDotMemory } from '@agent/core/dot/dot-memory';
 import { listPendingDotFollowups } from '@agent/core/dot/dot-followups';
@@ -405,6 +406,14 @@ function reportStatus(argv: string[]) {
         dot_id: entry.charter.dot_id,
         status: entry.charter.status,
         scope: entry.charter.scope,
+        transition_expectations: [
+          '--expect-status',
+          entry.charter.status,
+          '--expect-admission-hash',
+          dotAdmissionScopeHash(entry.charter),
+          '--expect-scope-json',
+          JSON.stringify(entry.charter.scope),
+        ],
         heartbeat_id: entry.charter.runtime.heartbeat_id,
         tokens_today: dotTokensUsedToday(entry.charter.dot_id, {}),
         wake_count: wakes.length,
@@ -713,6 +722,7 @@ function printReport(report: Record<string, unknown>, print: (line: string) => v
           : `  [${dot.authority_role}]  triggers=${(dot.triggers as string[]).join(',')}  heartbeat=${dot.heartbeat_id}`;
       print(`${dot.status}  ${String(dot.dot_id).padEnd(24)} ${dot.title ?? ''}${tail}`.trimEnd());
       if (dot.scope) print('    scope: ' + JSON.stringify(dot.scope));
+      if (dot.transition_expectations) print('    Use status --json for transition expectations.');
       if (last?.summary) print(`    last said: ${String(last.summary).slice(0, 200)}`);
       const actions = dot.actions as Record<string, number> | undefined;
       if (actions && Object.keys(actions).length > 0) {

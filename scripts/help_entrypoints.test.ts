@@ -45,6 +45,44 @@ describe('CLI help entrypoints', () => {
     expect(result.stdout).toContain('docs/EMAIL_OPERATOR.ja.md');
   });
 
+  it('previews reply-all inputs without inferring recipients or requiring send approval', () => {
+    const result = runHelp(path.join('scripts', 'email-workflow.ts'), [
+      'deliver',
+      '--body-markdown',
+      'preview only',
+      '--reply-mode',
+      'reply-all',
+      '--message-id',
+      'fixture-message',
+      '--dry-run',
+      '--json',
+    ]);
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      dry_run: true,
+      reply_mode: 'reply-all',
+      message_id: 'fixture-message',
+      verification: {
+        account: 'not_resolved',
+        recipients: 'not_resolved',
+        approval: 'checked_on_delivery',
+      },
+    });
+  });
+
+  it('rejects an incomplete reply preview before account resolution', () => {
+    const result = runHelp(path.join('scripts', 'email-workflow.ts'), [
+      'deliver',
+      '--body-markdown',
+      'preview only',
+      '--reply-mode',
+      'reply',
+      '--dry-run',
+    ]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('--message-id is required');
+  });
+
   it('honors shared output flags for email workflow results', () => {
     const json = runHelp(path.join('scripts', 'email-workflow.ts'), ['--', 'status', '--json']);
     expect(json.status).toBe(0);

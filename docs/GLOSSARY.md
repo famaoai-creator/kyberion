@@ -276,6 +276,13 @@ A lighter-weight durable work record for conversational work that does not need 
 
 The long-lived container of meaning around a body of work. A project can own repositories, missions, task sessions, artifacts, service bindings, and vault references.
 
+### Track
+
+A lane within a [Project](#project) for a release or change. Use a track to
+coordinate [Missions](#mission) against a lifecycle model or gate profile and
+identify the [Artifacts](#artifact) required to advance. A mission can carry a
+track ID when it contributes to that lane.
+
 ### Outcome
 
 The intended result of work, expressed as a requested result and success criteria. `outcome-catalog.json` names reusable output patterns; `OutcomeContract` specializes a pattern for a request. An output kind such as `pptx` is not the success criterion.
@@ -283,6 +290,10 @@ The intended result of work, expressed as a requested result and success criteri
 ### Artifact
 
 The concrete output of work. It can be a file, structured object or external reference. Its role can be primary output, specification or evidence: a screenshot is an Artifact and may support an Evidence claim. Having an artifact reference alone proves neither verification nor delivery.
+
+A [Track](#track) can require an artifact for a gate. Review the artifact against
+the gate's criteria and use the [delivery record](#delivery) when distribution
+is part of the outcome.
 
 ### Delivery
 

@@ -94,6 +94,117 @@ function orgDot(organizationId: string): DotCharter {
 }
 
 describe('CLI ask scope and source correlation', () => {
+  it.each([
+    ['tenant', 'テナントの有効化状況を確認するには？'],
+    ['objectives', '組織のOKRの進捗と関連プロジェクトを見る方法を教えて'],
+    ['portfolio', '複数のプロジェクトを俯瞰するには？'],
+    ['operations', '組織の定期オペレーションの実行履歴を見るには？'],
+    ['project', '既存プロジェクトの状態を確認する方法は？'],
+    ['track', 'プロジェクトのTrackで次のゲートと必要な成果物を確認するには？'],
+    ['mission', '既存ミッションを再開する前に次の手順を確認したい'],
+    ['workitem', '既存WorkItemの担当と引き継ぎ状況を確認する方法は？'],
+    ['artifact', 'ミッションの成果物とレビュー・配布状況を見るには？'],
+    ['model', '役割ごとに選ばれている推論モデルを確認するには？'],
+    ['workspace', '作業用ワークスペースの掃除を事前確認するには？'],
+    ['peer', 'テナントに登録されたPeerを確認する方法は？'],
+    ['ingress', 'Tailscaleで公開する前に何を確認すればよいですか？'],
+    ['actuator', 'PDFを読むアクチュエータを探す方法は？'],
+    ['track', 'How do I find the next gate for a project track?'],
+    ['task', 'タスクセッションを再開するには？'],
+    ['task', '定型タスクを探すには？'],
+    ['knowledge', '知識を登録して再利用するには？'],
+    ['knowledge', 'ナレッジの取り込み状況を見るには？'],
+    ['approval', '承認待ちを確認するには？'],
+    ['approval', '立ち上げの承認ゲートを確認するには？'],
+    ['operations', 'インシデントの対応履歴を見るには？'],
+    ['operations', '定例レビューと意思決定の記録を見るには？'],
+    ['runtime', 'サービスの登録と接続状況を確認するには？'],
+    ['organization', 'NHIの状態を確認するには？'],
+    ['workitem', '利用中のリースを確認するには？'],
+    ['artifact', '配布の受領証を確認するには？'],
+    ['channel', '通知先を確認するには？'],
+    ['channel', '受信箱の未読を見るには？'],
+    ['channel', 'チャネル連携を確認するには？'],
+    ['customer', '顧客とのやりとりを見るには？'],
+    ['release', 'リリースノートを作るには？'],
+    ['pipeline', 'ADFのサンプルを見るには？'],
+    ['credentials', '推論モデルの認証情報を確認するには？'],
+    ['task', 'How do I inspect a task session?'],
+    ['conversation', 'Kyberionを通して会話するには？'],
+    ['conversation', 'Kyberionと会話するには？'],
+    ['conversation', 'How do I talk through Kyberion?'],
+    ['voice', 'Kyberionと音声で会話するには？'],
+    ['channel', 'チームとSlackで会話するには？'],
+    ['coordination', '別のKyberionと会話するには？'],
+    ['coordination', '同じチェックアウトのClaudeとCodexで会話するには？'],
+    ['discussion', '話し合って目標を決めるには？'],
+    ['discussion', '議論をエージェントに任せるには？'],
+    ['meeting', '会議に代理出席するには？'],
+    ['meeting', '会議の文字起こしと宿題を確認するには？'],
+    ['conversation', '会話の続きを再開するには？'],
+    ['customer', '顧客と相談するには？'],
+    ['channel', '通知が届いた会話を探すには？'],
+    ['conversation', '手元のOllamaと会話するには？'],
+    ['calendar', '日程とタスクの予定をまとめて見るには？'],
+    ['audit', '誰が作業しているか監査するには？'],
+    ['recovery', '一時停止して安全に再開するには？'],
+    ['meeting', 'How do I join a meeting?'],
+    ['meeting', 'How do I check meeting consent?'],
+  ])('returns the %s guide before organization intake or delegation', async (id, text) => {
+    mocks.scope = organizationScope;
+    mocks.charters = [orgDot('org-a')];
+    const output: unknown[] = [];
+    await main(['ask', text, '--json'], (value) => output.push(value));
+    expect(JSON.parse(output.join('\n'))).toMatchObject({
+      kind: 'lifecycle_guidance',
+      verification: 'not_run',
+      routes: [{ id, inspection_commands: expect.any(Array) }],
+    });
+    expect(mocks.conversation).not.toHaveBeenCalled();
+    expect(readDotInboundEvents('synthetic-ask', { rootDir: ASK_ROOT })).toHaveLength(0);
+  });
+
+  it('offers ways to clarify who the user wants to talk with without starting a turn', async () => {
+    const output: unknown[] = [];
+    await main(['ask', 'Kyberion 通しで会話したい', '--json'], (value) => output.push(value));
+    const data = JSON.parse(output.join('\n'));
+    expect(data.clarification.question).toBe('誰と会話したいですか？');
+    expect(data.clarification.choices.map(({ domain }: { domain: string }) => domain)).toEqual([
+      'conversation',
+      'channel',
+      'coordination',
+    ]);
+    expect(mocks.conversation).not.toHaveBeenCalled();
+  });
+
+  it.each(['What is a Track?', 'Trackとは何ですか？'])(
+    'returns the glossary reference for %s',
+    async (text) => {
+      const output: unknown[] = [];
+      await main(['ask', text, '--json'], (value) => output.push(value));
+      expect(JSON.parse(output.join('\n'))).toMatchObject({
+        kind: 'lifecycle_guidance',
+        definition_ref: 'docs/GLOSSARY.md#track',
+        routes: [{ id: 'track' }],
+      });
+      expect(mocks.conversation).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    'Create a new project.',
+    'What is the status of my mission?',
+    'What are the current pending approvals?',
+    'How do I find the project track and start it?',
+    '会議に代理出席して議事録を送ってください。',
+    '別のKyberionにメッセージを送ってください。',
+    'How do I find the project track? Then create the release.',
+    'プロジェクトを作成してからトラックを確認する方法は？',
+  ])('preserves the execution path for %s', async (text) => {
+    await main(['ask', text, '--json']);
+    expect(mocks.conversation).toHaveBeenCalledWith(expect.objectContaining({ text }));
+  });
+
   it('carries the selected complete scope without overriding its tier with the CLI default', async () => {
     mocks.scope = organizationScope;
     await main([

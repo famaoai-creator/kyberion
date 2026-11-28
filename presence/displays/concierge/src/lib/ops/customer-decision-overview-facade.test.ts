@@ -77,11 +77,10 @@ describe('customer-decision facade child (CD-12)', () => {
     mocks.warn.mockReset();
   });
 
-  it('runs under a role that may read the decision ledger, which the server role may not', () => {
-    // Regression: bounding the child by SYSTEM_ROLE=concierge refused
-    // decision_ledger and broke every /ops customer-decision view.
+  it('keeps the retired ledger role unavailable to the child and the server', () => {
+    // The facade now reads through the tenant-bound decision_ledger_store grant.
     resetRoleAssumptionPolicyCache();
-    expect(isRoleAssumptionAllowed(CUSTOMER_DECISION_READER_ROLE, 'decision_ledger')).toBe(true);
+    expect(isRoleAssumptionAllowed(CUSTOMER_DECISION_READER_ROLE, 'decision_ledger')).toBe(false);
     expect(isRoleAssumptionAllowed('concierge', 'decision_ledger')).toBe(false);
   });
 

@@ -288,6 +288,12 @@ describe('install_chronos_launchd --daemon', () => {
         expect.stringContaining(`/${LAUNCHD_DAEMON_SPECS.chronos.label}.${instance.id}`),
       ]);
       expect(output[0]).toContain(`instance=${instance.id} root=${instance.repoRoot}`);
+      expect(output[0]).toContain(
+        'manager_query=succeeded exit_status=0 workload_health=not_checked'
+      );
+      probe.mockReturnValue({ status: 1, stdout: '', stderr: 'manager unavailable' });
+      await main(['--status'], (value) => output.push(String(value)), { platform: 'darwin' });
+      expect(output[1]).toContain('manager_query=failed exit_status=1 workload_health=not_checked');
     } finally {
       probe.mockRestore();
     }

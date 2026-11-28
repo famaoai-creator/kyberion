@@ -15,16 +15,16 @@
       "id": "run-sentinel",
       "role": "source",
       "op": "system:baseline_check",
-      "params": {
-        "export_as": "baseline_check"
-      }
+      "produces": { "channel": "baseline_check", "type": "Json", "sensitive": true },
+      "params": {}
     },
     {
       "id": "report-status",
       "role": "sink",
       "op": "system:log",
+      "consumes": "baseline_check",
       "params": {
-        "message": "[BASELINE] status={{baseline_check.status}} next_action={{baseline_check.next_action}} failed_layer={{baseline_check.failed_layer}} — branch on status per AGENTS.md §3 (detail: node dist/scripts/run_baseline_check.js)"
+        "message": "[BASELINE] status={{baseline_check.status}} next_action={{baseline_check.next_action}} failed_layer={{baseline_check.failed_layer}}\nNext step: {{baseline_check.next_step}}\nDetail: node dist/scripts/run_baseline_check.js"
       }
     }
   ]

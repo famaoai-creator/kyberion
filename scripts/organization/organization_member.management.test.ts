@@ -58,7 +58,13 @@ describe('managed member CLI parity', () => {
   });
   it('keeps new mutations dry-run until --apply and uses shared human creation', async () => {
     const args = ['create', 'alice', '--name', 'Alice', '--tenant', 'acme', '--role', 'viewer'];
-    await runOrganizationMember(args, vi.fn());
+    const print = vi.fn();
+    await runOrganizationMember(args, print);
+    expect(JSON.parse(print.mock.calls[0][0]).verification).toEqual({
+      change_scope: 'tenant_membership',
+      version_fence: 'not_requested',
+      source: 'requested_change',
+    });
     expect(s.create).not.toHaveBeenCalled();
     await runOrganizationMember([...args, '--apply'], vi.fn());
     expect(s.create).toHaveBeenCalledWith(
