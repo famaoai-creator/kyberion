@@ -1261,7 +1261,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
     },
     // DA-05: the explicit ingest ceremony (Hybrid Sovereign Ledger) — the
     // only ingest op that writes into knowledge/confidential/ (fail-closed
-    // path guard + narrowly-scoped ingest_commit authority role).
+    // path guard + narrowly-scoped ingest_knowledge_store declared grant).
     commit: {
       summary:
         'Explicit ingest ceremony: land a normalize_card result inside the tenant knowledge root and append the information-asset ledger record (duplicate → no write; same-source re-ingest → supersede version). DA-06: the card is PII/secret-scrubbed before landing (block-action findings refuse the commit unless an audited override lists them); landings in knowledge/confidential/common/ or knowledge/public/ingest/ require steward_approval_id (KM-03 queue).',

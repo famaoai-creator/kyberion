@@ -1,7 +1,7 @@
 ---
 title: 情報資産の所在登録・取得・完了確認の運用
 tags: [information-assets, runbook, intake, collectors, organization]
-last_updated: 2026-11-08
+last_updated: 2026-11-27
 ---
 
 # 情報資産の所在登録・取得・完了確認の運用
@@ -100,6 +100,19 @@ collect の実行を定期化するときは既存 Dot の cadence / event intak
 | unknown_effect / needs_recheck | 外部効果の結果を確認できていない。receipt と外部 readback を先に調べ、同じ変更を無条件で再送しない                        |
 
 symlink、非 regular file、不正 JSON、不正 schema は安全な空データへ置き換えず停止する。対象パス・変更履歴・認可を確認してから owner の管理操作で修復する。tenant / organization / project の mismatch は selector の変更で回避せず、正しい親子関係と実行 scope を確認する。
+
+## カレンダーを取り込み、約束を確認する
+
+Google Calendar の所在は `asset_type: calendar.meeting`、`collector_id: google_calendar.events`、`service_id: google-workspace` で登録する。binding の `allowed_actions` に `calendar_events_list` を含め、approval_policy を allowed にする。selectors の例: `{ "calendar_id": "primary", "prep_lead_seconds": 86400, "followup_window_seconds": 86400 }`。窓は 300 秒〜7 日の範囲外を拒否する。会議は開始前に `calendar.meeting_prep`（準備ブリーフ）、終了後に `calendar.meeting_followup`（アクション抽出）へ流れる。どちらも成果物の hash で完了し、外部への書き込みはしない。
+
+完了済みの取り込み作業から約束とダイジェストを読む:
+
+```sh
+pnpm organization information-assets commitments --tenant acme --organization-id support --self me@acme.example
+pnpm organization information-assets commitments --tenant acme --organization-id support --self me@acme.example --format json
+```
+
+`--self` には自分のメールアドレスや名前を渡す。省略すると、owner が書かれた action はすべて「相手待ち」に分類される。ダイジェストの「Not shown」は、成果物が読めない・hash が一致しない・形式が不正な作業である。成果物を手で直さず、該当 WorkItem の作業を既存経路で再実行する。
 
 ## 完了を確認する
 

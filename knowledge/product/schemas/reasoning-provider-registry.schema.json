@@ -76,6 +76,7 @@
             "enum": [
               "claude-cli",
               "claude-agent-sdk",
+              "cursor-sdk",
               "provider-cli",
               "anthropic-api",
               "openai-responses",
@@ -215,6 +216,10 @@
                 "description": "Path fragments of this CLI's install location (e.g. /@anthropic-ai/claude-code/). A parent process whose program or interpreter-run script path contains one is this CLI's agent session, even when the binary name is generic (node .../cli.js).",
                 "type": "array",
                 "items": { "type": "string", "pattern": "^/.*/$", "minLength": 3 }
+              },
+              "account_probe": {
+                "description": "Selects this CLI mode for its provider's local account inspection.",
+                "type": "boolean"
               },
               "session_principal": {
                 "description": "Name recorded as agent:<name> for a detected session; defaults to the mode.",

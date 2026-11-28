@@ -3,7 +3,7 @@
  * Part of scripts/customer/customer_decision.ts (the entry point); see its header.
  */
 import { humanActor } from '@agent/core/actor';
-import { withExecutionContextAsync } from '@agent/core/authority';
+import { withStoreGrantAsync } from '@agent/core/authority';
 import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { enforceApprovalGate } from '@agent/core/governance/approval-gate';
@@ -236,7 +236,7 @@ export async function runGenerate(opts: Record<string, string>, now: string): Pr
   installReasoningBackendsForService(AUDIT_AGENT);
   // D10: an explicit backend choice wins — the draft goes to that backend or to none.
   const requestedBackend = getRegisteredEnvText('KYBERION_REASONING_BACKEND')?.trim();
-  const result = await withExecutionContextAsync(
+  const result = await withStoreGrantAsync(
     LEDGER_ROLE,
     () =>
       generateAgendaDraft(agenda, {
@@ -245,8 +245,7 @@ export async function runGenerate(opts: Record<string, string>, now: string): Pr
         ...(requestedBackend ? { requestedBackend } : {}),
         ...(groundingText ? { groundingText } : {}),
       }),
-    undefined,
-    tenant
+    { tenantSlug: tenant }
   );
   const next: DecisionAgenda = { ...result.agenda, status: 'draft', updated_at: now };
   // The model call runs without the lock; the write only lands on the agenda it read.

@@ -170,7 +170,7 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 - **実行コマンド**: `pnpm reasoning:setup`
 - **目的**: 現在の host で使える reasoning backend を確認します。候補は `knowledge/product/governance/reasoning-backend-policy.json` の `allowed_modes` が正本で、主に次のものがあります。
   - ローカル CLI: `claude-cli` / `codex-cli` / `gemini-cli` / `agy-cli` / `grok-cli` / `copilot` / `cursor-cli` / `opencode-cli` / `devin-cli`
-  - API: `anthropic` / `claude-agent` / `gemini-api` / `grok-api` / `openrouter` / `nemotron-api`
+  - API: `anthropic` / `claude-agent` / `gemini-api` / `grok-api` / `openrouter` / `nemotron-api` / `cursor-sdk`（任意利用。`@cursor/sdk` によるツールなしのテキスト推論。自動選択はされません）
   - ローカルモデル: `local` / `ollama` / `vllm` / `lmstudio` / `llamacpp` / `mlx` / `localai`
   - オフライン・テスト用: `stub`
 - **物理的変化**:

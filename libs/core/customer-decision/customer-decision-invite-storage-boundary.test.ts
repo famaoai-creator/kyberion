@@ -145,13 +145,10 @@ describe('customer decision invite store on the real tier/tenant guard', () => {
     const file = path.join(tenantDir(TENANT), 'inv-0000000000000000.json');
     expect(() => io.safeWriteFile(file, '{}')).toThrow(/Higher tier required|POLICY|SECURITY/u);
     expect(() =>
-      authority.withExecutionContext(
-        'decision_ledger',
-        () => io.safeWriteFile(file, '{}'),
-        undefined,
-        TENANT
-      )
-    ).toThrow(/Higher tier required|POLICY|SECURITY/u);
+      authority.withStoreGrant('decision_ledger_store', () => io.safeWriteFile(file, '{}'), {
+        tenantSlug: TENANT,
+      })
+    ).toThrow(/Higher tier required|POLICY|SECURITY|SCOPE/u);
   });
 
   it('issues, verifies, revokes and lists with no persona in env', () => {

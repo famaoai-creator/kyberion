@@ -23,8 +23,9 @@ import {
  * CD-09 task decision locks
  * (`knowledge/confidential/<tenant>/decisions/<case>/consumers/<consumer>.json`,
  * libs/core/mission/mission-decision-lock.ts). Mission processes open the exact
- * consumer-lock grant at task boundaries instead of the full `decision_ledger`
- * role: it may read the case's ledger, switches and agendas and write exactly one
+ * consumer-lock grant at task boundaries instead of the full
+ * `decision_ledger_store` declared grant: it may read the case's ledger,
+ * switches and agendas and write exactly one
  * consumer lock, every write held to the content rules below.
  *
  * G2: the live grant is itself the authority for the I/O it covers
@@ -447,7 +448,8 @@ function unresolvableProblem(
  *     `entry_id` on the same item × key with `requires_customer: true`, and
  *     carries the facade's `reasked_proposals` marker for this proposal and
  *     consumer with `by` = `relinked_by` and `at` = the new `collected_at`
- *     (agendas are written only by the facade's decision_ledger role).
+ *     (agendas are written only inside the facade's decision_ledger_store
+ *     declared grant).
  * The caller also keeps the lock's `hold` unchanged in that write, and
  * `previous_links` never change otherwise. Returns the refusal reason, or
  * null when the relink is allowed.
@@ -514,7 +516,8 @@ export function taskProposalRelinkProblem(
     return 'a task proposal is re-asked on an agenda entry with its item and key';
   if (asked.requires_customer !== true)
     return 'a task proposal is re-asked only on a requires_customer agenda entry';
-  // Only the operator facade (decision_ledger) writes agendas: its marker on
+  // Only the operator facade (decision_ledger_store grant) writes agendas:
+  // its marker on
   // the target agenda is what a worker holding the lock capability cannot forge.
   const marked =
     Array.isArray(newAgenda.reasked_proposals) &&

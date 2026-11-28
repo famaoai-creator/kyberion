@@ -39,6 +39,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { auditChain } from '../governance/audit-chain.js';
+import { withStoreGrant } from '../authority.js';
 import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 
 /* ------------------------------------------------------------------ *
@@ -568,7 +569,12 @@ export async function bootstrapManifest(
   // Only persist when something was actually installed (or attempted).
   // A dry-run probe does not produce a receipt — `verifyReady` would
   // otherwise treat a probe-only run as "ready" until next probe.
-  if (opts.apply) writeReceipt(receipt, opts.mission_id);
+  // The receipt — the shared-state path or the mission's own evidence dir —
+  // is one store with two layouts, both owned by the env_setup_receipt_store
+  // grant, so the write never depends on the caller's authority.
+  if (opts.apply) {
+    withStoreGrant(ENV_SETUP_RECEIPT_GRANT, () => writeReceipt(receipt, opts.mission_id));
+  }
   return receipt;
 }
 
@@ -577,7 +583,14 @@ export function verifyReady(
   opts: { mission_id?: string; max_age_minutes?: number } = {}
 ): ReadinessReport {
   const checkedAt = nowIso();
-  const receipt = readReceipt(manifest.manifest_id, opts.mission_id);
+  // A mission-scoped receipt attests the mission's own evidence directory;
+  // the shared-state receipt attests the same readiness host-wide. Prefer
+  // whichever is newer so a stale mission receipt cannot shadow a fresh
+  // shared one (and vice versa).
+  const receipt = newerReceipt(
+    opts.mission_id ? readReceipt(manifest.manifest_id, opts.mission_id) : null,
+    readReceipt(manifest.manifest_id)
+  );
   if (!receipt) {
     return {
       ready: false,
@@ -694,6 +707,9 @@ export function verifyReady(
  * Receipt persistence                                                 *
  * ------------------------------------------------------------------ */
 
+/** Declared store grant owning the shared-state setup receipt directory. */
+const ENV_SETUP_RECEIPT_GRANT = 'env_setup_receipt_store';
+
 function receiptPath(manifestId: string, missionId?: string): string {
   const normalizedManifestId = assertEnvironmentManifestId(manifestId);
   if (missionId) {
@@ -725,6 +741,11 @@ function isSafeMissionEvidenceFilename(value: unknown): value is string {
 }
 
 function writeReceipt(receipt: SetupReceipt, missionId?: string): void {
+  if (missionId && !pathResolver.missionEvidenceDir(missionId)) {
+    throw new Error(
+      `[environment-capability] mission '${missionId}' was not found — a mission-scoped receipt requires an existing mission evidence directory`
+    );
+  }
   const file = receiptPath(receipt.manifest_id, missionId);
   safeMkdir(path.dirname(file), { recursive: true });
   const validated = defineCatalog<SetupReceipt>({
@@ -733,6 +754,16 @@ function writeReceipt(receipt: SetupReceipt, missionId?: string): void {
     schema: RECEIPT_SCHEMA_PATH,
   }).validate(receipt, file);
   safeWriteFile(file, JSON.stringify(validated, null, 2));
+}
+
+function newerReceipt(a: SetupReceipt | null, b: SetupReceipt | null): SetupReceipt | null {
+  if (!a) return b;
+  if (!b) return a;
+  const aMs = parseIsoDate(a.generated_at);
+  const bMs = parseIsoDate(b.generated_at);
+  if (!aMs.ok) return b;
+  if (!bMs.ok) return a;
+  return bMs.ms > aMs.ms ? b : a;
 }
 
 function readReceipt(manifestId: string, missionId?: string): SetupReceipt | null {

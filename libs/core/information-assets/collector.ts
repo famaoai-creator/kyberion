@@ -20,6 +20,7 @@ import type {
 import type { CollectorCursor, CollectorPage, InformationAssetCollector } from './provider.js';
 import { CollectorFullSyncRequired } from './provider.js';
 import { gmailHistoryCollector, gmailFollowupCollector } from './provider-gmail.js';
+import { googleCalendarEventsCollector } from './provider-calendar.js';
 import {
   githubReviewCollector,
   jiraIssueCollector,
@@ -29,6 +30,7 @@ import {
 const collectors: readonly InformationAssetCollector[] = [
   gmailHistoryCollector,
   gmailFollowupCollector,
+  googleCalendarEventsCollector,
   githubReviewCollector,
   jiraIssueCollector,
   jiraApprovalCollector,

@@ -358,6 +358,30 @@ pnpm onboarding apply --identity <reviewed-identity-json>
 
 ### Step 5.1: 使うモデルと provider への送信許可を決める（C）
 
+`pnpm onboarding llm account --json` はローカルの Codex CLI に実際のプラン識別子と認証種別を問い合わせる。メールアドレスは出力せず、認証の更新や推論リクエストも行わない。プラン名とアカウントのデータ利用設定はそれぞれ確認する。
+
+`--provider claude|agy|grok|devin|cursor` で別の CLI を指定できる。`--provider all --json` は各 CLI の結果を配列で返し、一部の CLI が未認証または取得不可でも他の結果を表示する。Claude、Agy、Devin、Cursor は契約プランを読み取る。Agy は一時ステータスラインへの対応と `jq` が必要。Grok は `grok usage --json` で利用枠を照会する。応答がない場合は一時ディレクトリで CLI の `/usage` を開き、表示されたプラン名と週次利用率を読み取る。CLI がディレクトリの信頼やログインの確認を求める場合は `unavailable` を返す。 Grok の対話確認には、空の専用ディレクトリを Grok で一度信頼済みにし、
+`TMPDIR=/path/to/trusted-empty-dir pnpm onboarding llm account --provider grok --json` で指定できる。認証ストアやバックグラウンドサービスにアクセスできない環境では `unavailable` になる場合がある。CLI から取得できたプランをテナントにまとめて登録するには、まず dry-run で対象を確認する。dry-run は CLI を照会し、テナントの申告や承認リクエストへの書き込みを行わない。
+
+```bash
+pnpm onboarding llm attest-installed --tenant <slug> --json
+pnpm onboarding llm attest-installed --tenant <slug> --provider grok --json
+pnpm onboarding llm attest-installed --tenant <slug> --apply --accept --review-token <review_token> --json
+```
+
+対象はプラン照会を備える Codex・Claude・Agy・Grok・Devin・Cursor。dry-run の `--provider` で1件に絞れる。CLI の起動・バージョン確認の失敗、プランの取得不可、照会のタイムアウトや出力上限超過を区別し、それぞれの対処を出力する。バージョン確認に成功し、実際にプランを取得できた CLI を、既存のテナント attestation 経路で登録する。データ利用区分は `unknown` と記録し、すでに登録済みの申告は保持する。dry-run の `apply_command` または `review_token` を使って適用する。登録候補だけを再照会し、その結果が変わった場合は、書き込む前に停止し、再度 dry-run を求める。適用はプロバイダー単位で行われ、途中で失敗した場合も成功済みの登録は保持される。確認した候補の結果が同じなら、同じトークンで再実行できる。Grok の対話確認で `TMPDIR` を使う場合は、dry-run と適用を実行するシェルで同じ値を `export` する。
+データ利用区分を `none` と申告する場合は通常の `attest` と既存の承認フローを使う。
+
+新しい CLI のアカウント照会を追加するときは、reasoning provider registry で対象の CLI モードに `cli.account_probe: true` を指定し、プロバイダー ID の照会定義を `scripts/onboarding/onboarding_provider_account.ts` に追加する。実行可否の確認には registry のバージョン引数を使い、照会関数はプランなど観測できたフィールドだけを返す。オンボーディングの対象一覧と登録フローに個別の分岐を追加する必要はない。
+
+Codex CLI、Claude Code、その他の外部モデルは、実際に使う認証経路・アカウント・契約のデータ利用条件を確認する。テナントの `llm attest` は既定で書き込まず、同じ対象に対する実行時の権限判定を表示する。`direct` は既存の承認または送信を開かない宣言、`delegated` は一致する有効な Charter、`interactive` は新たな決裁、`blocked` は証拠や前提条件の不足を示す。
+
+`interactive` の対象は Concierge の Settings → Authority で、テナント・操作・送信先・根拠を限定して委任できる。複数の provider をまとめて確認する場合は、各 dry-run が返す `delegation_grant` を一つの Charter 計画の `grants` に入れる。有効な委任がある同一の claim は、申請を再作成せず `--apply --accept` で記録する。個人・システム custody の attest は別の署名フローを使う。
+
+事前確認で適用可能な場合は、入力値を保持した POSIX シェル用の `apply_command` を表示する。個別承認を使う場合は有効な承認 ID を含める。委任で適用できる場合は、過去の個別承認 ID を付けずに更新できる。実行時には権限を再確認する。
+
+一般の操作は、実行前に既存の approval gate で、操作ポリシー・決裁権限・対象に一致する Charter を照合する。リスク評価の根拠や操作の対象を確定できないときは保留し、必要な情報を集める。対象や効果が変わったときは再評価する。契約や認証経路の変更は、同じ表示名の provider であっても attest の根拠を見直す。
+
 Kyberion が使う推論バックエンドとモデル、そして tenant の機密情報をどの provider に送ってよいかを
 ここで決める。どちらも dry-run が既定で、`--apply` を付けたときだけ書き込む。
 
@@ -384,8 +408,8 @@ pnpm onboarding llm select --backend claude-cli --model claude-opus-5-5 --apply
 provider への送信は既定で拒否される。shipped policy では claude / codex / gemini などの
 `training_use` が `unknown` のため、confidential・personal の material（mission distill など）は
 local-only provider 以外に送られない。契約しているプランが学習に使わないことを確認できたら、
-tenant ごとに明示的に attest する。`training_use none` は confidential の送信を開くため、人間の
-承認（approval gate）を通してからでないと記録されない。
+tenant ごとに明示的に attest する。`training_use none` は confidential の送信条件を満たすため、
+有効な Charter で委任されているか、同じ claim の個別承認があることを適用時に照合する。
 
 ```bash
 # 1. 内容を確認する（dry-run）。同じ値をこの後の手順でも使う
@@ -463,7 +487,13 @@ pnpm onboarding llm attest --custody person --provider claude --training-use non
 
 ### Step 6: customer stance と organization を結合する（C）
 
+内部組織の準備は customer stance を作らずに始められる。`pnpm onboarding:context organization --tenant-slug <tenant> --organization-id <org> --json` で既存テナントと組織の状態を確認する。組織が未登録なら `pnpm organization init --dry-run` の引数が返る。適用は既存の組織管理コマンドで行い、その権限判定に従う。組織が稼働状態なら `--intent "<request>"` で、同じテナントと組織に限定した `organization work resolve --dry-run` を案内する。
+
+顧客向けの初回業務や tenant activation の記録を作る場合は、以下の customer stance を使う経路に進む。
+
 tenant と organization の結合を dry-run で確認してから適用する。
+customer stance がまだなければ、`bind` の `next_action` が既存の stance 作成手順を案内する。
+権限を持つオペレーターが stance を用意してから再実行する。
 
 ```bash
 pnpm onboarding:context bind \
@@ -480,6 +510,7 @@ pnpm onboarding:context bind \
 
 この apply は `knowledge/personal/stances/{customer-slug}/onboarding/organization-context.json` と、
 tenant に紐づく organization state を作成または再利用する。これは activation ではない。
+既に結合済みで書き込みが不要な場合と、結合を適用した直後は、`next_action.argv` が同じ customer・tenant・organization の activation plan を案内する。
 
 Web の初回利用では、既存 first-run の本人登録後に `/setup/company` から会社登録・probe・本人承認・最初の仕事の準備を進められる。対象はその credential が許可する既存 tenant に限る。詳細は [Web 会社設定](../../../docs/developer/COMPANY_WEB_ONBOARDING.ja.md) を参照。
 
@@ -524,8 +555,12 @@ quota と budget、approval gate、pause と escalation、drift watcher）、各
 
 4 つの probe は `probe` サブコマンドがまとめて実行し、activation receipt の隣
 （`.../tenant-activation/<tenant>/<organization>/<tier>/probes/`）に証跡 JSON を書き出す。
-全項目が通ると、その証跡を参照する `activate` コマンドがそのまま表示される（`<human:owner>` を
-承認者に置き換えて実行する）。probe は観測するだけで、activation も NHI の発行も行わない。
+まず `plan` の `next_action` で、登録、組織との結合、責任者、probe のうち最初に解消すべき項目を確認する。
+`probe` は4項目の結果と、結合・組織状態・責任者を含む activation 全体の判定を表示する。
+全条件が揃った場合に限り、同じスコープと証跡を参照する `activate_args` と、POSIX シェル用の
+`activate_command` が表示される。組織の結合に記録済みの責任者を使う場合、コマンドに手入力の置換は要らない。
+probe は activation や NHI 発行を行わない。表示されたコマンドの `--accept` は人間の受け入れを表す。
+Web の会社設定でも同じ activation 判定を使い、個別 probe が通っていても未解決の前提条件があれば activation の承認申請を案内しない。
 
 ```bash
 pnpm tenant:activation probe --customer-slug <customer-slug> --tenant-slug <tenant-slug> \
@@ -646,6 +681,19 @@ pnpm mission start <mission-id>
 ```
 
 契約、支払い、外部公開、credential や権限の変更は、first-work review の後も人間の承認なしに確定しない。
+
+#### 最初の委任ミッションを試す
+
+実行中の人間承認を挟まずに委任を試す場合は、既に有効な権限の範囲で、合成データを使う短い内部作業を選ぶ。
+開始前に `pnpm mission start <mission-id> --dry-run --json` でスコープと前提条件を確認し、ミッションのゲートと作業内容に必須の人間承認が含まれる場合は、その経路を保留として記録する。
+登録済みのミッションは `pnpm mission workflow-select <mission-id>` の `machine_gate_preview` で、テンプレートに明記された人間・レビュー担当の確認ゲートを調べる。監査台帳による保留、委任先、権限、証跡は、実行前にそれぞれのゲートで確認する。
+
+1. `pnpm onboarding llm show`（テナント経路では `--tenant <tenant-slug>` を付ける）で対象スコープの backend とモデルを確認する。Codex CLI や Claude Code に学習利用を許さない条件で委任する場合は、実際のアカウントに対応する有効な attest（Step 5.1 の `training_use: none`）と、各送信経路の `training_use: no_training` を確認する。データ利用条件は委任、助言、コンテキスト圧縮、判定、蒸留の経路ごとに決まる。条件が揃わなければ、送信を保留して Step 5.1 の事前確認に戻る。ローカル接続の確認には別途 `local_only` のプローブを利用できる。
+2. ミッションコントローラーで開始し、タスクを WorkItem としてワーカーに委任する。各タスクの担当、成果物、検証結果を WorkItem の証跡で照合する。委任の受付だけで完了とせず、必要な独立レビューを含め、ミッションの終端状態まで確認する。
+3. 結果には実行したモデルとデータ利用条件、完了した委任タスク数、実行中に発生した承認要求数、終端状態を残す。スタブやテスト用のゲートで検証した場合は、実際に通った段階と代替した処理を明記する。実モデルによる一周は、実モデルが委任を受けた証跡と、同じミッションが終端まで進んだ証跡の両方で確認する。オンボーディングに還元するのは再利用できる手順と診断結果に絞り、知識昇格は既存のレビューを通す。
+
+`local_only` の試行では、接続先を選んだ後、委任経路の候補をローカル backend に限定し、外部へのフォールバックを無効にする。カタログに表示された選択に加え、実行ログで各モデル呼び出しが実際に解決した backend と接続先を確認する。Ollama を OpenAI 互換経路で使う場合は、対象のホストで `/v1` の接続確認を行う。
+Ollama をクラウド機能無効で起動済みなら、`pnpm onboarding llm probe-local --url http://127.0.0.1:11434/v1 --model <installed-model> --json` で、ループバックに限定した合成タスクの委任と結果照合を試せる。初回の読み込みで `timed_out` が出た場合は `--timeout-ms` で待ち時間を延ばせる（上限 180 秒）。このコマンドが確認するのはモデルへの委任と応答であり、ミッションの終端状態は手順 3 の証跡で確認する。
 
 ### Step 9: 完了を確認する（D）
 

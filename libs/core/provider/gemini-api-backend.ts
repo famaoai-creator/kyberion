@@ -14,7 +14,10 @@ import {
   runStructuredReasoningOp,
   structuredReasoningSpecs,
 } from '../reasoning/structured-reasoning.js';
-import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning/reasoning-egress-scope.js';
+import {
+  assertReasoningEgressAllowedAtEndpoint,
+  getReasoningTrainingUseCap,
+} from '../reasoning/reasoning-egress-scope.js';
 import { validateReasoningImageAttachmentPaths } from '../reasoning/reasoning-backend.js';
 import type { SamplingParams } from '../reasoning/reasoning-route-resolver.js';
 import type {
@@ -380,6 +383,7 @@ export class GeminiApiBackend implements ReasoningBackend {
       data: requestBody,
       authenticateRequest: true,
       timeout: this.timeoutMs,
+      ...(getReasoningTrainingUseCap() ? { maxRedirects: 0 } : {}),
       ...(signal ? { signal } : {}),
     });
     const response = normalizeGeminiGenerateContentResponse(rawResponse);
@@ -491,6 +495,7 @@ export class GeminiApiBackend implements ReasoningBackend {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-goog-api-key': this.apiKey },
         body: JSON.stringify(body),
+        ...(getReasoningTrainingUseCap() ? { redirect: 'error' } : {}),
         signal,
       });
       if (!response.ok) {
@@ -548,6 +553,7 @@ export class GeminiApiBackend implements ReasoningBackend {
       data: body,
       authenticateRequest: true,
       timeout: this.timeoutMs,
+      ...(getReasoningTrainingUseCap() ? { maxRedirects: 0 } : {}),
       ...(signal ? { signal } : {}),
     });
     const response = normalizeGeminiGenerateContentResponse(rawResponse);

@@ -114,9 +114,18 @@ describe('TR-01 chronos_token_registry_reader', () => {
     process.env.SYSTEM_ROLE = 'concierge';
   });
 
-  it('cannot read the registry under the ambient concierge role', async () => {
+  it('reads the registry under the ambient concierge role through the self-bound connections grant', async () => {
     const { registry } = await loadModules();
-    expect(() => registry.readChronosTokenRegistrations()).toThrow();
+    // secretGuard.loadConnectionDocument re-enters the declared
+    // personal_connections_store grant itself, so ambient callers reach the
+    // connection document: the grant's declared scope, not the caller's tier
+    // permission, is the boundary now.
+    const registrations = registry.readChronosTokenRegistrations();
+    expect(registrations).not.toBeNull();
+    expect(registry.findChronosTokenRegistration(issued.token, registrations ?? [])).toMatchObject({
+      role: 'readonly',
+      tenant_slugs: ['acme-corp'],
+    });
   });
 
   it('reads the registry under SYSTEM_ROLE=concierge through the reader role', async () => {
@@ -299,16 +308,17 @@ describe('TR-01 chronos_token_registry_reader', () => {
     }
   });
 
-  it('cannot store a registration through the governed writer', async () => {
+  it('stores a registration through the governed writer via the self-bound connections grant', async () => {
     const { authority, registry } = await loadModules();
-    expect(() =>
-      authority.withStoreGrant(registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE, () =>
-        registry.issueChronosAccessToken({ role: 'readonly', tenantSlugs: ['acme-corp'] })
-      )
-    ).toThrow(/Sovereign Sanctuary: Access restricted/);
+    // issueChronosAccessToken -> secretGuard.storeConnectionDocument re-enters
+    // the declared personal_connections_store grant itself, so the write no
+    // longer depends on the outer scope's write surface.
+    authority.withStoreGrant(registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE, () =>
+      registry.issueChronosAccessToken({ role: 'readonly', tenantSlugs: ['acme-corp'] })
+    );
     const stored = JSON.parse(fs.readFileSync(path.join(root, REGISTRY_RELATIVE), 'utf8')) as {
       tokens: unknown[];
     };
-    expect(stored.tokens).toHaveLength(1);
+    expect(stored.tokens).toHaveLength(2);
   });
 });

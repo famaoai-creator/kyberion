@@ -62,6 +62,8 @@ describe('autonomous-loop-readiness', () => {
     expect(report.status).toBe('ready');
     expect(report.ready_for_unattended_loop).toBe(true);
     expect(report.findings).toEqual([]);
+    expect(report.diagnostics).toEqual([]);
+    expect(report.next_check).toBeUndefined();
     const formatted = formatAutonomousLoopReadiness(report);
     expect(formatted).toContain('Autonomous loop readiness: READY (unattended OK)');
     expect(formatted).toContain('[closed; retrieval=100%, utilization=50%]');
@@ -78,6 +80,14 @@ describe('autonomous-loop-readiness', () => {
     });
     expect(blocked.status).toBe('blocked');
     expect(blocked.heartbeats.unhealthy_ids).toEqual(['dot-ops:missing']);
+    expect(blocked.next_check).toMatchObject({
+      code: 'unhealthy_heartbeats',
+      severity: 'blocker',
+      area: 'operations',
+    });
+    expect(formatAutonomousLoopReadiness(blocked)).toContain(
+      'next check: Run pnpm kyberion scheduler reconcile'
+    );
 
     const degraded = evaluateAutonomousLoopReadiness({
       now: NOW,
@@ -101,6 +111,53 @@ describe('autonomous-loop-readiness', () => {
     expect(degraded.status).toBe('degraded');
     expect(degraded.ready_for_unattended_loop).toBe(false);
     expect(degraded.findings.some((f) => f.includes('memory loop usage open'))).toBe(true);
+    expect(degraded.next_check).toMatchObject({
+      code: 'memory_usage_open',
+      severity: 'warning',
+      area: 'learning',
+    });
+  });
+
+  it('surfaces a factory blocker before learning advice when both need attention', () => {
+    const report = evaluateAutonomousLoopReadiness({
+      now: NOW,
+      tenant_slug: 'acme',
+      listActiveDotHeartbeatsFn: () => [],
+      listHeartbeatStatuses: () => [],
+      listDotChartersFn: () => [],
+      readWakeLedgerFn: () => [],
+      computeMemoryLoopFn: () => ({
+        ...closedMemoryLoop(),
+        retrieved: 0,
+        used: 0,
+        loop_status: 'delivery_open',
+        retrieval_rate: 0,
+        utilization_rate: 0,
+        warning: 'No promoted knowledge reached workers.',
+      }),
+      evaluateFactoryFn: () => ({
+        ready: false,
+        tenant_slug: 'acme',
+        halted: true,
+        tenant_enabled: true,
+        graduated_actions: [],
+        active_mandate_count: 1,
+        actions: [],
+        blockers: ['Operations are halted'],
+      }),
+    });
+
+    expect(report.status).toBe('blocked');
+    expect(report.diagnostics.map(({ code }) => code)).toEqual([
+      'memory_delivery_open',
+      'factory_not_ready',
+    ]);
+    expect(report.next_check).toMatchObject({
+      code: 'factory_not_ready',
+      severity: 'blocker',
+      area: 'operations',
+    });
+    expect(report.findings).toContain('Operations are halted');
   });
 
   it('applies per-dot max_idle_wake_ms to real heartbeat files while keeping daemon defaults strict', () => {

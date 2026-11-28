@@ -230,7 +230,9 @@
     },
     "calendar_events_list": {
       "type": "cli",
+      "kind": "capture",
       "risk": "read",
+      "approval_required": false,
       "command": "gws",
       "args": ["calendar", "events", "list", "--params", "{{params}}"],
       "description": "List Google Calendar events for a calendar.",

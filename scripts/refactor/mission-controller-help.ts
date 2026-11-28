@@ -124,7 +124,7 @@ Visibility Commands:
                                  composition) and materialize its runtime
   classify <ID> [intent] [task]  Classify mission context into class/delivery/risk/stage
   workflow-select <ID> [intent] [task]
-                                 Resolve workflow template from mission classification
+                                 Resolve workflow template and preview machine-only gate compatibility
   plan-tasks <ID> [--force] [--refresh-catalog]
                                  Expand process template phases into NEXT_TASKS.json + gates (--refresh-catalog re-resolves from the current catalog)
   review-worker-output <ID> [verified|rejected] [note]

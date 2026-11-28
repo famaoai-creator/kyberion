@@ -1,6 +1,7 @@
 import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
-import { resolveRole, withExecutionContext } from '../authority.js';
+import { resolveRole, withExecutionContext, withStoreGrant } from '../authority.js';
+import { isDeclaredStoreGrantName } from '../foundation/declared-store-grant.js';
 import {
   currentPrPublicationScope,
   withPrPublicationStoreAccess,
@@ -205,13 +206,21 @@ function scopedCharterIo<T>(
       ],
     },
     () =>
-      withExecutionContext(
-        role,
-        action,
-        'ecosystem_architect',
-        scope.tenant_slug,
-        identity.organizationId
-      )
+      // A declared store grant name is re-entered the way its facade opens it
+      // (withStoreGrant): it is never an assumable role, and the same grant
+      // bound to the same tenant is what the caller's I/O already runs under.
+      isDeclaredStoreGrantName(role)
+        ? withStoreGrant(role, action, {
+            tenantSlug: scope.tenant_slug,
+            ...(identity.organizationId ? { organizationId: identity.organizationId } : {}),
+          })
+        : withExecutionContext(
+            role,
+            action,
+            'ecosystem_architect',
+            scope.tenant_slug,
+            identity.organizationId
+          )
   );
 }
 

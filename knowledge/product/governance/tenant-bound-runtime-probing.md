@@ -56,7 +56,7 @@ declared `runtime` needs are part of what the human approved; editing them
 invalidates the approval.
 
 Knowledge landings inside that process go through `ingest:commit`, which
-switches to the narrow `ingest_commit` role for the write itself.
+opens the narrow `ingest_knowledge_store` declared grant for the write itself.
 
 ### Personal-scoped runs (chronos)
 

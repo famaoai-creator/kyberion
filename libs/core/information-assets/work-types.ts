@@ -21,6 +21,7 @@ export interface InformationAssetWorkBinding {
 export type InformationAssetRecipeAction =
   | 'classify'
   | 'prepare_reply'
+  | 'prepare_brief'
   | 'extract_actions'
   | 'follow_up'
   | 'review'

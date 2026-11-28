@@ -6,7 +6,8 @@
  * Part of scripts/customer/customer_decision.ts (the entry point); see its header.
  *
  *   1. read every case of the tenant (agendas, receipts, switches) as the
- *      tenant-bound `decision_ledger` role — no case lock, nothing else read;
+ *      tenant-bound `decision_ledger_store` declared grant — no case lock,
+ *      nothing else read;
  *   2. metrics and suggestions (`libs/core/customer-decision/learning.ts`,
  *      pure, minimum sample sizes);
  *   3. unless `--dry-run`: the report
@@ -29,7 +30,7 @@
  * is not tenant-partitioned). No role is widened.
  */
 import * as path from 'node:path';
-import { withExecutionContext } from '@agent/core/authority';
+import { withStoreGrant } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
 import { withLockSync } from '@agent/core/foundation/lock-utils';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -130,7 +131,7 @@ function queueSuggestion(
   report: { date: string; ref: string }
 ): { candidate: 'created' | 'existing' | 'refused'; learning_id: string } {
   const subject = subjectLabel(suggestion);
-  const result = withExecutionContext(
+  const result = withStoreGrant(
     LEDGER_ROLE,
     () =>
       enqueueOperationalLearningCandidateOnce(
@@ -174,9 +175,7 @@ function queueSuggestion(
         },
         { supersedes: (latest) => isMaterialEvidenceChange(latest.metadata, suggestion) }
       ),
-    undefined,
-    tenant,
-    organizationId
+    { tenantSlug: tenant, organizationId }
   );
   if (!result) return { candidate: 'refused', learning_id: suggestion.learning_id };
   return { candidate: result.created ? 'created' : 'existing', learning_id: result.learning_id };

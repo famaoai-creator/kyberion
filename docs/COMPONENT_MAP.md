@@ -22,6 +22,8 @@ For a layer-oriented view of the concepts themselves, read:
 
 The Mission CLI binds the selected tenant for lifecycle commands and their cleanup. The shared authorization registry and operation preflight resolve operations, resources, and egress before execution. The approval store records decisions from the terminal and Concierge, and the Grant store verifies and consumes the decision when issuing a Grant. The [scope governance design](../knowledge/product/architecture/scope-governance-plane.md) describes where each check runs.
 
+`libs/core/governance/autonomous-loop-readiness.ts` reports operational blockers and learning warnings with a prioritized diagnostic. Within one process, callers can opt into a reasoning data-use restriction in `libs/core/reasoning/reasoning-egress-scope.ts`. The endpoint gate applies it across nested calls, and `libs/core/mission/mission-llm.ts` refuses direct profiles while that restriction is active.
+
 ```text
 Sovereign intent
   -> AGENTS.md governance and 5-phase lifecycle
@@ -263,6 +265,9 @@ The operations console does not directly own mission state. It delegates to:
 
 ### 5. Service binding and channel delivery
 
+- `libs/core/information-assets/collector.ts` (typed read-only collectors: `provider-gmail.ts`, `provider-calendar.ts` for Google Calendar meeting prep / follow-up windows, `provider-code-work.ts`; capture admission in `libs/core/service/service-capture-admission.ts`)
+- `libs/core/information-assets/work-preparation.ts` + `work-types.ts` (recipe preparation; provider-derived matter and source facts on every intake artifact)
+- `libs/core/information-assets/commitments.ts` (Commitment Loop: read-only projection of completed intake artifacts into owed / waiting commitments and the morning digest, `pnpm organization information-assets commitments`)
 - `libs/core/service/service-binding.ts`
 - `libs/core/service/service-binding-reader.ts` (governed connection reads; no execution authorization)
 - `libs/core/service/service-binding-registry.ts` (writes and tenant/project/action authorization)

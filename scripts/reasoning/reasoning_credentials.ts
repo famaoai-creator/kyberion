@@ -14,7 +14,6 @@ import {
   CREDENTIAL_SERVICES,
   credentialServiceBackends,
 } from '@agent/core/secret/credential-allocations';
-import { withExecutionContextAsync } from '@agent/core/authority';
 import { withSecretResolutionSession } from '@agent/core/foundation/secret-resolution-session';
 import { credentialExecutionIdentity } from '@agent/core/foundation/credential-binding';
 import { readJsonIfPresent, writeJson } from '@agent/core/foundation/json';
@@ -33,18 +32,6 @@ import {
   persistEnvValue,
   readPersistedEnvValue,
 } from './reasoning_backend_selection.js';
-
-function withCredentialAuthority<T>(run: () => T | Promise<T>): Promise<T> {
-  const identity = credentialExecutionIdentity();
-  return withExecutionContextAsync(
-    'secret_introduce',
-    run,
-    undefined,
-    identity.tenantSlug ?? '',
-    undefined,
-    { missionId: identity.missionId ?? null, taskId: identity.taskId ?? null }
-  );
-}
 
 /**
  * Proof location in the registered `api_verification` root:
@@ -187,7 +174,7 @@ async function runCredentialCommandImpl(
     let configured = false;
     let verified = false;
     try {
-      const key = await withCredentialAuthority(() => resolveReasoningApiKey(options.provider));
+      const key = await resolveReasoningApiKey(options.provider);
       configured = Boolean(key);
       const proof = readJsonIfPresent<Record<string, unknown>>(verificationPath(options.provider));
       const identity = credentialExecutionIdentity();
@@ -237,8 +224,9 @@ async function runCredentialCommandImpl(
     if (options.activate && (!model || !isReasoningApiModel(model)))
       throw new Error('Select a model or configure an existing model before activation.');
     const identity = descriptor.secret_refs![0]!;
-    const result = await withCredentialAuthority(() =>
-      runSecretCli(['introduce', identity.service_id, identity.secret_key, '--json'], { print })
+    const result = await runSecretCli(
+      ['introduce', identity.service_id, identity.secret_key, '--json'],
+      { print }
     );
     if (result.status !== 'applied') return 1;
     if (options.model && keys[0]) persistEnvValue(keys[0], options.model);
@@ -261,13 +249,11 @@ async function runCredentialCommandImpl(
     );
     return 0;
   }
-  const result = await withCredentialAuthority(() =>
-    verifyReasoningApiCredential({
-      provider: options.provider,
-      model: options.model!,
-      allowPaid: options.allowPaid,
-    })
-  );
+  const result = await verifyReasoningApiCredential({
+    provider: options.provider,
+    model: options.model!,
+    allowPaid: options.allowPaid,
+  });
   writeJson(verificationPath(options.provider), result);
   print(JSON.stringify(result));
   return result.status === 'success' ? 0 : 1;

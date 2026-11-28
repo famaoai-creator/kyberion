@@ -17,6 +17,7 @@ import {
   type TenantActivationProbeCheck,
 } from './tenant-activation.js';
 import { resolveTenant } from './tenant-registry.js';
+import { shellQuoteArg } from './tenant-governance.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '../secure-io.js';
 import { loadOrganizationProfileAtPath } from './organization-profile.js';
@@ -34,6 +35,7 @@ export interface TenantActivationProbeInput {
   tier?: StorageDataTier;
   nhiIds: string[];
   serviceIds: string[];
+  ownerId?: string;
   rootDir?: string;
 }
 
@@ -261,16 +263,55 @@ export async function runTenantActivationProbes(
     service_readiness: '--check-services',
     isolation_probe: '--check-isolation',
   };
-  const activateCommand = passed
-    ? [
-        'pnpm tenant:activation activate',
-        `--customer-slug ${input.customerSlug} --tenant-slug ${input.tenantSlug} --organization-id ${input.organizationId}`,
-        ...input.nhiIds.map((nhiId) => `--nhi-id ${nhiId}`),
-        ...TENANT_ACTIVATION_PROBE_CHECKS.map(
-          (check) => `${flags[check]} --probe-ref ${check}=${evidenceRef}`
-        ),
-        '--owner-id <human:owner> --apply --accept',
-      ].join(' ')
-    : null;
-  return { passed, evidence_ref: evidenceRef, results, activate_command: activateCommand };
+  const activation = resolveTenantActivation({
+    ...input,
+    checks: Object.fromEntries(
+      TENANT_ACTIVATION_PROBE_CHECKS.map((check) => [check, results[check].passed])
+    ),
+    probeRefs: Object.fromEntries(
+      TENANT_ACTIVATION_PROBE_CHECKS.filter((check) => results[check].passed).map((check) => [
+        check,
+        evidenceRef,
+      ])
+    ),
+  }).record;
+  const activateArgs =
+    activation.status === 'ready' && (!input.tier || input.tier === 'confidential')
+      ? [
+          'pnpm',
+          'tenant:activation',
+          'activate',
+          '--customer-slug',
+          input.customerSlug,
+          '--tenant-slug',
+          input.tenantSlug,
+          '--organization-id',
+          input.organizationId,
+          ...(input.rootDir ? ['--root-dir', input.rootDir] : []),
+          ...(input.ownerId ? ['--owner-id', activation.owner_id] : []),
+          ...input.nhiIds.flatMap((nhiId) => ['--nhi-id', nhiId]),
+          ...TENANT_ACTIVATION_PROBE_CHECKS.flatMap((check) => [
+            flags[check],
+            '--probe-ref',
+            `${check}=${evidenceRef}`,
+          ]),
+          '--apply',
+          '--accept',
+        ]
+      : null;
+  let activateCommand: string | null = null;
+  try {
+    activateCommand = activateArgs?.map(shellQuoteArg).join(' ') ?? null;
+  } catch {
+    // The argv form still supports platforms or paths the POSIX renderer rejects.
+  }
+  return {
+    passed,
+    evidence_ref: evidenceRef,
+    results,
+    activation_status: activation.status,
+    activation_blockers: activation.blockers,
+    activate_args: activateArgs,
+    activate_command: activateCommand,
+  };
 }

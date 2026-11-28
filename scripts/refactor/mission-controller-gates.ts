@@ -151,18 +151,13 @@ export async function gatePass(
     }
   };
 
-  const { parseMachineMissionGate, runMachineOnlyMissionGate } =
+  const { parseMachineMissionGate, requiresManualGateConfirmation, runMachineOnlyMissionGate } =
     await import('../mission/mission_machine_gate.js');
   const inspectStoredGate = (upperId: string, gateId: string) => {
     inspectActivation(gateId);
     const stored = readStoredMissionGate(upperId, gateId);
     if (!stored) throw new Error(`Stored gate definition missing: ${upperId}/${gateId}`);
-    if (
-      machineOnly &&
-      stored.definition.gate.checks.some(
-        (check) => check.kind === 'human_override' || check.kind === 'reviewer_approved'
-      )
-    ) {
+    if (machineOnly && stored.definition.gate.checks.some(requiresManualGateConfirmation)) {
       throw new Error(
         `Machine-only gate requires human or reviewer confirmation: ${upperId}/${gateId}`
       );

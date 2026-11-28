@@ -8,6 +8,12 @@ import {
   loadKnowledgeRankingWeightProposal,
   proposeKnowledgeRankingWeightRecalculation,
 } from '@agent/core/knowledge/knowledge-weight-recalculation';
+import {
+  captureSessionCorrection,
+  citePromotedKnowledgeForSession,
+  recallPromotedKnowledgeForSession,
+} from '@agent/core/knowledge';
+import type { MemoryScopeEnvelope } from '@agent/core/knowledge/memory-scope';
 import { pathResolver } from '@agent/core/path-resolver';
 import { recordHumanKnowledgeFeedback } from '@agent/core/knowledge/knowledge-feedback-loop';
 import { resolveTenant } from '@agent/core/organization/tenant-registry';
@@ -18,6 +24,9 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 
 const USAGE =
   'Usage: pnpm knowledge place --level <tenant|organization|project|mission|task|session|common|product|public> --slug <name> --title <title> --body <text> [--apply]\n       pnpm knowledge feedback --path <path> --verdict <useful|stale|wrong|not_useful>' +
+  '\n       pnpm knowledge recall --topic <text> [--session <id>] [--limit <n>] [--min-score <n>] [--tenant <slug>]' +
+  '\n       pnpm knowledge cite --used <csv> [--not-used <csv>] [--missing-topics <csv>] [--session <id>] [--result-id <id>] [--tenant <slug>]' +
+  '\n       pnpm knowledge capture-correction --text <text> [--session <id>] [--tenant <slug>] [--owner <nhi>] [--tier <public|confidential|personal>]' +
   '\n       pnpm knowledge weights recalculate --tenant <tenant-slug> [--min-events <n>] [--no-persist]' +
   '\n       pnpm knowledge weights apply --proposal <path> --approval-ref <ref> --approved-by <principal> [--dry-run]';
 
@@ -26,13 +35,107 @@ function flag(args: string[], name: string): string | undefined {
   return i >= 0 ? args[i + 1] : undefined;
 }
 
+function csvFlag(args: string[], name: string): string[] {
+  const raw = flag(args, name);
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+export function resolveCliSessionScope(args: string[]): MemoryScopeEnvelope {
+  const current = currentScope();
+  const requestedTenant = flag(args, '--tenant')?.trim();
+  if (requestedTenant) {
+    if (!isValidTenantSlug(requestedTenant)) {
+      throw new Error(`[SCOPE_CONTEXT_INVALID] Invalid --tenant '${requestedTenant}'.`);
+    }
+    if (current.tenant_slug && current.tenant_slug !== requestedTenant) {
+      throw new Error(
+        `[SCOPE_CONTEXT_MISMATCH] Bound tenant '${current.tenant_slug}' does not match --tenant '${requestedTenant}'.`
+      );
+    }
+  }
+  const requestedTier = flag(args, '--tier')?.trim();
+  if (requestedTier && !['public', 'confidential', 'personal'].includes(requestedTier)) {
+    throw new Error(`[SCOPE_CONTEXT_INVALID] Invalid --tier '${requestedTier}'.`);
+  }
+  const tenantSlug = requestedTenant || current.tenant_slug;
+  const tier =
+    (requestedTier as MemoryScopeEnvelope['tier'] | undefined) ||
+    (tenantSlug ? 'confidential' : current.tier);
+  const ownerNhi =
+    flag(args, '--owner')?.trim() || current.nhi_id || current.viewer_principal || undefined;
+  return {
+    ...current,
+    tier,
+    ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+    ...(ownerNhi ? { owner_nhi: ownerNhi } : {}),
+  };
+}
+
 export const main = defineScript({
   name: 'knowledge',
   flags: ['dry-run'],
-  run(context) {
+  async run(context) {
     const args = context.positional;
     if (args.length === 0 || args[0] === '--help' || args[0] === '-h' || args[0] === 'help') {
       context.print(USAGE);
+      return;
+    }
+    if (args[0] === 'recall') {
+      const topic = flag(args, '--topic')?.trim();
+      if (!topic) {
+        throw new Error(
+          '[MEMORY_LOOP_TOPIC_REQUIRED] Usage: pnpm knowledge recall --topic <text> [--session <id>] [--limit <n>] [--min-score <n>] [--tenant <slug>]'
+        );
+      }
+      const sessionId = flag(args, '--session')?.trim() || `cli-${nowIso().slice(0, 10)}`;
+      const limitRaw = flag(args, '--limit');
+      const minScoreRaw = flag(args, '--min-score');
+      const result = await recallPromotedKnowledgeForSession({
+        topic,
+        sessionId,
+        scope: resolveCliSessionScope(args),
+        recipientKind: 'cli_session',
+        ...(limitRaw !== undefined ? { limit: Number(limitRaw) } : {}),
+        ...(minScoreRaw !== undefined ? { minScore: Number(minScoreRaw) } : {}),
+      });
+      context.print(result);
+      return;
+    }
+    if (args[0] === 'cite') {
+      const sessionId = flag(args, '--session')?.trim() || `cli-${nowIso().slice(0, 10)}`;
+      const used = csvFlag(args, '--used');
+      const notUsed = csvFlag(args, '--not-used');
+      const missingTopics = csvFlag(args, '--missing-topics');
+      const result = citePromotedKnowledgeForSession({
+        sessionId,
+        used,
+        notUsed,
+        missingTopics,
+        scope: resolveCliSessionScope(args),
+        ...(flag(args, '--result-id') ? { resultId: flag(args, '--result-id') } : {}),
+      });
+      context.print(result);
+      return;
+    }
+    if (args[0] === 'capture-correction') {
+      const text = flag(args, '--text')?.trim();
+      if (!text) {
+        throw new Error(
+          '[MEMORY_LOOP_CORRECTION_REQUIRED] Usage: pnpm knowledge capture-correction --text <text> [--session <id>] [--tenant <slug>] [--owner <nhi>] [--tier <public|confidential|personal>]'
+        );
+      }
+      const sessionId = flag(args, '--session')?.trim() || `cli-${nowIso().slice(0, 10)}`;
+      const result = captureSessionCorrection({
+        text,
+        sessionId,
+        scope: resolveCliSessionScope(args),
+        surface: 'cli',
+      });
+      context.print(result);
       return;
     }
     if (args[0] === 'weights' && args[1] === 'recalculate') {

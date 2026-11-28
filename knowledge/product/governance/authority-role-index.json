@@ -83,7 +83,7 @@
       "tier_access": ["public", "confidential", "personal"]
     },
     "chronos_tenant_runner": {
-      "description": "Chronos tenant-scoped pipeline runner. Entered ONLY in the child process chronos spawns for a schedule discovered under knowledge/confidential/{tenant}/pipelines/ (and, in the daemon, synchronously while listing/reading that tenant's pipeline files), always bound to that tenant (KYBERION_TENANT / execution-scope tenant, KYBERION_TENANT_SCOPE_REQUIRED=1 in the child). Grants resolve through ${KYBERION_TENANT}, so reads are limited to the bound tenant's confidential root plus the tenant registry; knowledge landings go through ingest:commit (ingest_commit role); writes are limited to that tenant's audit/trace mirrors.",
+      "description": "Chronos tenant-scoped pipeline runner. Entered ONLY in the child process chronos spawns for a schedule discovered under knowledge/confidential/{tenant}/pipelines/ (and, in the daemon, synchronously while listing/reading that tenant's pipeline files), always bound to that tenant (KYBERION_TENANT / execution-scope tenant, KYBERION_TENANT_SCOPE_REQUIRED=1 in the child). Grants resolve through ${KYBERION_TENANT}, so reads are limited to the bound tenant's confidential root plus the tenant registry; knowledge landings go through ingest:commit (ingest_knowledge_store declared grant); writes are limited to that tenant's audit/trace mirrors.",
       "default_persona": "worker",
       "write_scopes": [],
       "scope_classes": ["operations_runtime", "audit"],
@@ -111,17 +111,6 @@
       "scope_classes": ["operations_runtime", "observability", "audit"],
       "allowed_actuators": ["process-actuator"],
       "tier_access": ["public"]
-    },
-    "decision_ledger": {
-      "description": "Decision-ledger write authority: appends and promotes decisions under the active tenant's knowledge/confidential/{tenant}/decisions/ and customers/ only.",
-      "default_persona": "analyst",
-      "write_scopes": [
-        "knowledge/confidential/${KYBERION_TENANT}/decisions/",
-        "knowledge/confidential/${KYBERION_TENANT}/customers/"
-      ],
-      "scope_classes": ["knowledge_core"],
-      "allowed_actuators": ["artifact-actuator"],
-      "tier_access": ["confidential"]
     },
     "designer": {
       "description": "Visual identity and UX authority for interaction design and design-system stewardship.",

@@ -135,8 +135,8 @@ function setup(recipeId = 'email.morning_triage') {
   };
 }
 describe('information intake work', () => {
-  it('declares twelve recipes and stable business identities across delivery ids', () => {
-    expect(recipes).toHaveLength(12);
+  it('declares fourteen recipes and stable business identities across delivery ids', () => {
+    expect(recipes).toHaveLength(14);
     const recipe = recipes[0];
     expect(informationAssetWorkKey(obs, recipe)).toBe(
       informationAssetWorkKey(

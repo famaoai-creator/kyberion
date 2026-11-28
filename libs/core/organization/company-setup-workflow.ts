@@ -379,13 +379,19 @@ export async function executeCompanySetup(
           receipt = {
             ...receipt,
             evidenceRef: result.evidence_ref,
-            probePassed: result.passed,
+            probePassed: result.activation_status === 'ready',
             probeCheckedAt: new Date().toISOString(),
-            probeSummary: Object.entries(result.results).map(
-              // No per-mode note on viewer_scope: every KYBERION_VIEWER_SCOPE mode
-              // denies out-of-scope tenant reads (warn also audits them).
-              ([key, value]) => key + ': ' + (value.passed ? 'passed' : 'needs attention')
-            ),
+            probeSummary: [
+              ...Object.entries(result.results).map(
+                // Viewer scope always denies out-of-scope reads, even in warn mode.
+                ([key, value]) => key + ': ' + (value.passed ? 'passed' : 'needs attention')
+              ),
+              ...(result.passed && result.activation_status === 'validating'
+                ? [
+                    'Activation prerequisites need attention. Check the organization binding, state and accountable owner.',
+                  ]
+                : []),
+            ],
           };
           const priorApproval = approvalSummary(receipt, auth);
           if (

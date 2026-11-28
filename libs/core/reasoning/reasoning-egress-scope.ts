@@ -1,5 +1,6 @@
 import type { StorageDataTier } from '../storage-layout.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { isIP } from 'node:net';
 import { createLogger } from '../logger.js';
 import { evaluateEgressPolicy } from '../governance/egress-policy.js';
 import {
@@ -52,6 +53,8 @@ const logger = createLogger('reasoning-egress');
 
 export type ReasoningTrainingUse =
   'local_only' | 'no_training' | 'zero_retention' | 'training_eligible';
+
+export type ReasoningTrainingUseCap = 'local_only' | 'no_training';
 
 interface ReasoningPayloadScopeBase {
   /** Tenant the material belongs to, when above public. */
@@ -122,6 +125,20 @@ export type ReasoningPayloadScope = PublicReasoningPayloadScope | NonPublicReaso
 export type ReasoningPayloadTier = ReasoningPayloadScope['tier'];
 
 const scopeStorage = new AsyncLocalStorage<ReasoningPayloadScope>();
+const trainingUseCapStorage = new AsyncLocalStorage<ReasoningTrainingUseCap>();
+
+/** Restrict data use across a unit of work, even when a child declares its own payload scope. */
+export function withReasoningTrainingUseCap<T>(cap: ReasoningTrainingUseCap, fn: () => T): T {
+  if (cap !== 'local_only' && cap !== 'no_training') {
+    throw new TypeError('Unsupported reasoning training-use cap');
+  }
+  const inherited = getReasoningTrainingUseCap();
+  return trainingUseCapStorage.run(inherited === 'local_only' ? inherited : cap, fn);
+}
+
+export function getReasoningTrainingUseCap(): ReasoningTrainingUseCap | undefined {
+  return trainingUseCapStorage.getStore();
+}
 
 /** Run `fn` with every reasoning send inside it governed by this scope. */
 export function withReasoningPayloadScope<T>(scope: ReasoningPayloadScope, fn: () => T): T {
@@ -129,7 +146,14 @@ export function withReasoningPayloadScope<T>(scope: ReasoningPayloadScope, fn: (
 }
 
 export function getReasoningPayloadScope(): ReasoningPayloadScope | undefined {
-  return scopeStorage.getStore();
+  const scope = scopeStorage.getStore();
+  const cap = getReasoningTrainingUseCap();
+  if (!cap || !scope) return scope;
+  const posture = effectiveReasoningTrainingUse(scope);
+  if (cap === 'no_training' && (posture === 'local_only' || posture === 'zero_retention')) {
+    return scope;
+  }
+  return { ...scope, training_use: cap };
 }
 
 export function isLocalReasoningBackend(backendName: string): boolean {
@@ -423,13 +447,34 @@ function assertTaskBackendPolicy(backendName: string, local: boolean): void {
 }
 
 export function assertReasoningEgressAllowed(backendName: string): void {
-  assertTaskBackendPolicy(backendName, isLocalReasoningBackend(backendName));
-  assertSandboxNetworkAllowed(reasoningBackendEndpoint(backendName));
+  const localBackend = isLocalReasoningBackend(backendName);
+  const endpoint = reasoningBackendEndpoint(backendName);
+  assertTaskBackendPolicy(backendName, localBackend);
+  assertSandboxNetworkAllowed(endpoint);
   // This overload has no endpoint information. The endpoint-aware path below
-  // is the enforcement point for configurable adapters; preserve the
-  // name-only local declaration for callers that only have a backend id.
-  if (isLocalReasoningBackend(backendName)) return;
-  assertReasoningEgressAllowedAtEndpoint(backendName, reasoningBackendEndpoint(backendName));
+  // enforces that a configurable local adapter really uses a loopback address.
+  // A local name alone cannot establish a no-training claim under a strict cap.
+  if (localBackend && getReasoningTrainingUseCap()) {
+    throw new ReasoningEgressDeniedError(
+      `Local backend ${backendName} requires an explicit loopback endpoint under a training-use cap`
+    );
+  }
+  if (localBackend) return;
+  assertReasoningEgressAllowedAtEndpoint(backendName, endpoint);
+}
+
+function isLoopbackReasoningEndpoint(endpoint: string): boolean {
+  try {
+    const { hostname, protocol } = new URL(endpoint);
+    if (protocol !== 'http:' && protocol !== 'https:') return false;
+    return (
+      hostname === 'localhost' ||
+      hostname === '[::1]' ||
+      (isIP(hostname) === 4 && hostname.startsWith('127.'))
+    );
+  } catch {
+    return false;
+  }
 }
 
 /** Apply the same gate when an adapter has a configurable provider endpoint. */
@@ -437,12 +482,15 @@ export function assertReasoningEgressAllowedAtEndpoint(
   backendName: string,
   endpoint: string
 ): void {
-  assertTaskBackendPolicy(backendName, isLocalReasoningEndpoint(endpoint));
+  const cap = getReasoningTrainingUseCap();
+  const localEndpoint = cap
+    ? isLoopbackReasoningEndpoint(endpoint)
+    : isLocalReasoningEndpoint(endpoint);
+  assertTaskBackendPolicy(backendName, localEndpoint);
   assertSandboxNetworkAllowed(endpoint);
-  const localEndpoint = isLocalReasoningEndpoint(endpoint);
   if (isLocalReasoningBackend(backendName) && !localEndpoint) {
     throw new ReasoningEgressDeniedError(
-      `[REASONING_EGRESS_DENIED] Local-only backend ${backendName} must use a local endpoint: ${endpoint}`
+      `Local-only backend ${backendName} must use a local endpoint${cap ? ' (loopback under a training-use cap)' : ''}: ${endpoint}`
     );
   }
   const scope = getReasoningPayloadScope();
@@ -457,6 +505,16 @@ export function assertReasoningEgressAllowedAtEndpoint(
       throw new ReasoningEgressDeniedError(
         `[REASONING_EGRESS_SCOPE_REQUIRED] ${backendName} endpoint is not approved without an explicit payload scope: ${decision.reason}`
       );
+    }
+    // Retain the no-scope domain gate above, then apply the enclosing restriction
+    // even if a caller did not declare a payload scope for this send.
+    if (cap === 'local_only') {
+      throw new ReasoningEgressDeniedError(
+        `training_use 'local_only' forbids sending to external backend ${backendName}`
+      );
+    }
+    if (cap === 'no_training') {
+      assertNoTrainingAttested(backendName, { tier: 'public', training_use: cap });
     }
     return;
   }

@@ -1138,7 +1138,7 @@ export function validateWritePermission(
     isProtectedStorageFloorTier(partitionedRuntimeStateTierInPath(relativePath))
   ) {
     // An authority role granted this runtime partition by its real path (e.g.
-    // credential_allocation_manager → runtime/grants/confidential/${KYBERION_TENANT}/)
+    // credential_allocation_store → runtime/grants/confidential/${KYBERION_TENANT}/)
     // is matched before the knowledge-path projection, which no such grant can match.
     // Only grants naming a state root itself count; a broad ancestor such as
     // `active/shared/runtime/` must not reach tier data. Inside an exact
@@ -1487,7 +1487,7 @@ function ledgerRoleReadGrant(
     if (typeof pattern !== 'string') return false;
     const expanded = expandPolicyPath(pattern, missionId, identity.tenantSlug);
     if (expanded === null) return false;
-    // Durable-state roots (e.g. grants → credential_allocation_manager) are
+    // Durable-state roots (e.g. grants → credential_allocation_store) are
     // tier-partitioned the same way and admit the same explicit root grants —
     // except inside an exact resource ceiling, where scoped authorizers
     // (storeGrantAuthorizes / capability checks) are the only grant path and an

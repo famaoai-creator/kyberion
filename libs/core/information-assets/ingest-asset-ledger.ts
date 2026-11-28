@@ -86,8 +86,9 @@ function ingestAssetCatalog(filePath: string): GovernedCatalog<IngestAssetRecord
  *
  * `knowledgeRoot` carries a tenant knowledge root the caller already resolved
  * through the tenant registry. A narrowly-scoped writer (ingest:commit runs
- * under the `ingest_commit` role, which cannot read the personal-tier tenant
- * profiles) passes it so ledger access never re-reads the registry.
+ * under the `ingest_knowledge_store` declared grant, which cannot read the
+ * personal-tier tenant profiles) passes it so ledger access never re-reads
+ * the registry.
  */
 export type IngestLedgerPathOptions = TenantRegistryPathOptions & { knowledgeRoot?: string };
 

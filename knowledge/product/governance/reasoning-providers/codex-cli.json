@@ -35,6 +35,7 @@
       "endpoint": "https://api.openai.com",
       "egress_provider_id": "codex",
       "cli": {
+        "account_probe": true,
         "binary": "codex",
         "version_args": ["--version"],
         "help_args": ["--help"],

@@ -1270,6 +1270,42 @@
       "subsystem": "reasoning"
     },
     {
+      "name": "KYBERION_CURSOR_SDK_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Model id for the Cursor SDK reasoning backend (cursor-sdk); defaults to composer-2.5. List valid ids with Cursor.models.list().",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_CURSOR_SDK_NATIVE_SYSTEM_PROMPT",
+      "category": "runtime",
+      "type": "boolean",
+      "required": false,
+      "description": "Send the system prompt through the Cursor SDK native systemPrompt option (cursor-sdk) for stateless calls; continued conversations (context_mode) always fold it into the conversation messages instead (first message, and again whenever it changes). Off by default: accounts without the feature reject the run only after ~20s of SDK retries; the default folds the system prompt into the user message.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_CURSOR_SDK_SESSION_IDLE_TTL_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Idle time in milliseconds after which the cursor-sdk backend releases a continued conversation (context_mode fresh/continue); the default is 900000 (15 minutes). 0 disables the idle release.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_CURSOR_SDK_TIMEOUT_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Optional wall-clock timeout in milliseconds for a single cursor-sdk reasoning call (covers agent create, send and wait); leave unset to use the governed default of 300000 (5 minutes).",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
       "name": "KYBERION_CUSTOMER",
       "category": "runtime",
       "type": "string",

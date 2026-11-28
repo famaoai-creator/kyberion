@@ -1,6 +1,13 @@
 import * as path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { withExecutionContext } from '@agent/core/authority';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeRmSync } from '@agent/core/secure-io';
+import { writeTenantProfile } from '@agent/core/organization/tenant-registry';
 import { parseArgs, run } from './onboarding_context.js';
+
+const fixtureRoot = pathResolver.sharedTmp('internal-organization-onboarding-test');
+afterEach(() => safeRmSync(fixtureRoot, { recursive: true, force: true }));
 
 describe('onboarding_context CLI', () => {
   it('routes help output through the injected printer', () => {
@@ -51,5 +58,42 @@ describe('onboarding_context CLI', () => {
   it('resolves an explicit root directory for hermetic execution', () => {
     const parsed = parseArgs(['show', '--root-dir', './fixture-root', '--json']);
     expect(parsed.rootDir).toBe(path.resolve('./fixture-root'));
+  });
+
+  it('plans an internal organization without a customer stance or a write', () => {
+    const args = [
+      'organization',
+      '--tenant-slug',
+      'internal-team',
+      '--organization-id',
+      'ops',
+      '--root-dir',
+      fixtureRoot,
+      '--json',
+    ];
+    writeTenantProfile(
+      {
+        tenant_slug: 'internal-team',
+        tenant_id: 'internal-team',
+        display_name: 'Internal Team',
+        status: 'active',
+        assigned_role: 'owner',
+      },
+      { rootDir: fixtureRoot }
+    );
+    const result: unknown[] = [];
+    run(args, (output) => result.push(output));
+    expect(JSON.parse(String(result[0]))).toMatchObject({
+      tenant_slug: 'internal-team',
+      organization_id: 'ops',
+      organization_status: 'missing',
+      next_action: { kind: 'preview_organization_init' },
+    });
+    expect(safeExistsSync(path.join(fixtureRoot, 'active/organizations'))).toBe(false);
+    expect(safeExistsSync(path.join(fixtureRoot, 'knowledge/personal/stances'))).toBe(false);
+    expect(() => run([...args, '--apply'])).toThrow(/read-only/);
+    expect(() =>
+      withExecutionContext('sovereign_concierge', () => run(args), undefined, 'other-tenant')
+    ).toThrow(/does not match the current tenant scope/);
   });
 });

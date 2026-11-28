@@ -40,7 +40,7 @@
     },
     {
       "op": "commit",
-      "description": "DA-05 explicit ingest ceremony: lands a normalized knowledge card inside the tenant knowledge root (fail-closed path guard, ingest_commit authority role) and appends the append-only asset ledger record; re-ingests of the same source become supersede versions",
+      "description": "DA-05 explicit ingest ceremony: lands a normalized knowledge card inside the tenant knowledge root (fail-closed path guard, ingest_knowledge_store declared grant) and appends the append-only asset ledger record; re-ingests of the same source become supersede versions",
       "platforms": ["darwin", "linux"],
       "effect": "write"
     },

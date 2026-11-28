@@ -14,6 +14,12 @@
  *
  *   pnpm env:bootstrap --manifest meeting-participation-runtime --apply --force
  *     # ↑ also install operator-confirmed ones (brew install, npm add).
+ *
+ *   pnpm env:bootstrap --manifest meeting-participation-runtime --apply --mission MSN-…
+ *     # ↑ also write the setup receipt into the mission's own evidence dir.
+ *
+ *   pnpm env:bootstrap --manifest meeting-participation-runtime --verify [--mission MSN-…]
+ *     # ↑ readiness check from the newest setup receipt (shared or mission-scoped).
  */
 
 import {

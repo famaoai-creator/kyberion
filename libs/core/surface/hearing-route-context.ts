@@ -45,7 +45,7 @@ export function assertHearingLedgerServed(
 
 /**
  * The tenant decision-ledger reads a hearing step needs (`hearing-ledger-service.ts`),
- * supplied by a surface whose process may read the ledger (`decision_ledger`).
+ * supplied by a surface whose process may read the ledger (`decision_ledger_store` grant).
  * Absent, decision-ledger hearings are refused and no ledger is read.
  */
 export interface HearingLedgerReader {

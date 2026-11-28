@@ -1,10 +1,10 @@
 import * as yaml from 'js-yaml';
 import { fixedWindowLimiter } from '../foundation/rate-limit.js';
 import { createLogger } from '../logger.js';
-import { getFoundationIo } from '../foundation/io.js';
 import { isRecord } from '../foundation/text.js';
 import * as path from 'node:path';
 import { assertSafeRepositoryPath, pathResolver } from '../path-resolver.js';
+import { rawReadTextFile } from '../fs-primitives.js';
 
 const logger = createLogger('policy-engine');
 
@@ -191,9 +191,11 @@ class PolicyEngineImpl {
     let content: string;
     try {
       safePolicyPath = assertSafeRepositoryPath(policyPath, { allowMissingLeaf: true });
-      content = getFoundationIo().readFile(safePolicyPath, {
-        label: 'agent policy file',
-      });
+      // The engine's own policy file is governance substrate, not agent I/O:
+      // reading it through the scoped persona fails closed whenever the lazy
+      // load lands inside a store-grant or otherwise narrow scope. Same
+      // substrate-read convention as tier-guard's readRepoFile.
+      content = rawReadTextFile(safePolicyPath);
     } catch (error: unknown) {
       logger.warn(
         `[POLICY_ENGINE] Policy file unavailable: ${error instanceof Error ? error.message : String(error)}`

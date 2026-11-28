@@ -76,6 +76,7 @@ export type ReasoningProviderCostTier = 'free' | 'metered';
 export const REASONING_PROVIDER_ADAPTERS = [
   'claude-cli',
   'claude-agent-sdk',
+  'cursor-sdk',
   'provider-cli',
   'anthropic-api',
   'openai-responses',
@@ -148,6 +149,7 @@ export interface ReasoningProviderCli {
   help_args?: readonly string[];
   bin_env_key?: string;
   discovery: boolean;
+  account_probe?: boolean;
   model_flag?: string;
   sandbox?: ReasoningProviderCliSandbox;
   install?: ReasoningProviderCliInstall;
@@ -588,6 +590,9 @@ function parseCli(value: unknown): ReasoningProviderCli | string {
       });
     }
   }
+  if (value.account_probe !== undefined && typeof value.account_probe !== 'boolean') {
+    return 'cli.account_probe must be a boolean';
+  }
   const sessionPrincipal = optionalString(value, 'session_principal', /^[a-z0-9][a-z0-9-]*$/u);
   if (!sessionPrincipal.ok) return 'cli.session_principal must be a lowercase name';
   const installPathMarkers = value.install_path_markers;
@@ -606,6 +611,7 @@ function parseCli(value: unknown): ReasoningProviderCli | string {
     ...(value.help_args ? { help_args: [...(value.help_args as string[])] } : {}),
     ...(binEnvKey.value ? { bin_env_key: binEnvKey.value } : {}),
     discovery: value.discovery,
+    ...(typeof value.account_probe === 'boolean' ? { account_probe: value.account_probe } : {}),
     ...(modelFlag.value ? { model_flag: modelFlag.value } : {}),
     ...(sandbox ? { sandbox } : {}),
     ...(install ? { install } : {}),

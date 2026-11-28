@@ -43,6 +43,7 @@ import {
   getPluginExecutionContext,
   PluginGrantDeniedError,
 } from '../shell/sandbox-policy.js';
+import { withStoreGrant } from '../authority.js';
 
 /**
  * Sovereign Secret Guard v1.5 [AUTHORITY ENABLED]
@@ -202,10 +203,12 @@ function _connectionPath(serviceId: string): string {
 
 function _loadConnectionDocument(serviceId: string): Record<string, any> {
   const fullPath = _connectionPath(serviceId);
-  if (!safeExistsSync(fullPath)) return {};
+  if (!withStoreGrant('personal_connections_store', () => safeExistsSync(fullPath))) return {};
   let parsed: unknown;
   try {
-    parsed = readSensitiveJson<unknown>(fullPath);
+    parsed = withStoreGrant('personal_connections_store', () =>
+      readSensitiveJson<unknown>(fullPath)
+    );
   } catch (_) {
     return {};
   }
@@ -388,7 +391,9 @@ function resolveGuardedSecret(
   if (!value) {
     try {
       const secrets = parseSecretRecord(
-        readSensitiveJson<unknown>(safeSecretPath(SECRETS_FILE)),
+        withStoreGrant('secret_vault_store', () =>
+          readSensitiveJson<unknown>(safeSecretPath(SECRETS_FILE))
+        ),
         'vault secrets'
       );
       const candidate = secrets?.[key] ?? secrets?.[storedKey];
@@ -485,30 +490,32 @@ export const storeConnectionDocument = (
   const existing = _loadConnectionDocument(serviceId);
   const next = { ...existing, ...patch };
 
-  if (safeExistsSync(fullPath) && options.backup !== false) {
-    // Back up the raw previous bytes: an encrypted document must never gain
-    // a plaintext .bak sibling.
-    const backupPath = safeSecretPath(`${fullPath}.bak`);
-    safeWriteFile(backupPath, safeReadFile(fullPath, { encoding: 'utf8' }) as string, {
-      mode: 0o600,
-    });
+  withStoreGrant('personal_connections_store', () => {
+    if (safeExistsSync(fullPath) && options.backup !== false) {
+      // Back up the raw previous bytes: an encrypted document must never gain
+      // a plaintext .bak sibling.
+      const backupPath = safeSecretPath(`${fullPath}.bak`);
+      safeWriteFile(backupPath, safeReadFile(fullPath, { encoding: 'utf8' }) as string, {
+        mode: 0o600,
+      });
+      try {
+        safeFsyncFile(backupPath);
+      } catch (_) {
+        /* best-effort fsync */
+      }
+    }
+
+    const serialized =
+      resolveSecretEncryptionMode() === 'none'
+        ? JSON.stringify(next, null, 2)
+        : JSON.stringify(encryptConnectionDocument(next), null, 2);
+    safeWriteFile(fullPath, serialized + '\n', { mode: 0o600 });
     try {
-      safeFsyncFile(backupPath);
+      safeFsyncFile(fullPath);
     } catch (_) {
       /* best-effort fsync */
     }
-  }
-
-  const serialized =
-    resolveSecretEncryptionMode() === 'none'
-      ? JSON.stringify(next, null, 2)
-      : JSON.stringify(encryptConnectionDocument(next), null, 2);
-  safeWriteFile(fullPath, serialized + '\n', { mode: 0o600 });
-  try {
-    safeFsyncFile(fullPath);
-  } catch (_) {
-    /* best-effort fsync */
-  }
+  });
 
   const serviceName = _sanitizeServiceId(serviceId).toUpperCase();
   _clearServiceSecrets(serviceName);

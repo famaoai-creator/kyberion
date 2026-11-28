@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { withExecutionContext as initialContext } from '@agent/core/authority';
+import { withExecutionContext as initialContext, withStoreGrant } from '@agent/core/authority';
 import { rootDir } from '@agent/core/path-resolver';
 import * as initialIO from '@agent/core/secure-io';
 
@@ -193,11 +193,10 @@ describe('customer-decision tenant templates (HR-01, real paths)', () => {
       'ja',
     ])) as { agenda_id: string; has_objective?: boolean };
     expect(drafted.has_objective).toBe(true);
-    const agenda = initialContext(
-      'decision_ledger',
+    const agenda = withStoreGrant(
+      'decision_ledger_store',
       () => core.readAgenda({ tenantSlug: TENANT, caseId: 'case-hr01' }, drafted.agenda_id),
-      undefined,
-      TENANT
+      { tenantSlug: TENANT }
     );
     expect(agenda).toMatchObject({
       title: '要件レビュー',
@@ -210,7 +209,9 @@ describe('customer-decision tenant templates (HR-01, real paths)', () => {
     expect(agenda?.entries.map((entry) => entry.question)).toEqual(['申請承認は何段階ですか？']);
     // The template directory is never a case.
     expect(
-      initialContext('decision_ledger', () => core.listTenantCaseIds(TENANT), undefined, TENANT)
+      withStoreGrant('decision_ledger_store', () => core.listTenantCaseIds(TENANT), {
+        tenantSlug: TENANT,
+      })
     ).toEqual(['case-hr01']);
   });
 

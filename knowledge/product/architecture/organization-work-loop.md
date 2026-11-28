@@ -370,6 +370,34 @@ adapt their authorized records into this same projection rather than create a co
 Binding verification to immutable artifact versions remains the responsibility of existing
 review receipts; this projection alone does not establish that binding.
 
+### 9.3 Unattended execution under standing authority
+
+An unattended run can delegate, verify and reach a terminal result under existing
+authority without requesting a human decision during that run. Record terminal
+state, outcome verification and the number of human decisions independently.
+An unmet criterion remains visible even if the run terminates on schedule.
+
+| Boundary                  | Evidence required for an unattended run                                                                                                                                                                                     |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Admission and action      | Bind the applicable Charter and Grant to the mission. Check scope, destination, budget, expiry and revocation at each governed action. Each child receives a subset of that authority.                                      |
+| Outcome and delegation    | Persist the outcome criteria and fallback policy. Link each WorkItem claim, result and accepted artifact to the same mission and contract revision.                                                                         |
+| Verification and recovery | Bind verifier identity and evidence to the exact artifact revision. Reconcile a lost response before retrying an effect. Continue unrelated WorkItems if one becomes ineligible, and report unmet criteria at the deadline. |
+| Model data use            | Carry the chosen restriction to each reasoning boundary, including fallback, review, compaction and distillation. A worker that cannot prove the restriction must refuse the affected send.                                 |
+| Feedback                  | Retain operational evidence under its existing scope. Track improvements by delivery, reported use and measured outcome. A knowledge record does not carry execution authority.                                             |
+
+The first onboarding rehearsal uses public synthetic inputs, a report worker and a
+separate verifier. Functional acceptance requires receipts from both under a
+single mission ID and zero human approval requests during the run. Reliability
+acceptance requires recovery after worker interruption and no duplicate effect
+after replay. The onboarding result shows the actual model, verification status,
+and the next check for any blocked step.
+
+The machine-gate preview assesses declared gate checks. The runtime readiness
+diagnostic reports operating and learning signals. The process-local reasoning
+restriction applies through endpoint-gated backends. A complete rehearsal also
+needs persisted model posture across worker boundaries and proof of terminal
+completion. The current shadow mandate supplies planning evidence only.
+
 ## 10. Companion Documents
 
 - `knowledge/product/architecture/enterprise-operating-kernel.md`

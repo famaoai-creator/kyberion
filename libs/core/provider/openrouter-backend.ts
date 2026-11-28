@@ -55,7 +55,10 @@ import {
   runStructuredReasoningOp,
   structuredReasoningSpecs,
 } from '../reasoning/structured-reasoning.js';
-import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning/reasoning-egress-scope.js';
+import {
+  assertReasoningEgressAllowedAtEndpoint,
+  getReasoningTrainingUseCap,
+} from '../reasoning/reasoning-egress-scope.js';
 import type { ReasoningToolName } from '../reasoning/reasoning-route-resolver.js';
 import {
   markDelegationExecutionStarted,
@@ -429,6 +432,7 @@ export class OpenRouterBackend implements ReasoningBackend {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
+      ...(getReasoningTrainingUseCap() ? { redirect: 'error' } : {}),
       signal: opts.signal ?? buildAbortSignal(this.timeoutMs),
     });
 

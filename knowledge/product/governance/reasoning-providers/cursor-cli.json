@@ -9,7 +9,7 @@
         "reasoning": true,
         "structured_output": true,
         "abort": true,
-        "session_continuity": false,
+        "session_continuity": true,
         "input_modalities": ["text"]
       },
       "env_keys": ["CURSOR_API_KEY", "CURSOR_CLI", "CURSOR_AGENT", "KYBERION_CURSOR_CLI_BIN"],
@@ -34,6 +34,7 @@
       "egress_provider_id": "cursor",
       "model_env_keys": ["KYBERION_CURSOR_CLI_MODEL"],
       "cli": {
+        "account_probe": true,
         "binary": "cursor-agent",
         "version_args": ["--version"],
         "help_args": ["--help"],

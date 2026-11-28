@@ -7,6 +7,8 @@
  *   - state, ledger and floor roots have typed registrations and retention references;
  *   - every store-scoped authority role (`*_store`, `*_writer`, `*_reader`) is
  *     listed on each entry its security-policy paths reach, and nowhere else;
+ *   - every declared store grant (`security-policy.json store_grants`) is listed
+ *     under `grants` on each entry its allow paths reach, and nowhere else;
  *   - a legacy-move entry names an existing replacement;
  *   - the number of unscoped-legacy entries only goes down (baseline).
  * It reads the catalog; tier-guard does not consume it yet.
@@ -37,6 +39,7 @@ export interface StoreEntry {
   status: 'active' | 'planned' | 'legacy-move';
   moves_to?: string;
   legacy_roles?: string[];
+  grants?: string[];
   registration?: StoreRootRegistration;
   tiers?: readonly string[];
 }
@@ -123,6 +126,7 @@ export function owningStore(stores: StoreEntry[], policyPath: string): StoreEntr
 export function checkStoreCatalog(
   catalog: StoreCatalog,
   roles: RolePermissions,
+  grants: RolePermissions,
   baseline: { unscoped_legacy: number }
 ): { violations: string[]; unscoped: number } {
   const violations: string[] = [];
@@ -158,6 +162,28 @@ export function checkStoreCatalog(
     if (want.join(',') !== have.join(','))
       violations.push(
         `${store.id}: legacy_roles [${have.join(', ')}] should be [${want.join(', ')}] (from ${POLICY})`
+      );
+  }
+  const expectedGrants = new Map<string, Set<string>>();
+  for (const [grant, permissions] of Object.entries(grants)) {
+    for (const raw of [...(permissions.allow_read ?? []), ...(permissions.allow_write ?? [])]) {
+      const policyPath = normalizePolicyPath(raw);
+      const store = owningStore(stores, policyPath);
+      if (!store) {
+        violations.push(`${grant}: grant path ${raw} reaches no catalog store`);
+        continue;
+      }
+      (expectedGrants.get(store.id) ?? expectedGrants.set(store.id, new Set()).get(store.id)!).add(
+        grant
+      );
+    }
+  }
+  for (const store of stores) {
+    const want = [...(expectedGrants.get(store.id) ?? [])].sort();
+    const have = [...(store.grants ?? [])].sort();
+    if (want.join(',') !== have.join(','))
+      violations.push(
+        `${store.id}: grants [${have.join(', ')}] should be [${want.join(', ')}] (from ${POLICY} store_grants)`
       );
   }
   const unscoped = stores.filter((store) => store.custody.kind === 'unscoped-legacy').length;
@@ -206,14 +232,17 @@ export const runCheckStoreCatalog = defineScript({
           ...registrationViolations.map((line) => `- ${line}`),
         ].join('\n')
       );
-    const policy = readSafeJsonFile<{ authority_role_permissions?: RolePermissions }>(
-      pathResolver.rootResolve(POLICY),
-      'security policy'
-    );
+    const policy = readSafeJsonFile<{
+      authority_role_permissions?: RolePermissions;
+      store_grants?: RolePermissions;
+    }>(pathResolver.rootResolve(POLICY), 'security policy');
     const baselinePath = resolveCiGateBaselinePath('store-catalog');
     const roles = policy.authority_role_permissions ?? {};
+    const grants = policy.store_grants ?? {};
     if (context.unknownFlags.includes('--write-baseline')) {
-      const { unscoped } = checkStoreCatalog(catalog, roles, { unscoped_legacy: Infinity });
+      const { unscoped } = checkStoreCatalog(catalog, roles, grants, {
+        unscoped_legacy: Infinity,
+      });
       withExecutionContext('ecosystem_architect', () =>
         writeJson(baselinePath, { version: 1, unscoped_legacy: unscoped })
       );
@@ -224,7 +253,7 @@ export const runCheckStoreCatalog = defineScript({
       baselinePath,
       'store catalog baseline'
     );
-    const report = checkStoreCatalog(catalog, roles, baseline);
+    const report = checkStoreCatalog(catalog, roles, grants, baseline);
     if (report.violations.length > 0) {
       throw new ScriptExitError(
         1,

@@ -47,6 +47,7 @@ const st = vi.hoisted(() => ({
   failRegistration: false,
   registrations: 0,
   probes: 0,
+  activationReady: true,
   requests: 0,
   applies: 0,
   firstWrites: 0,
@@ -120,6 +121,7 @@ vi.mock('./tenant-activation-probe.js', () => ({
     st.probes++;
     return {
       passed: true,
+      activation_status: st.activationReady ? 'ready' : 'validating',
       evidence_ref: 'server-probe',
       results: {
         viewer_scope: {
@@ -211,6 +213,7 @@ beforeEach(() => {
     failRegistration: false,
     registrations: 0,
     probes: 0,
+    activationReady: true,
     requests: 0,
     applies: 0,
     firstWrites: 0,
@@ -329,6 +332,20 @@ describe('company setup workflow mediation', () => {
     expect(st.requests).toBe(1);
     expect(st.applies).toBe(0);
   });
+  it('keeps activation approval unavailable when the probes pass but activation is blocked', async () => {
+    await register();
+    st.activationReady = false;
+    const result = await executeCompanySetup(auth, { action: 'probe' }, principal);
+    expect(result.setup.canRequestActivation).toBe(false);
+    expect(result.setup.probeSummary).toContain(
+      'Activation prerequisites need attention. Check the organization binding, state and accountable owner.'
+    );
+    await expect(
+      executeCompanySetup(auth, { action: 'request_activation' }, principal)
+    ).rejects.toThrow('readiness');
+    expect(st.requests).toBe(0);
+  });
+
   it('summarizes the viewer scope probe without claiming warn mode leaves access open', async () => {
     await register();
     const probed = await executeCompanySetup(auth, { action: 'probe' }, principal);

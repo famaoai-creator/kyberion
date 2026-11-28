@@ -4936,6 +4936,10 @@
       "types": "./dist/provider/bundles/cursor-cli.d.ts",
       "default": "./dist/provider/bundles/cursor-cli.js"
     },
+    "./provider/bundles/cursor-sdk": {
+      "types": "./dist/provider/bundles/cursor-sdk.d.ts",
+      "default": "./dist/provider/bundles/cursor-sdk.js"
+    },
     "./provider/bundles/devin-cli": {
       "types": "./dist/provider/bundles/devin-cli.d.ts",
       "default": "./dist/provider/bundles/devin-cli.js"
@@ -5055,6 +5059,14 @@
     "./provider/cursor-cli-session-adapter": {
       "types": "./dist/provider/cursor-cli-session-adapter.d.ts",
       "default": "./dist/provider/cursor-cli-session-adapter.js"
+    },
+    "./provider/cursor-sdk-query": {
+      "types": "./dist/provider/cursor-sdk-query.d.ts",
+      "default": "./dist/provider/cursor-sdk-query.js"
+    },
+    "./provider/cursor-sdk-reasoning-backend": {
+      "types": "./dist/provider/cursor-sdk-reasoning-backend.d.ts",
+      "default": "./dist/provider/cursor-sdk-reasoning-backend.js"
     },
     "./provider/custody-provider-attestation-governance": {
       "types": "./dist/provider/custody-provider-attestation-governance.d.ts",

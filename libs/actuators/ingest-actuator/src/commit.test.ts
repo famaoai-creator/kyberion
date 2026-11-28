@@ -19,7 +19,7 @@ import {
   safeSymlinkSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { withExecutionContext } from '@agent/core/authority';
+import { withStoreGrant } from '@agent/core/authority';
 import { validateWritePermission } from '@agent/core/tier-guard';
 import { commitIngest, INGEST_COMMIT_ROLE } from './commit.js';
 import { dedupContent } from './dedup.js';
@@ -202,26 +202,34 @@ describe('ingest_commit security-policy grant scoping (DA-05 acceptance 1)', () 
       }) as string
     );
     // DA-06: the public grant is the narrow knowledge/public/ingest/ subtree
-    // (steward-approved landings only) — never knowledge/public/ wholesale.
-    expect(policy.authority_role_permissions.ingest_commit).toEqual({
-      allow_write: ['knowledge/confidential/', 'knowledge/public/ingest/'],
-    });
+    // (steward-approved landings only) — never knowledge/public/ wholesale. The
+    // ceremony's I/O runs under the declared tenant-bound store grant, not a role.
+    expect(policy.authority_role_permissions.ingest_commit).toBeUndefined();
+    const grant = policy.store_grants[INGEST_COMMIT_ROLE];
+    expect(grant.allow_write).toEqual([
+      'knowledge/confidential/${KYBERION_TENANT}/',
+      'knowledge/public/ingest/',
+    ]);
   });
 
-  it('knowledge/confidential/ writes are denied without the role and allowed under it', () => {
+  it('knowledge/confidential/ writes are denied without the grant and allowed inside it', () => {
     delete process.env.KYBERION_BASE_ROLE;
     process.env.MISSION_ROLE = 'unit_test_ingest_denied';
     const target = pathResolver.knowledge('confidential/acme-corp/reports/q1.md');
     expect(validateWritePermission(target).allowed).toBe(false);
-    const underRole = withExecutionContext(INGEST_COMMIT_ROLE, () =>
-      validateWritePermission(target)
-    );
-    expect(underRole.allowed).toBe(true);
+    const inGrant = <T>(fn: () => T): T =>
+      withStoreGrant(INGEST_COMMIT_ROLE, fn, { tenantSlug: 'acme-corp' });
+    expect(inGrant(() => validateWritePermission(target)).allowed).toBe(true);
     // The grant does not leak outside knowledge/confidential/.
-    const outside = withExecutionContext(INGEST_COMMIT_ROLE, () =>
+    const outside = inGrant(() =>
       validateWritePermission(pathResolver.knowledge('product/governance/anything.md'))
     );
     expect(outside.allowed).toBe(false);
+    // …and never another tenant's subtree.
+    const otherTenant = inGrant(() =>
+      validateWritePermission(pathResolver.knowledge('confidential/other-corp/reports/q1.md'))
+    );
+    expect(otherTenant.allowed).toBe(false);
   });
 });
 

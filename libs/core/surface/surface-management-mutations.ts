@@ -22,7 +22,8 @@ export {
 } from './surface-management-contract.js';
 /** Trusted HTTP mediator for four bounded, owner-authorized management commands. */
 import * as path from 'node:path';
-import { withExecutionContextAsync, resolveRole } from '../authority.js';
+import { withExecutionContextAsync, withStoreGrantAsync, resolveRole } from '../authority.js';
+import { isDeclaredStoreGrantName } from '../foundation/declared-store-grant.js';
 import { humanActor } from '../contracts/actor.js';
 import { withEntityLifecycleLockAsync } from '../organization/entity-lifecycle-lock.js';
 import { withConciergeManagementAccessAsync } from './concierge-management-access.js';
@@ -287,35 +288,36 @@ async function audit(
 ): Promise<void> {
   const role = resolveRole();
   if (!role) fail('runtime_unavailable', 503, 'Management runtime role is unavailable.');
-  await withExecutionContextAsync(
-    role,
-    () =>
-      auditChain.record({
-        agentId: auth.actorId,
-        actor: humanActor(auth.memberId),
-        action: 'surface.management.' + result,
-        operation: command.operation,
-        result,
-        correlationId: digest([auth.actorId, auth.tenantSlug, command.requestId]),
+  // A declared store grant name is re-entered the way its facade opens it
+  // (withStoreGrantAsync): it is never an assumable role, and the same grant
+  // bound to the same tenant is what the caller's I/O already runs under.
+  const audit = () =>
+    auditChain.record({
+      agentId: auth.actorId,
+      actor: humanActor(auth.memberId),
+      action: 'surface.management.' + result,
+      operation: command.operation,
+      result,
+      correlationId: digest([auth.actorId, auth.tenantSlug, command.requestId]),
+      tenantSlug: auth.tenantSlug,
+      scope: {
+        scope_kind: 'tenant',
+        tier: TIER,
+        tenant_slug: auth.tenantSlug,
+        organization_id: target.organizationId,
+        ...(target.projectId ? { project_id: target.projectId } : {}),
+      },
+      metadata: {
+        member_id: auth.memberId,
+        fields: Object.keys(command).filter((key) => ['name', 'purpose', 'summary'].includes(key)),
+      },
+    });
+  await (isDeclaredStoreGrantName(role)
+    ? withStoreGrantAsync(role, audit, {
         tenantSlug: auth.tenantSlug,
-        scope: {
-          scope_kind: 'tenant',
-          tier: TIER,
-          tenant_slug: auth.tenantSlug,
-          organization_id: target.organizationId,
-          ...(target.projectId ? { project_id: target.projectId } : {}),
-        },
-        metadata: {
-          member_id: auth.memberId,
-          fields: Object.keys(command).filter((key) =>
-            ['name', 'purpose', 'summary'].includes(key)
-          ),
-        },
-      }),
-    undefined,
-    auth.tenantSlug,
-    target.organizationId
-  );
+        organizationId: target.organizationId,
+      })
+    : withExecutionContextAsync(role, audit, undefined, auth.tenantSlug, target.organizationId));
 }
 export async function executeSurfaceManagementMutation(
   auth: SurfaceManagementAuthorization,

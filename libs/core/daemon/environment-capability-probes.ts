@@ -164,11 +164,15 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
       return { available: true };
     }
   }
-  const options = descriptors.map((descriptor) =>
-    descriptor.cli
+  const options = descriptors.map((descriptor) => {
+    // Only the keys that authenticate the backend belong in the hint — tunables
+    // in env_keys (timeouts, TTLs) would read as alternative auth paths.
+    const authKeys = descriptor.secret_refs?.flatMap((ref) => ref.env_keys);
+    const keys = authKeys?.length ? authKeys : descriptor.env_keys;
+    return descriptor.cli
       ? `${descriptor.mode} (\`${descriptor.cli.binary}\`)`
-      : `${descriptor.mode} (${descriptor.env_keys.join(' or ') || 'see setup'})`
-  );
+      : `${descriptor.mode} (${keys.join(' or ') || 'see setup'})`;
+  });
   return {
     available: false,
     reason: `no real reasoning backend reachable. Authenticate or configure one of: ${options.join(', ')}. Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.`,

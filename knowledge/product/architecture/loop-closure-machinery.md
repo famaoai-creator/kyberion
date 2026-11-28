@@ -80,7 +80,8 @@ L4 人間フィードバック 却下 → ask-why 1問(5カテゴリ) → イベ
 - **共有語彙**: `libs/core/contracts/rejection-reason.ts`(5カテゴリ + `normalizeRejectionReasonCategory`)。カテゴリを閉じているのは学習側の dedup を決定論化するため。
 - **機械由来のギャップ**(goal 不充足)は IL-04 が元から閉じている。L4 はそこに**人間由来の却下を同じ状態機械で合流**させた(新設なし)。
 - **会話中の自然な訂正の捕捉 (IL-05)**: `libs/core/knowledge/conversational-correction-learning.ts` が `surface-runtime-orchestrator` 上のスコープ付き会話ターンから「今後は〜して」「〜しないで」等の選好・境界ルールを `intent-phrase-lexicon.json` で検出し、レビュー可能な `MemoryCandidate` を生成する(権限・手順は自動変更しない)。
-- **記憶ループ健全性と自律ループ診断**: `libs/core/knowledge/memory-loop-health.ts` が `promoted / retrieved / used` と `loop_status` (`idle | delivery_open | usage_open | closed`) を計測し、`libs/core/governance/autonomous-loop-readiness.ts`（`pnpm tsx scripts/pr/pr_shadow.ts report --loop-readiness`）が heartbeat（active dot は `daemon_watchdog` と同じ `runtime.max_idle_wake_ms` を適用） / active dot / memory loop（`--tenant` 省略時は登録済みテナントを集約） / factory readiness を統合診断する。
+- **記憶ループ健全性と自律ループ診断**: `libs/core/knowledge/memory-loop-health.ts` が `promoted / retrieved / used` と `loop_status` (`idle | delivery_open | usage_open | closed`) を計測し、`libs/core/governance/autonomous-loop-readiness.ts`（`pnpm tsx scripts/pr/pr_shadow.ts report --loop-readiness`）が heartbeat（active dot は `daemon_watchdog` と同じ `runtime.max_idle_wake_ms` を適用） / active dot / memory loop（`--tenant` 省略時は登録済みテナントを集約） / factory readiness を統合診断する。また、外部 LLM CLI・MCP セッションは共通ファサード `libs/core/knowledge/memory-loop-session.ts`（`pnpm knowledge recall | cite | capture-correction` および MCP ツール `kyberion.knowledge.recall | cite | capture_correction`）から配信・利用・会話訂正を記録でき、内部自動ループ（`adf-repair-agent.ts` / `background-review-runner.ts`）も配信済み知識の `used` / `not_used` を `recordKnowledgeUsageFeedback` で閉ループ化する。
+- **確認順**: `--json` の `loop_readiness.diagnostics` で運用上のブロッカーと学習の注意点を判別できる。`next_check` は運用上のブロッカーを優先し、テキスト出力にも最初の確認先を表示する。`--tenant` は記憶・factory の対象を指定する。heartbeat と dot wake はワークスペースの運用診断として扱う。
 
 ## 主要な環境変数
 

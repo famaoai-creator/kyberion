@@ -28,6 +28,15 @@ describe('retired store role names (G2)', () => {
         PR_PUBLICATION_GRANT_ISSUANCE_RIGHT,
         RUN_MANIFEST_GATE_GRANT_ISSUANCE_RIGHT,
         'dot_lifecycle_writer',
+        // Store-only roles retired into declared store grants: the name is
+        // never assumable; its facade opens the grant instead.
+        'ops_alerts',
+        'run_baseline_check',
+        'credential_allocation_manager',
+        'credential_allocation_probe',
+        'secret_introduce',
+        'decision_ledger',
+        'ingest_commit',
       ].sort()
     );
   });

@@ -17,6 +17,10 @@ const allowedImporters = new Set([
   'libs/core/foundation/mission-scope-env.ts',
   'libs/core/path-resolver.ts',
   'libs/core/tier-guard.ts',
+  // The policy engine's lazy catalog load is the substrate the tier-guard
+  // itself consults — it must read policy files below the guard, else a first
+  // evaluation inside a store-grant scope fails closed (STORE_GRANT_REQUIRED).
+  'libs/core/governance/policy-engine.ts',
   // Policy-enforced snapshot wrapper delegates only its low-level file mechanics.
   'libs/core/secure-io.ts',
   'libs/core/secret/vault-mount.ts',

@@ -24,6 +24,7 @@ import {
   providerIdForReasoningIdentifier,
 } from '../provider/provider-egress-gate.js';
 import { resolveProviderCliCommand } from '../provider/provider-managed-env.js';
+import { getReasoningTrainingUseCap } from '../reasoning/reasoning-egress-scope.js';
 import type { TierLevel } from '../types.js';
 import { runGeminiCliQuery } from '../provider/gemini-cli-backend.js';
 import {
@@ -287,6 +288,7 @@ export function invokeShellProfile(
   profile: LlmProfile,
   options: { systemPrompt?: string } = {}
 ): string {
+  assertDirectProfileSupportsTrainingUseCap();
   const viaStdin = profile.prompt_via === 'stdin';
   if (viaStdin && profile.args.includes('{prompt}')) {
     throw new Error(
@@ -468,6 +470,7 @@ export function invokeLlm(
   policy?: LlmPolicyConfig,
   options: { egress?: LlmEgressScope } = {}
 ): string {
+  assertDirectProfileSupportsTrainingUseCap();
   const profile = resolveLlmConfig(purpose, policy);
   assertLlmProfileEgress(profile, purpose, options.egress);
   logger.info(`🤖 Invoking LLM: ${profile.command} (timeout: ${profile.timeout_ms || 120_000}ms)`);
@@ -579,6 +582,18 @@ export const DEFAULT_LLM_EGRESS_SCOPE: LlmEgressScope = Object.freeze({
 /** Runners that execute `profile.command` themselves (see registerDefaultStructuredRunners). */
 const SHELL_RUNNER_ADAPTERS = new Set(['shell-json', 'claude-cli', 'shell-claude-cli']);
 
+function directProfileTrainingUseDenial(): string | undefined {
+  const cap = getReasoningTrainingUseCap();
+  if (cap) {
+    return `Direct mission LLM profiles cannot enforce training_use '${cap}'; use a governed reasoning backend`;
+  }
+}
+
+function assertDirectProfileSupportsTrainingUseCap(): void {
+  const denial = directProfileTrainingUseDenial();
+  if (denial) throw new ProviderEgressDeniedError(denial);
+}
+
 /**
  * Egress-policy provider id for a profile — the provider that actually
  * receives the prompt. Shell runners execute `profile.command`, so the id
@@ -605,6 +620,8 @@ function checkLlmProfileEgress(
   purpose: string,
   egress: LlmEgressScope = DEFAULT_LLM_EGRESS_SCOPE
 ): { allowed: boolean; reason?: string } {
+  const denial = directProfileTrainingUseDenial();
+  if (denial) return { allowed: false, reason: denial };
   if (egress.dataTier === 'public') return { allowed: true };
   const provider = llmProfileProviderId(profile);
   const decision = checkProviderEgress({
@@ -663,6 +680,9 @@ export async function runAdaptiveStructuredLlmProfile<T>(
     egress?: LlmEgressScope;
   } = {}
 ): Promise<T> {
+  // Every candidate uses the same direct-profile boundary. Stop before probing
+  // executable availability or resolving a fallback under a strict cap.
+  assertDirectProfileSupportsTrainingUseCap();
   const { policy, systemPrompt, isCommandAvailable, egress } = options;
   const candidateNames = resolveCandidateProfileNames(purpose, policy);
   const profiles = policy?.profiles || {};

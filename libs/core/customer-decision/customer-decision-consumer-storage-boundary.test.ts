@@ -91,11 +91,10 @@ function agenda(tenant: string) {
 
 /** Seed a case as the operator would (the facade's decision_ledger writer). */
 function seedCase(tenant: string): void {
-  authority.withExecutionContext(
-    'decision_ledger',
+  authority.withStoreGrant(
+    'decision_ledger_store',
     () => store.writeAgenda({ tenantSlug: tenant, caseId: CASE }, agenda(tenant)),
-    'sovereign',
-    tenant
+    { tenantSlug: tenant }
   );
 }
 
@@ -105,8 +104,8 @@ function customerDecides(
   key = 'auth.method',
   value: unknown = 'sso'
 ): void {
-  authority.withExecutionContext(
-    'decision_ledger',
+  authority.withStoreGrant(
+    'decision_ledger_store',
     () =>
       ledger.appendDecisions(
         { tenantSlug: tenant, caseId: CASE },
@@ -129,8 +128,7 @@ function customerDecides(
         ],
         { caseId: CASE }
       ),
-    'sovereign',
-    tenant
+    { tenantSlug: tenant }
   );
 }
 
@@ -625,8 +623,8 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
         entry: Record<string, unknown>,
         extra: Record<string, unknown> = {}
       ) =>
-        authority.withExecutionContext(
-          'decision_ledger',
+        authority.withStoreGrant(
+          'decision_ledger_store',
           () =>
             store.writeAgenda(
               { tenantSlug: TENANT, caseId: CASE },
@@ -638,8 +636,7 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
                 ...extra,
               }
             ),
-          'sovereign',
-          TENANT
+          { tenantSlug: TENANT }
         );
       /** The facade's re-ask marker (only decision_ledger writes agendas). */
       const marker = (proposalId: string, by = 'user:alice') => ({
@@ -666,8 +663,8 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
         );
         const [proposalId] = held.hold_proposal_ids;
         putAgenda('agd-old00001', 'draft', { ...ENTRY, entry_id: proposalId });
-        authority.withExecutionContext(
-          'decision_ledger',
+        authority.withStoreGrant(
+          'decision_ledger_store',
           () => {
             const location = { tenantSlug: TENANT, caseId: CASE };
             const current = store.readConsumedDecisionLock(location, consumer)!;
@@ -685,8 +682,7 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
               ),
             });
           },
-          'sovereign',
-          TENANT
+          { tenantSlug: TENANT }
         );
         return { lock: readLock(), proposalId };
       }
@@ -879,15 +875,14 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
         expect(() =>
           writeLock({ ...lock, status: 'completed', completed_at: LATER, superseded: by })
         ).toThrow(/adds only superseded/u);
-        const superseded = authority.withExecutionContext(
-          'decision_ledger',
+        const superseded = authority.withStoreGrant(
+          'decision_ledger_store',
           () =>
             store.supersededConsumedDecisionLock(
               store.readConsumedDecisionLock({ tenantSlug: TENANT, caseId: CASE }, consumer)!,
               by
             ),
-          'sovereign',
-          TENANT
+          { tenantSlug: TENANT }
         );
         writeLock(superseded);
         expect(readLock().superseded).toEqual(by);
@@ -915,8 +910,8 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
         customerDecides(TENANT, 'RELEASE', 'release.go', { approved: true });
         // Stamp the release on the old link as the facade's store could (decision_ledger).
         const stamp = (status?: 'completed') =>
-          authority.withExecutionContext(
-            'decision_ledger',
+          authority.withStoreGrant(
+            'decision_ledger_store',
             () => {
               const location = { tenantSlug: TENANT, caseId: CASE };
               const current = store.readConsumedDecisionLock(location, consumer)!;
@@ -936,8 +931,7 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
                 ),
               });
             },
-            'sovereign',
-            TENANT
+            { tenantSlug: TENANT }
           );
         const relinkStamped = (current: LockJson) =>
           relinkTo(current, proposalId, 'agd-new00001', ({ resolved: _stale, ...p }) => ({

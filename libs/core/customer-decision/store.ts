@@ -22,7 +22,7 @@
  *
  * The respond journal stays beside the ledger (not on the runtime floor): it
  * guards the ledger records it pre-assigns, so it is written and read under
- * the same `decision_ledger` role, the same tenant scope and the same locks
+ * the same `decision_ledger_store` grant, the same tenant scope and the same locks
  * as those records, and it holds the same confidential data (the receipt).
  * It is removed when the run completes; a leftover record is a run that
  * `reconcileCase` must still finish, never stale cache.
@@ -804,9 +804,9 @@ export function listTenantCaseIds(tenantSlug: string): string[] {
  * `decisions/_templates/<template_id>.json`. Like `_reports`, the leading
  * underscore keeps the directory outside the case id grammar, so it is never
  * listed or resolved as a case, and the location inherits the case data's
- * tier, tenant scope, `decision_ledger` authority, backup and offboarding.
+ * tier, tenant scope, `decision_ledger_store` authority, backup and offboarding.
  * The records are raw here; `template.ts` validates them against the template
- * schema on read and write. Call as the tenant-bound ledger role.
+ * schema on read and write. Call as the tenant-bound ledger grant.
  */
 export const CUSTOMER_DECISION_TEMPLATES_DIR = '_templates';
 const TENANT_TEMPLATE_ID_PATTERN = /^[a-z][a-z0-9-]{0,80}$/u;

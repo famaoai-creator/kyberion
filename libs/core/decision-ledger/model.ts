@@ -242,12 +242,14 @@ export const DECISION_LEDGER_LAYOUT = {
 } as const;
 
 /**
- * Authority roles the ledger runs under. Both ledger reads and writes use the tenant-scoped
- * `decision_ledger` role; `memberLookup` is for the member registry, which is not ledger data.
+ * Store grant the ledger runs under: both ledger reads and writes open the
+ * tenant-bound `decision_ledger_store` grant (withStoreGrant, bound to the
+ * ledger's tenant); `memberLookup` is for the member registry, which is not
+ * ledger data.
  */
 export const DECISION_LEDGER_ROLES = {
-  write: 'decision_ledger',
-  read: 'decision_ledger',
+  write: 'decision_ledger_store',
+  read: 'decision_ledger_store',
   memberLookup: 'ecosystem_architect',
 } as const;
 

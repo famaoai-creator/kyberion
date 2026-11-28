@@ -249,6 +249,7 @@ describe('store catalog gate', () => {
         stray_reader: { allow_read: ['active/elsewhere/'] },
         mission_controller: { allow_write: ['active/elsewhere/'] },
       },
+      {},
       { unscoped_legacy: 0 }
     );
     expect(report.unscoped).toBe(1);
@@ -262,5 +263,33 @@ describe('store catalog gate', () => {
     );
     // non-store roles are not catalogued
     expect(report.violations.join('\n')).not.toContain('mission_controller');
+  });
+
+  it('projects declared store grants onto each store their allow paths reach', () => {
+    const stores = [
+      store('deals', 'knowledge/confidential/<tenant>/deals', {
+        grants: ['deal_grant_store'],
+      }),
+      store('tenant', 'knowledge/confidential/<tenant>', { grants: ['wrong_grant'] }),
+      store('scratch', 'active/shared/tmp/<tier>/<tenant>'),
+    ];
+    const grants = {
+      deal_grant_store: {
+        allow_read: ['knowledge/confidential/${KYBERION_TENANT}/deals/'],
+        allow_write: ['knowledge/confidential/${KYBERION_TENANT}/deals/'],
+      },
+      broad_grant_store: { allow_write: ['knowledge/confidential/${KYBERION_TENANT}/'] },
+      uncovered_grant_store: { allow_write: ['vault/elsewhere/'] },
+    };
+    const report = checkStoreCatalog({ stores }, {}, grants, { unscoped_legacy: 0 });
+    expect(report.violations).toEqual(
+      expect.arrayContaining([
+        'tenant: grants [wrong_grant] should be [broad_grant_store] (from knowledge/product/governance/security-policy.json store_grants)',
+        'uncovered_grant_store: grant path vault/elsewhere/ reaches no catalog store',
+      ])
+    );
+    // declared grants already listed correctly produce no violation
+    expect(report.violations.join('\n')).not.toContain('deals: grants');
+    expect(report.violations.join('\n')).not.toContain('scratch: grants');
   });
 });
